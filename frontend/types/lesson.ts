@@ -47,6 +47,8 @@ export interface LessonQuote {
   teacherId: string;
   createdAt?: string;
   updatedAt?: string;
+  teacher?: Teacher;
+  lessonRequest?: LessonRequest;
 }
 
 // Interface for confirmed lesson data

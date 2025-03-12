@@ -1,117 +1,70 @@
 // API client for making requests to the backend
 
-// Base API configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api/v1';
+import axios from 'axios';
 
-// Request method types
-type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+// Base API URL - in a real app, this would come from environment variables
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 
-// Generic request options
-interface RequestOptions<T = unknown> {
-  method: Method;
-  headers?: Record<string, string>;
-  body?: T;
-  params?: Record<string, string | number | boolean | undefined>;
-}
+// Create a custom axios instance
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: true, // Allow cookies
+  timeout: 10000, // 10 seconds timeout
+  headers: {
+    'Content-Type': 'application/json',
+  }
+});
 
-// API response structure
-interface ApiResponse<T> {
-  success: boolean;
-  message: string;
-  data?: T;
-  error?: string;
-}
-
-// Create query string from params
-const createQueryString = (params?: Record<string, string | number | boolean | undefined>): string => {
-  if (!params) return '';
-  
-  const queryParams = Object.entries(params)
-    .filter(([_, value]) => value !== undefined)
-    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
-  
-  return queryParams.length ? `?${queryParams.join('&')}` : '';
-};
-
-// Generic request function
-export async function request<TResponse, TBody = unknown>(
-  endpoint: string,
-  options: RequestOptions<TBody> = { method: 'GET' }
-): Promise<ApiResponse<TResponse>> {
-  try {
-    const { method, headers = {}, body, params } = options;
-    
-    // Build request URL with query parameters
-    const queryString = createQueryString(params);
-    const url = `${API_BASE_URL}${endpoint}${queryString}`;
-    
-    // Default headers
-    const defaultHeaders = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      ...headers
-    };
-    
-    // Get auth token if available
+// Add request interceptor to inject auth token
+apiClient.interceptors.request.use(
+  (config) => {
     const token = localStorage.getItem('auth_token');
     if (token) {
-      defaultHeaders['Authorization'] = `Bearer ${token}`;
+      config.headers.Authorization = `Bearer ${token}`;
     }
-    
-    // Prepare fetch options
-    const fetchOptions: RequestInit = {
-      method,
-      headers: defaultHeaders,
-      credentials: 'include',
-    };
-    
-    // Add body for non-GET requests
-    if (method !== 'GET' && body) {
-      fetchOptions.body = JSON.stringify(body);
-    }
-    
-    // Execute request
-    const response = await fetch(url, fetchOptions);
-    
-    // Parse JSON response
-    const data = await response.json();
-    
-    // Handle API error responses
-    if (!response.ok) {
-      return {
-        success: false,
-        message: data.message || 'An error occurred',
-        error: data.error || `Request failed with status ${response.status}`
-      };
-    }
-    
-    return data as ApiResponse<TResponse>;
-  } catch (error) {
-    console.error('API request failed:', error);
-    return {
-      success: false,
-      message: 'Failed to complete request',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    };
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
-}
+);
 
-// Convenience methods
-export const api = {
-  get: <T>(endpoint: string, params?: Record<string, string | number | boolean | undefined>) => 
-    request<T>(endpoint, { method: 'GET', params }),
+// Add response interceptor to handle token refreshing
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
     
-  post: <TResponse, TBody>(endpoint: string, body: TBody, params?: Record<string, string | number | boolean | undefined>) => 
-    request<TResponse, TBody>(endpoint, { method: 'POST', body, params }),
+    // If the error is 401 and we haven't retried yet
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        // Try to refresh the token
+        const response = await axios.post(
+          `${API_BASE_URL.replace('/api', '')}/api/auth/refresh-token`, 
+          {}, 
+          { withCredentials: true }
+        );
+        
+        // If we get a new token, update it and retry
+        if (response.data.accessToken) {
+          localStorage.setItem('auth_token', response.data.accessToken);
+          apiClient.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
+          originalRequest.headers.Authorization = `Bearer ${response.data.accessToken}`;
+          return apiClient(originalRequest);
+        }
+      } catch (refreshError) {
+        console.error('Token refresh failed:', refreshError);
+        // If refresh fails, redirect to login
+        localStorage.removeItem('auth_token');
+        window.location.href = '/auth';
+        return Promise.reject(refreshError);
+      }
+    }
     
-  put: <TResponse, TBody>(endpoint: string, body: TBody, params?: Record<string, string | number | boolean | undefined>) => 
-    request<TResponse, TBody>(endpoint, { method: 'PUT', body, params }),
-    
-  patch: <TResponse, TBody>(endpoint: string, body: TBody, params?: Record<string, string | number | boolean | undefined>) => 
-    request<TResponse, TBody>(endpoint, { method: 'PATCH', body, params }),
-    
-  delete: <T>(endpoint: string, params?: Record<string, string | number | boolean | undefined>) => 
-    request<T>(endpoint, { method: 'DELETE', params }),
-};
+    return Promise.reject(error);
+  }
+);
 
-export default api; 
+export default apiClient; 

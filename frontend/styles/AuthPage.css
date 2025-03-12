@@ -1,0 +1,46 @@
+.auth-page-container {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 2rem;
+}
+
+.auth-page-title {
+  color: #333;
+  margin-bottom: 2rem;
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.auth-tabs {
+  display: flex;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 0.8rem;
+  text-align: center;
+  font-weight: 600;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-size: 1rem;
+  color: #555;
+  transition: all 0.3s;
+}
+
+.auth-tab:hover {
+  color: #333;
+}
+
+.auth-tab.active {
+  color: #4a90e2;
+  border-bottom: 2px solid #4a90e2;
+}
+
+.auth-form-wrapper {
+  max-width: 600px;
+  margin: 0 auto;
+} 

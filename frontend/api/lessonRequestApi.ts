@@ -1,7 +1,17 @@
 import { LessonRequest, LessonType } from '../types/lesson';
+import apiClient from './apiClient';
 
 // Base API URL - in a real app, this would come from environment variables
 const API_BASE_URL = 'http://localhost:3001/api';
+
+// Helper function to get auth headers
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('auth_token');
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': token ? `Bearer ${token}` : '',
+  };
+};
 
 export interface CreateLessonRequestPayload {
   type: LessonType;
@@ -18,20 +28,8 @@ export interface CreateLessonRequestPayload {
  */
 export const createLessonRequest = async (data: CreateLessonRequestPayload): Promise<LessonRequest> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/lesson-requests`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to create lesson request');
-    }
-
-    return response.json();
+    const response = await apiClient.post('/lesson-requests', data);
+    return response.data;
   } catch (error) {
     console.error('Error creating lesson request:', error);
     throw error;
@@ -45,14 +43,8 @@ export const createLessonRequest = async (data: CreateLessonRequestPayload): Pro
  */
 export const getLessonRequestById = async (id: string): Promise<LessonRequest> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/lesson-requests/${id}`);
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to fetch lesson request');
-    }
-
-    return response.json();
+    const response = await apiClient.get(`/lesson-requests/${id}`);
+    return response.data;
   } catch (error) {
     console.error('Error fetching lesson request:', error);
     throw error;
@@ -66,14 +58,8 @@ export const getLessonRequestById = async (id: string): Promise<LessonRequest> =
  */
 export const getLessonRequestsByStudent = async (studentId: string): Promise<LessonRequest[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/lesson-requests/student/${studentId}`);
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to fetch student lesson requests');
-    }
-
-    return response.json();
+    const response = await apiClient.get(`/lesson-requests/student/${studentId}`);
+    return response.data;
   } catch (error) {
     console.error('Error fetching student lesson requests:', error);
     throw error;

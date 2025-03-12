@@ -10,6 +10,20 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// User Type enum for different types of users
+enum UserType {
+  STUDENT
+  TEACHER
+}
+
+// Authentication Method enum for different authentication methods
+enum AuthMethod {
+  PASSWORD
+  PIN
+  GOOGLE
+  // Add more methods as needed
+}
+
 // Teacher model for instructors
 model Teacher {
   id          String   @id @default(uuid())
@@ -18,7 +32,12 @@ model Teacher {
   email       String   @unique
   phoneNumber String
   dateOfBirth DateTime
-
+  password    String?  // Optional to allow for different auth methods
+  isActive    Boolean  @default(true)
+  
+  // Authentication related fields
+  authMethods AuthMethod[] @default([])
+  
   // Relations
   lessonQuotes             LessonQuote[]
   teacherLessonHourlyRates TeacherLessonHourlyRate[]
@@ -34,6 +53,11 @@ model Student {
   email       String   @unique
   phoneNumber String
   dateOfBirth DateTime
+  password    String?  // Optional to allow for different auth methods
+  isActive    Boolean  @default(true)
+  
+  // Authentication related fields
+  authMethods AuthMethod[] @default([])
 
   // Relations
   lessonRequests LessonRequest[]
@@ -111,4 +135,15 @@ model Lesson {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Model for storing refresh tokens
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  userType  UserType
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
 }

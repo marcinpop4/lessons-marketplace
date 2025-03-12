@@ -2,6 +2,7 @@ import pkg from '@prisma/client';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import bcryptjs from 'bcryptjs';
 
 // Load environment variables from .env file in the project root
 const __filename = fileURLToPath(import.meta.url);
@@ -46,8 +47,17 @@ function addToDate(date: Date, days: number, hours: number): Date {
   return newDate;
 }
 
+// Hash password function
+async function hashPassword(password: string): Promise<string> {
+  const saltRounds = 10;
+  return bcryptjs.hash(password, saltRounds);
+}
+
 async function main() {
   console.log('Starting database seeding...');
+
+  // Hash the common password "1234" once 
+  const hashedPassword = await hashPassword("1234");
 
   try {
     // Clear existing data
@@ -76,7 +86,12 @@ async function main() {
     const teachers = await Promise.all(
       teacherData.map(async (teacher) => {
         return prisma.teacher.create({
-          data: teacher
+          data: {
+            ...teacher,
+            password: hashedPassword,
+            authMethods: ['PASSWORD'],
+            isActive: true
+          }
         });
       })
     );
@@ -101,7 +116,12 @@ async function main() {
     const students = await Promise.all(
       studentData.map(async (student) => {
         return prisma.student.create({
-          data: student
+          data: {
+            ...student,
+            password: hashedPassword,
+            authMethods: ['PASSWORD'],
+            isActive: true
+          }
         });
       })
     );

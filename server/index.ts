@@ -7,12 +7,14 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import prisma from './prisma.js';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 
 // Import routes
 import lessonRequestRoutes from './routes/lessonRequestRoutes.js';
 import teacherRoutes from './routes/teacherRoutes.js';
 import lessonQuoteRoutes from './routes/lessonQuoteRoutes.js';
 import lessonRoutes from './routes/lessonRoutes.js';
+import authRoutes from './routes/auth/authRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -29,9 +31,15 @@ const PORT = process.env.PORT || 3001;
 app.use(helmet()); // Security headers
 app.use(compression()); // Compress responses
 app.use(morgan('combined')); // Logging
-app.use(cors()); // Cross-origin resource sharing
+app.use(cors({ 
+  origin: process.env.NODE_ENV === 'production' 
+    ? 'https://yourdomain.com' 
+    : ['http://localhost:3000', 'http://localhost:5173'],
+  credentials: true, // Allow cookies to be sent with requests
+})); 
 app.use(express.json()); // Parse JSON request body
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded request body
+app.use(cookieParser()); // Parse cookies
 
 // Database connection test
 app.get('/api/health', async (req, res) => {
@@ -47,6 +55,7 @@ app.get('/api/health', async (req, res) => {
 });
 
 // API routes
+app.use('/api/auth', authRoutes);
 app.use('/api/lesson-requests', lessonRequestRoutes);
 app.use('/api/teachers', teacherRoutes);
 app.use('/api/lesson-quotes', lessonQuoteRoutes);

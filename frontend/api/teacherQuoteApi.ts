@@ -1,7 +1,17 @@
 import { Teacher, LessonQuote, LessonType } from '../types/lesson';
+import apiClient from './apiClient';
 
 // Base API URL - in a real app, this would come from environment variables
 const API_BASE_URL = 'http://localhost:3001/api';
+
+// Helper function to get auth headers
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('auth_token');
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': token ? `Bearer ${token}` : '',
+  };
+};
 
 // Interface for teacher with hourly rate information
 export interface TeacherWithRates extends Teacher {
@@ -21,16 +31,11 @@ export const getAvailableTeachers = async (
   limit: number = 5
 ): Promise<TeacherWithRates[]> => {
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/teachers?lessonType=${lessonType}&limit=${limit}`
-    );
+    const response = await apiClient.get(`/teachers`, {
+      params: { lessonType, limit }
+    });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to fetch available teachers');
-    }
-
-    return response.json();
+    return response.data;
   } catch (error) {
     console.error('Error fetching available teachers:', error);
     throw error;
@@ -54,25 +59,14 @@ export const createLessonQuote = async (
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
 
-    const response = await fetch(`${API_BASE_URL}/lesson-quotes`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        lessonRequestId,
-        teacherId,
-        costInCents,
-        expiresAt: expiresAt.toISOString(),
-      }),
+    const response = await apiClient.post(`/lesson-quotes`, {
+      lessonRequestId,
+      teacherId,
+      costInCents,
+      expiresAt: expiresAt.toISOString(),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to create lesson quote');
-    }
-
-    return response.json();
+    return response.data;
   } catch (error) {
     console.error('Error creating lesson quote:', error);
     throw error;
@@ -88,23 +82,12 @@ export const bookLesson = async (quoteId: string): Promise<any> => {
   try {
     const confirmedAt = new Date().toISOString();
     
-    const response = await fetch(`${API_BASE_URL}/lessons`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        quoteId,
-        confirmedAt,
-      }),
+    const response = await apiClient.post(`/lessons`, {
+      quoteId,
+      confirmedAt,
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to book lesson');
-    }
-
-    return response.json();
+    return response.data;
   } catch (error) {
     console.error('Error booking lesson:', error);
     throw error;

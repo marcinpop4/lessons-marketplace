@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { LessonRequest, LessonType, LessonQuote } from '../types/lesson';
-import { TeacherWithRates, getAvailableTeachers, createLessonQuote, bookLesson } from '../api/teacherQuoteApi';
+import { useParams } from 'react-router-dom';
+import { getLessonQuotesByRequestId, acceptLessonQuote } from '../api/lessonQuotesApi';
+import { getAvailableTeachers, createLessonQuote } from '../api/teacherQuoteApi';
 import { getLessonRequestById } from '../api/lessonRequestApi';
+import { LessonQuote } from '../types/lesson';
 import '../styles/TeacherQuotes.css';
 
 interface TeacherQuotesProps {
@@ -9,267 +11,210 @@ interface TeacherQuotesProps {
   onBack: () => void;
 }
 
-// Helper function to format date for display
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString() + ' at ' + 
-    date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-};
-
-// Helper function to format currency
-const formatCurrency = (cents: number): string => {
-  return `$${(cents / 100).toFixed(2)}`;
-};
-
-// Helper function to calculate lesson cost
-const calculateLessonCost = (hourlyRate: number, durationMinutes: number): number => {
-  return Math.round((hourlyRate * durationMinutes) / 60);
-};
-
-// Interface for teacher quote data
-interface TeacherQuoteData {
-  quoteId: string;
-  teacher: TeacherWithRates;
-  lessonCost: number;
-}
-
-const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId, onBack }) => {
-  const [teacherQuotes, setTeacherQuotes] = useState<TeacherQuoteData[]>([]);
-  const [lessonRequest, setLessonRequest] = useState<LessonRequest | null>(null);
-  const [loading, setLoading] = useState(true);
+const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLessonRequestId, onBack }) => {
+  const [quotes, setQuotes] = useState<LessonQuote[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [bookingStatuses, setBookingStatuses] = useState<{ [quoteId: string]: 'idle' | 'loading' | 'success' | 'error' }>({});
+  const [acceptingQuote, setAcceptingQuote] = useState<string | null>(null);
+  const [acceptSuccess, setAcceptSuccess] = useState<string | null>(null);
+  const [generatingQuotes, setGeneratingQuotes] = useState<boolean>(false);
+  
+  // Get lessonRequestId from URL params as a fallback
+  const { lessonRequestId: paramLessonRequestId } = useParams<{ lessonRequestId: string }>();
+  
+  // Use the prop if available, otherwise use the URL param
+  const effectiveLessonRequestId = propLessonRequestId || paramLessonRequestId || '';
 
-  // Fetch lesson request, teachers, and create quotes
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Step 1: Fetch the lesson request details
-        console.log('Fetching lesson request details...');
-        const request = await getLessonRequestById(lessonRequestId);
-        setLessonRequest(request);
-        
-        // Step 2: Fetch available teachers for the lesson type
-        console.log('Fetching available teachers...');
-        const availableTeachers = await getAvailableTeachers(request.type);
-        
-        if (availableTeachers.length === 0) {
-          setLoading(false);
-          return; // No teachers available, will show the "no teachers" message
-        }
-        
-        // Step 3: Create quotes for each teacher
-        console.log('Creating quotes for teachers...');
-        const createdQuotes: TeacherQuoteData[] = [];
-        const newBookingStatuses: { [quoteId: string]: 'idle' | 'loading' | 'success' | 'error' } = {};
-        
-        // Process teachers sequentially to avoid race conditions
-        for (const teacher of availableTeachers) {
-          try {
-            // Calculate cost based on teacher's hourly rate and lesson duration
-            const hourlyRate = teacher.lessonHourlyRates[request.type] || 0;
-            const lessonCost = calculateLessonCost(hourlyRate, request.durationMinutes);
-            
-            // Create the quote in the database
-            const quoteResult = await createLessonQuote(
-              lessonRequestId,
-              teacher.id,
-              lessonCost
-            );
-            
-            // Only add successfully created quotes
-            if (quoteResult && quoteResult.id) {
-              createdQuotes.push({
-                quoteId: quoteResult.id,
-                teacher,
-                lessonCost
-              });
-              
-              // Initialize booking status for this quote
-              newBookingStatuses[quoteResult.id] = 'idle';
-            }
-          } catch (quoteErr) {
-            console.error(`Error creating quote for teacher ${teacher.id}:`, quoteErr);
-            // We don't add this teacher to the list if quote creation failed
-          }
-        }
-        
-        // Step 4: Update state with only the successfully created quotes
-        setTeacherQuotes(createdQuotes);
-        setBookingStatuses(newBookingStatuses);
-        
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to load teacher quotes.';
-        setError(errorMessage);
-        console.error('Error loading teacher quotes:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchData();
-  }, [lessonRequestId]);
+  // Function to fetch quotes
+  const fetchQuotes = async () => {
+    if (!effectiveLessonRequestId) {
+      setError('No lesson request ID provided');
+      setLoading(false);
+      return;
+    }
 
-  // Handle booking a lesson with a selected quote
-  const handleBookLesson = async (quoteId: string) => {
-    if (!quoteId) return;
-    
     try {
-      // Update booking status for this quote
-      setBookingStatuses(prev => ({
-        ...prev,
-        [quoteId]: 'loading'
-      }));
+      const quotesData = await getLessonQuotesByRequestId(effectiveLessonRequestId);
+      setQuotes(quotesData);
       
-      // Book the lesson using the quote
-      await bookLesson(quoteId);
-      
-      // Update booking status to success
-      setBookingStatuses(prev => ({
-        ...prev,
-        [quoteId]: 'success'
-      }));
+      // If no quotes are found, automatically generate them
+      if (quotesData.length === 0 && !generatingQuotes) {
+        await generateQuotes();
+      }
     } catch (err) {
-      console.error('Error booking lesson:', err);
+      console.error('Error fetching quotes:', err);
+      // Continue with empty quotes rather than showing error
+      setQuotes([]);
       
-      // Update booking status to error
-      setBookingStatuses(prev => ({
-        ...prev,
-        [quoteId]: 'error'
-      }));
+      // If quotes couldn't be fetched, try to generate them
+      if (!generatingQuotes) {
+        try {
+          await generateQuotes();
+        } catch (genErr) {
+          console.error('Failed to auto-generate quotes:', genErr);
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to generate quotes from available teachers
+  const generateQuotes = async () => {
+    if (!effectiveLessonRequestId) {
+      setError('No lesson request ID provided');
+      return;
+    }
+
+    setGeneratingQuotes(true);
+    setError(null);
+
+    try {
+      // 1. Get the lesson request details
+      const lessonRequest = await getLessonRequestById(effectiveLessonRequestId);
+      
+      // 2. Get available teachers for this lesson type
+      const teachers = await getAvailableTeachers(lessonRequest.type);
+      
+      if (teachers.length === 0) {
+        setError('No teachers available for this lesson type.');
+        setGeneratingQuotes(false);
+        return;
+      }
+      
+      // 3. Create quotes for each teacher
+      const createdQuotes: LessonQuote[] = [];
+      
+      for (const teacher of teachers) {
+        try {
+          // Calculate cost based on hourly rate and duration
+          const hourlyRate = teacher.lessonHourlyRates[lessonRequest.type] || 5000; // Default to $50/hour if not specified
+          const costInCents = Math.round((hourlyRate * lessonRequest.durationMinutes) / 60);
+          
+          // Create a quote
+          const quote = await createLessonQuote(
+            effectiveLessonRequestId,
+            teacher.id,
+            costInCents
+          );
+          
+          createdQuotes.push(quote);
+        } catch (quoteErr) {
+          console.error(`Error creating quote for teacher ${teacher.id}:`, quoteErr);
+          // Continue with other teachers if one fails
+        }
+      }
+      
+      // 4. Fetch all quotes again to get the updated list
+      await fetchQuotes();
+      
+    } catch (err) {
+      console.error('Error generating quotes:', err);
+      setError('Failed to generate quotes. Please try again.');
+    } finally {
+      setGeneratingQuotes(false);
+    }
+  };
+
+  // Fetch quotes on mount and when lessonRequestId changes
+  useEffect(() => {
+    fetchQuotes();
+  }, [effectiveLessonRequestId]);
+
+  // Format price for display
+  const formatPrice = (priceInCents: number): string => {
+    return `$${(priceInCents / 100).toFixed(2)}`;
+  };
+
+  // Format date for display
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Handle accepting a quote
+  const handleAcceptQuote = async (quoteId: string) => {
+    try {
+      setAcceptingQuote(quoteId);
+      await acceptLessonQuote(quoteId);
+      setAcceptSuccess(quoteId);
+    } catch (err) {
+      console.error('Error accepting quote:', err);
+      setError('Failed to accept quote. Please try again.');
+    } finally {
+      setAcceptingQuote(null);
     }
   };
 
   if (loading) {
-    return (
-      <div className="teacher-quotes-container">
-        <div className="loading-message">Loading teacher quotes...</div>
-      </div>
-    );
+    return <div className="teacher-quotes-loading">Loading quotes...</div>;
   }
 
   if (error) {
     return (
-      <div className="teacher-quotes-container">
-        <div className="error-message">Error: {error}</div>
-        <button className="back-button" onClick={onBack}>Go Back</button>
+      <div className="teacher-quotes-error">
+        <p>{error}</p>
+        <button onClick={onBack} className="back-button">Go Back</button>
       </div>
     );
   }
 
-  if (!lessonRequest) {
+  if (quotes.length === 0) {
     return (
-      <div className="teacher-quotes-container">
-        <div className="error-message">Could not find lesson request.</div>
-        <button className="back-button" onClick={onBack}>Go Back</button>
-      </div>
-    );
-  }
-
-  if (teacherQuotes.length === 0) {
-    return (
-      <div className="teacher-quotes-container">
-        <div className="teacher-quotes-header">
-          <h2>Available Teachers</h2>
-        </div>
-        
-        <div className="lesson-details">
-          <div className="lesson-details-title">Lesson Details</div>
-          <div className="lesson-detail-item">
-            <span className="lesson-detail-label">Type:</span>
-            <span>{lessonRequest.type}</span>
-          </div>
-          <div className="lesson-detail-item">
-            <span className="lesson-detail-label">Date & Time:</span>
-            <span>{formatDate(lessonRequest.startTime)}</span>
-          </div>
-          <div className="lesson-detail-item">
-            <span className="lesson-detail-label">Duration:</span>
-            <span>{lessonRequest.durationMinutes} minutes</span>
-          </div>
-          <div className="lesson-detail-item">
-            <span className="lesson-detail-label">Location:</span>
-            <span>{lessonRequest.address}</span>
-          </div>
-        </div>
-        
-        <div className="no-teachers-message">
-          No available teachers for {lessonRequest.type} lessons at this time.
-        </div>
-        
-        <button className="back-button" onClick={onBack}>Go Back</button>
+      <div className="teacher-quotes-empty">
+        <h2>No Quotes Available Yet</h2>
+        <p>Would you like to request quotes from available teachers?</p>
+        <button 
+          className="generate-quotes-button" 
+          onClick={generateQuotes}
+          disabled={generatingQuotes}
+        >
+          {generatingQuotes ? 'Generating Quotes...' : 'Get Quotes from Teachers'}
+        </button>
+        <button onClick={onBack} className="back-button">Back to Lesson Request</button>
       </div>
     );
   }
 
   return (
     <div className="teacher-quotes-container">
-      <div className="teacher-quotes-header">
-        <h2>Available Teachers</h2>
-        <p>Choose a teacher for your {lessonRequest.type} lesson</p>
-      </div>
+      <h2>Teacher Quotes</h2>
+      <p className="teacher-quotes-subheading">Compare offers from our teachers:</p>
       
-      <div className="lesson-details">
-        <div className="lesson-details-title">Lesson Details</div>
-        <div className="lesson-detail-item">
-          <span className="lesson-detail-label">Type:</span>
-          <span>{lessonRequest.type}</span>
-        </div>
-        <div className="lesson-detail-item">
-          <span className="lesson-detail-label">Date & Time:</span>
-          <span>{formatDate(lessonRequest.startTime)}</span>
-        </div>
-        <div className="lesson-detail-item">
-          <span className="lesson-detail-label">Duration:</span>
-          <span>{lessonRequest.durationMinutes} minutes</span>
-        </div>
-        <div className="lesson-detail-item">
-          <span className="lesson-detail-label">Location:</span>
-          <span>{lessonRequest.address}</span>
-        </div>
-      </div>
-      
-      <div className="teacher-cards-grid">
-        {teacherQuotes.map((quoteData) => {
-          const { quoteId, teacher, lessonCost } = quoteData;
-          const bookingStatus = bookingStatuses[quoteId] || 'idle';
-          
-          return (
-            <div key={quoteId} className="teacher-card">
-              <div className="teacher-name">{teacher.firstName} {teacher.lastName}</div>
-              <div className="teacher-rate">
-                Rate: {formatCurrency(teacher.lessonHourlyRates[lessonRequest.type] || 0)} per hour
-              </div>
-              <div className="lesson-cost">
-                Lesson Cost: {formatCurrency(lessonCost)}
-              </div>
-              
-              {bookingStatus === 'success' ? (
-                <div className="success-message">
-                  Lesson booked successfully!
-                </div>
-              ) : bookingStatus === 'error' ? (
-                <div className="error-message">
-                  Failed to book lesson. Please try again.
-                </div>
+      <div className="quotes-list">
+        {quotes.map((quote) => (
+          <div key={quote.id} className="quote-card">
+            <div className="quote-header">
+              <h3>{quote.teacher?.firstName || 'Unknown'} {quote.teacher?.lastName || ''}</h3>
+              <p className="quote-price">{formatPrice(quote.costInCents)}</p>
+            </div>
+            
+            <div className="quote-details">
+              <p><strong>Lesson Type:</strong> {quote.lessonRequest?.type || 'Unknown'}</p>
+              <p><strong>Duration:</strong> {quote.lessonRequest?.durationMinutes || 0} minutes</p>
+              <p><strong>Date:</strong> {quote.lessonRequest?.startTime ? formatDate(quote.lessonRequest.startTime) : 'Unknown'}</p>
+              <p><strong>Location:</strong> {quote.lessonRequest?.address || 'Unknown'}</p>
+            </div>
+            
+            <div className="quote-footer">
+              <p className="quote-expiry">Offer expires: {formatDate(quote.expiresAt)}</p>
+              {acceptSuccess === quote.id ? (
+                <div className="success-message">Quote accepted successfully!</div>
               ) : (
                 <button 
-                  className="book-button"
-                  onClick={() => handleBookLesson(quoteId)}
-                  disabled={bookingStatus === 'loading' || Object.values(bookingStatuses).includes('success')}
+                  className="accept-quote-button" 
+                  onClick={() => handleAcceptQuote(quote.id || '')}
+                  disabled={acceptingQuote === quote.id || acceptSuccess !== null}
                 >
-                  {bookingStatus === 'loading' ? 'Booking...' : 'Book Lesson'}
+                  {acceptingQuote === quote.id ? 'Processing...' : 'Accept Quote'}
                 </button>
               )}
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
       
-      <button className="back-button" onClick={onBack}>Go Back</button>
+      <button onClick={onBack} className="back-button">Back to Lesson Request</button>
     </div>
   );
 };

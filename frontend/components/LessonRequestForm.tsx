@@ -1,23 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { LessonType, LessonRequest, Student } from '../types/lesson';
 import { createLessonRequest } from '../api/lessonRequestApi';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import '../styles/LessonRequestForm.css';
-
-// Hardcoded student ID - in a real app this would be retrieved from an auth context
-// This represents Ethan Parker's ID from the seed file
-const LOGGED_IN_STUDENT_ID = '41834212-ab09-41e5-8578-ffd23326ec75';
-
-// Mock function to get the logged-in student (hardcoded for now)
-const getLoggedInStudent = (): Student => {
-  // In a real app, this would fetch from an auth context or API
-  return {
-    id: LOGGED_IN_STUDENT_ID,
-    firstName: 'Ethan',
-    lastName: 'Parker',
-    email: 'ethan.parker@example.com',
-    phoneNumber: '987-654-3210'
-  };
-};
 
 // Helper function to format date for input field
 const formatDateForInput = (date: Date): string => {
@@ -78,6 +64,9 @@ interface LessonRequestFormProps {
 }
 
 const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  
   const [formData, setFormData] = useState<LessonRequest>({
     type: LessonType.GUITAR,
     startTime: '',
@@ -95,7 +84,16 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
 
   // Set the studentId on component mount and initialize with current date
   useEffect(() => {
-    const student = getLoggedInStudent();
+    // Redirect if not a student or not authenticated
+    if (!user) {
+      navigate('/auth', { replace: true });
+      return;
+    }
+    
+    if (user.userType !== 'STUDENT') {
+      navigate('/', { replace: true });
+      return;
+    }
     
     // Set up initial date (today)
     const today = new Date();
@@ -105,9 +103,9 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
     
     setFormData(prevData => ({
       ...prevData,
-      studentId: student.id
+      studentId: user.id
     }));
-  }, []);
+  }, [user, navigate]);
 
   // Update form data when date or time changes
   useEffect(() => {
