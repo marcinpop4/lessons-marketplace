@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
+import LessonRequestForm from './components/LessonRequestForm'
 // Import directly to remove dependency on SVG file
 import './App.css'
 
@@ -7,21 +8,19 @@ function App() {
 
   return (
     <>
-      <div>
-        {/* Removed logo images temporarily */}
+      <div className="header">
+        <h1>Arts Marketplace</h1>
       </div>
-      <h1>Arts Marketplace</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>frontend/App.tsx</code> and save to test HMR
+      
+      <div className="main-content">
+        <LessonRequestForm />
+      </div>
+      
+      <div className="footer">
+        <p className="read-the-docs">
+          Welcome to the Arts Marketplace project
         </p>
       </div>
-      <p className="read-the-docs">
-        Welcome to the Arts Marketplace project
-      </p>
     </>
   )
 }

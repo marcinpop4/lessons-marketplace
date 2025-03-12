@@ -8,6 +8,9 @@ import { fileURLToPath } from 'url';
 import prisma from './prisma.js';
 import dotenv from 'dotenv';
 
+// Import routes
+import lessonRequestRoutes from './routes/lessonRequestRoutes.js';
+
 // Load environment variables
 dotenv.config();
 
@@ -40,13 +43,11 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+// API routes
+app.use('/api/lesson-requests', lessonRequestRoutes);
+
 // Serve static files
 app.use(express.static(path.join(__dirname, '../dist/frontend')));
-
-// API routes (to be added later)
-// app.use('/api/v1/users', userRoutes);
-// app.use('/api/v1/products', productRoutes);
-// app.use('/api/v1/orders', orderRoutes);
 
 // Catch-all route for SPA (React)
 app.get('*', (req, res) => {
