@@ -20,10 +20,10 @@ model Teacher {
   dateOfBirth DateTime
 
   // Relations
-  lessons     Lesson[]
-  hourlyRates HourlyRate[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  lessonQuotes             LessonQuote[]
+  teacherLessonHourlyRates TeacherLessonHourlyRate[]
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
 }
 
 // Student model for users who book lessons
@@ -36,9 +36,9 @@ model Student {
   dateOfBirth DateTime
 
   // Relations
-  lessons   Lesson[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  lessonRequests LessonRequest[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 }
 
 // Represents the types of lessons available
@@ -50,31 +50,64 @@ enum LessonType {
 }
 
 // Mapping table for teacher hourly rates by lesson type
-model HourlyRate {
-  id        String     @id @default(uuid())
-  teacher   Teacher    @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  teacherId String
-  type      LessonType
-  rate      Float
+model TeacherLessonHourlyRate {
+  id          String     @id @default(uuid())
+  teacher     Teacher    @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  teacherId   String
+  type        LessonType
+  rateInCents Int
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   @@unique([teacherId, type])
 }
 
-// Lesson model representing a specific music lesson
-model Lesson {
+// New model for lesson requests from students
+model LessonRequest {
   id              String     @id @default(uuid())
   type            LessonType
   startTime       DateTime
   durationMinutes Int
   address         String
 
-  // Teacher relationship
-  teacher   Teacher @relation(fields: [teacherId], references: [id])
-  teacherId String
+  // Student relationship
+  student   Student @relation(fields: [studentId], references: [id])
+  studentId String
 
-  // Optional student relationship (null until booked)
-  student   Student? @relation(fields: [studentId], references: [id])
-  studentId String?
+  // Quotes associated with this request
+  lessonQuotes LessonQuote[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// New model for quotes provided by teachers
+model LessonQuote {
+  id          String   @id @default(uuid())
+  costInCents Int
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  // Relationships
+  lessonRequest   LessonRequest @relation(fields: [lessonRequestId], references: [id])
+  lessonRequestId String
+  teacher         Teacher       @relation(fields: [teacherId], references: [id])
+  teacherId       String
+
+  // Lessons created from this quote
+  lessons Lesson[]
+
+  updatedAt DateTime @updatedAt
+}
+
+// Lesson model representing a confirmed music lesson
+model Lesson {
+  id          String   @id @default(uuid())
+  confirmedAt DateTime @default(now())
+
+  // Reference to the accepted quote
+  quote   LessonQuote @relation(fields: [quoteId], references: [id])
+  quoteId String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
