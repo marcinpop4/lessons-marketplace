@@ -30,13 +30,15 @@ CREATE TABLE "Student" (
 );
 
 -- CreateTable
-CREATE TABLE "HourlyRate" (
+CREATE TABLE "TeacherLessonHourlyRate" (
     "id" TEXT NOT NULL,
     "teacherId" TEXT NOT NULL,
     "type" "LessonType" NOT NULL,
-    "rate" DOUBLE PRECISION NOT NULL,
+    "rateInCents" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "HourlyRate_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "TeacherLessonHourlyRate_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -61,10 +63,10 @@ CREATE UNIQUE INDEX "Teacher_email_key" ON "Teacher"("email");
 CREATE UNIQUE INDEX "Student_email_key" ON "Student"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "HourlyRate_teacherId_type_key" ON "HourlyRate"("teacherId", "type");
+CREATE UNIQUE INDEX "TeacherLessonHourlyRate_teacherId_type_key" ON "TeacherLessonHourlyRate"("teacherId", "type");
 
 -- AddForeignKey
-ALTER TABLE "HourlyRate" ADD CONSTRAINT "HourlyRate_teacherId_fkey" FOREIGN KEY ("teacherId") REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "TeacherLessonHourlyRate" ADD CONSTRAINT "TeacherLessonHourlyRate_teacherId_fkey" FOREIGN KEY ("teacherId") REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Lesson" ADD CONSTRAINT "Lesson_teacherId_fkey" FOREIGN KEY ("teacherId") REFERENCES "Teacher"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

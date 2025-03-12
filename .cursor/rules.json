@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "name": "currency-in-cents",
+      "description": "All monetary values should be stored and calculated in cents",
+      "patterns": [
+        {
+          "pattern": "\\b(?!.*InCents)(price|cost|rate|amount|fee|payment|charge|total)\\b.*\\bnumber\\b",
+          "message": "Monetary values should use the 'InCents' suffix (e.g., 'priceInCents' instead of 'price')",
+          "severity": "warning"
+        },
+        {
+          "pattern": "\\b(price|cost|rate|amount|fee|payment|charge|total)InCents\\b.*\\s*=\\s*.*\\/\\s*100",
+          "message": "Don't divide by 100 when working with cent values; only convert to dollars for display purposes",
+          "severity": "error"
+        },
+        {
+          "pattern": "\\b(price|cost|rate|amount|fee|payment|charge|total)InCents\\b.*\\s*=\\s*.*\\s*\\*\\s*100",
+          "message": "Make sure to use Math.round() when multiplying by 100 to ensure integer results",
+          "severity": "warning"
+        }
+      ]
+    },
+    {
+      "name": "currency-calculations",
+      "description": "Ensure proper calculations with monetary values",
+      "patterns": [
+        {
+          "pattern": "\\b(?!.*Math\\.round)(.*InCents.*\\/).*",
+          "message": "Use Math.round() when dividing cent values to ensure integer results",
+          "severity": "warning"
+        }
+      ]
+    },
+    {
+      "name": "currency-display",
+      "description": "Currency display guidelines",
+      "patterns": [
+        {
+          "pattern": "new\\s+Intl\\.NumberFormat\\(.*\\)\\.format\\((?!.*\\/\\s*100).*InCents.*\\)",
+          "message": "When formatting cents as currency, divide by 100 (e.g., 'priceInCents / 100')",
+          "severity": "error"
+        }
+      ]
+    }
+  ],
+  "directives": [
+    {
+      "name": "currency-handling",
+      "description": "Guidelines for handling currency values",
+      "content": "Follow the currency handling guidelines as specified in docs/CURRENCY_GUIDELINES.md. Key points:\n\n1. Store and calculate all monetary values in cents (integer)\n2. Use the 'InCents' suffix for all monetary properties\n3. Use Math.round() when dividing cent values to ensure integer results\n4. Only convert to dollars for display purposes in the UI layer\n5. Use the currency formatting utilities in client/utils/currencyFormatter.ts\n6. Always use plain integers (number type) for cents values"
+    }
+  ]
+} 
