@@ -1,6 +1,6 @@
-import { LessonType } from './LessonType';
-import { Teacher } from './Teacher';
-import { Student } from './Student';
+import { LessonType } from './LessonType.js';
+import { Teacher } from './Teacher.js';
+import { Student } from './Student.js';
 
 /**
  * Lesson model representing a specific music lesson offering

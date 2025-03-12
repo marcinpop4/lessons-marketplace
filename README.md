@@ -1,128 +1,126 @@
 # Arts Marketplace
 
-A well-structured application with a React UI, API layer, database integration, and async messaging capabilities.
+A well-structured application with a React frontend, Express backend, PostgreSQL database integration, and async messaging capabilities.
 
 ## Project Structure
 
 ```
 arts-marketplace/
-├── src/                  # Frontend React application
-│   ├── components/       # Reusable UI components
-│   ├── pages/            # Page components that represent routes
-│   ├── layouts/          # Layout components (headers, footers, etc.)
-│   ├── hooks/            # Custom React hooks
-│   ├── utils/            # Utility functions
-│   ├── services/         # Frontend services
-│   │   ├── database/     # Database interaction from frontend
-│   │   ├── messaging/    # Messaging services (WebSockets, etc.)
-│   │   └── auth/         # Authentication services
-│   ├── api/              # API client for backend communication
-│   │   ├── endpoints/    # API endpoint definitions
-│   │   ├── utils/        # API utilities
-│   │   └── middleware/   # API middleware (interceptors, etc.)
-│   ├── contexts/         # React context providers
-│   ├── styles/           # Global styles, themes, etc.
-│   └── types/            # TypeScript type definitions
+├── frontend/               # Frontend React application (Vite-based)
+│   ├── components/         # Reusable UI components
+│   ├── pages/              # Page components that represent routes
+│   ├── layouts/            # Layout components (headers, footers, etc.)
+│   ├── hooks/              # Custom React hooks
+│   ├── utils/              # Utility functions
+│   ├── services/           # Frontend services
+│   ├── api/                # API client for backend communication
+│   ├── contexts/           # React context providers
+│   ├── styles/             # Global styles, themes, etc.
+│   ├── types/              # TypeScript type definitions
+│   ├── assets/             # Frontend assets (images, icons, etc.)
+│   ├── public/             # Static files served as-is
+│   ├── App.tsx             # Main App component
+│   ├── App.css             # App-specific styles
+│   ├── main.tsx            # Application entry point
+│   ├── index.html          # HTML template
+│   ├── index.css           # Global CSS
+│   ├── vite.config.ts      # Vite configuration
+│   ├── tsconfig.app.json   # TypeScript config for app
+│   └── tsconfig.node.json  # TypeScript config for Vite config
 │
-├── server/               # Backend API server
-│   ├── controllers/      # Route controllers
-│   ├── models/           # Database models
-│   ├── routes/           # API route definitions
-│   ├── middleware/       # Express middleware
-│   ├── services/         # Backend services
-│   │   ├── database/     # Database connection and operations
-│   │   ├── messaging/    # Message queue services
-│   │   ├── auth/         # Authentication services
-│   │   └── cache/        # Caching services
-│   ├── utils/            # Utility functions
-│   ├── config/           # Configuration files
-│   └── tests/            # Backend tests
+├── server/                # Backend API server (Express)
+│   ├── controllers/       # Route controllers
+│   ├── models/            # Database models
+│   ├── routes/            # API route definitions
+│   ├── middleware/        # Express middleware
+│   ├── services/          # Backend services
+│   ├── utils/             # Utility functions
+│   ├── config/            # Configuration files
+│   ├── tests/             # Backend tests
+│   ├── index.ts           # Server entry point
+│   ├── types.d.ts         # Type definitions
+│   └── tsconfig.server.json # TypeScript config for server
 │
-├── shared/               # Shared code between frontend and backend
-│   ├── types/            # Shared TypeScript types
-│   ├── utils/            # Shared utility functions
-│   └── constants/        # Shared constants
+├── shared/                # Shared code between frontend and backend
+│   ├── models/            # Shared data models
+│   ├── types/             # Shared TypeScript types
+│   ├── utils/             # Shared utility functions
+│   └── constants/         # Shared constants
 │
-├── public/               # Static files
-│   └── assets/           # Public assets
-│       ├── images/       # Image files
-│       ├── icons/        # Icon files
-│       └── fonts/        # Font files
-│
-├── package.json          # Node.js dependencies and scripts
-└── ...                   # Other configuration files
+├── .gitignore             # Git ignore file
+├── eslint.config.js       # ESLint configuration
+├── package.json           # Node.js dependencies and scripts
+├── pnpm-lock.yaml         # PNPM lock file
+└── tsconfig.json          # Base TypeScript configuration
 ```
 
 ## Getting Started
 
-1. Install dependencies:
+### Prerequisites
+
+- Node.js (v18 or higher recommended)
+- PNPM package manager
+- PostgreSQL database
+
+### Installation
+
+1. Clone the repository:
    ```
-   npm install
+   git clone https://github.com/your-username/arts-marketplace.git
+   cd arts-marketplace
    ```
 
-2. Start the development server:
+2. Install dependencies:
    ```
-   npm run dev
+   pnpm install
    ```
 
-## Scripts
+3. Create a `.env` file in the root directory with the following environment variables:
+   ```
+   # Database
+   DATABASE_URL=postgresql://username:password@localhost:5432/arts_marketplace
+   
+   # JWT Secret
+   JWT_SECRET=your-jwt-secret
+   
+   # RabbitMQ (if using message queue)
+   RABBITMQ_URL=amqp://localhost:5672
+   ```
 
-- `npm run dev` - Start the development server
-- `npm run build` - Build for production
-- `npm run lint` - Run linting
-- `npm run preview` - Preview the production build
+## Available Scripts
 
-# React + TypeScript + Vite
+- `pnpm dev` - Start the frontend development server (Vite)
+- `pnpm dev:server` - Start the backend development server with auto-reload (using tsx)
+- `pnpm dev:full` - Start both frontend and backend in development mode concurrently
+- `pnpm build` - Build the frontend for production
+- `pnpm build:server` - Build the backend for production
+- `pnpm build:full` - Build both frontend and backend for production
+- `pnpm start` - Start the production server
+- `pnpm lint` - Run ESLint on the project
+- `pnpm preview` - Preview the production build locally
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Development
 
-Currently, two official plugins are available:
+The project uses:
+- React 19 with TypeScript for the frontend
+- Express.js with TypeScript for the backend
+- PostgreSQL for database
+- RabbitMQ for async messaging
+- ESLint for code linting
+- Vite for frontend development and bundling
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Architecture
 
-## Expanding the ESLint configuration
+The application follows a modular architecture with clean separation between frontend and backend. The shared directory contains code that's used by both parts of the application, ensuring type safety and consistency across the entire codebase.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Deployment
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+Build the application for production:
+```
+pnpm build:full
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
+Then start the production server:
+```
+pnpm start
 ```
