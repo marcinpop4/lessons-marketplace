@@ -1,0 +1,81 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Teacher model for instructors
+model Teacher {
+  id          String   @id @default(uuid())
+  firstName   String
+  lastName    String
+  email       String   @unique
+  phoneNumber String
+  dateOfBirth DateTime
+
+  // Relations
+  lessons     Lesson[]
+  hourlyRates HourlyRate[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+// Student model for users who book lessons
+model Student {
+  id          String   @id @default(uuid())
+  firstName   String
+  lastName    String
+  email       String   @unique
+  phoneNumber String
+  dateOfBirth DateTime
+
+  // Relations
+  lessons   Lesson[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Represents the types of lessons available
+enum LessonType {
+  VOICE
+  GUITAR
+  BASS
+  DRUMS
+}
+
+// Mapping table for teacher hourly rates by lesson type
+model HourlyRate {
+  id        String     @id @default(uuid())
+  teacher   Teacher    @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  teacherId String
+  type      LessonType
+  rate      Float
+
+  @@unique([teacherId, type])
+}
+
+// Lesson model representing a specific music lesson
+model Lesson {
+  id              String     @id @default(uuid())
+  type            LessonType
+  startTime       DateTime
+  durationMinutes Int
+  address         String
+
+  // Teacher relationship
+  teacher   Teacher @relation(fields: [teacherId], references: [id])
+  teacherId String
+
+  // Optional student relationship (null until booked)
+  student   Student? @relation(fields: [studentId], references: [id])
+  studentId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
