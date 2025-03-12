@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { getLessonQuotesByRequestId, acceptLessonQuote } from '../api/lessonQuotesApi';
 import { getAvailableTeachers, createLessonQuote } from '../api/teacherQuoteApi';
 import { getLessonRequestById } from '../api/lessonRequestApi';
+import { createLessonFromQuote } from '../api/lessonApi';
 import { LessonQuote } from '../types/lesson';
 import '../styles/TeacherQuotes.css';
 
@@ -12,12 +13,14 @@ interface TeacherQuotesProps {
 }
 
 const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLessonRequestId, onBack }) => {
+  const navigate = useNavigate();
   const [quotes, setQuotes] = useState<LessonQuote[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [acceptingQuote, setAcceptingQuote] = useState<string | null>(null);
   const [acceptSuccess, setAcceptSuccess] = useState<string | null>(null);
   const [generatingQuotes, setGeneratingQuotes] = useState<boolean>(false);
+  const [creatingLesson, setCreatingLesson] = useState<boolean>(false);
   
   // Get lessonRequestId from URL params as a fallback
   const { lessonRequestId: paramLessonRequestId } = useParams<{ lessonRequestId: string }>();
@@ -136,13 +139,22 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
   const handleAcceptQuote = async (quoteId: string) => {
     try {
       setAcceptingQuote(quoteId);
+      
+      // Accept the quote
       await acceptLessonQuote(quoteId);
       setAcceptSuccess(quoteId);
+      
+      // Create a lesson from the accepted quote
+      setCreatingLesson(true);
+      const lesson = await createLessonFromQuote(quoteId);
+      
+      // Redirect to the lesson confirmation page
+      navigate(`/lesson-confirmation/${lesson.id}`);
     } catch (err) {
       console.error('Error accepting quote:', err);
       setError('Failed to accept quote. Please try again.');
-    } finally {
       setAcceptingQuote(null);
+      setCreatingLesson(false);
     }
   };
 
@@ -204,9 +216,9 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
                 <button 
                   className="accept-quote-button" 
                   onClick={() => handleAcceptQuote(quote.id || '')}
-                  disabled={acceptingQuote === quote.id || acceptSuccess !== null}
+                  disabled={acceptingQuote === quote.id || acceptSuccess !== null || creatingLesson}
                 >
-                  {acceptingQuote === quote.id ? 'Processing...' : 'Accept Quote'}
+                  {acceptingQuote === quote.id ? 'Processing...' : creatingLesson ? 'Creating Lesson...' : 'Accept Quote'}
                 </button>
               )}
             </div>

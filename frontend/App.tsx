@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'r
 import LessonRequestForm from './components/LessonRequestForm';
 import TeacherQuotes from './components/TeacherQuotes';
 import AuthPage from './pages/AuthPage';
+import LessonConfirmation from './pages/LessonConfirmation';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
 // Import directly to remove dependency on SVG file
@@ -57,6 +58,12 @@ const AppRoutes = () => {
                 lessonRequestId={lessonRequestId || ''} 
                 onBack={handleBackFromQuotes} 
               />} 
+            />
+            
+            {/* Lesson confirmation route */}
+            <Route 
+              path="/lesson-confirmation/:lessonId" 
+              element={<LessonConfirmation />} 
             />
           </Route>
           

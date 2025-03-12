@@ -1,0 +1,136 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { getLessonById } from '../api/lessonApi';
+import { Lesson, LessonQuote, Teacher, LessonRequest } from '../types/lesson';
+import '../styles/LessonConfirmation.css';
+
+// Extended lesson type that includes the quote data
+interface LessonWithDetails extends Lesson {
+  quote: LessonQuote & {
+    teacher: Teacher;
+    lessonRequest: LessonRequest;
+  };
+}
+
+const LessonConfirmation: React.FC = () => {
+  const { lessonId } = useParams<{ lessonId: string }>();
+  const navigate = useNavigate();
+  
+  const [lesson, setLesson] = useState<LessonWithDetails | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Fetch lesson data
+  useEffect(() => {
+    const fetchLesson = async () => {
+      if (!lessonId) {
+        setError('No lesson ID provided');
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        const lessonData = await getLessonById(lessonId);
+        setLesson(lessonData as LessonWithDetails);
+      } catch (err) {
+        console.error('Error fetching lesson:', err);
+        setError('Failed to load lesson details. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchLesson();
+  }, [lessonId]);
+  
+  // Format price for display
+  const formatPrice = (priceInCents: number): string => {
+    return `$${(priceInCents / 100).toFixed(2)}`;
+  };
+  
+  // Format date for display
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+  
+  // Handle creating a new lesson request
+  const handleCreateNewLesson = () => {
+    navigate('/lesson-request');
+  };
+  
+  if (loading) {
+    return <div className="lesson-confirmation-loading">Loading lesson details...</div>;
+  }
+  
+  if (error || !lesson) {
+    return (
+      <div className="lesson-confirmation-error">
+        <h2>Error</h2>
+        <p>{error || 'Failed to load lesson details'}</p>
+        <button onClick={handleCreateNewLesson} className="new-lesson-button">Create a New Lesson</button>
+      </div>
+    );
+  }
+  
+  // Extract quote, teacher and lesson request from the lesson data
+  const { quote } = lesson;
+  const { teacher, lessonRequest } = quote;
+  
+  return (
+    <div className="lesson-confirmation-container">
+      <div className="confirmation-header">
+        <h2>Lesson Confirmed!</h2>
+        <div className="confirmation-icon">✓</div>
+      </div>
+      
+      <div className="lesson-details-card">
+        <h3>Lesson Details</h3>
+        
+        <div className="lesson-info">
+          <div className="info-row">
+            <span className="info-label">Teacher:</span>
+            <span className="info-value">{teacher?.firstName} {teacher?.lastName}</span>
+          </div>
+          
+          <div className="info-row">
+            <span className="info-label">Lesson Type:</span>
+            <span className="info-value">{lessonRequest?.type}</span>
+          </div>
+          
+          <div className="info-row">
+            <span className="info-label">Date & Time:</span>
+            <span className="info-value">{lessonRequest?.startTime ? formatDate(lessonRequest.startTime) : 'Not specified'}</span>
+          </div>
+          
+          <div className="info-row">
+            <span className="info-label">Duration:</span>
+            <span className="info-value">{lessonRequest?.durationMinutes} minutes</span>
+          </div>
+          
+          <div className="info-row">
+            <span className="info-label">Location:</span>
+            <span className="info-value">{lessonRequest?.address}</span>
+          </div>
+          
+          <div className="info-row">
+            <span className="info-label">Price:</span>
+            <span className="info-value">{quote?.costInCents ? formatPrice(quote.costInCents) : 'Not specified'}</span>
+          </div>
+          
+          <div className="info-row">
+            <span className="info-label">Confirmed On:</span>
+            <span className="info-value">{formatDate(lesson.confirmedAt)}</span>
+          </div>
+        </div>
+      </div>
+      
+      <div className="confirmation-actions">
+        <p>Your lesson has been successfully booked. The teacher will contact you shortly with further details.</p>
+        <button onClick={handleCreateNewLesson} className="new-lesson-button">Book Another Lesson</button>
+      </div>
+    </div>
+  );
+};
+
+export default LessonConfirmation; 
