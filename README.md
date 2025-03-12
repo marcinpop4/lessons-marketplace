@@ -1,126 +1,124 @@
 # Arts Marketplace
 
-A well-structured application with a React frontend, Express backend, PostgreSQL database integration, and async messaging capabilities.
+A modern marketplace for artists to showcase and sell their artwork.
 
-## Project Structure
+## Database Setup
 
-```
-arts-marketplace/
-├── frontend/               # Frontend React application (Vite-based)
-│   ├── components/         # Reusable UI components
-│   ├── pages/              # Page components that represent routes
-│   ├── layouts/            # Layout components (headers, footers, etc.)
-│   ├── hooks/              # Custom React hooks
-│   ├── utils/              # Utility functions
-│   ├── services/           # Frontend services
-│   ├── api/                # API client for backend communication
-│   ├── contexts/           # React context providers
-│   ├── styles/             # Global styles, themes, etc.
-│   ├── types/              # TypeScript type definitions
-│   ├── assets/             # Frontend assets (images, icons, etc.)
-│   ├── public/             # Static files served as-is
-│   ├── App.tsx             # Main App component
-│   ├── App.css             # App-specific styles
-│   ├── main.tsx            # Application entry point
-│   ├── index.html          # HTML template
-│   ├── index.css           # Global CSS
-│   ├── vite.config.ts      # Vite configuration
-│   ├── tsconfig.app.json   # TypeScript config for app
-│   └── tsconfig.node.json  # TypeScript config for Vite config
-│
-├── server/                # Backend API server (Express)
-│   ├── controllers/       # Route controllers
-│   ├── models/            # Database models
-│   ├── routes/            # API route definitions
-│   ├── middleware/        # Express middleware
-│   ├── services/          # Backend services
-│   ├── utils/             # Utility functions
-│   ├── config/            # Configuration files
-│   ├── tests/             # Backend tests
-│   ├── index.ts           # Server entry point
-│   ├── types.d.ts         # Type definitions
-│   └── tsconfig.server.json # TypeScript config for server
-│
-├── shared/                # Shared code between frontend and backend
-│   ├── models/            # Shared data models
-│   ├── types/             # Shared TypeScript types
-│   ├── utils/             # Shared utility functions
-│   └── constants/         # Shared constants
-│
-├── .gitignore             # Git ignore file
-├── eslint.config.js       # ESLint configuration
-├── package.json           # Node.js dependencies and scripts
-├── pnpm-lock.yaml         # PNPM lock file
-└── tsconfig.json          # Base TypeScript configuration
-```
+### Option 1: Install PostgreSQL locally
 
-## Getting Started
+1. **Install PostgreSQL:**
+   - Mac: 
+     ```bash
+     brew install postgresql@15
+     brew services start postgresql@15
+     ```
+   - Windows: Download and install from [PostgreSQL website](https://www.postgresql.org/download/windows/)
+   - Linux:
+     ```bash
+     sudo apt update
+     sudo apt install postgresql postgresql-contrib
+     ```
 
-### Prerequisites
+2. **Create database:**
+   - macOS (Homebrew installation):
+     ```bash
+     # Connect with your system username (no need for -U flag)
+     psql postgres
+     CREATE DATABASE arts_marketplace;
+     \q
+     ```
+   - Windows/Linux (standard installation):
+     ```bash
+     psql -U postgres
+     CREATE DATABASE arts_marketplace;
+     \q
+     ```
 
-- Node.js (v18 or higher recommended)
-- PNPM package manager
-- PostgreSQL database
+3. **Note for macOS Homebrew users:**
+   - Homebrew PostgreSQL installations use your system username as the default PostgreSQL user
+   - Make sure to update your .env file to use your username instead of 'postgres'
+   - Example: `DATABASE_URL="postgresql://yourusername@localhost:5432/arts_marketplace?schema=public"`
 
-### Installation
+### Option 2: Use Docker
 
-1. Clone the repository:
+1. **Start PostgreSQL with Docker:**
+   ```bash
+   docker run --name arts-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=arts_marketplace -p 5432:5432 -d postgres:15
    ```
-   git clone https://github.com/your-username/arts-marketplace.git
+   
+   With Docker, keep the default connection string: 
+   ```
+   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/arts_marketplace?schema=public"
+   ```
+
+## Project Setup
+
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
    cd arts-marketplace
    ```
 
-2. Install dependencies:
-   ```
+2. **Install dependencies:**
+   ```bash
    pnpm install
    ```
 
-3. Create a `.env` file in the root directory with the following environment variables:
+3. **Configure environment variables:**
+   - Copy the `.env.example` file to `.env` (if not already done)
+   - Update the database connection URL if needed
+
+4. **Apply database migrations:**
+   ```bash
+   pnpm prisma:migrate
    ```
-   # Database
-   DATABASE_URL=postgresql://username:password@localhost:5432/arts_marketplace
-   
-   # JWT Secret
-   JWT_SECRET=your-jwt-secret
-   
-   # RabbitMQ (if using message queue)
-   RABBITMQ_URL=amqp://localhost:5672
+
+5. **Seed the database:**
+   ```bash
+   pnpm prisma:seed
+   ```
+
+6. **Start development server:**
+   ```bash
+   pnpm dev:full
    ```
 
 ## Available Scripts
 
-- `pnpm dev` - Start the frontend development server (Vite)
-- `pnpm dev:server` - Start the backend development server with auto-reload (using tsx)
-- `pnpm dev:full` - Start both frontend and backend in development mode concurrently
-- `pnpm build` - Build the frontend for production
-- `pnpm build:server` - Build the backend for production
-- `pnpm build:full` - Build both frontend and backend for production
-- `pnpm start` - Start the production server
-- `pnpm lint` - Run ESLint on the project
-- `pnpm preview` - Preview the production build locally
+- `pnpm dev` - Start frontend development server
+- `pnpm dev:server` - Start backend development server
+- `pnpm dev:full` - Start both frontend and backend servers
+- `pnpm build` - Build frontend
+- `pnpm build:server` - Build backend
+- `pnpm build:full` - Build entire application
+- `pnpm start` - Start production server
+- `pnpm lint` - Run linter
+- `pnpm prisma:generate` - Generate Prisma client
+- `pnpm prisma:migrate` - Run database migrations
+- `pnpm prisma:studio` - Open Prisma Studio to manage database
+- `pnpm prisma:seed` - Seed the database with initial data
+- `pnpm db:reset` - Reset the database (drop and recreate all tables)
+
+## Database Schema
+
+The application uses PostgreSQL with Prisma ORM. The main entities are:
+
+- **User**: Stores user information, can be artists or regular users
+- **Product**: Artwork listings with details
+- **Category**: Product categories
+- **Order**: User orders
+- **OrderItem**: Individual items in an order
 
 ## Development
 
-The project uses:
-- React 19 with TypeScript for the frontend
-- Express.js with TypeScript for the backend
-- PostgreSQL for database
-- RabbitMQ for async messaging
-- ESLint for code linting
-- Vite for frontend development and bundling
+To explore the database visually:
 
-## Architecture
-
-The application follows a modular architecture with clean separation between frontend and backend. The shared directory contains code that's used by both parts of the application, ensuring type safety and consistency across the entire codebase.
-
-## Deployment
-
-Build the application for production:
-```
-pnpm build:full
+```bash
+pnpm prisma:studio
 ```
 
-Then start the production server:
-```
-pnpm start
+To create a new migration after schema changes:
+
+```bash
+pnpm prisma:migrate
 ```
