@@ -10,6 +10,9 @@ import dotenv from 'dotenv';
 
 // Import routes
 import lessonRequestRoutes from './routes/lessonRequestRoutes.js';
+import teacherRoutes from './routes/teacherRoutes.js';
+import lessonQuoteRoutes from './routes/lessonQuoteRoutes.js';
+import lessonRoutes from './routes/lessonRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -45,6 +48,9 @@ app.get('/api/health', async (req, res) => {
 
 // API routes
 app.use('/api/lesson-requests', lessonRequestRoutes);
+app.use('/api/teachers', teacherRoutes);
+app.use('/api/lesson-quotes', lessonQuoteRoutes);
+app.use('/api/lessons', lessonRoutes);
 
 // Serve static files
 app.use(express.static(path.join(__dirname, '../dist/frontend')));

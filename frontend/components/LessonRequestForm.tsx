@@ -32,8 +32,8 @@ const formatDateForInput = (date: Date): string => {
 const generateTimeOptions = (): { value: string, label: string }[] => {
   const options: { value: string, label: string }[] = [];
   
-  // Generate options for every 30 minutes (48 intervals in 24 hours)
-  for (let hour = 0; hour < 24; hour++) {
+  // Generate options for every 30 minutes, but only between 8am (8:00) and 8pm (20:00)
+  for (let hour = 8; hour <= 20; hour++) {
     // Add option for the hour (00 minutes)
     const periodHour = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour % 12 || 12; // Convert 0 to 12 for display
@@ -57,7 +57,27 @@ const generateTimeOptions = (): { value: string, label: string }[] => {
   return options;
 };
 
-const LessonRequestForm = () => {
+// Helper function to check if a lesson would end after 9pm (21:00)
+const isLessonEndingAfter9pm = (timeString: string, durationMinutes: number): boolean => {
+  if (!timeString) return false;
+  
+  // Extract hours and minutes from the time string (format: "HH:MM")
+  const [hours, minutes] = timeString.split(':').map(part => parseInt(part, 10));
+  
+  // Calculate end time in minutes past midnight
+  const startTimeInMinutes = (hours * 60) + minutes;
+  const endTimeInMinutes = startTimeInMinutes + durationMinutes;
+  
+  // 9pm = 21 hours * 60 minutes = 1260 minutes past midnight
+  return endTimeInMinutes > 1260;
+};
+
+// Add props interface for the component
+interface LessonRequestFormProps {
+  onSubmitSuccess?: (lessonRequestId: string) => void;
+}
+
+const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }) => {
   const [formData, setFormData] = useState<LessonRequest>({
     type: LessonType.GUITAR,
     startTime: '',
@@ -105,7 +125,18 @@ const LessonRequestForm = () => {
   };
 
   const handleTimeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedTime(e.target.value);
+    const newTime = e.target.value;
+    setSelectedTime(newTime);
+    
+    // Check if the new time selection would cause the lesson to end after 9pm
+    if (newTime && isLessonEndingAfter9pm(newTime, formData.durationMinutes)) {
+      setError('Lesson cannot end after 9:00 PM. Please choose an earlier time or shorter duration.');
+    } else {
+      // Clear the error message if previously set for this condition
+      if (error && error.includes('Lesson cannot end after 9:00 PM')) {
+        setError(null);
+      }
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -113,6 +144,19 @@ const LessonRequestForm = () => {
     
     // Skip direct handling of date/time inputs as we're using custom logic
     if (name === 'startTime') return;
+    
+    // For duration change, check if it would make the lesson end after 9pm
+    if (name === 'durationMinutes') {
+      const durationValue = parseInt(value, 10);
+      if (selectedTime && isLessonEndingAfter9pm(selectedTime, durationValue)) {
+        setError('Lesson cannot end after 9:00 PM. Please choose an earlier time or shorter duration.');
+      } else {
+        // Clear the error message if previously set for this condition
+        if (error && error.includes('Lesson cannot end after 9:00 PM')) {
+          setError(null);
+        }
+      }
+    }
     
     setFormData(prevData => ({
       ...prevData,
@@ -126,6 +170,12 @@ const LessonRequestForm = () => {
     // Validate date and time are selected
     if (!selectedDate || !selectedTime) {
       setError('Please select both a date and time for the lesson.');
+      return;
+    }
+    
+    // Validate that the lesson doesn't end after 9pm
+    if (isLessonEndingAfter9pm(selectedTime, formData.durationMinutes)) {
+      setError('Lesson cannot end after 9:00 PM. Please choose an earlier time or shorter duration.');
       return;
     }
     
@@ -155,6 +205,12 @@ const LessonRequestForm = () => {
         studentId: formData.studentId // Keep the student ID
       });
       setSelectedTime('');
+      
+      // Call onSubmitSuccess callback if provided
+      if (onSubmitSuccess && result.id) {
+        onSubmitSuccess(result.id);
+      }
+      
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to submit lesson request. Please try again.';
       setError(errorMessage);
@@ -168,7 +224,7 @@ const LessonRequestForm = () => {
     <div className="lesson-request-form-container">
       <h2>Request a Lesson</h2>
       
-      {success && (
+      {success && !onSubmitSuccess && (
         <div className="success-message">
           Your lesson request has been submitted successfully!
         </div>
@@ -223,6 +279,7 @@ const LessonRequestForm = () => {
               </option>
             ))}
           </select>
+          <small className="form-helper-text">Lessons are available between 8:00 AM and 8:00 PM, and must end by 9:00 PM.</small>
         </div>
         
         <div className="form-group">
@@ -237,6 +294,7 @@ const LessonRequestForm = () => {
             <option value="30">30 minutes</option>
             <option value="60">60 minutes</option>
           </select>
+          <small className="form-helper-text">Please ensure your selected time and duration don't result in a lesson ending after 9:00 PM.</small>
         </div>
         
         <div className="form-group">
