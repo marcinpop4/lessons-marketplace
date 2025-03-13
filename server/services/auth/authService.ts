@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import jwt, { Secret, SignOptions } from 'jsonwebtoken';
 import prisma from '../../prisma.js';
 import { AuthMethod, UserType } from '@prisma/client';
 
@@ -62,7 +62,7 @@ class AuthService {
 
   // Generate JWT token
   generateToken(payload: TokenPayload): string {
-    return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    return jwt.sign(payload, JWT_SECRET as Secret, { expiresIn: JWT_EXPIRES_IN } as SignOptions);
   }
 
   // Generate refresh token
@@ -72,7 +72,7 @@ class AuthService {
     expiresAt.setDate(expiresAt.getDate() + parseInt(REFRESH_TOKEN_EXPIRES_IN));
 
     // Generate a random token
-    const token = jwt.sign({ id: userId, type: userType }, JWT_SECRET);
+    const token = jwt.sign({ id: userId, type: userType }, JWT_SECRET as Secret);
 
     // Store in database
     const refreshToken = await prisma.refreshToken.create({
@@ -90,7 +90,7 @@ class AuthService {
   // Verify JWT token
   verifyToken(token: string): TokenPayload {
     try {
-      return jwt.verify(token, JWT_SECRET) as TokenPayload;
+      return jwt.verify(token, JWT_SECRET as Secret) as TokenPayload;
     } catch (error) {
       throw new Error('Invalid token');
     }

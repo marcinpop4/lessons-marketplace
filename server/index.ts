@@ -26,7 +26,7 @@ const __dirname = path.dirname(__filename);
 
 // Initialize express app
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 
 // Middleware
 app.use(helmet()); // Security headers
@@ -83,7 +83,7 @@ if (frontendExists) {
       return res.status(404).json({ error: `API endpoint not found: ${req.path}` });
     }
     
-    res.status(200).send(`
+    return res.status(200).send(`
       <html>
         <head><title>Lessons Marketplace API Server</title></head>
         <body>
@@ -112,7 +112,7 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   if (!frontendExists) {
     console.log(`Frontend build not found at ${frontendDistPath}`);

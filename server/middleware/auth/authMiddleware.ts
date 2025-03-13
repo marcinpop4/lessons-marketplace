@@ -34,7 +34,7 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
     // Verify token
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
     req.user = decoded;
-    next();
+    return next();
   } catch (error) {
     return res.status(401).json({ error: 'Invalid token.' });
   }
@@ -50,7 +50,7 @@ export function isStudent(req: Request, res: Response, next: NextFunction) {
     return res.status(403).json({ error: 'Access denied. Student role required.' });
   }
 
-  next();
+  return next();
 }
 
 // Middleware to check if user is a teacher
@@ -63,7 +63,7 @@ export function isTeacher(req: Request, res: Response, next: NextFunction) {
     return res.status(403).json({ error: 'Access denied. Teacher role required.' });
   }
 
-  next();
+  return next();
 }
 
 // Middleware to check if the user is the specific student for the request

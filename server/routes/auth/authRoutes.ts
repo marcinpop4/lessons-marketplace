@@ -4,6 +4,7 @@ import prisma from '../../prisma.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import cookieParser from 'cookie-parser';
+import { Secret, SignOptions } from 'jsonwebtoken';
 
 const router = express.Router();
 
@@ -11,7 +12,7 @@ const router = express.Router();
 const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax' as const,
+  sameSite: (process.env.NODE_ENV === 'production' ? 'strict' : 'lax') as 'strict' | 'lax' | 'none',
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
 };
 
@@ -99,8 +100,8 @@ router.post('/register', async (req: Request, res: Response) => {
         email: user.email, 
         userType 
       }, 
-      JWT_SECRET, 
-      { expiresIn: JWT_EXPIRES_IN }
+      JWT_SECRET as Secret, 
+      { expiresIn: JWT_EXPIRES_IN } as SignOptions
     );
 
     // Calculate refresh token expiration
@@ -108,7 +109,7 @@ router.post('/register', async (req: Request, res: Response) => {
     expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_EXPIRES_IN);
 
     // Generate refresh token
-    const refreshToken = jwt.sign({ id: user.id, type: userType }, JWT_SECRET);
+    const refreshToken = jwt.sign({ id: user.id, type: userType }, JWT_SECRET as Secret);
 
     // Store refresh token in database
     await prisma.refreshToken.create({
@@ -191,8 +192,8 @@ router.post('/login', async (req: Request, res: Response) => {
         email: user.email, 
         userType 
       }, 
-      JWT_SECRET, 
-      { expiresIn: JWT_EXPIRES_IN }
+      JWT_SECRET as Secret, 
+      { expiresIn: JWT_EXPIRES_IN } as SignOptions
     );
 
     // Calculate refresh token expiration
@@ -200,7 +201,7 @@ router.post('/login', async (req: Request, res: Response) => {
     expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_EXPIRES_IN);
 
     // Generate refresh token
-    const refreshToken = jwt.sign({ id: user.id, type: userType }, JWT_SECRET);
+    const refreshToken = jwt.sign({ id: user.id, type: userType }, JWT_SECRET as Secret);
 
     // Store refresh token in database
     await prisma.refreshToken.create({
@@ -272,8 +273,8 @@ router.post('/refresh-token', async (req: Request, res: Response) => {
         id: storedToken.userId, 
         userType: storedToken.userType 
       }, 
-      JWT_SECRET, 
-      { expiresIn: JWT_EXPIRES_IN }
+      JWT_SECRET as Secret, 
+      { expiresIn: JWT_EXPIRES_IN } as SignOptions
     );
 
     // Calculate new refresh token expiration
@@ -281,7 +282,7 @@ router.post('/refresh-token', async (req: Request, res: Response) => {
     expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_EXPIRES_IN);
 
     // Generate new refresh token
-    const newRefreshToken = jwt.sign({ id: storedToken.userId, type: storedToken.userType }, JWT_SECRET);
+    const newRefreshToken = jwt.sign({ id: storedToken.userId, type: storedToken.userType }, JWT_SECRET as Secret);
 
     // Revoke old refresh token
     await prisma.refreshToken.update({
