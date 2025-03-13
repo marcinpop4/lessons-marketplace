@@ -85,9 +85,9 @@ if (frontendExists) {
     
     res.status(200).send(`
       <html>
-        <head><title>Arts Marketplace API Server</title></head>
+        <head><title>Lessons Marketplace API Server</title></head>
         <body>
-          <h1>Arts Marketplace API Server</h1>
+          <h1>Lessons Marketplace API Server</h1>
           <p>This is the backend API server. The frontend is not built or is being served separately.</p>
           <p>In development mode, the frontend is typically served by Vite at <a href="http://localhost:5173">http://localhost:5173</a>.</p>
           <p>Available API endpoints:</p>

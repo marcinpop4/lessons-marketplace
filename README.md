@@ -1,4 +1,4 @@
-# Arts Marketplace
+# Lessons Marketplace
 
 A modern marketplace for artists to showcase and sell their artwork.
 

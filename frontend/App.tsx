@@ -50,7 +50,7 @@ const AppRoutes = () => {
   return (
     <div className="app-container">
       <div className="header">
-        <h1>Arts Marketplace</h1>
+        <h1>Lessons Marketplace</h1>
       </div>
       
       <div className="main-content">
@@ -105,7 +105,7 @@ const AppRoutes = () => {
       
       <div className="footer">
         <p className="read-the-docs">
-          Welcome to the Arts Marketplace project
+          Welcome to the Lessons Marketplace project
         </p>
       </div>
     </div>
