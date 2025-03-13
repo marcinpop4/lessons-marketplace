@@ -4,7 +4,7 @@ import { getLessonQuotesByRequestId, acceptLessonQuote } from '../api/lessonQuot
 import { getAvailableTeachers, createLessonQuote } from '../api/teacherQuoteApi';
 import { getLessonRequestById } from '../api/lessonRequestApi';
 import { createLessonFromQuote } from '../api/lessonApi';
-import { LessonQuote } from '../types/lesson';
+import { LessonQuote, LessonRequest } from '../types/lesson';
 import '../styles/TeacherQuotes.css';
 
 interface TeacherQuotesProps {
@@ -15,6 +15,7 @@ interface TeacherQuotesProps {
 const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLessonRequestId, onBack }) => {
   const navigate = useNavigate();
   const [quotes, setQuotes] = useState<LessonQuote[]>([]);
+  const [lessonRequest, setLessonRequest] = useState<LessonRequest | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [acceptingQuote, setAcceptingQuote] = useState<string | null>(null);
@@ -37,6 +38,11 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
     }
 
     try {
+      // Fetch the lesson request details
+      const requestData = await getLessonRequestById(effectiveLessonRequestId);
+      setLessonRequest(requestData);
+      
+      // Fetch quotes
       const quotesData = await getLessonQuotesByRequestId(effectiveLessonRequestId);
       setQuotes(quotesData);
       
@@ -45,7 +51,7 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
         await generateQuotes();
       }
     } catch (err) {
-      console.error('Error fetching quotes:', err);
+      console.error('Error fetching data:', err);
       // Continue with empty quotes rather than showing error
       setQuotes([]);
       
@@ -73,11 +79,14 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
     setError(null);
 
     try {
-      // 1. Get the lesson request details
-      const lessonRequest = await getLessonRequestById(effectiveLessonRequestId);
+      // 1. Get the lesson request details if not already loaded
+      const lessonRequestData = lessonRequest || await getLessonRequestById(effectiveLessonRequestId);
+      if (!lessonRequest) {
+        setLessonRequest(lessonRequestData);
+      }
       
-      // 2. Get available teachers for this lesson type
-      const teachers = await getAvailableTeachers(lessonRequest.type);
+      // 2. Get available teachers for this lesson type (limit to 5)
+      const teachers = await getAvailableTeachers(lessonRequestData.type, 5);
       
       if (teachers.length === 0) {
         setError('No teachers available for this lesson type.');
@@ -85,14 +94,17 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
         return;
       }
       
+      // Ensure we only use up to 5 teachers
+      const teachersToUse = teachers.slice(0, 5);
+      
       // 3. Create quotes for each teacher
       const createdQuotes: LessonQuote[] = [];
       
-      for (const teacher of teachers) {
+      for (const teacher of teachersToUse) {
         try {
           // Calculate cost based on hourly rate and duration
-          const hourlyRate = teacher.lessonHourlyRates[lessonRequest.type] || 5000; // Default to $50/hour if not specified
-          const costInCents = Math.round((hourlyRate * lessonRequest.durationMinutes) / 60);
+          const hourlyRate = teacher.lessonHourlyRates[lessonRequestData.type] || 5000; // Default to $50/hour if not specified
+          const costInCents = Math.round((hourlyRate * lessonRequestData.durationMinutes) / 60);
           
           // Create a quote
           const quote = await createLessonQuote(
@@ -110,7 +122,6 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
       
       // 4. Fetch all quotes again to get the updated list
       await fetchQuotes();
-      
     } catch (err) {
       console.error('Error generating quotes:', err);
       setError('Failed to generate quotes. Please try again.');
@@ -191,34 +202,45 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
   return (
     <div className="teacher-quotes-container">
       <h2>Teacher Quotes</h2>
+      
+      {/* Lesson Request Details Card */}
+      {lessonRequest && (
+        <div className="lesson-request-card">
+          <h3>Lesson Request Details</h3>
+          <div className="lesson-request-details">
+            <p><strong>Lesson Type:</strong> {lessonRequest.type}</p>
+            <p><strong>Duration:</strong> {lessonRequest.durationMinutes} minutes</p>
+            <p><strong>Date:</strong> {formatDate(lessonRequest.startTime)}</p>
+            <p><strong>Location:</strong> {lessonRequest.address}</p>
+          </div>
+        </div>
+      )}
+      
       <p className="teacher-quotes-subheading">Compare offers from our teachers:</p>
       
-      <div className="quotes-list">
+      {/* Teacher Quotes Grid */}
+      <div className="quotes-grid">
         {quotes.map((quote) => (
           <div key={quote.id} className="quote-card">
             <div className="quote-header">
-              <h3>{quote.teacher?.firstName || 'Unknown'} {quote.teacher?.lastName || ''}</h3>
+              <h3>{quote.teacher?.firstName || 'Unknown'}</h3>
               <p className="quote-price">{formatPrice(quote.costInCents)}</p>
             </div>
             
             <div className="quote-details">
-              <p><strong>Lesson Type:</strong> {quote.lessonRequest?.type || 'Unknown'}</p>
-              <p><strong>Duration:</strong> {quote.lessonRequest?.durationMinutes || 0} minutes</p>
-              <p><strong>Date:</strong> {quote.lessonRequest?.startTime ? formatDate(quote.lessonRequest.startTime) : 'Unknown'}</p>
-              <p><strong>Location:</strong> {quote.lessonRequest?.address || 'Unknown'}</p>
+              <p className="quote-rate"><strong>Rate:</strong> {formatPrice(quote.costInCents * 60 / (quote.lessonRequest?.durationMinutes || 60))}/hr</p>
             </div>
             
             <div className="quote-footer">
-              <p className="quote-expiry">Offer expires: {formatDate(quote.expiresAt)}</p>
               {acceptSuccess === quote.id ? (
-                <div className="success-message">Quote accepted successfully!</div>
+                <div className="success-message">Quote accepted!</div>
               ) : (
                 <button 
                   className="accept-quote-button" 
                   onClick={() => handleAcceptQuote(quote.id || '')}
                   disabled={acceptingQuote === quote.id || acceptSuccess !== null || creatingLesson}
                 >
-                  {acceptingQuote === quote.id ? 'Processing...' : creatingLesson ? 'Creating Lesson...' : 'Accept Quote'}
+                  {acceptingQuote === quote.id ? 'Processing...' : creatingLesson ? 'Creating...' : 'Accept Quote'}
                 </button>
               )}
             </div>

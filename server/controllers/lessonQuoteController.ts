@@ -143,6 +143,7 @@ export const lessonQuoteController = {
       }
 
       // Get the lesson quotes with teacher and lesson request details
+      // Limit to 5 quotes and order by most recent first
       const quotes = await prisma.lessonQuote.findMany({
         where: {
           lessonRequestId,
@@ -158,6 +159,10 @@ export const lessonQuoteController = {
           },
           lessonRequest: true,
         },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        take: 5 // Limit to 5 quotes
       });
 
       return res.json(quotes);
