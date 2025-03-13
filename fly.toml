@@ -14,6 +14,19 @@ kill_timeout = '5s'
 [env]
   NODE_ENV = 'production'
   PORT = '3000'
+  DATABASE_URL = "postgres://postgres:xBnWThWyLkLn3yQ@twilight-sky-6674.internal:5432/lessons_marketplace_dawn_cherry_4121?schema=public"
+  JWT_SECRET = "production-jwt-secret-key-change-me"
+  JWT_EXPIRES_IN = "1h"
+  REFRESH_TOKEN_EXPIRES_IN = "7d"
+  
+  #Postgres cluster twilight-sky-6674 created
+  #Username:    postgres
+  #Password:    xBnWThWyLkLn3yQ
+  #Hostname:    twilight-sky-6674.internal
+  #Flycast:     fdaa:12:bd82:0:1::3
+  #Proxy port:  5432
+  #Postgres port:  5433
+  #Connection string: postgres://postgres:xBnWThWyLkLn3yQ@twilight-sky-6674.flycast:5432
 
 [http_service]
   internal_port = 3000

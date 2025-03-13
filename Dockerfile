@@ -2,6 +2,9 @@ FROM node:20-slim
 
 WORKDIR /app
 
+# Install OpenSSL for Prisma and other dependencies
+RUN apt-get update -y && apt-get install -y openssl
+
 # Install pnpm
 RUN npm install -g pnpm
 
@@ -13,6 +16,9 @@ RUN pnpm install --frozen-lockfile
 
 # Copy the rest of the application
 COPY . .
+
+# Copy production environment file
+COPY .env.production .env
 
 # Generate Prisma client
 RUN npx prisma generate --schema=server/prisma/schema.prisma
