@@ -15,6 +15,7 @@ import lessonRequestRoutes from './routes/lessonRequestRoutes.js';
 import teacherRoutes from './routes/teacherRoutes.js';
 import lessonRoutes from './routes/lessonRoutes.js';
 import authRoutes from './routes/auth/authRoutes.js';
+import lessonQuoteRoutes from './routes/lessonQuoteRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -59,6 +60,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/lesson-requests', lessonRequestRoutes);
 app.use('/api/teachers', teacherRoutes);
 app.use('/api/lessons', lessonRoutes);
+app.use('/api/lesson-quotes', lessonQuoteRoutes);
 
 // Check if the frontend build directory exists
 const frontendDistPath = path.join(__dirname, '../dist/frontend');
@@ -95,6 +97,7 @@ if (frontendExists) {
             <li>/api/lesson-requests - Lesson request endpoints</li>
             <li>/api/teachers - Teacher endpoints</li>
             <li>/api/lessons - Lesson endpoints</li>
+            <li>/api/lesson-quotes - Lesson quotes endpoints</li>
           </ul>
         </body>
       </html>
