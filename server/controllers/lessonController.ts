@@ -45,6 +45,25 @@ export const lessonController = {
         return;
       }
       
+      // Check if a lesson already exists for this quote
+      const existingLesson = await prisma.lesson.findFirst({
+        where: { quoteId },
+        include: {
+          quote: {
+            include: {
+              teacher: true,
+              lessonRequest: true
+            }
+          }
+        }
+      });
+      
+      if (existingLesson) {
+        console.log(`Lesson already exists for quote ${quoteId}. Returning existing lesson.`);
+        res.status(200).json(existingLesson);
+        return;
+      }
+      
       // Start a transaction to ensure all operations succeed or fail together
       const result = await prisma.$transaction(async (tx) => {
         // Create the lesson
@@ -127,6 +146,41 @@ export const lessonController = {
       console.error('Error fetching lesson:', error);
       res.status(500).json({ 
         message: 'An error occurred while fetching the lesson',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  },
+
+  /**
+   * Get lessons by quote ID
+   * @param req Request with quoteId as a route parameter
+   * @param res Response
+   */
+  getLessonsByQuoteId: async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { quoteId } = req.params;
+      
+      const lessons = await prisma.lesson.findMany({
+        where: { quoteId },
+        include: {
+          quote: {
+            include: {
+              teacher: true,
+              lessonRequest: {
+                include: {
+                  student: true
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      res.status(200).json(lessons);
+    } catch (error) {
+      console.error('Error fetching lessons by quote:', error);
+      res.status(500).json({ 
+        message: 'An error occurred while fetching the lessons',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }

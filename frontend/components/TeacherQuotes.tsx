@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getLessonQuotesByRequestId, acceptLessonQuote } from '../api/lessonQuotesApi';
 import { getAvailableTeachers, createLessonQuote } from '../api/teacherQuoteApi';
 import { getLessonRequestById } from '../api/lessonRequestApi';
-import { createLessonFromQuote } from '../api/lessonApi';
+import { getLessonsByQuoteId } from '../api/lessonApi';
 import { LessonQuote, LessonRequest } from '../types/lesson';
 import '../styles/TeacherQuotes.css';
 
@@ -47,9 +47,19 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
       const quotesData = await getLessonQuotesByRequestId(effectiveLessonRequestId);
       setQuotes(quotesData);
       
-      // If no quotes are found, automatically generate them
+      // If no quotes are found and we're not already generating quotes, generate them
       if (quotesData.length === 0 && !generatingQuotes) {
-        await generateQuotes();
+        // Set a flag to indicate we're about to generate quotes
+        // This helps prevent multiple concurrent quote generation attempts
+        setGeneratingQuotes(true);
+        
+        // Generate quotes in a controlled way
+        try {
+          await generateQuotes();
+        } finally {
+          // Make sure to reset the flag even if generation fails
+          setGeneratingQuotes(false);
+        }
       }
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -68,7 +78,6 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
       return;
     }
 
-    setGeneratingQuotes(true);
     setError(null);
 
     try {
@@ -78,23 +87,39 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
         setLessonRequest(lessonRequestData);
       }
       
+      // Check once more for existing quotes to prevent duplicates
+      // This handles race conditions if the component is mounted multiple times
+      const existingQuotes = await getLessonQuotesByRequestId(effectiveLessonRequestId);
+      if (existingQuotes.length > 0) {
+        setQuotes(existingQuotes);
+        return;
+      }
+      
       // 2. Get available teachers for this lesson type (limit to 5)
       const teachers = await getAvailableTeachers(lessonRequestData.type, 5);
       
       if (teachers.length === 0) {
         setError('No teachers available for this lesson type.');
-        setGeneratingQuotes(false);
         return;
       }
       
       // Ensure we only use up to 5 teachers
       const teachersToUse = teachers.slice(0, 5);
       
+      // Keep track of teachers we've already created quotes for
+      const processedTeacherIds = new Set();
+      
       // 3. Create quotes for each teacher
       const createdQuotes: LessonQuote[] = [];
       
       for (const teacher of teachersToUse) {
         try {
+          // Skip if we've already processed this teacher
+          if (processedTeacherIds.has(teacher.id)) {
+            console.log(`Skipping duplicate teacher ${teacher.id}`);
+            continue;
+          }
+          
           // Calculate cost based on hourly rate and duration
           // Check if hourly rate exists, throw error if not
           const hourlyRate = teacher.lessonHourlyRates[lessonRequestData.type];
@@ -112,6 +137,7 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
           );
           
           createdQuotes.push(quote);
+          processedTeacherIds.add(teacher.id);
         } catch (quoteErr) {
           console.error(`Error creating quote for teacher ${teacher.id}:`, quoteErr);
           // Continue with other teachers if one fails
@@ -119,12 +145,17 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
       }
       
       // 4. Fetch all quotes again to get the updated list
-      await fetchQuotes();
+      // Only do this if we created at least one quote successfully
+      if (createdQuotes.length > 0) {
+        const updatedQuotes = await getLessonQuotesByRequestId(effectiveLessonRequestId);
+        setQuotes(updatedQuotes);
+      } else if (processedTeacherIds.size === 0) {
+        // If we didn't process any teachers successfully, show an error
+        setError('Unable to generate quotes. Please try again later.');
+      }
     } catch (err) {
       console.error('Error generating quotes:', err);
       setError('Failed to generate quotes. Please try again.');
-    } finally {
-      setGeneratingQuotes(false);
     }
   };
 
@@ -153,17 +184,25 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
     
     try {
       setAcceptingQuote(quoteId);
+      setCreatingLesson(true);
       
-      // Accept the quote - this will also expire all other quotes for this lesson request
-      await acceptLessonQuote(quoteId);
+      // Accept the quote - this will also create a lesson and expire all other quotes
+      const result = await acceptLessonQuote(quoteId);
       setAcceptSuccess(quoteId);
       
-      // Create a lesson from the accepted quote
-      setCreatingLesson(true);
-      const lesson = await createLessonFromQuote(quoteId);
-      
       // Redirect to the lesson confirmation page
-      navigate(`/lesson-confirmation/${lesson.id}`);
+      // The lesson ID should be in the result from acceptLessonQuote
+      if (result.lesson && result.lesson.id) {
+        navigate(`/lesson-confirmation/${result.lesson.id}`);
+      } else {
+        // Fallback in case lesson wasn't returned - fetch first lesson for this quote
+        const lessons = await getLessonsByQuoteId(quoteId);
+        if (lessons && lessons.length > 0) {
+          navigate(`/lesson-confirmation/${lessons[0].id}`);
+        } else {
+          throw new Error('No lesson was created');
+        }
+      }
     } catch (err) {
       console.error('Error accepting quote:', err);
       setError('Failed to accept quote. Please try again.');

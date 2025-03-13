@@ -34,11 +34,14 @@ export const getLessonQuotesByRequestId = async (lessonRequestId: string): Promi
 
 /**
  * Accept a lesson quote
- * This will also expire all other quotes for the same lesson request
+ * This will also create a lesson and expire all other quotes for the same lesson request
  * @param quoteId - Lesson quote ID
- * @returns Accepted lesson quote
+ * @returns Accepted lesson quote with created lesson
  */
-export const acceptLessonQuote = async (quoteId: string): Promise<LessonQuote> => {
+export const acceptLessonQuote = async (quoteId: string): Promise<{ 
+  id: string;
+  lesson: { id: string } 
+}> => {
   try {
     const response = await apiClient.post(`/lesson-quotes/${quoteId}/accept`);
     return response.data;

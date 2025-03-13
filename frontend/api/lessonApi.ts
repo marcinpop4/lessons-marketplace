@@ -30,4 +30,19 @@ export const getLessonById = async (lessonId: string): Promise<Lesson> => {
     console.error('Error fetching lesson:', error);
     throw error;
   }
+};
+
+/**
+ * Get lessons for a specific quote
+ * @param quoteId - Quote ID
+ * @returns Array of lessons
+ */
+export const getLessonsByQuoteId = async (quoteId: string): Promise<Lesson[]> => {
+  try {
+    const response = await apiClient.get(`/lessons/quote/${quoteId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching lessons by quote:', error);
+    throw error;
+  }
 }; 

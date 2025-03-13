@@ -48,6 +48,21 @@ export const lessonQuoteController = {
         return;
       }
       
+      // Check for existing quotes for this teacher and lesson request
+      const existingQuote = await prisma.lessonQuote.findFirst({
+        where: {
+          lessonRequestId,
+          teacherId,
+        }
+      });
+      
+      // If a quote already exists, return it instead of creating a new one
+      if (existingQuote) {
+        console.log(`Quote already exists for teacher ${teacherId} and lesson request ${lessonRequestId}. Returning existing quote.`);
+        res.status(200).json(existingQuote);
+        return;
+      }
+      
       // Create the lesson quote
       const lessonQuote = await prisma.lessonQuote.create({
         data: {
@@ -234,10 +249,15 @@ export const lessonQuoteController = {
           }
         });
 
-        return lesson;
+        return {
+          id: quoteId,
+          lesson: {
+            id: lesson.id
+          }
+        };
       });
 
-      return res.json(result);
+      return res.status(200).json(result);
     } catch (error) {
       console.error('Error accepting lesson quote:', error);
       return res.status(500).json({ error: 'Failed to accept lesson quote' });
