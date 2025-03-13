@@ -1,6 +1,6 @@
 # Lessons Marketplace
 
-A modern marketplace for artists to showcase and sell their artwork.
+Unlock your potential with Lessons Marketplace – the go-to platform for parents and students to connect with top 1:1 instructors and master their passions!
 
 ## Database Setup
 

@@ -247,13 +247,13 @@ const TeacherLessonRatesManager: React.FC<TeacherLessonRatesManagerProps> = ({
       <div className="current-rates">
         <h3>Your Current Lesson Rates</h3>
         {lessonRates.length === 0 ? (
-          <p>You haven't set any lesson rates yet.</p>
+          <p className="no-rates-message">You haven't set any lesson rates yet.</p>
         ) : (
           <table className="rates-table">
             <thead>
               <tr>
                 <th>Lesson Type</th>
-                <th>Hourly Rate</th>
+                <th>Rate (hourly)</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -262,21 +262,24 @@ const TeacherLessonRatesManager: React.FC<TeacherLessonRatesManagerProps> = ({
               {lessonRates.map(rate => (
                 <tr key={rate.id} className={rate.isActive ? 'active-rate' : 'inactive-rate'}>
                   <td>{rate.type.charAt(0) + rate.type.slice(1).toLowerCase()}</td>
-                  <td>${formatDollars(rate.rateInCents)}/hr</td>
-                  <td>{rate.isActive ? 'Active' : 'Inactive'}</td>
+                  <td>${formatDollars(rate.rateInCents)}</td>
+                  <td className="status-cell">
+                    <span className={`status-indicator ${rate.isActive ? 'active' : 'inactive'}`}></span>
+                    {rate.isActive ? 'Active' : 'Inactive'}
+                  </td>
                   <td>
                     {rate.isActive ? (
                       <button 
+                        className="deactivate-button" 
                         onClick={() => handleDeactivate(rate.type)}
-                        className="deactivate-button"
                         disabled={loading}
                       >
                         Deactivate
                       </button>
                     ) : (
                       <button 
+                        className="reactivate-button" 
                         onClick={() => handleReactivate(rate.type)}
-                        className="reactivate-button"
                         disabled={loading}
                       >
                         Reactivate

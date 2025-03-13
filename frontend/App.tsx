@@ -50,7 +50,14 @@ const AppRoutes = () => {
   return (
     <div className="app-container">
       <div className="header">
-        <h1>Lessons Marketplace</h1>
+        <div className="logo-container">
+          <img 
+            src="/assets/images/lessons-marketplace.png" 
+            alt="Lessons Marketplace Logo" 
+            className="logo" 
+          />
+          <h1>Lessons Marketplace</h1>
+        </div>
       </div>
       
       <div className="main-content">

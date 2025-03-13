@@ -233,83 +233,89 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
       )}
       
       <form onSubmit={handleSubmit} className="lesson-request-form">
-        <div className="form-group">
-          <label htmlFor="type">Lesson Type</label>
-          <select
-            id="type"
-            name="type"
-            value={formData.type}
-            onChange={handleChange}
-            required
-          >
-            <option value={LessonType.VOICE}>Voice</option>
-            <option value={LessonType.GUITAR}>Guitar</option>
-            <option value={LessonType.BASS}>Bass</option>
-            <option value={LessonType.DRUMS}>Drums</option>
-          </select>
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="type">Lesson Type</label>
+            <select
+              id="type"
+              name="type"
+              value={formData.type}
+              onChange={handleChange}
+              required
+            >
+              <option value={LessonType.VOICE}>Voice</option>
+              <option value={LessonType.GUITAR}>Guitar</option>
+              <option value={LessonType.BASS}>Bass</option>
+              <option value={LessonType.DRUMS}>Drums</option>
+            </select>
+          </div>
+          
+          <div className="form-group">
+            <label htmlFor="durationMinutes">Lesson Duration</label>
+            <select
+              id="durationMinutes"
+              name="durationMinutes"
+              value={formData.durationMinutes}
+              onChange={handleChange}
+              required
+            >
+              <option value={30}>30 minutes</option>
+              <option value={45}>45 minutes</option>
+              <option value={60}>60 minutes</option>
+              <option value={90}>90 minutes</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="date">Date</label>
+            <input
+              id="date"
+              type="date"
+              value={selectedDate}
+              onChange={handleDateChange}
+              min={formatDateForInput(new Date())}
+              required
+            />
+          </div>
+          
+          <div className="form-group">
+            <label htmlFor="time">Time</label>
+            <select
+              id="time"
+              value={selectedTime}
+              onChange={handleTimeChange}
+              required
+            >
+              <option value="">Select a time</option>
+              {timeOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         
         <div className="form-group">
-          <label htmlFor="lessonDate">Lesson Date</label>
-          <input
-            type="date"
-            id="lessonDate"
-            name="lessonDate"
-            value={selectedDate}
-            onChange={handleDateChange}
-            required
-          />
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="lessonTime">Lesson Time</label>
-          <select
-            id="lessonTime"
-            name="lessonTime"
-            value={selectedTime}
-            onChange={handleTimeChange}
-            required
-          >
-            <option value="">Select a time</option>
-            {timeOptions.map((option, index) => (
-              <option key={index} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <small className="form-helper-text">Lessons are available between 8:00 AM and 8:00 PM, and must end by 9:00 PM.</small>
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="durationMinutes">Duration (minutes)</label>
-          <select
-            id="durationMinutes"
-            name="durationMinutes"
-            value={formData.durationMinutes}
-            onChange={handleChange}
-            required
-          >
-            <option value="30">30 minutes</option>
-            <option value="60">60 minutes</option>
-          </select>
-          <small className="form-helper-text">Please ensure your selected time and duration don't result in a lesson ending after 9:00 PM.</small>
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="address">Lesson Location</label>
+          <label htmlFor="address">Address</label>
           <textarea
             id="address"
             name="address"
             value={formData.address}
             onChange={handleChange}
-            placeholder="Enter the address or location for the lesson"
+            placeholder="Enter the full address where you'd like the lesson to take place"
             required
           />
         </div>
         
         <div className="form-actions">
-          <button type="submit" disabled={loading || !selectedTime || !selectedDate}>
-            {loading ? 'Submitting...' : 'Submit Lesson Request'}
+          <button
+            type="submit"
+            disabled={loading}
+          >
+            {loading ? 'Submitting...' : 'Submit Request'}
           </button>
         </div>
       </form>

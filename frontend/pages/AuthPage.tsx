@@ -34,29 +34,29 @@ const AuthPage: React.FC = () => {
 
   return (
     <div className="auth-page-container">
-      <h1 className="auth-page-title">Music Lessons Marketplace</h1>
-      
-      <div className="auth-tabs">
-        <button
-          className={`auth-tab ${activeTab === 'login' ? 'active' : ''}`}
-          onClick={() => setActiveTab('login')}
-        >
-          Login
-        </button>
-        <button
-          className={`auth-tab ${activeTab === 'register' ? 'active' : ''}`}
-          onClick={() => setActiveTab('register')}
-        >
-          Register
-        </button>
-      </div>
-      
-      <div className="auth-form-wrapper">
-        {activeTab === 'login' ? (
-          <LoginForm onSuccess={handleSuccess} />
-        ) : (
-          <RegisterForm onSuccess={handleSuccess} />
-        )}
+      <div className="auth-content">
+        <div className="auth-tabs">
+          <button
+            className={`auth-tab ${activeTab === 'login' ? 'active' : ''}`}
+            onClick={() => setActiveTab('login')}
+          >
+            Login
+          </button>
+          <button
+            className={`auth-tab ${activeTab === 'register' ? 'active' : ''}`}
+            onClick={() => setActiveTab('register')}
+          >
+            Register
+          </button>
+        </div>
+        
+        <div className="auth-form-wrapper">
+          {activeTab === 'login' ? (
+            <LoginForm onSuccess={handleSuccess} />
+          ) : (
+            <RegisterForm onSuccess={handleSuccess} />
+          )}
+        </div>
       </div>
     </div>
   );

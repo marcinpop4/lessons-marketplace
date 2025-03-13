@@ -26,10 +26,18 @@ interface LessonRate {
   updatedAt: string;
 }
 
+interface TeacherStats {
+  totalLessons: number;
+  completedLessons: number;
+  upcomingLessons: number;
+  activeQuotes: number;
+}
+
 const TeacherDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<TeacherProfile | null>(null);
+  const [stats, setStats] = useState<TeacherStats | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,15 +53,21 @@ const TeacherDashboard: React.FC = () => {
       return;
     }
 
-    // Fetch teacher profile
-    const fetchProfile = async () => {
+    // Fetch teacher profile and stats
+    const fetchTeacherData = async () => {
       try {
         setLoading(true);
-        // Use apiClient instead of fetch for consistent error handling and token management
-        const response = await apiClient.get('/teachers/profile');
-        setProfile(response.data);
+        
+        // Use Promise.all to fetch profile and stats in parallel
+        const [profileResponse, statsResponse] = await Promise.all([
+          apiClient.get('/teachers/profile'),
+          apiClient.get('/teachers/stats')
+        ]);
+        
+        setProfile(profileResponse.data);
+        setStats(statsResponse.data);
       } catch (err) {
-        console.error('Error fetching teacher profile:', err);
+        console.error('Error fetching teacher data:', err);
         
         // Extract more detailed error information
         if (axios.isAxiosError(err)) {
@@ -68,7 +82,7 @@ const TeacherDashboard: React.FC = () => {
       }
     };
 
-    fetchProfile();
+    fetchTeacherData();
   }, [user, navigate]);
 
   const handleLogout = () => {
@@ -79,7 +93,8 @@ const TeacherDashboard: React.FC = () => {
   if (loading) {
     return (
       <div className="teacher-dashboard loading">
-        <h2>Loading profile...</h2>
+        <h2>Loading your dashboard...</h2>
+        <p>Please wait while we retrieve your information.</p>
       </div>
     );
   }
@@ -87,9 +102,9 @@ const TeacherDashboard: React.FC = () => {
   if (error) {
     return (
       <div className="teacher-dashboard error">
-        <h2>Error</h2>
+        <h2>Error Loading Dashboard</h2>
         <p>{error}</p>
-        <button onClick={handleLogout}>Logout</button>
+        <button onClick={handleLogout} className="logout-button">Logout</button>
       </div>
     );
   }
@@ -106,9 +121,31 @@ const TeacherDashboard: React.FC = () => {
           <div className="profile-section">
             <h2>Profile Information</h2>
             <div className="profile-details">
-              <p><strong>Name:</strong> {profile.firstName} {profile.lastName}</p>
-              <p><strong>Email:</strong> {profile.email}</p>
-              <p><strong>Phone:</strong> {profile.phoneNumber}</p>
+              <p><strong>Name: </strong>{profile.firstName} {profile.lastName}</p>
+              <p><strong>Email: </strong>{profile.email}</p>
+              <p><strong>Phone: </strong>{profile.phoneNumber}</p>
+            </div>
+          </div>
+
+          <div className="profile-section">
+            <h2>Teaching Statistics</h2>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-value">{stats?.totalLessons || 0}</div>
+                <div className="stat-label">Total Lessons</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-value">{stats?.completedLessons || 0}</div>
+                <div className="stat-label">Completed Lessons</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-value">{stats?.upcomingLessons || 0}</div>
+                <div className="stat-label">Upcoming Lessons</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-value">{stats?.activeQuotes || 0}</div>
+                <div className="stat-label">Active Quotes</div>
+              </div>
             </div>
           </div>
 

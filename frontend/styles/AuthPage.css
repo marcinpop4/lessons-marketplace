@@ -1,7 +1,16 @@
 .auth-page-container {
-  max-width: 800px;
-  margin: 2rem auto;
-  padding: 2rem;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.auth-content {
+  width: 100%;
+  max-width: 600px;
+  padding: 0;
 }
 
 .auth-page-title {
@@ -14,13 +23,13 @@
 
 .auth-tabs {
   display: flex;
-  margin-bottom: 2rem;
+  margin-bottom: 0.5rem;
   border-bottom: 1px solid #ddd;
 }
 
 .auth-tab {
   flex: 1;
-  padding: 0.8rem;
+  padding: 0.7rem;
   text-align: center;
   font-weight: 600;
   cursor: pointer;
@@ -41,6 +50,13 @@
 }
 
 .auth-form-wrapper {
-  max-width: 600px;
+  width: 100%;
   margin: 0 auto;
+}
+
+/* Media query for smaller screens */
+@media (max-width: 768px) {
+  .auth-page-container {
+    padding: 0;
+  }
 } 

@@ -60,41 +60,42 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
           {displayError}
           {authError && (
             <button 
-              className="absolute top-0 bottom-0 right-0 px-4 py-3"
               onClick={clearError}
-              style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+              className="clear-error-btn"
             >
-              <span style={{ fontSize: '1.2rem' }}>&times;</span>
+              <span>&times;</span>
             </button>
           )}
         </div>
       )}
       
       <form onSubmit={handleSubmit} className="login-form">
-        <div className="form-group">
-          <label htmlFor="email">Email Address</label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="email">Email Address</label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          
+          <div className="form-group">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
         </div>
         
-        <div className="form-group">
-          <label htmlFor="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        
-        <div className="form-group">
-          <label>I am a:</label>
+        <div className="form-row user-type-container">
+          <label className="user-type-label">I am a:</label>
           <div className="user-type-options">
             <label className="user-type-option">
               <input
@@ -117,15 +118,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
               Teacher
             </label>
           </div>
-        </div>
         
-        <div className="form-actions">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Logging in...' : 'Login'}
-          </button>
+          <div className="form-actions">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Logging in...' : 'Login'}
+            </button>
+          </div>
         </div>
       </form>
     </div>

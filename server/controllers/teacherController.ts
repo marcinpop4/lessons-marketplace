@@ -399,5 +399,91 @@ export const teacherController = {
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
+  },
+
+  /**
+   * Get statistics for a teacher
+   * @param req Request - must include teacherId from authenticated user
+   * @param res Response
+   */
+  getTeacherStats: async (req: Request, res: Response): Promise<void> => {
+    try {
+      // Get the teacher ID from the authenticated user
+      const teacherId = req.user?.id;
+      
+      if (!teacherId) {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+      }
+
+      // Get today's date at midnight for comparing with lesson dates
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Get statistics using Prisma transactions
+      const stats = await prisma.$transaction(async (tx) => {
+        // Get all quotes for this teacher
+        const quotes = await tx.lessonQuote.findMany({
+          where: { teacherId },
+          include: {
+            lessonRequest: true,
+            lessons: true
+          }
+        });
+        
+        // Count active quotes (not expired and no lessons created)
+        const activeQuotes = quotes.filter(quote => 
+          new Date(quote.expiresAt) > new Date() && quote.lessons.length === 0
+        ).length;
+
+        // Get all lessons for this teacher through quotes
+        const allLessons = await tx.lesson.findMany({
+          where: {
+            quote: {
+              teacherId
+            }
+          },
+          include: {
+            quote: {
+              include: {
+                lessonRequest: true
+              }
+            }
+          }
+        });
+
+        // Total number of lessons
+        const totalLessons = allLessons.length;
+        
+        // Count completed lessons (start time + duration is in the past)
+        const completedLessons = allLessons.filter(lesson => {
+          const lessonRequest = lesson.quote.lessonRequest;
+          const lessonEndTime = new Date(lessonRequest.startTime);
+          lessonEndTime.setMinutes(lessonEndTime.getMinutes() + lessonRequest.durationMinutes);
+          return lessonEndTime < new Date();
+        }).length;
+        
+        // Count upcoming lessons (start time is in the future)
+        const upcomingLessons = allLessons.filter(lesson => {
+          const lessonRequest = lesson.quote.lessonRequest;
+          return new Date(lessonRequest.startTime) > new Date();
+        }).length;
+
+        return {
+          totalLessons,
+          completedLessons,
+          upcomingLessons,
+          activeQuotes
+        };
+      });
+
+      res.status(200).json(stats);
+    } catch (error) {
+      console.error('Error fetching teacher statistics:', error);
+      res.status(500).json({
+        message: 'An error occurred while fetching teacher statistics',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   }
 }; 

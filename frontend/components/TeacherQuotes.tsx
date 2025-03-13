@@ -245,20 +245,19 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
     <div className="teacher-quotes-container">
       <h2>Teacher Quotes</h2>
       
-      {/* Lesson Request Details Card */}
+      {/* Lesson Request Details - More Compact */}
       {lessonRequest && (
         <div className="lesson-request-card">
-          <h3>Lesson Request Details</h3>
           <div className="lesson-request-details">
-            <p><strong>Lesson Type:</strong> {lessonRequest.type}</p>
-            <p><strong>Duration:</strong> {lessonRequest.durationMinutes} minutes</p>
-            <p><strong>Date:</strong> {formatDate(lessonRequest.startTime)}</p>
-            <p><strong>Location:</strong> {lessonRequest.address}</p>
+            <p><span>Lesson Type:</span> {lessonRequest.type}</p>
+            <p><span>Duration:</span> {lessonRequest.durationMinutes} minutes</p>
+            <p><span>Date:</span> {formatDate(lessonRequest.startTime)}</p>
+            <p><span>Location:</span> {lessonRequest.address}</p>
           </div>
         </div>
       )}
       
-      <p className="teacher-quotes-subheading">Compare offers from our teachers:</p>
+      <p className="teacher-quotes-subheading">Choose your preferred teacher below:</p>
       
       {/* Teacher Quotes Grid */}
       <div className="quotes-grid">
@@ -280,7 +279,10 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
               </div>
               
               <div className="quote-details">
-                <p className="quote-rate"><strong>Rate:</strong> {formatPrice(quote.costInCents * 60 / quote.lessonRequest.durationMinutes)}/hr</p>
+                <p className="quote-rate"><span>Hourly Rate:</span> {formatPrice(quote.costInCents * 60 / quote.lessonRequest.durationMinutes)}</p>
+                {quote.teacher && 'experience' in quote.teacher && (
+                  <p className="teacher-bio-preview">Experience: {typeof quote.teacher.experience === 'string' ? quote.teacher.experience.substring(0, 60) : ''}...</p>
+                )}
               </div>
               
               <div className="quote-footer">

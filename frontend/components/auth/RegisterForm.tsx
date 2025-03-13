@@ -82,53 +82,57 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
           {authError && (
             <button 
               onClick={clearError}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', float: 'right' }}
+              className="clear-error-btn"
             >
-              <span style={{ fontSize: '1.2rem' }}>&times;</span>
+              <span>&times;</span>
             </button>
           )}
         </div>
       )}
       
       <form onSubmit={handleSubmit} className="register-form">
-        <div className="form-group">
-          <label htmlFor="email">Email Address</label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-          />
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="email">Email Address</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={handleChange}
+              required
+            />
+          </div>
         </div>
         
-        <div className="form-group">
-          <label htmlFor="password">Password</label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="confirmPassword">Confirm Password</label>
-          <input
-            id="confirmPassword"
-            name="confirmPassword"
-            type="password"
-            className={passwordError ? 'error' : ''}
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            required
-          />
-          {passwordError && (
-            <p className="error-text">{passwordError}</p>
-          )}
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          
+          <div className="form-group">
+            <label htmlFor="confirmPassword">Confirm Password</label>
+            <input
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              className={passwordError ? 'error' : ''}
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              required
+            />
+            {passwordError && (
+              <p className="error-text">{passwordError}</p>
+            )}
+          </div>
         </div>
         
         <div className="form-row">
@@ -157,63 +161,67 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
           </div>
         </div>
         
-        <div className="form-group">
-          <label htmlFor="phoneNumber">Phone Number</label>
-          <input
-            id="phoneNumber"
-            name="phoneNumber"
-            type="tel"
-            value={formData.phoneNumber}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="dateOfBirth">Date of Birth</label>
-          <input
-            id="dateOfBirth"
-            name="dateOfBirth"
-            type="date"
-            value={formData.dateOfBirth}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        
-        <div className="form-group">
-          <label>I am a:</label>
-          <div className="user-type-options">
-            <label className="user-type-option">
-              <input
-                type="radio"
-                name="userType"
-                value="STUDENT"
-                checked={formData.userType === 'STUDENT'}
-                onChange={() => setFormData(prev => ({ ...prev, userType: 'STUDENT' }))}
-              />
-              Student
-            </label>
-            <label className="user-type-option">
-              <input
-                type="radio"
-                name="userType"
-                value="TEACHER"
-                checked={formData.userType === 'TEACHER'}
-                onChange={() => setFormData(prev => ({ ...prev, userType: 'TEACHER' }))}
-              />
-              Teacher
-            </label>
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="phoneNumber">Phone Number</label>
+            <input
+              id="phoneNumber"
+              name="phoneNumber"
+              type="tel"
+              value={formData.phoneNumber}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          
+          <div className="form-group">
+            <label htmlFor="dateOfBirth">Date of Birth</label>
+            <input
+              id="dateOfBirth"
+              name="dateOfBirth"
+              type="date"
+              value={formData.dateOfBirth}
+              onChange={handleChange}
+              required
+            />
           </div>
         </div>
         
-        <div className="form-actions">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Registering...' : 'Register'}
-          </button>
+        <div className="form-row">
+          <div className="form-group" style={{ flex: '0 0 auto' }}>
+            <label>I am a:</label>
+            <div className="user-type-options">
+              <label className="user-type-option">
+                <input
+                  type="radio"
+                  name="userType"
+                  value="STUDENT"
+                  checked={formData.userType === 'STUDENT'}
+                  onChange={() => setFormData(prev => ({ ...prev, userType: 'STUDENT' }))}
+                />
+                Student
+              </label>
+              <label className="user-type-option">
+                <input
+                  type="radio"
+                  name="userType"
+                  value="TEACHER"
+                  checked={formData.userType === 'TEACHER'}
+                  onChange={() => setFormData(prev => ({ ...prev, userType: 'TEACHER' }))}
+                />
+                Teacher
+              </label>
+            </div>
+          </div>
+          
+          <div className="form-actions">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Registering...' : 'Register'}
+            </button>
+          </div>
         </div>
       </form>
     </div>

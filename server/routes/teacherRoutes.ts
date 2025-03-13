@@ -21,4 +21,7 @@ router.post('/lesson-rates/deactivate', authenticate, isTeacher, teacherControll
 // POST /api/teachers/lesson-rates/reactivate - Reactivate a lesson rate
 router.post('/lesson-rates/reactivate', authenticate, isTeacher, teacherController.reactivateLessonRate);
 
+// GET /api/teachers/stats - Get teacher statistics
+router.get('/stats', authenticate, isTeacher, teacherController.getTeacherStats);
+
 export default router; 

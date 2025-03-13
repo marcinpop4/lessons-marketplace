@@ -80,54 +80,67 @@ const LessonConfirmation: React.FC = () => {
   return (
     <div className="lesson-confirmation-container">
       <div className="confirmation-header">
-        <h2>Lesson Confirmed!</h2>
-        <div className="confirmation-icon">✓</div>
-      </div>
-      
-      <div className="lesson-details-card">
-        <h3>Lesson Details</h3>
-        
-        <div className="lesson-info">
-          <div className="info-row">
-            <span className="info-label">Teacher:</span>
-            <span className="info-value">{teacher?.firstName} {teacher?.lastName}</span>
-          </div>
-          
-          <div className="info-row">
-            <span className="info-label">Lesson Type:</span>
-            <span className="info-value">{lessonRequest?.type}</span>
-          </div>
-          
-          <div className="info-row">
-            <span className="info-label">Date & Time:</span>
-            <span className="info-value">{lessonRequest?.startTime ? formatDate(lessonRequest.startTime) : 'Not specified'}</span>
-          </div>
-          
-          <div className="info-row">
-            <span className="info-label">Duration:</span>
-            <span className="info-value">{lessonRequest?.durationMinutes} minutes</span>
-          </div>
-          
-          <div className="info-row">
-            <span className="info-label">Location:</span>
-            <span className="info-value">{lessonRequest?.address}</span>
-          </div>
-          
-          <div className="info-row">
-            <span className="info-label">Price:</span>
-            <span className="info-value">{quote?.costInCents ? formatPrice(quote.costInCents) : 'Not specified'}</span>
-          </div>
-          
-          <div className="info-row">
-            <span className="info-label">Confirmed On:</span>
-            <span className="info-value">{formatDate(lesson.confirmedAt)}</span>
+        <div className="confirmation-header-content">
+          <div className="confirmation-icon">✓</div>
+          <div className="confirmation-text">
+            <h2>Lesson Confirmed!</h2>
+            <p>Your lesson has been successfully booked and confirmed.</p>
           </div>
         </div>
+        <button 
+          className="new-lesson-button"
+          onClick={handleCreateNewLesson}
+        >
+          Book Another Lesson
+        </button>
       </div>
       
-      <div className="confirmation-actions">
-        <p>Your lesson has been successfully booked. The teacher will contact you shortly with further details.</p>
-        <button onClick={handleCreateNewLesson} className="new-lesson-button">Book Another Lesson</button>
+      <div className="lesson-details-section">
+        <div className="lesson-details-card">
+          <h3>Lesson Details</h3>
+          
+          <div className="lesson-info">
+            <div className="info-columns">
+              <div className="info-column">
+                <div className="info-item">
+                  <div className="info-label">Teacher</div>
+                  <div className="info-value">{teacher?.firstName} {teacher?.lastName}</div>
+                </div>
+                
+                <div className="info-item">
+                  <div className="info-label">Lesson Type</div>
+                  <div className="info-value">{lessonRequest?.type}</div>
+                </div>
+                
+                <div className="info-item">
+                  <div className="info-label">Date</div>
+                  <div className="info-value">{lessonRequest?.startTime ? formatDate(lessonRequest.startTime) : 'Not specified'}</div>
+                </div>
+              </div>
+              
+              <div className="info-column">
+                <div className="info-item">
+                  <div className="info-label">Duration</div>
+                  <div className="info-value">{lessonRequest?.durationMinutes} minutes</div>
+                </div>
+                
+                <div className="info-item">
+                  <div className="info-label">Location</div>
+                  <div className="info-value">{lessonRequest?.address}</div>
+                </div>
+                
+                <div className="info-item">
+                  <div className="info-label">Price</div>
+                  <div className="info-value">{quote?.costInCents ? formatPrice(quote.costInCents) : 'Not specified'}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="confirmation-footer">
+          <p className="teacher-contact-note">Your teacher will contact you shortly to confirm the details.</p>
+        </div>
       </div>
     </div>
   );
