@@ -15,7 +15,9 @@ interface TeacherLessonHourlyRate {
   type: LessonType;
   rateInCents: number;
   teacherId: string;
-  deactivatedAt?: Date | null;
+  deactivatedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 interface Teacher {
@@ -170,8 +172,8 @@ export const teacherController = {
           id: rate.id,
           type: rate.type,
           rateInCents: rate.rateInCents,
-          isActive: rate.deactivatedAt === null,
-          deactivatedAt: rate.deactivatedAt ? rate.deactivatedAt.toISOString() : null,
+          isActive: (rate as any).deactivatedAt === null,
+          deactivatedAt: (rate as any).deactivatedAt ? (rate as any).deactivatedAt.toISOString() : null,
           createdAt: rate.createdAt.toISOString(),
           updatedAt: rate.updatedAt.toISOString()
         }))
@@ -238,7 +240,7 @@ export const teacherController = {
         update: {
           rateInCents,
           deactivatedAt: null // Ensure it's active when updated
-        },
+        } as any,
         create: {
           teacherId,
           type: lessonType as LessonType,
@@ -310,7 +312,7 @@ export const teacherController = {
         },
         data: {
           deactivatedAt: new Date()
-        }
+        } as any
       });
 
       res.status(200).json({
@@ -318,7 +320,7 @@ export const teacherController = {
         type: updatedRate.type,
         rateInCents: updatedRate.rateInCents,
         isActive: false,
-        deactivatedAt: updatedRate.deactivatedAt?.toISOString(),
+        deactivatedAt: (updatedRate as any).deactivatedAt?.toISOString(),
         createdAt: updatedRate.createdAt.toISOString(),
         updatedAt: updatedRate.updatedAt.toISOString()
       });
@@ -378,7 +380,7 @@ export const teacherController = {
         },
         data: {
           deactivatedAt: null
-        }
+        } as any
       });
 
       res.status(200).json({
