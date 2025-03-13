@@ -1,7 +1,7 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 import prisma from '../../prisma.js';
-import bcrypt from 'bcrypt';
+import bcryptjs from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import cookieParser from 'cookie-parser';
 import { Secret, SignOptions } from 'jsonwebtoken';
@@ -22,15 +22,15 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 const REFRESH_TOKEN_EXPIRES_IN = 7; // days
 
 // Hash password
-async function hashPassword(password: string): Promise<string> {
+export const hashPassword = async (password: string): Promise<string> => {
   const saltRounds = 10;
-  return bcrypt.hash(password, saltRounds);
-}
+  return bcryptjs.hash(password, saltRounds);
+};
 
 // Compare password with hash
-async function comparePassword(password: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(password, hash);
-}
+export const comparePasswords = async (password: string, hash: string): Promise<boolean> => {
+  return bcryptjs.compare(password, hash);
+};
 
 // Register endpoint
 router.post('/register', async (req: Request, res: Response) => {
@@ -180,7 +180,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     // Verify password
-    const isValidPassword = await comparePassword(password, user.password);
+    const isValidPassword = await comparePasswords(password, user.password);
     if (!isValidPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }

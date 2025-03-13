@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { LessonType } from '../types/lesson';
 import '../styles/TeacherLessonRatesManager.css';
+import apiClient from '../api/apiClient';
 
 interface LessonRate {
   id: string;
@@ -70,25 +71,12 @@ const TeacherLessonRatesManager: React.FC<TeacherLessonRatesManagerProps> = ({
       setError(null);
       setSuccess(null);
 
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch('/api/teachers/lesson-rates', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          lessonType: selectedLessonType,
-          rateInCents: dollarsToCents(rateInDollars)
-        })
+      const response = await apiClient.post('/teachers/lesson-rates', {
+        lessonType: selectedLessonType,
+        rateInCents: dollarsToCents(rateInDollars)
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update rate');
-      }
-
-      const newRate = await response.json();
+      const newRate = response.data;
       
       // Update the local state with the new/updated rate
       const updatedRates = [...lessonRates];
@@ -121,22 +109,11 @@ const TeacherLessonRatesManager: React.FC<TeacherLessonRatesManagerProps> = ({
       setError(null);
       setSuccess(null);
 
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch('/api/teachers/lesson-rates/deactivate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ lessonType })
+      const response = await apiClient.post('/teachers/lesson-rates/deactivate', {
+        lessonType
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to deactivate rate');
-      }
-
-      const updatedRate = await response.json();
+      const updatedRate = response.data;
       
       // Update the local state
       const updatedRates = lessonRates.map(rate => 
@@ -160,22 +137,11 @@ const TeacherLessonRatesManager: React.FC<TeacherLessonRatesManagerProps> = ({
       setError(null);
       setSuccess(null);
 
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch('/api/teachers/lesson-rates/reactivate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ lessonType })
+      const response = await apiClient.post('/teachers/lesson-rates/reactivate', {
+        lessonType
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to reactivate rate');
-      }
-
-      const updatedRate = await response.json();
+      const updatedRate = response.data;
       
       // Update the local state
       const updatedRates = lessonRates.map(rate => 

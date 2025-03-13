@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt';
+import bcryptjs from 'bcryptjs';
 import jwt, { Secret, SignOptions } from 'jsonwebtoken';
 import prisma from '../../prisma.js';
 import { AuthMethod, UserType } from '@prisma/client';
@@ -52,12 +52,12 @@ class AuthService {
   // Hash password
   async hashPassword(password: string): Promise<string> {
     const saltRounds = 10;
-    return bcrypt.hash(password, saltRounds);
+    return bcryptjs.hash(password, saltRounds);
   }
 
   // Compare password with hash
   async comparePassword(password: string, hash: string): Promise<boolean> {
-    return bcrypt.compare(password, hash);
+    return bcryptjs.compare(password, hash);
   }
 
   // Generate JWT token

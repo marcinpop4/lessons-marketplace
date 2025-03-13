@@ -2,6 +2,48 @@
 
 Unlock your potential with Lessons Marketplace – the go-to platform for parents and students to connect with top 1:1 instructors and master their passions!
 
+## Prerequisites
+
+### Docker Installation
+
+To use the Docker-based development environment, you need to install Docker first:
+
+#### For macOS:
+
+**Option 1: Install Docker Desktop (Official Method)**
+1. Download Docker Desktop from [Docker's official website](https://www.docker.com/products/docker-desktop/)
+2. Open the downloaded `.dmg` file
+3. Drag the Docker icon to your Applications folder
+4. Open Docker from your Applications folder
+5. Accept the terms and conditions
+
+**Option 2: Install using Homebrew (Recommended for developers)**
+```bash
+# Install Homebrew if you don't have it
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install Docker Desktop
+brew install --cask docker
+
+# Start Docker Desktop from Applications folder
+```
+
+#### For Windows:
+1. Download Docker Desktop from [Docker's official website](https://www.docker.com/products/docker-desktop/)
+2. Run the installer and follow the instructions
+3. Make sure WSL 2 is enabled if prompted
+
+#### For Linux:
+```bash
+# Install Docker Engine
+sudo apt-get update
+sudo apt-get install docker-ce docker-ce-cli containerd.io
+
+# Install Docker Compose
+sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+```
+
 ## Database Setup
 
 ### Option 1: Install PostgreSQL locally
@@ -51,6 +93,30 @@ Unlock your potential with Lessons Marketplace – the go-to platform for parent
    DATABASE_URL="postgresql://postgres:postgres@localhost:5432/arts_marketplace?schema=public"
    ```
 
+### Option 3: Use Docker Compose (Recommended)
+
+This project includes a Docker Compose configuration (compose.yaml) for local development:
+
+1. **Start all services (database, backend, frontend):**
+   ```bash
+   docker compose up -d
+   ```
+
+2. **Access the services:**
+   - Frontend: http://localhost:5173
+   - Backend API: http://localhost:3000
+   - Database: PostgreSQL on localhost:5432
+
+3. **Stop all services:**
+   ```bash
+   docker compose down
+   ```
+
+4. **View logs:**
+   ```bash
+   docker compose logs -f
+   ```
+
 ## Project Setup
 
 1. **Clone the repository:**
@@ -98,6 +164,48 @@ Unlock your potential with Lessons Marketplace – the go-to platform for parent
 - `pnpm prisma:studio` - Open Prisma Studio to manage database
 - `pnpm prisma:seed` - Seed the database with initial data
 - `pnpm db:reset` - Reset the database (drop and recreate all tables)
+
+## Deployment
+
+This project uses a modern deployment approach with separate frontend and backend deployments.
+
+### Backend API Deployment
+
+The backend API is deployed to Fly.io:
+
+1. **Configure environment variables:**
+   - Update `.env.production` with your production database URL and other settings
+   - Set sensitive values as secrets: `fly secrets set JWT_SECRET=your-secret-value`
+
+2. **Deploy the backend:**
+   ```bash
+   ./server/deploy.sh
+   ```
+
+3. **Access the deployed API:**
+   - API URL: https://lessons-marketplace-dawn-cherry-4121.fly.dev
+   - Health check: https://lessons-marketplace-dawn-cherry-4121.fly.dev/api/health
+
+### Frontend Deployment
+
+The frontend is deployed separately to Fly.io:
+
+1. **Configure environment variables:**
+   - Update `frontend/.env.production` with your API URL
+
+2. **Deploy the frontend:**
+   ```bash
+   ./frontend/deploy.sh
+   ```
+
+3. **Access the deployed frontend:**
+   - Frontend URL: https://lessons-marketplace-frontend.fly.dev
+
+### Deployment Architecture
+
+- **Frontend**: Static React app served by Nginx
+- **Backend**: Node.js API server
+- **Database**: PostgreSQL on Fly.io
 
 ## Database Schema
 

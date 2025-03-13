@@ -1,8 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import axios from 'axios';
-
-// API base URL
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+import apiClient from '../api/apiClient';
 
 // User interface
 interface User {
@@ -81,9 +79,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
         
         // Try to get user data using the refresh token
-        const response = await axios.post(`${API_URL}/auth/refresh-token`, {}, {
-          withCredentials: true // Ensure cookies are sent
-        });
+        const response = await apiClient.post(`/auth/refresh-token`, {});
         
         // Save the new access token to localStorage
         localStorage.setItem('auth_token', response.data.accessToken);
@@ -92,12 +88,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
         
         // Get user data
-        const userResponse = await axios.get(`${API_URL}/auth/me`, {
-          withCredentials: true, // Ensure cookies are sent
-          headers: {
-            'Authorization': `Bearer ${response.data.accessToken}`
-          }
-        });
+        const userResponse = await apiClient.get(`/auth/me`);
         
         setUser(userResponse.data);
       } catch (error) {
@@ -120,7 +111,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
     
     try {
-      const response = await axios.post(`${API_URL}/auth/login`, {
+      const response = await apiClient.post(`/auth/login`, {
         email,
         password,
         userType,
@@ -148,7 +139,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
     
     try {
-      const response = await axios.post(`${API_URL}/auth/register`, userData);
+      const response = await apiClient.post(`/auth/register`, userData);
       
       // Save the access token to localStorage
       localStorage.setItem('auth_token', response.data.accessToken);
@@ -171,7 +162,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(true);
     
     try {
-      await axios.post(`${API_URL}/auth/logout`);
+      await apiClient.post(`/auth/logout`);
       
       // Clear the access token from localStorage
       localStorage.removeItem('auth_token');

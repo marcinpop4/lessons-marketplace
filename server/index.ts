@@ -3,12 +3,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import prisma from './prisma.js';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
-import fs from 'fs';
 
 // Import routes
 import lessonRequestRoutes from './routes/lessonRequestRoutes.js';
@@ -20,10 +17,6 @@ import lessonQuoteRoutes from './routes/lessonQuoteRoutes.js';
 // Load environment variables
 dotenv.config();
 
-// Get directory path equivalent to __dirname in CommonJS
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 // Initialize express app
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -33,9 +26,7 @@ app.use(helmet()); // Security headers
 app.use(compression()); // Compress responses
 app.use(morgan('combined')); // Logging
 app.use(cors({ 
-  origin: process.env.NODE_ENV === 'production' 
-    ? 'https://yourdomain.com' 
-    : ['http://localhost:3000', 'http://localhost:5173'],
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true, // Allow cookies to be sent with requests
 })); 
 app.use(express.json()); // Parse JSON request body
@@ -62,48 +53,20 @@ app.use('/api/teachers', teacherRoutes);
 app.use('/api/lessons', lessonRoutes);
 app.use('/api/lesson-quotes', lessonQuoteRoutes);
 
-// Check if the frontend build directory exists
-const frontendDistPath = path.join(__dirname, '../dist/frontend');
-const frontendExists = fs.existsSync(frontendDistPath);
-
-// Only serve static files and use the SPA catch-all route if the frontend build exists
-if (frontendExists) {
-  // Serve static files
-  app.use(express.static(frontendDistPath));
-
-  // Catch-all route for SPA (React)
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(frontendDistPath, 'index.html'));
-  });
-} else {
-  // In development mode, if the frontend is not built, return a helpful message for non-API routes
-  app.get('*', (req, res) => {
-    // Skip API routes (they're handled above)
-    if (req.path.startsWith('/api/')) {
-      return res.status(404).json({ error: `API endpoint not found: ${req.path}` });
+// API documentation for root route
+app.get('/', (req, res) => {
+  res.status(200).json({
+    message: 'Lessons Marketplace API Server',
+    endpoints: {
+      '/api/health': 'Check server health',
+      '/api/auth': 'Authentication endpoints',
+      '/api/lesson-requests': 'Lesson request endpoints',
+      '/api/teachers': 'Teacher endpoints',
+      '/api/lessons': 'Lesson endpoints',
+      '/api/lesson-quotes': 'Lesson quotes endpoints'
     }
-    
-    return res.status(200).send(`
-      <html>
-        <head><title>Lessons Marketplace API Server</title></head>
-        <body>
-          <h1>Lessons Marketplace API Server</h1>
-          <p>This is the backend API server. The frontend is not built or is being served separately.</p>
-          <p>In development mode, the frontend is typically served by Vite at <a href="http://localhost:5173">http://localhost:5173</a>.</p>
-          <p>Available API endpoints:</p>
-          <ul>
-            <li>/api/health - Check server health</li>
-            <li>/api/auth - Authentication endpoints</li>
-            <li>/api/lesson-requests - Lesson request endpoints</li>
-            <li>/api/teachers - Teacher endpoints</li>
-            <li>/api/lessons - Lesson endpoints</li>
-            <li>/api/lesson-quotes - Lesson quotes endpoints</li>
-          </ul>
-        </body>
-      </html>
-    `);
   });
-}
+});
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -114,10 +77,6 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
-  if (!frontendExists) {
-    console.log(`Frontend build not found at ${frontendDistPath}`);
-    console.log(`API server running without static file serving`);
-  }
 });
 
 // Graceful shutdown

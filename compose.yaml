@@ -1,0 +1,58 @@
+services:
+  # PostgreSQL database
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: arts_marketplace
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Backend API server
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/arts_marketplace?schema=public
+      - JWT_SECRET=local-development-secret-key
+      - FRONTEND_URL=http://localhost:5173
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./server:/app/server
+      - ./shared:/app/shared
+      - ./dist:/app/dist
+
+  # Frontend development server
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "5173:80"
+    environment:
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL}
+    depends_on:
+      - api
+    # Add a network alias to ensure the frontend can reach the API
+    networks:
+      default:
+        aliases:
+          - frontend
+
+volumes:
+  postgres_data: 

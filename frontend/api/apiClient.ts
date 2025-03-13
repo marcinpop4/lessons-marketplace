@@ -2,13 +2,25 @@
 
 import axios from 'axios';
 
-// Base API URL - in a real app, this would come from environment variables
-// In development, we rely on the Vite proxy
-// Using Vite's import.meta.env which is specifically designed for Vite apps
+// Check if we have a runtime configuration (set in the Docker environment)
+declare global {
+  interface Window {
+    API_CONFIG?: {
+      BASE_URL: string;
+    };
+  }
+}
+
+// Base API URL - in development we use the Vite proxy, in production we require VITE_API_BASE_URL
 const isDevelopment = import.meta.env.MODE === 'development';
-const API_BASE_URL = isDevelopment 
+// Use runtime config if available, otherwise fall back to environment variables
+const API_BASE_URL = window.API_CONFIG?.BASE_URL || (isDevelopment 
   ? '/api' // Use relative path for development (will be proxied by Vite)
-  : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api');
+  : `${import.meta.env.VITE_API_BASE_URL}/api`); // Append /api to the base URL
+
+if (!isDevelopment && !API_BASE_URL) {
+  throw new Error('API base URL is required in production');
+}
 
 console.log('API client initialized with base URL:', API_BASE_URL);
 
@@ -48,8 +60,9 @@ apiClient.interceptors.response.use(
       
       try {
         // Try to refresh the token
+        const baseUrl = API_BASE_URL.endsWith('/api') ? API_BASE_URL.slice(0, -4) : API_BASE_URL;
         const response = await axios.post(
-          `${API_BASE_URL.replace('/api', '')}/api/auth/refresh-token`, 
+          `${baseUrl}/api/auth/refresh-token`, 
           {}, 
           { withCredentials: true }
         );

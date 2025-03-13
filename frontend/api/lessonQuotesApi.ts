@@ -2,9 +2,6 @@ import axios from 'axios';
 import apiClient from './apiClient';
 import { LessonQuote } from '../types/lesson';
 
-// Base API URL - in a real app, this would come from environment variables
-const API_URL = 'http://localhost:3001/api';
-
 // Helper function to get auth headers
 const getAuthHeaders = () => {
   const token = localStorage.getItem('auth_token');
