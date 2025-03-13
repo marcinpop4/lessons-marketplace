@@ -7,7 +7,7 @@
     "dev": "vite --config frontend/vite.config.ts",
     "dev:server": "tsx watch server/index.ts",
     "dev:full": "concurrently \"npm run dev\" \"npm run dev:server\"",
-    "build": "tsc -b && vite build --config frontend/vite.config.ts",
+    "build": "tsc -b frontend/tsconfig.app.json && vite build --config frontend/vite.config.ts",
     "build:server": "tsc -p server/tsconfig.server.json",
     "build:full": "npm run build && npm run build:server",
     "start": "node dist/server/index.js",

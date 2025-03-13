@@ -13,7 +13,6 @@ import fs from 'fs';
 // Import routes
 import lessonRequestRoutes from './routes/lessonRequestRoutes.js';
 import teacherRoutes from './routes/teacherRoutes.js';
-import lessonQuoteRoutes from './routes/lessonQuoteRoutes.js';
 import lessonRoutes from './routes/lessonRoutes.js';
 import authRoutes from './routes/auth/authRoutes.js';
 
@@ -59,7 +58,6 @@ app.get('/api/health', async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/lesson-requests', lessonRequestRoutes);
 app.use('/api/teachers', teacherRoutes);
-app.use('/api/lesson-quotes', lessonQuoteRoutes);
 app.use('/api/lessons', lessonRoutes);
 
 // Check if the frontend build directory exists
@@ -96,7 +94,6 @@ if (frontendExists) {
             <li>/api/auth - Authentication endpoints</li>
             <li>/api/lesson-requests - Lesson request endpoints</li>
             <li>/api/teachers - Teacher endpoints</li>
-            <li>/api/lesson-quotes - Lesson quote endpoints</li>
             <li>/api/lessons - Lesson endpoints</li>
           </ul>
         </body>
