@@ -24,7 +24,10 @@ export const lessonController = {
       
       // Validate that the quote exists
       const quote = await prisma.lessonQuote.findUnique({
-        where: { id: quoteId }
+        where: { id: quoteId },
+        include: {
+          lessonRequest: true
+        }
       });
       
       if (!quote) {
@@ -42,25 +45,42 @@ export const lessonController = {
         return;
       }
       
-      // Create the lesson
-      const lesson = await prisma.lesson.create({
-        data: {
-          confirmedAt: confirmedAt ? new Date(confirmedAt) : new Date(),
-          quote: {
-            connect: { id: quoteId }
-          }
-        },
-        include: {
-          quote: {
-            include: {
-              teacher: true,
-              lessonRequest: true
+      // Start a transaction to ensure all operations succeed or fail together
+      const result = await prisma.$transaction(async (tx) => {
+        // Create the lesson
+        const lesson = await tx.lesson.create({
+          data: {
+            confirmedAt: confirmedAt ? new Date(confirmedAt) : new Date(),
+            quote: {
+              connect: { id: quoteId }
+            }
+          },
+          include: {
+            quote: {
+              include: {
+                teacher: true,
+                lessonRequest: true
+              }
             }
           }
-        }
+        });
+        
+        // Expire all other quotes for the same lesson request
+        await tx.lessonQuote.updateMany({
+          where: {
+            lessonRequestId: quote.lessonRequestId,
+            id: { not: quoteId },
+            expiresAt: { gt: new Date() } // Only update unexpired quotes
+          },
+          data: {
+            expiresAt: new Date() // Set to current time to expire immediately
+          }
+        });
+        
+        return lesson;
       });
       
-      res.status(201).json(lesson);
+      res.status(201).json(result);
     } catch (error) {
       console.error('Error creating lesson:', error);
       res.status(500).json({ 

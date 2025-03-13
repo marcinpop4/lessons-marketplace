@@ -75,13 +75,14 @@ enum LessonType {
 
 // Mapping table for teacher hourly rates by lesson type
 model TeacherLessonHourlyRate {
-  id          String     @id @default(uuid())
-  teacher     Teacher    @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  teacherId   String
-  type        LessonType
-  rateInCents Int
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id            String     @id @default(uuid())
+  teacher       Teacher    @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  teacherId     String
+  type          LessonType
+  rateInCents   Int
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  deactivatedAt DateTime?
 
   @@unique([teacherId, type])
 }

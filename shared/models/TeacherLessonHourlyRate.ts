@@ -9,6 +9,7 @@ export class TeacherLessonHourlyRate {
   rateInCents: number; // Rate stored in cents (e.g., $45.50 = 4550 cents)
   createdAt?: Date;
   updatedAt?: Date;
+  deactivatedAt?: Date; // When null, the rate is active; when set, the rate is deactivated
 
   constructor(
     id: string,
@@ -16,7 +17,8 @@ export class TeacherLessonHourlyRate {
     type: string,
     rateInCents: number,
     createdAt?: Date,
-    updatedAt?: Date
+    updatedAt?: Date,
+    deactivatedAt?: Date
   ) {
     this.id = id;
     this.teacherId = teacherId;
@@ -24,6 +26,7 @@ export class TeacherLessonHourlyRate {
     this.rateInCents = rateInCents;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
+    this.deactivatedAt = deactivatedAt;
   }
 
   /**
@@ -45,5 +48,13 @@ export class TeacherLessonHourlyRate {
       style: 'currency',
       currency: currency
     }).format(this.rateInDollars);
+  }
+
+  /**
+   * Check if the hourly rate is active (not deactivated)
+   * @returns Boolean indicating if the rate is active
+   */
+  isActive(): boolean {
+    return this.deactivatedAt === null || this.deactivatedAt === undefined;
   }
 } 

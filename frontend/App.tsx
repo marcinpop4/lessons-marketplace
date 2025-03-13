@@ -4,10 +4,30 @@ import LessonRequestForm from './components/LessonRequestForm';
 import TeacherQuotes from './components/TeacherQuotes';
 import AuthPage from './pages/AuthPage';
 import LessonConfirmation from './pages/LessonConfirmation';
+import TeacherDashboard from './pages/TeacherDashboard';
 import ProtectedRoute from './components/auth/ProtectedRoute';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 // Import directly to remove dependency on SVG file
 import './App.css';
+
+// Root redirect component to handle user type specific redirects
+const RootRedirect = () => {
+  const { user } = useAuth();
+  
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+  
+  if (user.userType === 'TEACHER') {
+    return <Navigate to="/teacher-dashboard" replace />;
+  }
+  
+  if (user.userType === 'STUDENT') {
+    return <Navigate to="/lesson-request" replace />;
+  }
+  
+  return <Navigate to="/auth" replace />;
+};
 
 // Inner component to use hooks
 const AppRoutes = () => {
@@ -50,6 +70,14 @@ const AppRoutes = () => {
             />
           </Route>
           
+          {/* Protected routes - Teacher only */}
+          <Route element={<ProtectedRoute userTypes={['TEACHER']} />}>
+            <Route 
+              path="/teacher-dashboard" 
+              element={<TeacherDashboard />} 
+            />
+          </Route>
+          
           {/* Protected routes - Student and Teacher */}
           <Route element={<ProtectedRoute />}>
             <Route 
@@ -67,13 +95,8 @@ const AppRoutes = () => {
             />
           </Route>
           
-          {/* Redirect students to lesson request form, others to auth by default */}
-          <Route 
-            path="/" 
-            element={
-              <Navigate to="/auth" replace />
-            } 
-          />
+          {/* Root route - redirects based on user type */}
+          <Route path="/" element={<RootRedirect />} />
           
           {/* Catch all route */}
           <Route path="*" element={<Navigate to="/auth" replace />} />

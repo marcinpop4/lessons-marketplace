@@ -3,6 +3,7 @@ import { Lesson } from '../types/lesson';
 
 /**
  * Create a new lesson from a quote
+ * This will also expire all other quotes for the same lesson request
  * @param quoteId - Lesson quote ID
  * @returns Created lesson
  */

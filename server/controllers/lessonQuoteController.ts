@@ -204,15 +204,40 @@ export const lessonQuoteController = {
         return res.status(403).json({ error: 'You are not authorized to accept this quote' });
       }
 
-      // Create a confirmed lesson
-      const lesson = await prisma.lesson.create({
-        data: {
-          confirmedAt: new Date().toISOString(),
-          quoteId,
-        },
+      // Check if the quote has expired
+      if (new Date(quote.expiresAt) < new Date()) {
+        return res.status(400).json({ error: 'This quote has expired' });
+      }
+
+      // Start a transaction to ensure all operations succeed or fail together
+      const result = await prisma.$transaction(async (tx) => {
+        // Create a confirmed lesson
+        const lesson = await tx.lesson.create({
+          data: {
+            confirmedAt: new Date(),
+            quoteId,
+          },
+          include: {
+            quote: true
+          }
+        });
+
+        // Expire all other quotes for the same lesson request
+        await tx.lessonQuote.updateMany({
+          where: {
+            lessonRequestId: quote.lessonRequestId,
+            id: { not: quoteId },
+            expiresAt: { gt: new Date() } // Only update unexpired quotes
+          },
+          data: {
+            expiresAt: new Date() // Set to current time to expire immediately
+          }
+        });
+
+        return lesson;
       });
 
-      return res.json(lesson);
+      return res.json(result);
     } catch (error) {
       console.error('Error accepting lesson quote:', error);
       return res.status(500).json({ error: 'Failed to accept lesson quote' });

@@ -42,7 +42,51 @@ export class Teacher extends Person {
    * @returns The hourly rate object or undefined if not set
    */
   getHourlyRate(lessonType: string): TeacherLessonHourlyRate | undefined {
-    return this.hourlyRates.find(rate => rate.type === lessonType);
+    return this.hourlyRates.find(rate => rate.type === lessonType && rate.isActive());
+  }
+
+  /**
+   * Gets all hourly rates (both active and inactive)
+   * @returns Array of all hourly rates
+   */
+  getAllHourlyRates(): TeacherLessonHourlyRate[] {
+    return this.hourlyRates;
+  }
+
+  /**
+   * Gets only active hourly rates (where deactivatedAt is null)
+   * @returns Array of active hourly rates
+   */
+  getActiveHourlyRates(): TeacherLessonHourlyRate[] {
+    return this.hourlyRates.filter(rate => rate.isActive());
+  }
+
+  /**
+   * Deactivates an hourly rate for a specific lesson type
+   * @param lessonType The type of lesson to deactivate
+   * @returns True if the rate was found and deactivated, false otherwise
+   */
+  deactivateHourlyRate(lessonType: string): boolean {
+    const rate = this.hourlyRates.find(rate => rate.type === lessonType);
+    if (rate) {
+      rate.deactivatedAt = new Date();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Reactivates a previously deactivated hourly rate
+   * @param lessonType The type of lesson to reactivate
+   * @returns True if the rate was found and reactivated, false otherwise
+   */
+  reactivateHourlyRate(lessonType: string): boolean {
+    const rate = this.hourlyRates.find(rate => rate.type === lessonType);
+    if (rate) {
+      rate.deactivatedAt = undefined;
+      return true;
+    }
+    return false;
   }
 
   /**

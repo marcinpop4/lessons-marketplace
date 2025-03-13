@@ -20,16 +20,14 @@ export class LessonQuote {
     teacher: Teacher,
     costInCents: number,
     createdAt: Date = new Date(),
-    expiresAt?: Date
+    expiresAt: Date
   ) {
     this.id = id;
     this.lessonRequest = lessonRequest;
     this.teacher = teacher;
     this.costInCents = costInCents;
     this.createdAt = createdAt;
-    
-    // Set expiration date to 48 hours from creation if not specified
-    this.expiresAt = expiresAt || new Date(createdAt.getTime() + 48 * 60 * 60 * 1000);
+    this.expiresAt = expiresAt;
   }
 
   /**
@@ -38,12 +36,14 @@ export class LessonQuote {
    * @param id Unique identifier for the quote
    * @param lessonRequest The lesson request
    * @param teacher The teacher providing the quote
+   * @param expiresAt When the quote expires
    * @returns A new LessonQuote instance
    */
   static createFromRequest(
     id: string,
     lessonRequest: LessonRequest,
-    teacher: Teacher
+    teacher: Teacher,
+    expiresAt: Date
   ): LessonQuote {
     const hourlyRate = teacher.getHourlyRate(lessonRequest.type);
     
@@ -55,7 +55,7 @@ export class LessonQuote {
       (hourlyRate.rateInCents * lessonRequest.durationMinutes) / 60
     );
     
-    return new LessonQuote(id, lessonRequest, teacher, costInCents);
+    return new LessonQuote(id, lessonRequest, teacher, costInCents, new Date(), expiresAt);
   }
 
   /**
@@ -78,5 +78,12 @@ export class LessonQuote {
    */
   isValid(): boolean {
     return new Date() < this.expiresAt;
+  }
+
+  /**
+   * Expire this quote immediately
+   */
+  expire(): void {
+    this.expiresAt = new Date();
   }
 } 

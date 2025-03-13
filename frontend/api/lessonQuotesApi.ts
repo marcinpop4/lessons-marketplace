@@ -34,6 +34,7 @@ export const getLessonQuotesByRequestId = async (lessonRequestId: string): Promi
 
 /**
  * Accept a lesson quote
+ * This will also expire all other quotes for the same lesson request
  * @param quoteId - Lesson quote ID
  * @returns Accepted lesson quote
  */

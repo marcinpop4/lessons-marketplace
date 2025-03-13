@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import prisma from './prisma.js';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
+import fs from 'fs';
 
 // Import routes
 import lessonRequestRoutes from './routes/lessonRequestRoutes.js';
@@ -61,13 +62,48 @@ app.use('/api/teachers', teacherRoutes);
 app.use('/api/lesson-quotes', lessonQuoteRoutes);
 app.use('/api/lessons', lessonRoutes);
 
-// Serve static files
-app.use(express.static(path.join(__dirname, '../dist/frontend')));
+// Check if the frontend build directory exists
+const frontendDistPath = path.join(__dirname, '../dist/frontend');
+const frontendExists = fs.existsSync(frontendDistPath);
 
-// Catch-all route for SPA (React)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../dist/frontend/index.html'));
-});
+// Only serve static files and use the SPA catch-all route if the frontend build exists
+if (frontendExists) {
+  // Serve static files
+  app.use(express.static(frontendDistPath));
+
+  // Catch-all route for SPA (React)
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendDistPath, 'index.html'));
+  });
+} else {
+  // In development mode, if the frontend is not built, return a helpful message for non-API routes
+  app.get('*', (req, res) => {
+    // Skip API routes (they're handled above)
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).json({ error: `API endpoint not found: ${req.path}` });
+    }
+    
+    res.status(200).send(`
+      <html>
+        <head><title>Arts Marketplace API Server</title></head>
+        <body>
+          <h1>Arts Marketplace API Server</h1>
+          <p>This is the backend API server. The frontend is not built or is being served separately.</p>
+          <p>In development mode, the frontend is typically served by Vite at <a href="http://localhost:5173">http://localhost:5173</a>.</p>
+          <p>Available API endpoints:</p>
+          <ul>
+            <li>/api/health - Check server health</li>
+            <li>/api/auth - Authentication endpoints</li>
+            <li>/api/lesson-requests - Lesson request endpoints</li>
+            <li>/api/teachers - Teacher endpoints</li>
+            <li>/api/lesson-quotes - Lesson quote endpoints</li>
+            <li>/api/lessons - Lesson endpoints</li>
+          </ul>
+        </body>
+      </html>
+    `);
+  });
+}
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -78,6 +114,10 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  if (!frontendExists) {
+    console.log(`Frontend build not found at ${frontendDistPath}`);
+    console.log(`API server running without static file serving`);
+  }
 });
 
 // Graceful shutdown

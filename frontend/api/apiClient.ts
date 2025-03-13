@@ -3,7 +3,14 @@
 import axios from 'axios';
 
 // Base API URL - in a real app, this would come from environment variables
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+// In development, we rely on the Vite proxy
+// Using Vite's import.meta.env which is specifically designed for Vite apps
+const isDevelopment = import.meta.env.MODE === 'development';
+const API_BASE_URL = isDevelopment 
+  ? '/api' // Use relative path for development (will be proxied by Vite)
+  : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api');
+
+console.log('API client initialized with base URL:', API_BASE_URL);
 
 // Create a custom axios instance
 const apiClient = axios.create({

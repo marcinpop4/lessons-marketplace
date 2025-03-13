@@ -27,7 +27,8 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
   const { lessonRequestId: paramLessonRequestId } = useParams<{ lessonRequestId: string }>();
   
   // Use the prop if available, otherwise use the URL param
-  const effectiveLessonRequestId = propLessonRequestId || paramLessonRequestId || '';
+  // Will throw error if both are undefined
+  const effectiveLessonRequestId = propLessonRequestId || paramLessonRequestId;
 
   // Function to fetch quotes
   const fetchQuotes = async () => {
@@ -52,17 +53,9 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
       }
     } catch (err) {
       console.error('Error fetching data:', err);
-      // Continue with empty quotes rather than showing error
+      // Set error instead of continuing with empty quotes
+      setError('Failed to fetch quotes. Please try again.');
       setQuotes([]);
-      
-      // If quotes couldn't be fetched, try to generate them
-      if (!generatingQuotes) {
-        try {
-          await generateQuotes();
-        } catch (genErr) {
-          console.error('Failed to auto-generate quotes:', genErr);
-        }
-      }
     } finally {
       setLoading(false);
     }
@@ -103,7 +96,12 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
       for (const teacher of teachersToUse) {
         try {
           // Calculate cost based on hourly rate and duration
-          const hourlyRate = teacher.lessonHourlyRates[lessonRequestData.type] || 5000; // Default to $50/hour if not specified
+          // Check if hourly rate exists, throw error if not
+          const hourlyRate = teacher.lessonHourlyRates[lessonRequestData.type];
+          if (hourlyRate === undefined) {
+            throw new Error(`Teacher ${teacher.id} does not have a rate for ${lessonRequestData.type} lessons`);
+          }
+          
           const costInCents = Math.round((hourlyRate * lessonRequestData.durationMinutes) / 60);
           
           // Create a quote
@@ -148,10 +146,15 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
 
   // Handle accepting a quote
   const handleAcceptQuote = async (quoteId: string) => {
+    if (!quoteId) {
+      setError('Invalid quote ID');
+      return;
+    }
+    
     try {
       setAcceptingQuote(quoteId);
       
-      // Accept the quote
+      // Accept the quote - this will also expire all other quotes for this lesson request
       await acceptLessonQuote(quoteId);
       setAcceptSuccess(quoteId);
       
@@ -220,32 +223,43 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
       
       {/* Teacher Quotes Grid */}
       <div className="quotes-grid">
-        {quotes.map((quote) => (
-          <div key={quote.id} className="quote-card">
-            <div className="quote-header">
-              <h3>{quote.teacher?.firstName || 'Unknown'}</h3>
-              <p className="quote-price">{formatPrice(quote.costInCents)}</p>
+        {quotes.map((quote) => {
+          // Validate required properties exist before rendering
+          if (!quote.teacher || !quote.lessonRequest || !quote.id) {
+            console.error('Invalid quote data:', quote);
+            return null; // Skip rendering this quote
+          }
+          
+          // Store the ID in a local variable to ensure TypeScript knows it's not undefined
+          const quoteId = quote.id;
+          
+          return (
+            <div key={quoteId} className="quote-card">
+              <div className="quote-header">
+                <h3>{quote.teacher.firstName}</h3>
+                <p className="quote-price">{formatPrice(quote.costInCents)}</p>
+              </div>
+              
+              <div className="quote-details">
+                <p className="quote-rate"><strong>Rate:</strong> {formatPrice(quote.costInCents * 60 / quote.lessonRequest.durationMinutes)}/hr</p>
+              </div>
+              
+              <div className="quote-footer">
+                {acceptSuccess === quoteId ? (
+                  <div className="success-message">Quote accepted!</div>
+                ) : (
+                  <button 
+                    className="accept-quote-button" 
+                    onClick={() => handleAcceptQuote(quoteId)}
+                    disabled={acceptingQuote === quoteId || acceptSuccess !== null || creatingLesson}
+                  >
+                    {acceptingQuote === quoteId ? 'Processing...' : creatingLesson ? 'Creating...' : 'Accept Quote'}
+                  </button>
+                )}
+              </div>
             </div>
-            
-            <div className="quote-details">
-              <p className="quote-rate"><strong>Rate:</strong> {formatPrice(quote.costInCents * 60 / (quote.lessonRequest?.durationMinutes || 60))}/hr</p>
-            </div>
-            
-            <div className="quote-footer">
-              {acceptSuccess === quote.id ? (
-                <div className="success-message">Quote accepted!</div>
-              ) : (
-                <button 
-                  className="accept-quote-button" 
-                  onClick={() => handleAcceptQuote(quote.id || '')}
-                  disabled={acceptingQuote === quote.id || acceptSuccess !== null || creatingLesson}
-                >
-                  {acceptingQuote === quote.id ? 'Processing...' : creatingLesson ? 'Creating...' : 'Accept Quote'}
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       
       <button onClick={onBack} className="back-button">Back to Lesson Request</button>
