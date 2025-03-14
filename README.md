@@ -305,11 +305,26 @@ This structure keeps build artifacts separate from source code, making the codeb
 
 ### Docker Build Process
 
-The project uses a multi-stage Dockerfile that:
+The project uses a streamlined multi-stage Dockerfile with explicit build steps:
 
-1. Creates a base image with all dependencies
-2. Builds all components (shared, frontend, server)
-3. Creates separate production images for frontend and server
+1. **Build Stage**:
+   - Installs dependencies with `pnpm install`
+   - Explicitly cleans any previous build artifacts with `pnpm clean`
+   - Generates the Prisma client with `pnpm prisma:generate`
+   - Builds frontend and server components with explicit build commands
+   - Creates all build artifacts in the `/app/dist` directory
+
+2. **Frontend Production Stage**:
+   - Uses Nginx as the base image
+   - Copies only the built frontend assets from the build stage
+   - Configures Nginx to serve the frontend application
+
+3. **Server Production Stage**:
+   - Uses a minimal Node.js image
+   - Installs only production dependencies
+   - Copies only the necessary built files and runtime assets
+
+This approach makes the build process explicit and predictable, resulting in optimized production images that contain only what's needed to run each component.
 
 To build and run with Docker:
 
