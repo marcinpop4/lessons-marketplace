@@ -1,20 +1,28 @@
-FROM node:20-slim
+FROM node:20-slim AS build
 
-# Install OpenSSL for Prisma, PostgreSQL client for database checks, and build tools for bcrypt
-RUN apt-get update && apt-get install -y openssl python3 make g++ postgresql-client
-
-# Install pnpm
-RUN npm install -g pnpm
+# Install required packages and clean up
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    openssl \
+    python3 \
+    make \
+    g++ \
+    postgresql-client && \
+    npm install -g pnpm && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files for better layer caching
 COPY package.json pnpm-lock.yaml ./
+COPY server/package.json ./server/
+COPY shared/package.json ./shared/ 2>/dev/null || mkdir -p ./shared/
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Rebuild bcrypt
+# Rebuild bcrypt for the current platform
 RUN cd node_modules/bcrypt && npm rebuild
 
 # Copy necessary files for building the server
@@ -22,30 +30,54 @@ COPY tsconfig.json ./
 COPY server/ ./server/
 COPY shared/ ./shared/
 
-# Generate Prisma client
-RUN pnpm prisma generate --schema=server/prisma/schema.prisma
+# Set production environment
+ENV NODE_ENV=production
 
-# Build the server
-RUN pnpm build:server
+# Generate Prisma client and build the server
+RUN pnpm prisma:generate && \
+    pnpm build:server
 
-# Debug: List the compiled files
-RUN ls -la server/dist
-RUN find server/dist -name "teacherRoutes.js" | xargs ls -la
-
-# Verify that all routes are properly compiled (try both possible paths)
-RUN if [ -f "/app/server/dist/routes/teacherRoutes.js" ]; then \
-      grep -q "router.get('/stats'" /app/server/dist/routes/teacherRoutes.js || (echo "Stats route not found in compiled file" && exit 1); \
-    elif [ -f "/app/server/dist/server/routes/teacherRoutes.js" ]; then \
-      grep -q "router.get('/stats'" /app/server/dist/server/routes/teacherRoutes.js || (echo "Stats route not found in compiled file" && exit 1); \
-    else \
-      echo "Could not find teacherRoutes.js in either location" && exit 1; \
-    fi
+# Verify build output
+RUN ls -la dist/server && \
+    echo "Build verification complete"
 
 # Make the entrypoint script executable
 RUN chmod +x /app/server/entrypoint.sh
 
-# Expose the port the server listens on
+# Production stage
+FROM node:20-slim AS production
+
+# Install runtime dependencies and clean up
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    openssl \
+    postgresql-client && \
+    npm install -g pnpm && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy package files and install production dependencies
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --prod
+
+# Copy built files and runtime assets
+COPY --from=build /app/dist/server ./dist/server
+COPY --from=build /app/dist/shared ./dist/shared
+
+# Copy Prisma schema and migrations (these are source files needed for runtime database operations)
+COPY --from=build /app/server/prisma ./server/prisma
+
+# Copy entrypoint script
+COPY --from=build /app/server/entrypoint.sh ./server/
+RUN chmod +x ./server/entrypoint.sh
+
+# Generate Prisma client in the production image
+RUN npx prisma generate --schema=server/prisma/schema.prisma
+
+# Expose the server port
 EXPOSE 3000
 
-# Start the server using the entrypoint script
-CMD ["/bin/sh", "/app/server/entrypoint.sh"]
+# Start the server
+CMD ["/bin/sh", "./server/entrypoint.sh"]

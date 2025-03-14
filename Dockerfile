@@ -1,10 +1,10 @@
-FROM node:20-slim as build
+FROM node:20-slim AS build
 
 # Install OpenSSL for Prisma and other build essentials
-RUN apt-get update && apt-get install -y openssl
-
-# Install pnpm
-RUN npm install -g pnpm
+RUN apt-get update && apt-get install -y openssl && \
+    npm install -g pnpm && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -19,17 +19,17 @@ RUN pnpm install --frozen-lockfile
 # Copy the rest of the application
 COPY . .
 
-# Clean any previous build artifacts
-RUN pnpm clean
+# Set production environment
+ENV NODE_ENV=production
 
-# Generate Prisma client
-RUN pnpm prisma:generate
-
-# Build everything
-RUN pnpm build:frontend && pnpm build:server
+# Clean, generate Prisma client, and build
+RUN pnpm clean && \
+    pnpm prisma:generate && \
+    pnpm build:frontend && \
+    pnpm build:server
 
 # Production stage for frontend with Nginx
-FROM nginx:alpine as frontend
+FROM nginx:alpine AS frontend
 
 # Copy the built frontend from the build stage
 COPY --from=build /app/dist/frontend /usr/share/nginx/html
@@ -48,28 +48,25 @@ EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 
 # Production stage for server
-FROM node:20-slim as server
+FROM node:20-slim AS server
 
 # Install OpenSSL for Prisma and PostgreSQL client for database checks
-RUN apt-get update && apt-get install -y openssl postgresql-client
-
-# Install pnpm
-RUN npm install -g pnpm
+RUN apt-get update && \
+    apt-get install -y openssl postgresql-client && \
+    npm install -g pnpm && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files and install production dependencies
 COPY package.json pnpm-lock.yaml ./
-
-# Install production dependencies (includes @prisma/client)
 RUN pnpm install --frozen-lockfile --prod
 
 # Copy built files and runtime assets
 COPY --from=build /app/dist/server ./dist/server
 COPY --from=build /app/dist/shared ./dist/shared
 COPY --from=build /app/server/prisma ./server/prisma
-
-# Copy entrypoint script
 COPY --from=build /app/server/entrypoint.sh ./server/
 RUN chmod +x ./server/entrypoint.sh
 
