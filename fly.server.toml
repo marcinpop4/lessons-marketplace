@@ -1,0 +1,31 @@
+# fly.toml app configuration file for lessons-marketplace-server
+app = "lessons-marketplace-server"
+primary_region = "ewr"
+
+[build]
+  dockerfile = "server/Dockerfile"
+
+[env]
+  DB_HOST = "twilight-sky-6674.internal"
+  DB_NAME = "lessons_marketplace_dawn_cherry_4121"
+  DB_PORT = "5432"
+  DB_USER = "postgres"
+  DB_SSL = "false"
+  FRONTEND_URL = "https://lessons-marketplace-frontend.fly.dev"
+  NODE_ENV = "production"
+  PORT = "3000"
+  # Note: Sensitive values like DB_PASSWORD and JWT_SECRET should be set as secrets
+  # using 'fly secrets set DB_PASSWORD=your_password' and not in this file
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1 

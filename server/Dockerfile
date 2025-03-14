@@ -17,7 +17,7 @@ WORKDIR /app
 # Copy package files for better layer caching
 COPY package.json pnpm-lock.yaml ./
 COPY server/package.json ./server/
-COPY shared/package.json ./shared/ 2>/dev/null || mkdir -p ./shared/
+RUN mkdir -p ./shared/
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
