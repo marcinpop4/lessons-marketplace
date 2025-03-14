@@ -1,52 +1,23 @@
-# fly.toml app configuration file generated for lessons-marketplace-dawn-cherry-4121 on 2025-03-13T10:00:18-04:00
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
-
-app = 'lessons-marketplace-dawn-cherry-4121'
-primary_region = 'iad'
-kill_signal = 'SIGINT'
-kill_timeout = '5s'
+# fly.toml app configuration file generated for lessons-marketplace-frontend
+app = "lessons-marketplace-frontend"
+primary_region = "ams"
 
 [build]
-  dockerfile = 'server/Dockerfile'
+  dockerfile = "Dockerfile"
 
 [env]
-  NODE_ENV = 'production'
-  PORT = '3000'
-  # Database connection settings using individual variables
-  DB_HOST = "twilight-sky-6674.internal"
-  DB_PORT = "5432"
-  DB_NAME = "lessons_marketplace_dawn_cherry_4121"
-  DB_USER = "postgres"
-  DB_SSL = "true"
-  # Note: DB_PASSWORD should be set as a secret using 'fly secrets set DB_PASSWORD=your_password'
-  JWT_SECRET = "production-jwt-secret-key-change-me"
-  JWT_EXPIRES_IN = "1h"
-  REFRESH_TOKEN_EXPIRES_IN = "7d"
-  
-  # Postgres cluster information (for reference)
-  # Username:    postgres
-  # Password:    xBnWThWyLkLn3yQ (should be set as a secret)
-  # Hostname:    twilight-sky-6674.internal
-  # Flycast:     fdaa:12:bd82:0:1::3
-  # Proxy port:  5432
-  # Postgres port:  5433
+  PORT = "80"
+  VITE_API_BASE_URL = "https://lessons-marketplace-dawn-cherry-4121.fly.dev"
 
 [http_service]
-  internal_port = 3000
+  internal_port = 80
   force_https = true
-  auto_stop_machines = 'stop'
+  auto_stop_machines = true
   auto_start_machines = true
   min_machines_running = 0
-  processes = ['app']
-
-  [http_service.concurrency]
-    type = 'connections'
-    hard_limit = 25
-    soft_limit = 20
+  processes = ["app"]
 
 [[vm]]
-  memory = '512mb'
-  cpu_kind = 'shared'
+  cpu_kind = "shared"
   cpus = 1
+  memory_mb = 1024

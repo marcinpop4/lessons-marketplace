@@ -19,14 +19,11 @@ RUN cd node_modules/bcrypt && npm rebuild
 
 # Copy necessary files for building the server
 COPY tsconfig.json ./
-COPY server/ ./server/
+COPY . ./server/
 COPY shared/ ./shared/
 
 # Generate Prisma client
 RUN pnpm prisma generate --schema=server/prisma/schema.prisma
-
-# List files to debug
-RUN ls -la server/
 
 # Build the server using a modified version of the build:server script
 RUN pnpm exec tsc --project server/tsconfig.server.json --skipLibCheck
@@ -41,4 +38,4 @@ RUN chmod +x /app/server/entrypoint.sh
 EXPOSE 3000
 
 # Start the server using the entrypoint script
-CMD ["/bin/sh", "/app/server/entrypoint.sh"] 
+CMD ["/bin/sh", "/app/server/entrypoint.sh"]
