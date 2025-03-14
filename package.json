@@ -7,13 +7,19 @@
     "dev": "vite --config frontend/vite.config.ts",
     "dev:server": "tsx watch server/index.ts",
     "dev:full": "concurrently \"npm run dev\" \"npm run dev:server\"",
-    "build": "tsc --project frontend/tsconfig.app.json --skipLibCheck && vite build --config frontend/vite.config.ts",
+    "prebuild:shared": "pnpm prisma:generate",
     "build:shared": "tsc --project shared/tsconfig.shared.json --skipLibCheck",
+    "build:frontend": "tsc --project frontend/tsconfig.app.json --skipLibCheck && vite build --config frontend/vite.config.ts",
     "build:server": "pnpm run build:shared && tsc --project server/tsconfig.server.json --skipLibCheck",
-    "build:full": "npm run build && npm run build:server",
-    "start": "node server/dist/index.js",
+    "build": "pnpm run build:frontend && pnpm run build:server",
+    "clean": "rm -rf dist",
+    "prebuild": "pnpm run clean",
+    
+    "start": "node dist/server/index.js",
+    "start:frontend": "vite preview --config frontend/vite.config.ts --outDir ../dist/frontend",
+    
     "lint": "eslint .",
-    "preview": "vite preview --config frontend/vite.config.ts",
+    
     "prisma:generate": "prisma generate --schema=server/prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema=server/prisma/schema.prisma",
     "prisma:studio": "prisma studio --schema=server/prisma/schema.prisma",

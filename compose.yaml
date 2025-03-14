@@ -20,7 +20,8 @@ services:
   api:
     build:
       context: .
-      dockerfile: server/Dockerfile
+      dockerfile: Dockerfile
+      target: server
     ports:
       - "3000:3000"
     environment:
@@ -47,7 +48,8 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: frontend/Dockerfile
+      dockerfile: Dockerfile
+      target: frontend
     ports:
       - "5173:80"
     environment:

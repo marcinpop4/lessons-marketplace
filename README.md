@@ -235,3 +235,107 @@ To create a new migration after schema changes:
 ```bash
 pnpm prisma:migrate
 ```
+
+## Build Process and Best Practices
+
+This project follows a monorepo structure with three main components:
+
+1. **Frontend**: React application built with Vite
+2. **Server**: Node.js/Express backend
+3. **Shared**: Common code used by both frontend and server
+
+### NPM Scripts
+
+The project uses a streamlined set of npm scripts for development and building:
+
+```bash
+# Development
+npm run dev            # Start frontend development server
+npm run dev:server     # Start backend development server with hot reload
+npm run dev:full       # Start both frontend and backend in development mode
+
+# Building
+npm run build:shared   # Build shared code (automatically generates Prisma client first)
+npm run build:frontend # Build frontend application
+npm run build:server   # Build server (includes building shared code first)
+npm run build          # Build everything (frontend and server, which includes shared)
+npm run clean          # Remove all build artifacts (automatically runs before build)
+
+# Running
+npm run start          # Start the production server
+npm run start:frontend # Start the frontend in preview mode
+```
+
+#### Script Hooks
+
+The project uses npm/pnpm script hooks for automatic sequencing:
+
+- `prebuild:shared`: Automatically runs before `build:shared` to generate the Prisma client
+- `prebuild`: Automatically runs before `build` to clean the dist directory
+
+These hooks ensure that dependencies are generated and old artifacts are cleaned up before building.
+
+### Fresh Checkout Workflow
+
+For a fresh checkout of the project, you only need two commands:
+
+```bash
+# Install dependencies
+pnpm install
+
+# Build everything (includes Prisma client generation)
+pnpm build
+```
+
+This will automatically:
+1. Install all dependencies
+2. Generate the Prisma client
+3. Clean any previous build artifacts
+4. Build all components (shared, frontend, server)
+
+### Build Output Directories
+
+When you run `pnpm build`, all build artifacts are placed in a centralized `dist/` directory:
+
+1. `dist/frontend` - Contains the built frontend application (compiled and bundled by Vite)
+2. `dist/server` - Contains the compiled server TypeScript code
+3. `dist/shared` - Contains the compiled shared TypeScript code
+
+This structure keeps build artifacts separate from source code, making the codebase cleaner and easier to navigate. The centralized `dist/` directory can be easily cleaned with `pnpm run clean`.
+
+### Docker Build Process
+
+The project uses a multi-stage Dockerfile that:
+
+1. Creates a base image with all dependencies
+2. Builds all components (shared, frontend, server)
+3. Creates separate production images for frontend and server
+
+To build and run with Docker:
+
+```bash
+# Build both frontend and server
+docker build -t lessons-marketplace .
+
+# Run frontend only
+docker run -p 5173:80 --target frontend lessons-marketplace
+
+# Run server only
+docker run -p 3000:3000 --target server lessons-marketplace
+```
+
+Or use Docker Compose to run the complete stack:
+
+```bash
+docker-compose up
+```
+
+### Best Practices
+
+1. **Dependency Management**: All dependencies are in the root package.json for simplicity
+2. **Build Order**: Always build shared code first, then server and frontend
+3. **Docker Optimization**: 
+   - Uses multi-stage builds to keep production images small
+   - Copies package.json files first for better layer caching
+   - Installs only production dependencies in final images
+4. **Development Workflow**: Use the dev scripts for local development and docker-compose for a complete environment
