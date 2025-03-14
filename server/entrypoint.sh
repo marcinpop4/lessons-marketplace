@@ -5,15 +5,13 @@ set -e
 wait_for_postgres() {
   echo "Waiting for PostgreSQL to be ready..."
   
-  # Use the database host and port from the DATABASE_URL environment variable
-  # For docker-compose, the host should be 'db'
-  pg_isready -h db -p 5432
+  # Use environment variables for database connection
+  echo "Using database connection: host=$DB_HOST, port=$DB_PORT"
   
   # Keep checking until PostgreSQL is ready
-  until [ $? -eq 0 ]; do
+  until pg_isready -h $DB_HOST -p $DB_PORT; do
     echo "PostgreSQL is unavailable - sleeping"
     sleep 1
-    pg_isready -h db -p 5432
   done
   
   echo "PostgreSQL is up and running!"
@@ -21,6 +19,42 @@ wait_for_postgres() {
 
 # Wait for the database to be ready
 wait_for_postgres
+
+# Build and set the DATABASE_URL environment variable
+build_database_url() {
+  # Check if required variables are set
+  if [ -z "$DB_HOST" ] || [ -z "$DB_PORT" ] || [ -z "$DB_NAME" ] || [ -z "$DB_USER" ]; then
+    echo "Error: Missing required database configuration. Please set DB_HOST, DB_PORT, DB_NAME, and DB_USER environment variables."
+    exit 1
+  fi
+  
+  # Build the URL
+  SSL_PARAM=""
+  if [ "$DB_SSL" = "true" ]; then
+    SSL_PARAM="?sslmode=require"
+  fi
+  
+  PASSWORD_PART=""
+  if [ -n "$DB_PASSWORD" ]; then
+    PASSWORD_PART=":$DB_PASSWORD"
+  fi
+  
+  DATABASE_URL="postgresql://$DB_USER$PASSWORD_PART@$DB_HOST:$DB_PORT/$DB_NAME$SSL_PARAM"
+  
+  # Mask password for logging
+  if [ -n "$DB_PASSWORD" ]; then
+    MASKED_URL=$(echo $DATABASE_URL | sed "s/$DB_PASSWORD/******/")
+    echo "Built DATABASE_URL from environment variables: $MASKED_URL"
+  else
+    echo "Built DATABASE_URL from environment variables: $DATABASE_URL"
+  fi
+  
+  # Export the DATABASE_URL for Prisma to use
+  export DATABASE_URL
+}
+
+# Build and export the DATABASE_URL
+build_database_url
 
 # Run database migrations
 echo "Running database migrations..."

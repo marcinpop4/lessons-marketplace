@@ -3,9 +3,17 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
-import prisma from './prisma.js';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
+
+// Load environment variables
+dotenv.config();
+
+// Load database configuration (must be before importing prisma)
+import './config/database.js';
+
+// Import prisma client
+import prisma from './prisma.js';
 
 // Import routes
 import lessonRequestRoutes from './routes/lessonRequestRoutes.js';
@@ -13,9 +21,6 @@ import teacherRoutes from './routes/teacherRoutes.js';
 import lessonRoutes from './routes/lessonRoutes.js';
 import authRoutes from './routes/auth/authRoutes.js';
 import lessonQuoteRoutes from './routes/lessonQuoteRoutes.js';
-
-// Load environment variables
-dotenv.config();
 
 // Initialize express app
 const app = express();
@@ -25,8 +30,26 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 app.use(helmet()); // Security headers
 app.use(compression()); // Compress responses
 app.use(morgan('combined')); // Logging
+
+// Enhanced CORS configuration using only environment variables
+const frontendUrl = process.env.FRONTEND_URL || '';
+const allowedOrigins = frontendUrl.split(',').map(url => url.trim()).filter(url => url);
+
+// Log the allowed origins for debugging
+console.log('CORS allowed origins:', allowedOrigins);
+
 app.use(cors({ 
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+      callback(null, true);
+    } else {
+      console.warn(`Origin ${origin} not allowed by CORS`);
+      callback(null, true); // Still allow for now, but log a warning
+    }
+  },
   credentials: true, // Allow cookies to be sent with requests
 })); 
 app.use(express.json()); // Parse JSON request body

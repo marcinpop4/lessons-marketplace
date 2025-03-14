@@ -14,19 +14,24 @@ kill_timeout = '5s'
 [env]
   NODE_ENV = 'production'
   PORT = '3000'
-  DATABASE_URL = "postgres://postgres:xBnWThWyLkLn3yQ@twilight-sky-6674.internal:5432/lessons_marketplace_dawn_cherry_4121?schema=public"
+  # Database connection settings using individual variables
+  DB_HOST = "twilight-sky-6674.internal"
+  DB_PORT = "5432"
+  DB_NAME = "lessons_marketplace_dawn_cherry_4121"
+  DB_USER = "postgres"
+  DB_SSL = "true"
+  # Note: DB_PASSWORD should be set as a secret using 'fly secrets set DB_PASSWORD=your_password'
   JWT_SECRET = "production-jwt-secret-key-change-me"
   JWT_EXPIRES_IN = "1h"
   REFRESH_TOKEN_EXPIRES_IN = "7d"
   
-  #Postgres cluster twilight-sky-6674 created
-  #Username:    postgres
-  #Password:    xBnWThWyLkLn3yQ
-  #Hostname:    twilight-sky-6674.internal
-  #Flycast:     fdaa:12:bd82:0:1::3
-  #Proxy port:  5432
-  #Postgres port:  5433
-  #Connection string: postgres://postgres:xBnWThWyLkLn3yQ@twilight-sky-6674.flycast:5432
+  # Postgres cluster information (for reference)
+  # Username:    postgres
+  # Password:    xBnWThWyLkLn3yQ (should be set as a secret)
+  # Hostname:    twilight-sky-6674.internal
+  # Flycast:     fdaa:12:bd82:0:1::3
+  # Proxy port:  5432
+  # Postgres port:  5433
 
 [http_service]
   internal_port = 3000

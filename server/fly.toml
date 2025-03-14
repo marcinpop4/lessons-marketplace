@@ -8,6 +8,16 @@ primary_region = "ams"
 [env]
   PORT = "3000"
   NODE_ENV = "production"
+  # Database connection settings using individual variables
+  # These will be overridden by fly.io's database connection settings if needed
+  DB_HOST = "fly-lessons-marketplace-db.internal"
+  DB_PORT = "5432"
+  DB_NAME = "arts_marketplace"
+  DB_USER = "postgres"
+  DB_SSL = "true"
+  # Note: DB_PASSWORD should be set as a secret using 'fly secrets set DB_PASSWORD=your_password'
+  # Comma-separated list of allowed frontend URLs
+  FRONTEND_URL = "https://lessons-marketplace-frontend.fly.dev"
 
 [http_service]
   internal_port = 3000

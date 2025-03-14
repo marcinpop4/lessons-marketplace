@@ -1,35 +1,45 @@
-import { Pool } from 'pg'; // or any other database driver you prefer
+/**
+ * Database configuration
+ * 
+ * This module builds the database connection URL from individual environment variables
+ * and exports it for use in the application.
+ */
 
-// Database connection configuration
-export interface DatabaseConfig {
-  host: string;
-  port: number;
-  database: string;
-  user: string;
-  password: string;
-  ssl?: boolean;
-  max?: number; // max number of clients in the pool
-  idleTimeoutMillis?: number;
-}
+// Load environment variables
+import dotenv from 'dotenv';
+dotenv.config();
 
-// Load configuration from environment variables
-const config: DatabaseConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  database: process.env.DB_NAME || 'arts_marketplace',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  ssl: process.env.DB_SSL === 'true',
-  max: parseInt(process.env.DB_POOL_SIZE || '10', 10),
-  idleTimeoutMillis: 30000
+// Get database configuration from environment variables
+const DB_HOST = process.env.DB_HOST || '';
+const DB_PORT = process.env.DB_PORT || '';
+const DB_NAME = process.env.DB_NAME || '';
+const DB_USER = process.env.DB_USER || '';
+const DB_PASSWORD = process.env.DB_PASSWORD || '';
+const DB_SSL = process.env.DB_SSL === 'true';
+
+// Build the database URL from individual components
+const buildDatabaseUrl = (): string => {
+  if (!DB_HOST || !DB_PORT || !DB_NAME || !DB_USER) {
+    throw new Error('Missing required database configuration. Please set DB_HOST, DB_PORT, DB_NAME, and DB_USER environment variables.');
+  }
+  
+  const sslParam = DB_SSL ? '?sslmode=require' : '';
+  const passwordPart = DB_PASSWORD ? `:${DB_PASSWORD}` : '';
+  
+  const url = `postgresql://${DB_USER}${passwordPart}@${DB_HOST}:${DB_PORT}/${DB_NAME}${sslParam}`;
+  
+  // Log the database URL (with masked password for security)
+  const maskedUrl = DB_PASSWORD 
+    ? url.replace(DB_PASSWORD, '******') 
+    : url;
+  
+  console.log(`Built database URL from environment variables: ${maskedUrl}`);
+  
+  return url;
 };
 
-// Create a connection pool
-const pool = new Pool(config);
+// Build the database URL and set it for Prisma
+const databaseUrl = buildDatabaseUrl();
+process.env.DATABASE_URL = databaseUrl;
 
-pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
-});
-
-export default pool; 
+export default databaseUrl; 

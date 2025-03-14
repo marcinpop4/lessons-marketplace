@@ -26,9 +26,16 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3000
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/arts_marketplace?schema=public
+      # Database connection - using individual variables
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=arts_marketplace
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_SSL=false
+      # Other environment variables
       - JWT_SECRET=local-development-secret-key
-      - FRONTEND_URL=http://localhost:5173
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
     depends_on:
       db:
         condition: service_healthy
@@ -45,7 +52,7 @@ services:
     ports:
       - "5173:80"
     environment:
-      - VITE_API_BASE_URL=${VITE_API_BASE_URL}
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:3000}
     depends_on:
       - api
     # Add a network alias to ensure the frontend can reach the API
