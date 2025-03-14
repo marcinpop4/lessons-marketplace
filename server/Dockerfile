@@ -19,17 +19,27 @@ RUN cd node_modules/bcrypt && npm rebuild
 
 # Copy necessary files for building the server
 COPY tsconfig.json ./
-COPY . ./server/
+COPY server/ ./server/
 COPY shared/ ./shared/
 
 # Generate Prisma client
 RUN pnpm prisma generate --schema=server/prisma/schema.prisma
 
-# Build the server using a modified version of the build:server script
-RUN pnpm exec tsc --project server/tsconfig.server.json --skipLibCheck
+# Build the server
+RUN pnpm build:server
 
-# Verify that all routes are properly compiled
-RUN grep -q "router.get('/stats'" /app/server/dist/server/routes/teacherRoutes.js || (echo "Stats route not found in compiled file" && exit 1)
+# Debug: List the compiled files
+RUN ls -la server/dist
+RUN find server/dist -name "teacherRoutes.js" | xargs ls -la
+
+# Verify that all routes are properly compiled (try both possible paths)
+RUN if [ -f "/app/server/dist/routes/teacherRoutes.js" ]; then \
+      grep -q "router.get('/stats'" /app/server/dist/routes/teacherRoutes.js || (echo "Stats route not found in compiled file" && exit 1); \
+    elif [ -f "/app/server/dist/server/routes/teacherRoutes.js" ]; then \
+      grep -q "router.get('/stats'" /app/server/dist/server/routes/teacherRoutes.js || (echo "Stats route not found in compiled file" && exit 1); \
+    else \
+      echo "Could not find teacherRoutes.js in either location" && exit 1; \
+    fi
 
 # Make the entrypoint script executable
 RUN chmod +x /app/server/entrypoint.sh

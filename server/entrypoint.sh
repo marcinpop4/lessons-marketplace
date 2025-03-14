@@ -67,9 +67,22 @@ npx prisma generate --schema=server/prisma/schema.prisma
 # Debug information
 echo "Listing server/dist directory:"
 ls -la server/dist
-echo "Listing server/dist/server directory:"
-ls -la server/dist/server || echo "server/dist/server does not exist"
+
+# Try to find the index.js file
+echo "Finding index.js files:"
+find server/dist -name "index.js" | sort
 
 # Start the server
 echo "Starting server..."
-node server/dist/server/index.js 
+# Try the direct path first
+if [ -f "server/dist/index.js" ]; then
+  echo "Using server/dist/index.js"
+  node server/dist/index.js
+# Fall back to the nested path if needed
+elif [ -f "server/dist/server/index.js" ]; then
+  echo "Using server/dist/server/index.js"
+  node server/dist/server/index.js
+else
+  echo "Error: Could not find index.js in either server/dist or server/dist/server"
+  exit 1
+fi 
