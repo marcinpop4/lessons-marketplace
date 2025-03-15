@@ -1,4 +1,4 @@
-import { LessonRequest, LessonType } from '../types/lesson';
+import { LessonRequest, LessonType, Address } from '../types/lesson';
 import apiClient from './apiClient';
 
 // Helper function to get auth headers
@@ -14,7 +14,7 @@ export interface CreateLessonRequestPayload {
   type: LessonType;
   startTime: string; // ISO string format
   durationMinutes: number;
-  address: string;
+  addressObj: Address; // Now required
   studentId: string;
 }
 

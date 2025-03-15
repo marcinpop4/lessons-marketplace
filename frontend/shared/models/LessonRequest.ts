@@ -1,5 +1,6 @@
 import { LessonType } from './LessonType.js';
 import { Student } from './Student.js';
+import { Address } from './Address.js';
 
 /**
  * LessonRequest model representing a student's requirements for a lesson
@@ -10,7 +11,7 @@ export class LessonRequest {
   type: LessonType;
   startTime: Date;
   durationMinutes: number;
-  address: string;
+  address: Address;
   student: Student;
   
   constructor(
@@ -18,7 +19,7 @@ export class LessonRequest {
     type: LessonType,
     startTime: Date,
     durationMinutes: number,
-    address: string,
+    address: Address,
     student: Student
   ) {
     this.id = id;

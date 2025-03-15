@@ -133,4 +133,20 @@
   .form-actions button {
     width: 100%;
   }
+}
+
+/* Remove the address toggle styles */
+.address-toggle {
+  display: none;
+}
+
+.toggle-buttons {
+  display: none;
+}
+
+.address-fields {
+  border: 1px solid #e0e0e0;
+  padding: 1rem;
+  border-radius: 4px;
+  background-color: #f9f9f9;
 } 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LessonType, LessonRequest, Student } from '../types/lesson';
+import { LessonType, LessonRequest, Student, Address } from '../types/lesson';
 import { createLessonRequest } from '../api/lessonRequestApi';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -14,48 +14,40 @@ const formatDateForInput = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-// Generate available time options for the current selected date
-const generateTimeOptions = (): { value: string, label: string }[] => {
-  const options: { value: string, label: string }[] = [];
+// Helper function to generate time options (9am to 8pm)
+const generateTimeOptions = () => {
+  const options = [];
   
-  // Generate options for every 30 minutes, but only between 8am (8:00) and 8pm (20:00)
-  for (let hour = 8; hour <= 20; hour++) {
-    // Add option for the hour (00 minutes)
-    const periodHour = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12; // Convert 0 to 12 for display
+  for (let hour = 9; hour <= 20; hour++) {
+    const hourFormatted = hour % 12 === 0 ? 12 : hour % 12;
+    const amPm = hour < 12 ? 'AM' : 'PM';
     
-    // Format time as HH:MM (24-hour format for value)
-    const valueHour = String(hour).padStart(2, '0');
-    
-    // Format as "H:00 AM/PM" for display
+    // Add on the hour option
     options.push({
-      value: `${valueHour}:00`,
-      label: `${displayHour}:00 ${periodHour}`
+      value: `${hour.toString().padStart(2, '0')}:00`,
+      label: `${hourFormatted}:00 ${amPm}`
     });
     
-    // Add option for the half hour (30 minutes)
+    // Add half-hour option
     options.push({
-      value: `${valueHour}:30`,
-      label: `${displayHour}:30 ${periodHour}`
+      value: `${hour.toString().padStart(2, '0')}:30`,
+      label: `${hourFormatted}:30 ${amPm}`
     });
   }
   
   return options;
 };
 
-// Helper function to check if a lesson would end after 9pm (21:00)
-const isLessonEndingAfter9pm = (timeString: string, durationMinutes: number): boolean => {
-  if (!timeString) return false;
+// Helper function to check if a lesson would end after 9pm
+const isLessonEndingAfter9pm = (startTime: string, durationMinutes: number): boolean => {
+  const [hours, minutes] = startTime.split(':').map(Number);
   
-  // Extract hours and minutes from the time string (format: "HH:MM")
-  const [hours, minutes] = timeString.split(':').map(part => parseInt(part, 10));
+  // Calculate end time in minutes since midnight
+  const startMinutesSinceMidnight = (hours * 60) + minutes;
+  const endMinutesSinceMidnight = startMinutesSinceMidnight + durationMinutes;
   
-  // Calculate end time in minutes past midnight
-  const startTimeInMinutes = (hours * 60) + minutes;
-  const endTimeInMinutes = startTimeInMinutes + durationMinutes;
-  
-  // 9pm = 21 hours * 60 minutes = 1260 minutes past midnight
-  return endTimeInMinutes > 1260;
+  // 9pm = 21 hours * 60 minutes = 1260 minutes since midnight
+  return endMinutesSinceMidnight > 1260;
 };
 
 // Add props interface for the component
@@ -67,11 +59,19 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
   const { user } = useAuth();
   const navigate = useNavigate();
   
-  const [formData, setFormData] = useState<LessonRequest>({
+  const [formData, setFormData] = useState<Omit<LessonRequest, 'address'> & { 
+    addressObj: Address;
+  }>({
     type: LessonType.GUITAR,
     startTime: '',
     durationMinutes: 30,
-    address: '',
+    addressObj: {
+      street: '',
+      city: '',
+      state: '',
+      postalCode: '',
+      country: 'USA'
+    },
     studentId: ''
   });
 
@@ -156,6 +156,19 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
       }
     }
     
+    // Handle address fields
+    if (name.startsWith('addressObj.')) {
+      const addressField = name.split('.')[1];
+      setFormData(prevData => ({
+        ...prevData,
+        addressObj: {
+          ...prevData.addressObj,
+          [addressField]: value
+        }
+      }));
+      return;
+    }
+    
     setFormData(prevData => ({
       ...prevData,
       [name]: name === 'durationMinutes' ? parseInt(value, 10) : value
@@ -177,17 +190,26 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
       return;
     }
     
+    // Validate address fields
+    const { street, city, state, postalCode } = formData.addressObj;
+    if (!street || !city || !state || !postalCode) {
+      setError('Please fill in all address fields.');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     
     try {
-      const result = await createLessonRequest({
+      const payload = {
         type: formData.type,
         startTime: formData.startTime,
         durationMinutes: formData.durationMinutes,
-        address: formData.address,
+        addressObj: formData.addressObj,
         studentId: formData.studentId
-      });
+      };
+      
+      const result = await createLessonRequest(payload);
       
       console.log('Lesson request created:', result);
       
@@ -199,7 +221,13 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
         type: LessonType.GUITAR,
         startTime: '',
         durationMinutes: 30,
-        address: '',
+        addressObj: {
+          street: '',
+          city: '',
+          state: '',
+          postalCode: '',
+          country: 'USA'
+        },
         studentId: formData.studentId // Keep the student ID
       });
       setSelectedTime('');
@@ -298,16 +326,80 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
           </div>
         </div>
         
-        <div className="form-group">
-          <label htmlFor="address">Address</label>
-          <textarea
-            id="address"
-            name="address"
-            value={formData.address}
-            onChange={handleChange}
-            placeholder="Enter the full address where you'd like the lesson to take place"
-            required
-          />
+        <div className="form-group address-group">
+          <label>Address</label>
+          <div className="address-fields">
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="addressObj.street">Street</label>
+                <input
+                  id="addressObj.street"
+                  name="addressObj.street"
+                  type="text"
+                  value={formData.addressObj.street}
+                  onChange={handleChange}
+                  placeholder="Street address"
+                  required
+                />
+              </div>
+            </div>
+            
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="addressObj.city">City</label>
+                <input
+                  id="addressObj.city"
+                  name="addressObj.city"
+                  type="text"
+                  value={formData.addressObj.city}
+                  onChange={handleChange}
+                  placeholder="City"
+                  required
+                />
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="addressObj.state">State</label>
+                <input
+                  id="addressObj.state"
+                  name="addressObj.state"
+                  type="text"
+                  value={formData.addressObj.state}
+                  onChange={handleChange}
+                  placeholder="State"
+                  required
+                />
+              </div>
+            </div>
+            
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="addressObj.postalCode">Postal Code</label>
+                <input
+                  id="addressObj.postalCode"
+                  name="addressObj.postalCode"
+                  type="text"
+                  value={formData.addressObj.postalCode}
+                  onChange={handleChange}
+                  placeholder="Postal Code"
+                  required
+                />
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="addressObj.country">Country</label>
+                <input
+                  id="addressObj.country"
+                  name="addressObj.country"
+                  type="text"
+                  value={formData.addressObj.country}
+                  onChange={handleChange}
+                  placeholder="Country"
+                  required
+                />
+              </div>
+            </div>
+          </div>
         </div>
         
         <div className="form-actions">

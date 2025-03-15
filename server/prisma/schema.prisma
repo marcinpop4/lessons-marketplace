@@ -7,8 +7,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // The DATABASE_URL is set by the database.ts module before Prisma is initialized
-  url      = env("DATABASE_URL")
+  // Using individual environment variables instead of DATABASE_URL
+  url = env("DATABASE_URL")
 }
 
 // User Type enum for different types of users
@@ -88,13 +88,31 @@ model TeacherLessonHourlyRate {
   @@unique([teacherId, type])
 }
 
+// Address model for storing physical locations
+model Address {
+  id         String   @id @default(uuid())
+  street     String
+  city       String
+  state      String
+  postalCode String
+  country    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  lessonRequests LessonRequest[]
+}
+
 // New model for lesson requests from students
 model LessonRequest {
   id              String     @id @default(uuid())
   type            LessonType
   startTime       DateTime
   durationMinutes Int
-  address         String
+  
+  // Address relationship (now required)
+  address   Address @relation(fields: [addressId], references: [id])
+  addressId String
 
   // Student relationship
   student   Student @relation(fields: [studentId], references: [id])

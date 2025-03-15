@@ -2,11 +2,19 @@ import prisma from '../../prisma.js';
 
 export type LessonType = 'VOICE' | 'GUITAR' | 'BASS' | 'DRUMS';
 
+export interface AddressDTO {
+  street: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+}
+
 export interface CreateLessonRequestDTO {
   type: LessonType;
   startTime: Date;
   durationMinutes: number;
-  address: string;
+  addressObj: AddressDTO; // Now required
   studentId: string;
 }
 
@@ -27,18 +35,40 @@ export class LessonRequestService {
         throw new Error(`Student with ID ${data.studentId} not found`);
       }
 
-      // Create the lesson request
-      const lessonRequest = await prisma.lessonRequest.create({
-        data: {
-          type: data.type as any, // Type cast for TypeScript
-          startTime: data.startTime,
-          durationMinutes: data.durationMinutes,
-          address: data.address,
-          studentId: data.studentId
-        }
-      });
+      // Create the lesson request with the address relationship
+      return await prisma.$transaction(async (tx) => {
+        // Create an Address record
+        const addressRecord = await tx.address.create({
+          data: {
+            street: data.addressObj.street,
+            city: data.addressObj.city,
+            state: data.addressObj.state,
+            postalCode: data.addressObj.postalCode,
+            country: data.addressObj.country
+          }
+        });
 
-      return lessonRequest;
+        // Create the lesson request with the address relationship
+        const lessonRequest = await tx.lessonRequest.create({
+          data: {
+            type: data.type as any, // Type cast for TypeScript
+            startTime: data.startTime,
+            durationMinutes: data.durationMinutes,
+            address: {
+              connect: { id: addressRecord.id }
+            },
+            student: {
+              connect: { id: data.studentId }
+            }
+          },
+          include: {
+            student: true,
+            address: true
+          }
+        });
+
+        return lessonRequest;
+      });
     } catch (error) {
       // Re-throw the error for handling in the controller
       throw error;
@@ -55,6 +85,7 @@ export class LessonRequestService {
       where: { id },
       include: {
         student: true,
+        address: true,
         lessonQuotes: {
           include: {
             teacher: true
@@ -73,6 +104,7 @@ export class LessonRequestService {
     return prisma.lessonRequest.findMany({
       where: { studentId },
       include: {
+        address: true,
         lessonQuotes: {
           include: {
             teacher: true,

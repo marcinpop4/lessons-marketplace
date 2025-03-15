@@ -1,3 +1,10 @@
+/**
+ * Prisma Seed Script for Address Data Migration
+ * 
+ * This script migrates existing lesson requests to use the Address model.
+ * It should be run after the schema migration that adds the Address model.
+ */
+
 import pkg from '@prisma/client';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -53,6 +60,45 @@ async function hashPassword(password: string): Promise<string> {
   return bcryptjs.hash(password, saltRounds);
 }
 
+// Sample addresses for lessons
+const sampleAddresses = [
+  {
+    street: '123 Main Street',
+    city: 'New York',
+    state: 'NY',
+    postalCode: '10001',
+    country: 'USA'
+  },
+  {
+    street: '456 Oak Avenue',
+    city: 'Los Angeles',
+    state: 'CA',
+    postalCode: '90001',
+    country: 'USA'
+  },
+  {
+    street: '789 Pine Boulevard',
+    city: 'Chicago',
+    state: 'IL',
+    postalCode: '60601',
+    country: 'USA'
+  },
+  {
+    street: '101 Maple Drive',
+    city: 'Houston',
+    state: 'TX',
+    postalCode: '77001',
+    country: 'USA'
+  },
+  {
+    street: '202 Cedar Lane',
+    city: 'Miami',
+    state: 'FL',
+    postalCode: '33101',
+    country: 'USA'
+  }
+];
+
 async function main() {
   console.log('Starting database seeding...');
 
@@ -66,6 +112,7 @@ async function main() {
       prisma.lesson.deleteMany(),
       prisma.lessonQuote.deleteMany(),
       prisma.lessonRequest.deleteMany(),
+      prisma.address.deleteMany(),
       prisma.teacherLessonHourlyRate.deleteMany(),
       prisma.teacher.deleteMany(),
       prisma.student.deleteMany(),
@@ -157,6 +204,17 @@ async function main() {
 
     console.log('TeacherLessonHourlyRates created:', teacherLessonHourlyRates.length);
 
+    // Create addresses for lesson locations
+    console.log('Creating addresses...');
+    const addresses = await Promise.all(
+      sampleAddresses.map(addressData => 
+        prisma.address.create({
+          data: addressData
+        })
+      )
+    );
+    console.log('Addresses created:', addresses.length);
+
     // Create 20 lesson requests, quotes, and some confirmed lessons
     console.log('Creating lesson requests, quotes, and lessons...');
     const lessonTypes = Object.values(LessonType);
@@ -167,6 +225,7 @@ async function main() {
     for (let i = 0; i < 20; i++) {
       const student = students[i % students.length];
       const lessonType = lessonTypes[i % lessonTypes.length];
+      const address = addresses[i % addresses.length];
       
       // Create lesson requests at different times over the next 30 days
       const startTime = addToDate(today, Math.floor(i / 4), 9 + (i % 8)); // Lessons between 9am and 5pm
@@ -176,8 +235,12 @@ async function main() {
           type: lessonType as any, // Type casting to avoid TypeScript errors
           startTime,
           durationMinutes: 60, // 1-hour lessons
-          address: `Studio ${(i % 5) + 1}, Music School, 123 Melody Lane`,
-          studentId: student.id,
+          address: {
+            connect: { id: address.id }
+          },
+          student: {
+            connect: { id: student.id }
+          }
         },
       });
       

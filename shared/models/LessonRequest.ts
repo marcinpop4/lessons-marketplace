@@ -1,5 +1,6 @@
 import { LessonType } from './LessonType.js';
 import { Student } from './Student.js';
+import { Address } from './Address.js';
 
 /**
  * LessonRequest model representing a student's requirements for a lesson
@@ -11,6 +12,7 @@ export class LessonRequest {
   startTime: Date;
   durationMinutes: number;
   address: string;
+  addressObj?: Address;
   student: Student;
   
   constructor(
@@ -19,7 +21,8 @@ export class LessonRequest {
     startTime: Date,
     durationMinutes: number,
     address: string,
-    student: Student
+    student: Student,
+    addressObj?: Address
   ) {
     this.id = id;
     this.type = type;
@@ -27,6 +30,7 @@ export class LessonRequest {
     this.durationMinutes = durationMinutes;
     this.address = address;
     this.student = student;
+    this.addressObj = addressObj;
   }
 
   /**
@@ -36,5 +40,16 @@ export class LessonRequest {
     const end = new Date(this.startTime);
     end.setMinutes(end.getMinutes() + this.durationMinutes);
     return end;
+  }
+
+  /**
+   * Get the formatted address string
+   * If addressObj is available, use it, otherwise use the address string
+   */
+  get formattedAddress(): string {
+    if (this.addressObj) {
+      return this.addressObj.toString();
+    }
+    return this.address;
   }
 } 

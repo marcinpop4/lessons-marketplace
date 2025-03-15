@@ -6,6 +6,18 @@ export enum LessonType {
   DRUMS = 'DRUMS'
 }
 
+// Interface for address data
+export interface Address {
+  id?: string;
+  street: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 // Interface for student data
 export interface Student {
   id: string;
@@ -22,7 +34,7 @@ export interface LessonRequest {
   type: LessonType;
   startTime: string; // ISO string format
   durationMinutes: number;
-  address: string;
+  address: Address; // Now required and renamed from addressObj
   studentId: string;
   createdAt?: string;
   updatedAt?: string;
