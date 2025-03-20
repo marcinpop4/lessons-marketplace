@@ -11,15 +11,17 @@ declare global {
   }
 }
 
-// Base API URL - in development we use the Vite proxy, in production we require VITE_API_BASE_URL
+// Base API URL determination
 const isDevelopment = import.meta.env.MODE === 'development';
-// Use runtime config if available, otherwise fall back to environment variables
-const API_BASE_URL = window.API_CONFIG?.BASE_URL || (isDevelopment 
-  ? '/api' // Use relative path for development (will be proxied by Vite)
-  : `${import.meta.env.VITE_API_BASE_URL}/api`); // Append /api to the base URL
+const isTest = import.meta.env.MODE === 'test' || import.meta.env.VITE_TEST_MODE === 'true';
 
-if (!isDevelopment && !API_BASE_URL) {
-  throw new Error('API base URL is required in production');
+// For tests and development, always use the local API
+// In production, use runtime config or env variable
+let API_BASE_URL = '/api';  // Default to local relative path for dev and test
+
+// Only use external URLs in production
+if (!isDevelopment && !isTest) {
+  API_BASE_URL = window.API_CONFIG?.BASE_URL || `${import.meta.env.VITE_API_BASE_URL}/api`;
 }
 
 console.log('API client initialized with base URL:', API_BASE_URL);

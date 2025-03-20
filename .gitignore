@@ -49,3 +49,8 @@ ehthumbs.db
 Desktop.ini
 node_modules/
 frontend/node_modules/
+
+# Test artifacts
+tests/screenshots/
+test-results/
+playwright-report/

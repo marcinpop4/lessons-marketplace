@@ -354,3 +354,28 @@ docker-compose up
    - Copies package.json files first for better layer caching
    - Installs only production dependencies in final images
 4. **Development Workflow**: Use the dev scripts for local development and docker-compose for a complete environment
+
+## End-to-End Testing
+
+### Running Tests
+
+The project uses Playwright for end-to-end testing. Before running tests, ensure:
+
+1. Your database is seeded with test data: `pnpm prisma:seed`
+2. The application is running: `pnpm dev:full`
+
+Run tests with one of these commands:
+
+```bash
+# Run all E2E tests with console output
+pnpm test:e2e
+
+# Run tests and generate an HTML report
+pnpm test:e2e:report
+```
+
+### Screenshots
+
+All test screenshots are saved in the `tests/screenshots` directory and are excluded from Git. 
+
+Playwright is configured to automatically take screenshots on test failures. Tests also take explicit screenshots at key points for debugging purposes.
