@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// CACHE-BUSTER: 20250320101632
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import '../../styles/LoginForm.css';
 
@@ -15,6 +16,32 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  // Use the authError from context if it exists
+  const displayError = error || authError;
+
+  // Reset error only when user makes changes to the form
+  const resetErrorOnUserAction = () => {
+    if (displayError) {
+      setError(null);
+      clearError();
+    }
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value);
+    resetErrorOnUserAction();
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPassword(e.target.value);
+    resetErrorOnUserAction();
+  };
+
+  const handleUserTypeChange = (newUserType: 'STUDENT' | 'TEACHER') => {
+    setUserType(newUserType);
+    resetErrorOnUserAction();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -25,25 +52,28 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
     }
     
     setIsSubmitting(true);
-    setError(null);
+    console.log('Attempting login...');
     
     try {
-      await login(email, password, userType);
-      setSuccess(true);
-      
-      if (onSuccess) {
-        onSuccess();
+      const loginSuccess = await login(email, password, userType);
+      console.log('Login result:', { loginSuccess, authError });
+      if (loginSuccess) {
+        setSuccess(true);
+        if (onSuccess) {
+          onSuccess();
+        }
       }
-    } catch (error) {
-      console.error('Login error:', error);
-      setError((error as Error).message || 'Failed to log in. Please try again.');
+      // If login returned false, the error should already be set in the auth context
+      // We don't need to do anything here as we're using displayError = error || authError
+    } catch (error: any) {
+      // This should only happen for unexpected errors, not auth failures
+      console.error('Unexpected error:', error);
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setIsSubmitting(false);
+      console.log('Final state:', { error, authError, displayError });
     }
   };
-
-  // Use the authError from context if it exists
-  const displayError = error || authError;
 
   return (
     <div className="login-form-container">
@@ -58,14 +88,16 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
       {displayError && (
         <div className="error-message">
           {displayError}
-          {authError && (
-            <button 
-              onClick={clearError}
-              className="clear-error-btn"
-            >
-              <span>&times;</span>
-            </button>
-          )}
+          <button 
+            onClick={() => {
+              setError(null);
+              clearError();
+            }}
+            className="clear-error-btn"
+            aria-label="Clear error message"
+          >
+            <span>&times;</span>
+          </button>
         </div>
       )}
       
@@ -77,7 +109,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={handleEmailChange}
               required
             />
           </div>
@@ -88,7 +120,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={handlePasswordChange}
               required
             />
           </div>
@@ -103,7 +135,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
                 name="userType"
                 value="STUDENT"
                 checked={userType === 'STUDENT'}
-                onChange={() => setUserType('STUDENT')}
+                onChange={() => handleUserTypeChange('STUDENT')}
               />
               Student
             </label>
@@ -113,7 +145,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
                 name="userType"
                 value="TEACHER"
                 checked={userType === 'TEACHER'}
-                onChange={() => setUserType('TEACHER')}
+                onChange={() => handleUserTypeChange('TEACHER')}
               />
               Teacher
             </label>

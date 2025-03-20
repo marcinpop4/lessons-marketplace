@@ -1,3 +1,4 @@
+// CACHE-BUSTER: 20250320101632
 import React, { useState, useEffect } from 'react';
 import { LessonType, LessonRequest, Student, Address } from '../types/lesson';
 import { createLessonRequest } from '../api/lessonRequestApi';
@@ -5,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import '../styles/LessonRequestForm.css';
 
+// Version: 2023-03-20-1 Cache buster
 // Helper function to format date for input field
 const formatDateForInput = (date: Date): string => {
   const year = date.getFullYear();
@@ -247,7 +249,7 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
   };
 
   return (
-    <div className="lesson-request-form-container">
+    <div className="lesson-request-form-container" key="lesson-request-form-v20230320">
       <h2>Request a Lesson</h2>
       
       {success && !onSubmitSuccess && (
@@ -415,4 +417,5 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
   );
 };
 
-export default LessonRequestForm; 
+// Wrap with React.memo to ensure re-mounting when keys change
+export default React.memo(LessonRequestForm); 

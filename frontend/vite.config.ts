@@ -10,6 +10,17 @@ export default defineConfig({
     outDir: '../dist/frontend'
   },
   server: {
+    // Force Vite to always use new versions of files and not serve from memory cache
+    hmr: {
+      overlay: true,
+    },
+    watch: {
+      usePolling: true,
+    },
+    headers: {
+      // Prevent browser caching in development mode
+      'Cache-Control': 'no-store'
+    },
     proxy: {
       // More specific API routes first
       '/api/auth': {

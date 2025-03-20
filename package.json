@@ -4,9 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --config frontend/vite.config.ts",
+    "dev": "vite --config frontend/vite.config.ts --force",
+    "dev:clear-cache": "rm -rf node_modules/.vite && vite --config frontend/vite.config.ts --force",
     "dev:server": "tsx watch server/index.ts",
     "dev:full": "concurrently \"npm run dev\" \"npm run dev:server\"",
+    "dev:full:clear-cache": "concurrently \"npm run dev:clear-cache\" \"npm run dev:server\"",
     "prebuild:shared": "pnpm prisma:generate",
     "build:shared": "tsc --project shared/tsconfig.shared.json --skipLibCheck",
     "build:frontend": "tsc --project frontend/tsconfig.app.json --skipLibCheck && vite build --config frontend/vite.config.ts",

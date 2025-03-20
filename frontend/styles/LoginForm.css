@@ -120,24 +120,43 @@
 }
 
 .error-message {
+  position: relative;
   background-color: #f8d7da;
   color: #721c24;
-  padding: 0.8rem;
-  margin-bottom: 1rem;
+  border: 1px solid #f5c6cb;
   border-radius: 4px;
-  text-align: center;
-  position: relative;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  text-align: left;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  animation: fade-in 0.3s ease-in-out;
 }
 
 .clear-error-btn {
   position: absolute;
-  top: 0.2rem;
+  top: 0.5rem;
   right: 0.5rem;
-  background: none;
+  background: transparent;
   border: none;
+  color: #721c24;
   font-size: 1.2rem;
   cursor: pointer;
-  color: #721c24;
+  padding: 0.2rem 0.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+}
+
+.clear-error-btn:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* Media queries for responsive behavior */

@@ -1,3 +1,4 @@
+// CACHE-BUSTER: 20250320101632
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import axios from 'axios';
 import apiClient from '../api/apiClient';
@@ -16,7 +17,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
-  login: (email: string, password: string, userType: 'STUDENT' | 'TEACHER') => Promise<void>;
+  login: (email: string, password: string, userType: 'STUDENT' | 'TEACHER') => Promise<boolean>;
   register: (userData: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
@@ -38,7 +39,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: false,
   error: null,
-  login: async () => {},
+  login: async () => false,
   register: async () => {},
   logout: async () => {},
   clearError: () => {},
@@ -108,7 +109,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Login function
   const login = async (email: string, password: string, userType: 'STUDENT' | 'TEACHER') => {
     setLoading(true);
-    setError(null);
+    // Don't clear the error here - let it be explicitly cleared by user action
     
     try {
       const response = await apiClient.post(`/auth/login`, {
@@ -125,12 +126,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // Set user data
       setUser(response.data.user);
+      
+      // Only clear error on successful login
+      setError(null);
     } catch (error: any) {
-      setError(error.response?.data?.error || 'Login failed');
-      throw error;
+      const errorMessage = error.response?.data?.error || 'Login failed';
+      console.error('Login error:', errorMessage);
+      setError(errorMessage);
+      // Don't throw the error, just return false to indicate failure
+      return false;
     } finally {
       setLoading(false);
     }
+    // Return true to indicate success
+    return true;
   };
 
   // Register function

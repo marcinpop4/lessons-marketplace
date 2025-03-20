@@ -2,7 +2,7 @@
 
 import axios from 'axios';
 
-// Check if we have a runtime configuration (set in the Docker environment)
+// Type declaration for the global window object with API_CONFIG
 declare global {
   interface Window {
     API_CONFIG?: {
@@ -11,17 +11,23 @@ declare global {
   }
 }
 
-// Base API URL determination
+// In development/test, always use the local API that gets proxied by Vite
+// In production, use the runtime configuration from config.js
 const isDevelopment = import.meta.env.MODE === 'development';
 const isTest = import.meta.env.MODE === 'test' || import.meta.env.VITE_TEST_MODE === 'true';
 
-// For tests and development, always use the local API
-// In production, use runtime config or env variable
-let API_BASE_URL = '/api';  // Default to local relative path for dev and test
+// Use a different API URL based on the environment
+let API_BASE_URL: string;
 
-// Only use external URLs in production
-if (!isDevelopment && !isTest) {
-  API_BASE_URL = window.API_CONFIG?.BASE_URL || `${import.meta.env.VITE_API_BASE_URL}/api`;
+if (isDevelopment || isTest) {
+  // In development or test, always use the relative path which gets proxied by Vite
+  API_BASE_URL = '/api';
+} else {
+  // In production, the API URL must be set in the config.js file
+  if (!window.API_CONFIG?.BASE_URL) {
+    throw new Error('API_CONFIG.BASE_URL is required in production. Make sure config.js is properly loaded.');
+  }
+  API_BASE_URL = window.API_CONFIG.BASE_URL;
 }
 
 console.log('API client initialized with base URL:', API_BASE_URL);
@@ -56,15 +62,20 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     
-    // If the error is 401 and we haven't retried yet
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Skip token refresh for login endpoint and if we've already retried
+    if (error.response?.status === 401 && 
+        !originalRequest._retry && 
+        !originalRequest.url?.endsWith('/auth/login')) {
       originalRequest._retry = true;
       
       try {
-        // Try to refresh the token
-        const baseUrl = API_BASE_URL.endsWith('/api') ? API_BASE_URL.slice(0, -4) : API_BASE_URL;
+        // Try to refresh the token - use the same API_BASE_URL
+        const refreshUrl = API_BASE_URL.endsWith('/api') 
+          ? `${API_BASE_URL.slice(0, -4)}/api/auth/refresh-token`
+          : `${API_BASE_URL}/auth/refresh-token`;
+          
         const response = await axios.post(
-          `${baseUrl}/api/auth/refresh-token`, 
+          refreshUrl, 
           {}, 
           { withCredentials: true }
         );
@@ -78,9 +89,11 @@ apiClient.interceptors.response.use(
         }
       } catch (refreshError) {
         console.error('Token refresh failed:', refreshError);
-        // If refresh fails, redirect to login
-        localStorage.removeItem('auth_token');
-        window.location.href = '/auth';
+        // If refresh fails, redirect to login only if not already on login page
+        if (!window.location.pathname.includes('/auth')) {
+          localStorage.removeItem('auth_token');
+          window.location.href = '/auth';
+        }
         return Promise.reject(refreshError);
       }
     }
