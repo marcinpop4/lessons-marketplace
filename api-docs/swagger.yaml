@@ -1,0 +1,861 @@
+openapi: 3.0.0
+info:
+  title: Lessons Marketplace API
+  description: API for the Lessons Marketplace application
+  version: 1.0.0
+servers:
+  - url: '/api'
+    description: Default server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    LessonType:
+      type: string
+      enum: [VOICE, GUITAR, BASS, DRUMS]
+    
+    Address:
+      type: object
+      properties:
+        id:
+          type: string
+        street:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        postalCode:
+          type: string
+        country:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - street
+        - city
+        - state
+        - postalCode
+        - country
+    
+    Student:
+      type: object
+      properties:
+        id:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        phoneNumber:
+          type: string
+        dateOfBirth:
+          type: string
+          format: date
+      required:
+        - id
+        - firstName
+        - lastName
+        - email
+    
+    Teacher:
+      type: object
+      properties:
+        id:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        phoneNumber:
+          type: string
+        dateOfBirth:
+          type: string
+          format: date
+      required:
+        - id
+        - firstName
+        - lastName
+        - email
+    
+    TeacherWithRates:
+      allOf:
+        - $ref: '#/components/schemas/Teacher'
+        - type: object
+          properties:
+            lessonHourlyRates:
+              type: object
+              additionalProperties:
+                type: number
+    
+    LessonRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          $ref: '#/components/schemas/LessonType'
+        startTime:
+          type: string
+          format: date-time
+        durationMinutes:
+          type: integer
+          minimum: 1
+        address:
+          $ref: '#/components/schemas/Address'
+        studentId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - type
+        - startTime
+        - durationMinutes
+        - address
+        - studentId
+    
+    LessonQuote:
+      type: object
+      properties:
+        id:
+          type: string
+        costInCents:
+          type: integer
+          minimum: 0
+        expiresAt:
+          type: string
+          format: date-time
+        lessonRequestId:
+          type: string
+        teacherId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        teacher:
+          $ref: '#/components/schemas/Teacher'
+        lessonRequest:
+          $ref: '#/components/schemas/LessonRequest'
+      required:
+        - costInCents
+        - expiresAt
+        - lessonRequestId
+        - teacherId
+    
+    Lesson:
+      type: object
+      properties:
+        id:
+          type: string
+        confirmedAt:
+          type: string
+          format: date-time
+        quoteId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - confirmedAt
+        - quoteId
+    
+    UserCredentials:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        userType:
+          type: string
+          enum: [STUDENT, TEACHER]
+      required:
+        - email
+        - password
+        - userType
+    
+    RegistrationData:
+      allOf:
+        - $ref: '#/components/schemas/UserCredentials'
+        - type: object
+          properties:
+            firstName:
+              type: string
+            lastName:
+              type: string
+            phoneNumber:
+              type: string
+            dateOfBirth:
+              type: string
+              format: date
+          required:
+            - firstName
+            - lastName
+            - phoneNumber
+            - dateOfBirth
+    
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            email:
+              type: string
+            firstName:
+              type: string
+            lastName:
+              type: string
+            userType:
+              type: string
+              enum: [STUDENT, TEACHER]
+        accessToken:
+          type: string
+      required:
+        - user
+        - accessToken
+    
+    TeacherStats:
+      type: object
+      properties:
+        totalLessonsCompleted:
+          type: integer
+        totalEarnings:
+          type: integer
+        upcomingLessons:
+          type: integer
+    
+    TeacherProfile:
+      allOf:
+        - $ref: '#/components/schemas/Teacher'
+        - type: object
+          properties:
+            ratings:
+              type: array
+              items:
+                type: object
+            bio:
+              type: string
+            lessonHourlyRates:
+              type: array
+              items:
+                type: object
+                properties:
+                  type:
+                    $ref: '#/components/schemas/LessonType'
+                  rateInCents:
+                    type: integer
+                  isActive:
+                    type: boolean
+    
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+security:
+  - BearerAuth: []
+
+paths:
+  /auth/register:
+    post:
+      summary: Register a new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrationData'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /auth/login:
+    post:
+      summary: Login as an existing user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCredentials'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /auth/refresh-token:
+    post:
+      summary: Refresh an expired access token
+      security: []
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+        '401':
+          description: Unauthorized or invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /auth/logout:
+    post:
+      summary: Logout the current user
+      responses:
+        '200':
+          description: Logout successful
+  
+  /auth/me:
+    get:
+      summary: Get the current authenticated user
+      responses:
+        '200':
+          description: Current user details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  email:
+                    type: string
+                  firstName:
+                    type: string
+                  lastName:
+                    type: string
+                  userType:
+                    type: string
+                    enum: [STUDENT, TEACHER]
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /lesson-requests:
+    post:
+      summary: Create a new lesson request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  $ref: '#/components/schemas/LessonType'
+                startTime:
+                  type: string
+                  format: date-time
+                durationMinutes:
+                  type: integer
+                  minimum: 1
+                addressObj:
+                  $ref: '#/components/schemas/Address'
+                studentId:
+                  type: string
+              required:
+                - type
+                - startTime
+                - durationMinutes
+                - addressObj
+                - studentId
+      responses:
+        '201':
+          description: Lesson request created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonRequest'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /lesson-requests/{id}:
+    get:
+      summary: Get a lesson request by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lesson request details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonRequest'
+        '404':
+          description: Lesson request not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /lesson-requests/student/{studentId}:
+    get:
+      summary: Get all lesson requests for a student
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of lesson requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LessonRequest'
+        '404':
+          description: Student not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /lesson-quotes:
+    post:
+      summary: Create a new lesson quote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lessonRequestId:
+                  type: string
+                teacherId:
+                  type: string
+                costInCents:
+                  type: integer
+                  minimum: 0
+                expiresAt:
+                  type: string
+                  format: date-time
+              required:
+                - lessonRequestId
+                - teacherId
+                - costInCents
+                - expiresAt
+      responses:
+        '201':
+          description: Lesson quote created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonQuote'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /lesson-quotes/request/{lessonRequestId}:
+    get:
+      summary: Get all quotes for a lesson request
+      parameters:
+        - name: lessonRequestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of lesson quotes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LessonQuote'
+        '404':
+          description: Lesson request not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /lesson-quotes/{quoteId}/accept:
+    post:
+      summary: Accept a lesson quote
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Quote accepted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  lesson:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Quote not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /lessons:
+    post:
+      summary: Create a new lesson from a quote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                quoteId:
+                  type: string
+                confirmedAt:
+                  type: string
+                  format: date-time
+              required:
+                - quoteId
+      responses:
+        '201':
+          description: Lesson created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lesson'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /lessons/{lessonId}:
+    get:
+      summary: Get a lesson by ID
+      parameters:
+        - name: lessonId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lesson details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lesson'
+        '404':
+          description: Lesson not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /lessons/quote/{quoteId}:
+    get:
+      summary: Get a lesson by quote ID
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lesson details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lesson'
+        '404':
+          description: Lesson not found or quote not accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /teachers:
+    get:
+      summary: Get available teachers
+      parameters:
+        - name: lessonType
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/LessonType'
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 5
+      responses:
+        '200':
+          description: List of available teachers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TeacherWithRates'
+  
+  /teachers/profile:
+    get:
+      summary: Get the current teacher's profile
+      responses:
+        '200':
+          description: Teacher profile details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeacherProfile'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: User is not a teacher
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /teachers/stats:
+    get:
+      summary: Get the current teacher's statistics
+      responses:
+        '200':
+          description: Teacher statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeacherStats'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: User is not a teacher
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /teachers/lesson-rates:
+    post:
+      summary: Add or update a lesson rate for a teacher
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lessonType:
+                  $ref: '#/components/schemas/LessonType'
+                rateInCents:
+                  type: integer
+                  minimum: 0
+              required:
+                - lessonType
+                - rateInCents
+      responses:
+        '201':
+          description: Lesson rate added or updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  type:
+                    $ref: '#/components/schemas/LessonType'
+                  rateInCents:
+                    type: integer
+                  isActive:
+                    type: boolean
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /teachers/lesson-rates/deactivate:
+    post:
+      summary: Deactivate a lesson rate for a teacher
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lessonType:
+                  $ref: '#/components/schemas/LessonType'
+              required:
+                - lessonType
+      responses:
+        '200':
+          description: Lesson rate deactivated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /teachers/lesson-rates/reactivate:
+    post:
+      summary: Reactivate a lesson rate for a teacher
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lessonType:
+                  $ref: '#/components/schemas/LessonType'
+              required:
+                - lessonType
+      responses:
+        '200':
+          description: Lesson rate reactivated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error' 

@@ -25,7 +25,8 @@
     "prisma:seed": "tsx server/prisma/seed.ts",
     "db:reset": "prisma migrate reset --force --schema=server/prisma/schema.prisma",
     "test:e2e": "playwright test --reporter=list",
-    "test:e2e:html": "playwright test"
+    "test:e2e:html": "playwright test",
+    "swagger:server": "tsx api-docs/serve-swagger.ts"
   },
   "dependencies": {
     "amqplib": "^0.10.3",
