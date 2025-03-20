@@ -30,11 +30,17 @@ if (isDevelopment || isTest) {
   API_BASE_URL = window.API_CONFIG.BASE_URL;
 }
 
-console.log('API client initialized with base URL:', API_BASE_URL);
+// API version prefix
+const API_VERSION = '/v1';
+
+// Full API base URL with version
+const VERSIONED_API_BASE_URL = `${API_BASE_URL}${API_VERSION}`;
+
+console.log('API client initialized with base URL:', VERSIONED_API_BASE_URL);
 
 // Create a custom axios instance
 const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: VERSIONED_API_BASE_URL,
   withCredentials: true, // Allow cookies
   timeout: 10000, // 10 seconds timeout
   headers: {
@@ -69,11 +75,9 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
       
       try {
-        // Try to refresh the token - use the same API_BASE_URL
-        const refreshUrl = API_BASE_URL.endsWith('/api') 
-          ? `${API_BASE_URL.slice(0, -4)}/api/auth/refresh-token`
-          : `${API_BASE_URL}/auth/refresh-token`;
-          
+        // Try to refresh the token - update to use versioned URL
+        const refreshUrl = `${API_BASE_URL}${API_VERSION}/auth/refresh-token`;
+        
         const response = await axios.post(
           refreshUrl, 
           {}, 

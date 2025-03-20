@@ -4,8 +4,8 @@ info:
   description: API for the Lessons Marketplace application
   version: 1.0.0
 servers:
-  - url: '/api'
-    description: Default server
+  - url: '/api/v1'
+    description: Version 1 API
 
 components:
   securitySchemes:

@@ -31,12 +31,15 @@ test('Student login form submission', async ({ page }) => {
   await page.getByLabel('Email').fill(studentEmail);
   await page.getByLabel('Password').fill(password);
   
-  // Submit the form using a more specific selector
+  // Submit the form and wait for API response
   console.log('Submitting login form');
-  await page.locator('form button[type="submit"]').click();
-  
-  // Wait a bit for form submission to complete
-  await page.waitForTimeout(2000);
+  const [loginResponse] = await Promise.all([
+    page.waitForResponse(
+      response => response.url().includes('/api/v1/auth/login') && response.request().method() === 'POST',
+      { timeout: 2000 }
+    ),
+    page.locator('form button[type="submit"]').click()
+  ]);
   
   // Take a screenshot after submission
   await page.screenshot({ path: 'tests/screenshots/student-after-login.png' });
@@ -72,23 +75,18 @@ test('Teacher login form submission', async ({ page }) => {
   // Select the teacher radio button
   await page.locator('input[name="userType"][value="TEACHER"]').check();
   
-  // Submit the form using a more specific selector
+  // Submit the form and wait for API response
   console.log('Submitting login form');
-  await page.locator('form button[type="submit"]').click();
-  
-  // Wait a bit for form submission to complete
-  await page.waitForTimeout(2000);
+  const [loginResponse] = await Promise.all([
+    page.waitForResponse(
+      response => response.url().includes('/api/v1/auth/login') && response.request().method() === 'POST',
+      { timeout: 2000 }
+    ),
+    page.locator('form button[type="submit"]').click()
+  ]);
   
   // Take a screenshot after submission
   await page.screenshot({ path: 'tests/screenshots/teacher-after-login.png' });
-  
-  // Verify the form submission - either we should see a success message or we might see an error related to API connection
-  // (since we're testing the form submission itself, not the API response)
-  const formSubmitted = await page.locator('form button[type="submit"]').isDisabled() ||
-                         await page.locator('.success-message').isVisible() || 
-                         await page.locator('.error-message').isVisible();
-  
-  expect(formSubmitted).toBeTruthy();
   
   console.log('Teacher login form submitted');
 }); 

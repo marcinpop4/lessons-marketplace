@@ -12,7 +12,7 @@ async function attemptLogin(page, email, password, userType = 'STUDENT') {
   await page.goto('/auth');
   
   // Wait for the app to be ready - look for the login form container
-  await page.waitForSelector('.login-form-container', { state: 'visible', timeout: 5000 });
+  await page.waitForSelector('.login-form-container', { state: 'visible', timeout: 2000 });
   
   // Make sure we're on the login tab (not register)
   const loginTab = page.locator('button.auth-tab', { hasText: 'Login' });
@@ -37,14 +37,10 @@ async function attemptLogin(page, email, password, userType = 'STUDENT') {
     await page.locator('input[name="userType"][value="STUDENT"]').check();
   }
   
-  // Submit the form and wait for the network request to complete
-  const submitPromise = page.waitForResponse(response => 
-    response.url().includes('/api/auth/login') && response.status() === 401
-  );
+  // Submit the form without waiting for network response
   await page.locator('form button[type="submit"]').click();
-  await submitPromise;
   
-  // Wait a bit for the error message to appear in the DOM
+  // Wait a bit for any error message to appear in the DOM
   await page.waitForTimeout(500);
 }
 

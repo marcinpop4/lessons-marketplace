@@ -69,12 +69,12 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/lesson-requests', lessonRequestRoutes);
-app.use('/api/teachers', teacherRoutes);
-app.use('/api/lessons', lessonRoutes);
-app.use('/api/lesson-quotes', lessonQuoteRoutes);
+// API routes with versioning
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/lesson-requests', lessonRequestRoutes);
+app.use('/api/v1/teachers', teacherRoutes);
+app.use('/api/v1/lessons', lessonRoutes);
+app.use('/api/v1/lesson-quotes', lessonQuoteRoutes);
 
 // API documentation for root route
 app.get('/', (req, res) => {
@@ -82,11 +82,11 @@ app.get('/', (req, res) => {
     message: 'Lessons Marketplace API Server',
     endpoints: {
       '/api/health': 'Check server health',
-      '/api/auth': 'Authentication endpoints',
-      '/api/lesson-requests': 'Lesson request endpoints',
-      '/api/teachers': 'Teacher endpoints',
-      '/api/lessons': 'Lesson endpoints',
-      '/api/lesson-quotes': 'Lesson quotes endpoints'
+      '/api/v1/auth': 'Authentication endpoints (v1)',
+      '/api/v1/lesson-requests': 'Lesson request endpoints (v1)',
+      '/api/v1/teachers': 'Teacher endpoints (v1)',
+      '/api/v1/lessons': 'Lesson endpoints (v1)',
+      '/api/v1/lesson-quotes': 'Lesson quotes endpoints (v1)'
     }
   });
 });

@@ -22,28 +22,28 @@ export default defineConfig({
       'Cache-Control': 'no-store'
     },
     proxy: {
-      // More specific API routes first
-      '/api/auth': {
+      // Versioned API routes
+      '/api/v1/auth': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false
       },
-      '/api/teachers': {
+      '/api/v1/teachers': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false
       },
-      '/api/lesson-requests': {
+      '/api/v1/lesson-requests': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false
       },
-      '/api/lesson-quotes': {
+      '/api/v1/lesson-quotes': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false
       },
-      '/api/lessons': {
+      '/api/v1/lessons': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false

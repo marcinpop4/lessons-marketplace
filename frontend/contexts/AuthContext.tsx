@@ -114,7 +114,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Login function
   const login = async (email: string, password: string, userType: 'STUDENT' | 'TEACHER') => {
     setLoading(true);
-    // Don't clear the error here - let it be explicitly cleared by user action
+    setError(null);
     
     try {
       const response = await apiClient.post(`/auth/login`, {
@@ -123,28 +123,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         userType,
       });
       
-      // Save the access token to localStorage
-      localStorage.setItem('auth_token', response.data.accessToken);
+      if (response.data && response.data.accessToken) {
+        setUser(response.data.user);
+        localStorage.setItem('auth_token', response.data.accessToken);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
+        return true;
+      }
       
-      // Set the access token in axios defaults
-      axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
-      
-      // Set user data
-      setUser(response.data.user);
-      
-      // Only clear error on successful login
-      setError(null);
+      return false;
     } catch (error: any) {
-      const errorMessage = error.response?.data?.error || 'Login failed';
-      console.error('Login error:', errorMessage);
+      console.error('Login error:', error);
+      const errorMessage = error.response?.data?.error || 'Login failed. Please try again.';
       setError(errorMessage);
-      // Don't throw the error, just return false to indicate failure
       return false;
     } finally {
       setLoading(false);
     }
-    // Return true to indicate success
-    return true;
   };
 
   // Register function
@@ -157,22 +151,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await apiClient.post(`/auth/register`, registerData);
       console.log('Registration API response:', response.data);
       
-      // Save the access token to localStorage
-      localStorage.setItem('auth_token', response.data.accessToken);
+      if (response.data && response.data.accessToken) {
+        setUser(response.data.user);
+        setJustRegistered(true);
+        localStorage.setItem('auth_token', response.data.accessToken);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
+        return response.data.user;
+      }
       
-      // Set the access token in axios defaults
-      axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
-      
-      // Get user data
-      const userResponse = await apiClient.get(`/auth/me`);
-      const userData = userResponse.data;
-      
-      // Set user data and justRegistered flag
-      setUser(userData);
-      setJustRegistered(true);
-      
-      // Return the user data so the component can use it
-      return userData;
+      return null;
     } catch (error: any) {
       console.error('Registration error in AuthContext:', error);
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Registration failed';
