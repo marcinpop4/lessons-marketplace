@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getLessonById } from '../api/lessonApi';
-import { Lesson, LessonQuote, Teacher, LessonRequest } from '../types/lesson';
+import { Lesson, LessonQuote, Teacher, LessonRequest, Address } from '../types/lesson';
 import '../styles/LessonConfirmation.css';
 
 // Extended lesson type that includes the quote data
@@ -52,6 +52,12 @@ const LessonConfirmation: React.FC = () => {
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+  
+  // Format address for display
+  const formatAddress = (address: Address): string => {
+    if (!address) return 'No address provided';
+    return `${address.street}, ${address.city}, ${address.state} ${address.postalCode}, ${address.country}`;
   };
   
   // Handle creating a new lesson request
@@ -126,7 +132,7 @@ const LessonConfirmation: React.FC = () => {
                 
                 <div className="info-item">
                   <div className="info-label">Location</div>
-                  <div className="info-value">{lessonRequest?.address}</div>
+                  <div className="info-value">{lessonRequest?.address ? formatAddress(lessonRequest.address) : 'No address specified'}</div>
                 </div>
                 
                 <div className="info-item">

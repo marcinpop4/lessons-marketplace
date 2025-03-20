@@ -1,8 +1,7 @@
 /**
- * Prisma Seed Script for Address Data Migration
+ * Prisma Seed Script
  * 
- * This script migrates existing lesson requests to use the Address model.
- * It should be run after the schema migration that adds the Address model.
+ * This script seeds the database with initial data for development and testing.
  */
 
 import pkg from '@prisma/client';
@@ -309,13 +308,14 @@ async function main() {
     console.log('Seeding completed successfully!');
   } catch (error) {
     console.error('Error during seeding:', error);
-    throw error;
+  } finally {
+    await prisma.$disconnect();
   }
 }
 
 main()
   .catch((e) => {
-    console.error('Error during seeding:', e);
+    console.error(e);
     process.exit(1);
   })
   .finally(async () => {

@@ -21,15 +21,18 @@ export class LessonRequestController {
         type,
         startTime,
         durationMinutes,
-        address,
+        addressObj,
         studentId
       } = req.body;
 
+      // Log the request body for debugging
+      console.log('Received lesson request data:', req.body);
+
       // Validate required fields
-      if (!type || !startTime || !durationMinutes || !address || !studentId) {
+      if (!type || !startTime || !durationMinutes || !addressObj || !studentId) {
         return res.status(400).json({
           error: 'Missing required fields',
-          message: 'Please provide type, startTime, durationMinutes, address, and studentId'
+          message: 'Please provide type, startTime, durationMinutes, addressObj, and studentId'
         });
       }
 
@@ -47,7 +50,7 @@ export class LessonRequestController {
         type,
         startTime: parsedStartTime,
         durationMinutes: parseInt(durationMinutes, 10),
-        address,
+        addressObj,
         studentId
       });
 

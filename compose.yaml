@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: arts_marketplace
+      POSTGRES_DB: lessons_marketplace
     ports:
       - "5432:5432"
     volumes:
@@ -30,10 +30,11 @@ services:
       # Database connection - using individual variables
       - DB_HOST=db
       - DB_PORT=5432
-      - DB_NAME=arts_marketplace
+      - DB_NAME=lessons_marketplace
       - DB_USER=postgres
       - DB_PASSWORD=postgres
       - DB_SSL=false
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/lessons_marketplace?schema=public
       # Other environment variables
       - JWT_SECRET=local-development-secret-key
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}

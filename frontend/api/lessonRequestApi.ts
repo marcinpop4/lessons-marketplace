@@ -14,7 +14,7 @@ export interface CreateLessonRequestPayload {
   type: LessonType;
   startTime: string; // ISO string format
   durationMinutes: number;
-  addressObj: Address; // Now required
+  addressObj: Address; // Field name needs to match backend expectation
   studentId: string;
 }
 
@@ -25,6 +25,10 @@ export interface CreateLessonRequestPayload {
  */
 export const createLessonRequest = async (data: CreateLessonRequestPayload): Promise<LessonRequest> => {
   try {
+    // Log the request payload for debugging
+    console.log('Sending lesson request data:', data);
+    
+    // Make sure we're using the correct API endpoint (without redundant '/api')
     const response = await apiClient.post('/lesson-requests', data);
     return response.data;
   } catch (error) {

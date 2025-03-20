@@ -4,7 +4,7 @@ import { getLessonQuotesByRequestId, acceptLessonQuote } from '../api/lessonQuot
 import { getAvailableTeachers, createLessonQuote } from '../api/teacherQuoteApi';
 import { getLessonRequestById } from '../api/lessonRequestApi';
 import { getLessonsByQuoteId } from '../api/lessonApi';
-import { LessonQuote, LessonRequest } from '../types/lesson';
+import { LessonQuote, LessonRequest, Address } from '../types/lesson';
 import '../styles/TeacherQuotes.css';
 
 interface TeacherQuotesProps {
@@ -175,6 +175,12 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
     return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Add a format address function
+  const formatAddress = (address: Address): string => {
+    if (!address) return 'No address provided';
+    return `${address.street}, ${address.city}, ${address.state} ${address.postalCode}, ${address.country}`;
+  };
+
   // Handle accepting a quote
   const handleAcceptQuote = async (quoteId: string) => {
     if (!quoteId) {
@@ -252,7 +258,7 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
             <p><span>Lesson Type:</span> {lessonRequest.type}</p>
             <p><span>Duration:</span> {lessonRequest.durationMinutes} minutes</p>
             <p><span>Date:</span> {formatDate(lessonRequest.startTime)}</p>
-            <p><span>Location:</span> {lessonRequest.address}</p>
+            <p><span>Location:</span> {typeof lessonRequest.address === 'object' ? formatAddress(lessonRequest.address) : lessonRequest.address}</p>
           </div>
         </div>
       )}
