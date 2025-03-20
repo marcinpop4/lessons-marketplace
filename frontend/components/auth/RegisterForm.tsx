@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import '../../styles/RegisterForm.css';
+import { useNavigate } from 'react-router-dom';
 
 interface RegisterFormProps {
   onSuccess?: () => void;
@@ -23,6 +24,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
   const [error, setError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState('');
   const [success, setSuccess] = useState(false);
+  const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -50,14 +52,30 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
       // Omit confirmPassword from the data sent to the API
       const { confirmPassword, ...registerData } = formData;
       
-      await register(registerData);
-      setSuccess(true);
+      const userData = await register(registerData);
       
-      if (onSuccess) {
-        onSuccess();
-      }
+      // Store success message flag
+      sessionStorage.setItem('registrationSuccess', 'true');
+      
+      // Short delay to ensure authentication state is fully processed
+      setTimeout(() => {
+        try {
+          // Determine destination based on user type
+          const destination = registerData.userType === 'TEACHER' 
+            ? '/teacher-dashboard' 
+            : '/lesson-request';
+          
+          // Use navigate function directly for cleaner redirects within React Router
+          // This helps maintain React context and authentication state
+          navigate(destination);
+        } catch (navError) {
+          // Emergency fallback if navigation fails
+          window.location.replace(registerData.userType === 'TEACHER' 
+            ? '/teacher-dashboard' 
+            : '/lesson-request');
+        }
+      }, 200);
     } catch (error) {
-      console.error('Registration error:', error);
       setError((error as Error).message || 'Registration failed. Please try again.');
     } finally {
       setIsSubmitting(false);

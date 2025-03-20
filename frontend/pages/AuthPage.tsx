@@ -18,12 +18,21 @@ const AuthPage: React.FC = () => {
     // Get the requested path or use appropriate default based on user type
     const { from } = location.state || {};
     
+    // Skip navigation if we're handling this in the RegisterForm component
+    if (activeTab === 'register' && user) {
+      console.log('Registration success handled by RegisterForm');
+      return;
+    }
+    
     if (user?.userType === 'STUDENT') {
       // Students go to lesson request form
       navigate('/lesson-request', { replace: true });
     } else if (user?.userType === 'TEACHER') {
-      // Teachers might go to a dashboard or other page
-      navigate('/teacher-dashboard', { replace: true });
+      // Teachers go to dashboard with registration success state
+      navigate('/teacher-dashboard', { 
+        replace: true,
+        state: { fromRegistration: activeTab === 'register' }
+      });
     } else if (from) {
       // Use the original requested path if available
       navigate(from.pathname, { replace: true });

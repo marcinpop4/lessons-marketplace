@@ -1,6 +1,6 @@
 // CACHE-BUSTER: 20250320101632
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import TeacherLessonRatesManager from '../components/TeacherLessonRatesManager';
 import '../styles/TeacherDashboard.css';
@@ -37,10 +37,34 @@ interface TeacherStats {
 const TeacherDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [profile, setProfile] = useState<TeacherProfile | null>(null);
   const [stats, setStats] = useState<TeacherStats | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+
+  useEffect(() => {
+    // Check for registration success in sessionStorage instead of URL
+    const registrationSuccess = sessionStorage.getItem('registrationSuccess');
+    
+    if (registrationSuccess === 'true') {
+      setShowSuccessMessage(true);
+      
+      // Remove the success flag from sessionStorage
+      sessionStorage.removeItem('registrationSuccess');
+    }
+  }, []);
+  
+  useEffect(() => {
+    // Hide success message after 5 seconds
+    if (showSuccessMessage) {
+      const timer = setTimeout(() => {
+        setShowSuccessMessage(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccessMessage]);
 
   useEffect(() => {
     // Redirect if not logged in or not a teacher
@@ -68,8 +92,6 @@ const TeacherDashboard: React.FC = () => {
         setProfile(profileResponse.data);
         setStats(statsResponse.data);
       } catch (err) {
-        console.error('Error fetching teacher data:', err);
-        
         // Extract more detailed error information
         if (axios.isAxiosError(err)) {
           const errorMessage = err.response?.data?.error || err.message;
@@ -112,6 +134,9 @@ const TeacherDashboard: React.FC = () => {
 
   return (
     <div className="teacher-dashboard">
+      {showSuccessMessage && (
+        <div className="success-pill">Registration successful!</div>
+      )}
       <div className="dashboard-header">
         <h1>Teacher Dashboard</h1>
         <button className="logout-button" onClick={handleLogout}>Logout</button>

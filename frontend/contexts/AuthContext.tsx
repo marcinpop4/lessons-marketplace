@@ -17,10 +17,12 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
+  justRegistered: boolean;
   login: (email: string, password: string, userType: 'STUDENT' | 'TEACHER') => Promise<boolean>;
-  register: (userData: RegisterData) => Promise<void>;
+  register: (userData: RegisterData) => Promise<User | null>;
   logout: () => Promise<void>;
   clearError: () => void;
+  clearJustRegistered: () => void;
 }
 
 // Register data interface
@@ -39,10 +41,12 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: false,
   error: null,
+  justRegistered: false,
   login: async () => false,
-  register: async () => {},
+  register: async () => null,
   logout: async () => {},
   clearError: () => {},
+  clearJustRegistered: () => {},
 });
 
 // Auth provider props
@@ -55,6 +59,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [justRegistered, setJustRegistered] = useState<boolean>(false);
 
   // Configure axios to include credentials
   axios.defaults.withCredentials = true;
@@ -143,12 +148,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   // Register function
-  const register = async (userData: RegisterData) => {
+  const register = async (registerData: RegisterData) => {
     setLoading(true);
     setError(null);
+    console.log('Starting registration in AuthContext:', { ...registerData, password: '[REDACTED]' });
     
     try {
-      const response = await apiClient.post(`/auth/register`, userData);
+      const response = await apiClient.post(`/auth/register`, registerData);
+      console.log('Registration API response:', response.data);
       
       // Save the access token to localStorage
       localStorage.setItem('auth_token', response.data.accessToken);
@@ -156,11 +163,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Set the access token in axios defaults
       axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
       
-      // Set user data
-      setUser(response.data.user);
+      // Get user data
+      const userResponse = await apiClient.get(`/auth/me`);
+      const userData = userResponse.data;
+      
+      // Set user data and justRegistered flag
+      setUser(userData);
+      setJustRegistered(true);
+      
+      // Return the user data so the component can use it
+      return userData;
     } catch (error: any) {
-      setError(error.response?.data?.error || 'Registration failed');
-      throw error;
+      console.error('Registration error in AuthContext:', error);
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Registration failed';
+      console.error('Setting error message:', errorMessage);
+      setError(errorMessage);
+      throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -193,16 +211,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
   };
 
+  // Clear justRegistered flag
+  const clearJustRegistered = () => {
+    setJustRegistered(false);
+  };
+
   return (
     <AuthContext.Provider
       value={{
         user,
         loading,
         error,
+        justRegistered,
         login,
         register,
         logout,
         clearError,
+        clearJustRegistered,
       }}
     >
       {children}

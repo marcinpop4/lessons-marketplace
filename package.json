@@ -24,8 +24,8 @@
     "prisma:studio": "prisma studio --schema=server/prisma/schema.prisma",
     "prisma:seed": "tsx server/prisma/seed.ts",
     "db:reset": "prisma migrate reset --force --schema=server/prisma/schema.prisma",
-    "test:e2e": "playwright test",
-    "test:e2e:report": "playwright test --reporter=html && npx playwright show-report"
+    "test:e2e": "playwright test --reporter=list",
+    "test:e2e:html": "playwright test"
   },
   "dependencies": {
     "amqplib": "^0.10.3",

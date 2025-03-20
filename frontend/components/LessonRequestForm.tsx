@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { LessonType, LessonRequest, Student, Address } from '../types/lesson';
 import { createLessonRequest } from '../api/lessonRequestApi';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import '../styles/LessonRequestForm.css';
 
 // Version: 2023-03-20-1 Cache buster
@@ -58,8 +58,10 @@ interface LessonRequestFormProps {
 }
 
 const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }) => {
-  const { user } = useAuth();
+  const { user, justRegistered, clearJustRegistered } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   
   const [formData, setFormData] = useState<Omit<LessonRequest, 'address'> & { 
     addressObj: Address;
@@ -79,7 +81,7 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [timeOptions] = useState<{ value: string, label: string }[]>(generateTimeOptions());
@@ -119,6 +121,31 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
       }));
     }
   }, [selectedDate, selectedTime]);
+
+  // Check for registration success in sessionStorage instead of URL
+  useEffect(() => {
+    const registrationSuccess = sessionStorage.getItem('registrationSuccess');
+    
+    if (registrationSuccess === 'true') {
+      setShowSuccessMessage(true);
+      
+      // Remove the success flag from sessionStorage
+      sessionStorage.removeItem('registrationSuccess');
+    }
+  }, []);
+  
+  // Hide success message after 5 seconds
+  useEffect(() => {
+    if (showSuccessMessage || justRegistered) {
+      const timer = setTimeout(() => {
+        setShowSuccessMessage(false);
+        if (justRegistered) {
+          clearJustRegistered();
+        }
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccessMessage, justRegistered, clearJustRegistered]);
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedDate(e.target.value);
@@ -213,10 +240,8 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
       
       const result = await createLessonRequest(payload);
       
-      console.log('Lesson request created:', result);
-      
       // Success!
-      setSuccess(true);
+      setShowSuccessMessage(true);
       
       // Reset form after successful submission
       setFormData({
@@ -242,7 +267,6 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to submit lesson request. Please try again.';
       setError(errorMessage);
-      console.error('Error submitting lesson request:', err);
     } finally {
       setLoading(false);
     }
@@ -252,9 +276,9 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
     <div className="lesson-request-form-container" key="lesson-request-form-v20230320">
       <h2>Request a Lesson</h2>
       
-      {success && !onSubmitSuccess && (
-        <div className="success-message">
-          Your lesson request has been submitted successfully!
+      {(justRegistered || showSuccessMessage) && (
+        <div className="success-pill">
+          Registration successful! You can now request a lesson.
         </div>
       )}
       
