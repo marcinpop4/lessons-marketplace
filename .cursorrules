@@ -1,1 +1,3 @@
-when writing end to end tests, keep timeouts short, 2s max, since at least locally, the app is very quick and I want to optimize for quick feedback
+When writing end to end tests, keep timeouts short, 2s max, since at least locally, the app is very quick and I want to optimize for quick feedback
+
+Only create typescript files and avoid creating javascript files

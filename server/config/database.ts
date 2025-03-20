@@ -3,33 +3,73 @@
  * 
  * This module builds the database connection URL from individual environment variables
  * and exports it for use in the application.
+ * 
+ * Single source of truth for database URL construction.
  */
 
 // Load environment variables
 import dotenv from 'dotenv';
-dotenv.config();
+import path from 'path';
+import fs from 'fs';
 
-// Function to get the database URL
-const getDatabaseUrl = (): string => {
-  // Check if DATABASE_URL is directly provided
-  if (process.env.DATABASE_URL) {
+/**
+ * Load environment variables from a specific path
+ * @param envPath Optional path to .env file
+ */
+export const loadEnvFromPath = (envPath?: string): void => {
+  if (envPath && fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+  } else {
+    dotenv.config();
+  }
+};
+
+// By default, load from default location
+loadEnvFromPath();
+
+/**
+ * Mask a database URL for secure logging by hiding the password
+ * @param url The database URL to mask
+ * @returns The masked URL
+ */
+export const maskDatabaseUrl = (url: string): string => {
+  return url.includes('@') 
+    ? url.replace(/\/\/([^:]+):([^@]+)@/, '//$1:******@')
+    : url;
+};
+
+/**
+ * Build a database URL from environment variables
+ * @param options Optional parameters to override environment variables
+ * @returns The constructed database URL
+ */
+export const getDatabaseUrl = (options?: {
+  host?: string;
+  port?: string | number;
+  name?: string;
+  user?: string;
+  password?: string;
+  ssl?: boolean;
+  useEnvUrl?: boolean;
+}): string => {
+  // Use options or fallback to environment variables
+  const useEnvUrl = options?.useEnvUrl ?? true;
+  
+  // Check if DATABASE_URL is directly provided and should be used
+  if (useEnvUrl && process.env.DATABASE_URL) {
     console.log('Using DATABASE_URL from environment variables');
-    // Log the database URL (with masked password for security)
-    const maskedUrl = process.env.DATABASE_URL.includes('@') 
-      ? process.env.DATABASE_URL.replace(/\/\/([^:]+):([^@]+)@/, '//$1:******@')
-      : process.env.DATABASE_URL;
-    
+    const maskedUrl = maskDatabaseUrl(process.env.DATABASE_URL);
     console.log(`Database URL: ${maskedUrl}`);
     
     return process.env.DATABASE_URL;
   } else {
-    // Get database configuration from environment variables
-    const DB_HOST = process.env.DB_HOST || '';
-    const DB_PORT = process.env.DB_PORT || '';
-    const DB_NAME = process.env.DB_NAME || '';
-    const DB_USER = process.env.DB_USER || '';
-    const DB_PASSWORD = process.env.DB_PASSWORD || '';
-    const DB_SSL = process.env.DB_SSL === 'true';
+    // Get database configuration from environment variables or options
+    const DB_HOST = options?.host ?? process.env.DB_HOST ?? '';
+    const DB_PORT = options?.port?.toString() ?? process.env.DB_PORT ?? '';
+    const DB_NAME = options?.name ?? process.env.DB_NAME ?? '';
+    const DB_USER = options?.user ?? process.env.DB_USER ?? '';
+    const DB_PASSWORD = options?.password ?? process.env.DB_PASSWORD ?? '';
+    const DB_SSL = options?.ssl ?? (process.env.DB_SSL === 'true');
 
     // Build the database URL from individual components
     if (!DB_HOST || !DB_PORT || !DB_NAME || !DB_USER) {
@@ -42,10 +82,7 @@ const getDatabaseUrl = (): string => {
     const url = `postgresql://${DB_USER}${passwordPart}@${DB_HOST}:${DB_PORT}/${DB_NAME}${sslParam}`;
     
     // Log the database URL (with masked password for security)
-    const maskedUrl = DB_PASSWORD 
-      ? url.replace(DB_PASSWORD, '******') 
-      : url;
-    
+    const maskedUrl = maskDatabaseUrl(url);
     console.log(`Built database URL from environment variables: ${maskedUrl}`);
     
     return url;
@@ -56,5 +93,5 @@ const getDatabaseUrl = (): string => {
 const databaseUrl = getDatabaseUrl();
 process.env.DATABASE_URL = databaseUrl;
 
-// Export the URL
+// Export the URL and the function
 export default databaseUrl; 
