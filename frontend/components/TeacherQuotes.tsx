@@ -279,7 +279,7 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
           const quoteId = quote.id;
           
           return (
-            <div key={quoteId} className="quote-card">
+            <div key={quoteId} className="quote-card" data-quote-id={quoteId}>
               <div className="quote-header">
                 <h3>{quote.teacher.firstName}</h3>
                 <p className="quote-price">{formatPrice(quote.costInCents)}</p>
