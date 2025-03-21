@@ -41,9 +41,6 @@ RUN pnpm prisma:generate && \
 RUN ls -la dist/server && \
     echo "Build verification complete"
 
-# Make the entrypoint script executable
-RUN chmod +x /app/server/entrypoint.sh
-
 # Production stage
 FROM node:20-slim AS production
 
@@ -69,15 +66,11 @@ COPY --from=build /app/dist/shared ./dist/shared
 # Copy Prisma schema and migrations (these are source files needed for runtime database operations)
 COPY --from=build /app/server/prisma ./server/prisma
 
-# Copy entrypoint script
-COPY --from=build /app/server/entrypoint.sh ./server/
-RUN chmod +x ./server/entrypoint.sh
-
 # Generate Prisma client in the production image
 RUN npx prisma generate --schema=server/prisma/schema.prisma
 
 # Expose the server port
 EXPOSE 3000
 
-# Start the server
-CMD ["/bin/sh", "./server/entrypoint.sh"]
+# Start the server using the TypeScript entrypoint
+CMD ["node", "dist/server/entrypoint.js"]

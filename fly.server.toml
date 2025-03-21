@@ -7,10 +7,11 @@ primary_region = "ewr"
 
 [env]
   DB_HOST = "twilight-sky-6674.internal"
-  DB_NAME = "lessons_marketplace_dawn_cherry_4121"
+  DB_NAME = "lessons_marketplace"
   DB_PORT = "5432"
   DB_USER = "postgres"
   DB_SSL = "false"
+  DB_POOL_SIZE = "10"
   FRONTEND_URL = "https://lessons-marketplace-frontend.fly.dev"
   NODE_ENV = "production"
   PORT = "3000"

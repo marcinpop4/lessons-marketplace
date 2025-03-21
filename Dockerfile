@@ -67,8 +67,11 @@ RUN pnpm install --no-frozen-lockfile --prod
 COPY --from=build /app/dist/server ./dist/server
 COPY --from=build /app/dist/shared ./dist/shared
 COPY --from=build /app/server/prisma ./server/prisma
-COPY --from=build /app/server/entrypoint.sh ./server/
-RUN chmod +x ./server/entrypoint.sh
+COPY --from=build /app/server/entrypoint.ts ./server/
+COPY --from=build /app/deploy.ts ./
+
+# Install tsx for running TypeScript files directly
+RUN pnpm add -g tsx
 
 # Generate Prisma client in the production image
 RUN npx prisma generate --schema=server/prisma/schema.prisma
@@ -76,5 +79,5 @@ RUN npx prisma generate --schema=server/prisma/schema.prisma
 # Expose the server port
 EXPOSE 3000
 
-# Start the server
-CMD ["/bin/sh", "./server/entrypoint.sh"] 
+# Start the server using the TypeScript entrypoint
+CMD ["tsx", "./server/entrypoint.ts"] 

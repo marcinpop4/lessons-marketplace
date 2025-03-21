@@ -174,37 +174,25 @@ This project includes a Docker Compose configuration (compose.yaml) for local de
 
 This project uses a modern deployment approach with separate frontend and backend deployments.
 
-### Backend API Deployment
+### Deploying to Fly.io
 
-The backend API is deployed to Fly.io:
+To deploy the application to Fly.io:
 
-1. **Configure environment variables:**
-   - Update `.env.production` with your production database URL and other settings
-   - Set sensitive values as secrets: `fly secrets set JWT_SECRET=your-secret-value`
+```bash
+# Simple deployment without database setup
+pnpm deploy:fly
 
-2. **Deploy the backend:**
-   ```bash
-   ./server/deploy.sh
-   ```
+# Deployment with database setup (password setup, connection, etc.)
+pnpm deploy:fly:with-db
+```
 
-3. **Access the deployed API:**
-   - API URL: https://lessons-marketplace-dawn-cherry-4121.fly.dev
-   - Health check: https://lessons-marketplace-dawn-cherry-4121.fly.dev/api/health
+The `deploy:fly` command will deploy both the API and frontend applications without attempting to modify the database configuration, which is useful for routine deployments where database settings remain unchanged.
 
-### Frontend Deployment
-
-The frontend is deployed separately to Fly.io:
-
-1. **Configure environment variables:**
-   - Update `frontend/.env.production` with your API URL
-
-2. **Deploy the frontend:**
-   ```bash
-   ./frontend/deploy.sh
-   ```
-
-3. **Access the deployed frontend:**
-   - Frontend URL: https://lessons-marketplace-frontend.fly.dev
+Use the `deploy:fly:with-db` flag when you need to:
+- Set up the database for the first time
+- Update database credentials
+- Recreate the DATABASE_URL secret
+- Reconnect to the database if connection issues occur
 
 ### Deployment Architecture
 
