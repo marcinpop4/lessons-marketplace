@@ -41,7 +41,7 @@ function getBaseRateInCents(lessonType: LessonType): number {
     case LessonType.DRUMS:
       return 3500; // $35.00
     default:
-      return 4000; // $40.00 default fallback
+      throw new Error(`Unsupported lesson type: ${lessonType}`);
   }
 }
 

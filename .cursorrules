@@ -1,3 +1,5 @@
 When writing end to end tests, keep timeouts short, 2s max, since at least locally, the app is very quick and I want to optimize for quick feedback
 
 Only create typescript files and avoid creating javascript files
+
+Don't implement any fallbacks for things that are not loaded correctly or missing. I don't want to mask problems, and get the feedback right away, via a failure, that something is missing.

@@ -20,7 +20,7 @@ COPY server/package.json ./server/
 RUN mkdir -p ./shared/
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # Rebuild bcrypt for the current platform
 RUN cd node_modules/bcrypt && npm rebuild
@@ -60,7 +60,7 @@ WORKDIR /app
 
 # Copy package files and install production dependencies
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --no-frozen-lockfile --prod
 
 # Copy built files and runtime assets
 COPY --from=build /app/dist/server ./dist/server

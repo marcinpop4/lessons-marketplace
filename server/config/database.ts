@@ -52,11 +52,8 @@ export const getDatabaseUrl = (options?: {
   ssl?: boolean;
   useEnvUrl?: boolean;
 }): string => {
-  // Use options or fallback to environment variables
-  const useEnvUrl = options?.useEnvUrl ?? true;
-  
   // Check if DATABASE_URL is directly provided and should be used
-  if (useEnvUrl && process.env.DATABASE_URL) {
+  if (process.env.DATABASE_URL) {
     console.log('Using DATABASE_URL from environment variables');
     const maskedUrl = maskDatabaseUrl(process.env.DATABASE_URL);
     console.log(`Database URL: ${maskedUrl}`);
@@ -64,18 +61,31 @@ export const getDatabaseUrl = (options?: {
     return process.env.DATABASE_URL;
   } else {
     // Get database configuration from environment variables or options
-    const DB_HOST = options?.host ?? process.env.DB_HOST ?? '';
-    const DB_PORT = options?.port?.toString() ?? process.env.DB_PORT ?? '';
-    const DB_NAME = options?.name ?? process.env.DB_NAME ?? '';
-    const DB_USER = options?.user ?? process.env.DB_USER ?? '';
-    const DB_PASSWORD = options?.password ?? process.env.DB_PASSWORD ?? '';
-    const DB_SSL = options?.ssl ?? (process.env.DB_SSL === 'true');
+    const DB_HOST = options?.host || process.env.DB_HOST;
+    const DB_PORT = options?.port?.toString() || process.env.DB_PORT;
+    const DB_NAME = options?.name || process.env.DB_NAME;
+    const DB_USER = options?.user || process.env.DB_USER;
+    const DB_PASSWORD = options?.password || process.env.DB_PASSWORD;
+    const DB_SSL = options?.ssl !== undefined ? options.ssl : (process.env.DB_SSL === 'true');
 
-    // Build the database URL from individual components
-    if (!DB_HOST || !DB_PORT || !DB_NAME || !DB_USER) {
-      throw new Error('Missing required database configuration. Please set DB_HOST, DB_PORT, DB_NAME, and DB_USER environment variables.');
+    // Validate all required parameters are present
+    if (!DB_HOST) {
+      throw new Error('Database host is required but not provided');
     }
     
+    if (!DB_PORT) {
+      throw new Error('Database port is required but not provided');
+    }
+    
+    if (!DB_NAME) {
+      throw new Error('Database name is required but not provided');
+    }
+    
+    if (!DB_USER) {
+      throw new Error('Database user is required but not provided');
+    }
+
+    // Build the database URL from individual components
     const sslParam = DB_SSL ? '?sslmode=require' : '';
     const passwordPart = DB_PASSWORD ? `:${DB_PASSWORD}` : '';
     

@@ -29,9 +29,20 @@ async function waitForPostgres(): Promise<void> {
   let isReady = false;
   while (!isReady) {
     try {
+      const host = process.env.DB_HOST;
+      const port = process.env.DB_PORT;
+      
+      if (!host) {
+        throw new Error('DB_HOST environment variable is required');
+      }
+      
+      if (!port) {
+        throw new Error('DB_PORT environment variable is required');
+      }
+      
       const result: SpawnSyncReturns<Buffer> = spawnSync('pg_isready', [
-        '-h', process.env.DB_HOST ?? 'localhost', 
-        '-p', process.env.DB_PORT ?? '5432'
+        '-h', host, 
+        '-p', port
       ]);
       
       if (result.status === 0) {
@@ -106,7 +117,11 @@ async function main(): Promise<void> {
       // Handle server process events
       server.on('close', (code) => {
         console.log(`Server process exited with code ${code}`);
-        process.exit(code ?? 1);
+        if (code === undefined || code === null) {
+          process.exit(1);
+        } else {
+          process.exit(code);
+        }
       });
       
       // Forward signals to the child process

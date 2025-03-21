@@ -3,15 +3,15 @@ services:
   db:
     image: postgres:15
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: lessons_marketplace
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -25,19 +25,22 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=development
-      - PORT=3000
-      # Database connection - using individual variables
+      - NODE_ENV=${NODE_ENV}
+      - PORT=${PORT}
+      # Database connection
       - DB_HOST=db
       - DB_PORT=5432
-      - DB_NAME=lessons_marketplace
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - DB_SSL=false
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/lessons_marketplace?schema=public
-      # Other environment variables
-      - JWT_SECRET=local-development-secret-key
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_SSL=${DB_SSL}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public
+      # JWT settings
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
+      - REFRESH_TOKEN_EXPIRES_IN=${REFRESH_TOKEN_EXPIRES_IN}
+      # Frontend URL
+      - FRONTEND_URL=${FRONTEND_URL}
     depends_on:
       db:
         condition: service_healthy
@@ -54,7 +57,8 @@ services:
     ports:
       - "5173:80"
     environment:
-      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:3000}
+      - NODE_ENV=${NODE_ENV}
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL}
     depends_on:
       - api
     # Add a network alias to ensure the frontend can reach the API

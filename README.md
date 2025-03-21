@@ -379,3 +379,35 @@ pnpm test:e2e:report
 All test screenshots are saved in the `tests/screenshots` directory and are excluded from Git. 
 
 Playwright is configured to automatically take screenshots on test failures. Tests also take explicit screenshots at key points for debugging purposes.
+
+## Docker Development Environment
+
+You can run the application using Docker with the following npm scripts:
+
+```bash
+# Start all Docker containers in detached mode
+npm run docker:up
+
+# Stop all Docker containers
+npm run docker:down
+
+# Seed the database in Docker
+npm run docker:seed
+
+# View Docker logs
+npm run docker:logs
+
+# Run end-to-end tests in Docker environment
+npm run docker:test
+
+# Run end-to-end tests with interactive prompt to keep containers running
+npm run docker:test:interactive
+
+# Build Docker images
+npm run docker:build
+
+# Rebuild Docker images without cache
+npm run docker:rebuild
+```
+
+These commands replace the need for direct Docker commands or shell scripts.

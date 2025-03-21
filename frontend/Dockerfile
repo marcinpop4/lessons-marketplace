@@ -16,7 +16,7 @@ COPY frontend/package.json ./frontend/
 RUN mkdir -p ./shared/
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # Copy source files with proper structure
 COPY frontend/ ./frontend/

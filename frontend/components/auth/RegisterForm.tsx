@@ -59,21 +59,14 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
       
       // Short delay to ensure authentication state is fully processed
       setTimeout(() => {
-        try {
-          // Determine destination based on user type
-          const destination = registerData.userType === 'TEACHER' 
-            ? '/teacher-dashboard' 
-            : '/lesson-request';
-          
-          // Use navigate function directly for cleaner redirects within React Router
-          // This helps maintain React context and authentication state
-          navigate(destination);
-        } catch (navError) {
-          // Emergency fallback if navigation fails
-          window.location.replace(registerData.userType === 'TEACHER' 
-            ? '/teacher-dashboard' 
-            : '/lesson-request');
-        }
+        // Determine destination based on user type
+        const destination = registerData.userType === 'TEACHER' 
+          ? '/teacher-dashboard' 
+          : '/lesson-request';
+        
+        // Use navigate function directly for cleaner redirects within React Router
+        // This helps maintain React context and authentication state
+        navigate(destination);
       }, 200);
     } catch (error) {
       setError((error as Error).message || 'Registration failed. Please try again.');

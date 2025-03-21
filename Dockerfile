@@ -14,7 +14,7 @@ COPY server/package.json ./server/
 COPY frontend/package.json ./frontend/
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # Copy the rest of the application
 COPY . .
@@ -61,7 +61,7 @@ WORKDIR /app
 
 # Copy package files and install production dependencies
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --no-frozen-lockfile --prod
 
 # Copy built files and runtime assets
 COPY --from=build /app/dist/server ./dist/server

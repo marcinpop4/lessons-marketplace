@@ -202,13 +202,7 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
       if (result.lesson && result.lesson.id) {
         navigate(`/lesson-confirmation/${result.lesson.id}`);
       } else {
-        // Fallback in case lesson wasn't returned - fetch first lesson for this quote
-        const lessons = await getLessonsByQuoteId(quoteId);
-        if (lessons && lessons.length > 0) {
-          navigate(`/lesson-confirmation/${lessons[0].id}`);
-        } else {
-          throw new Error('No lesson was created');
-        }
+        throw new Error('No lesson was created or no lesson ID was returned from the server');
       }
     } catch (err) {
       console.error('Error accepting quote:', err);
