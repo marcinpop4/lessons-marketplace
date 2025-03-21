@@ -1,13 +1,16 @@
 // CACHE-BUSTER: 20250320101632
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, Link } from 'react-router-dom';
 import LessonRequestForm from './components/LessonRequestForm';
 import TeacherQuotes from './components/TeacherQuotes';
 import AuthPage from './pages/AuthPage';
 import LessonConfirmation from './pages/LessonConfirmation';
 import TeacherDashboard from './pages/TeacherDashboard';
+import ThemeDemoPage from './pages/ThemeDemoPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import ThemeProvider from './contexts/ThemeContext';
+import ThemeSwitcher from './components/ThemeSwitcher';
 // Import directly to remove dependency on SVG file
 import './App.css';
 
@@ -50,7 +53,7 @@ const AppRoutes = () => {
 
   return (
     <div className="app-container">
-      <div className="header">
+      <header className="header animate-fade-in">
         <div className="logo-container">
           <img 
             src="/assets/images/lessons-marketplace.png" 
@@ -59,12 +62,13 @@ const AppRoutes = () => {
           />
           <h1>Lessons Marketplace</h1>
         </div>
-      </div>
+      </header>
       
-      <div className="main-content">
+      <main className="main-content animate-slide-up">
         <Routes>
           {/* Public routes */}
           <Route path="/auth" element={<AuthPage />} />
+          <Route path="/theme-demo" element={<ThemeDemoPage />} />
           
           {/* Protected routes - Student only */}
           <Route element={<ProtectedRoute userTypes={['STUDENT']} />}>
@@ -109,13 +113,19 @@ const AppRoutes = () => {
           {/* Catch all route */}
           <Route path="*" element={<Navigate to="/auth" replace />} />
         </Routes>
-      </div>
+      </main>
       
-      <div className="footer">
+      <footer className="footer flex justify-between items-center px-4">
         <p className="read-the-docs">
           Welcome to the Lessons Marketplace project
         </p>
-      </div>
+        <div className="flex items-center space-x-4">
+          <Link to="/theme-demo" className="text-primary-600 hover:text-primary-700 text-sm">
+            Theme Demo
+          </Link>
+          <ThemeSwitcher className="flex items-center" />
+        </div>
+      </footer>
     </div>
   );
 };
@@ -123,9 +133,11 @@ const AppRoutes = () => {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <AppRoutes />
-      </Router>
+      <ThemeProvider>
+        <Router>
+          <AppRoutes />
+        </Router>
+      </ThemeProvider>
     </AuthProvider>
   );
 }
