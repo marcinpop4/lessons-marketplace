@@ -48,6 +48,10 @@ export interface Teacher {
   email: string;
   phoneNumber?: string;
   dateOfBirth?: string;
+  experience?: number;
+  bio?: string;
+  specialties?: string[];
+  lessonHourlyRates: Record<LessonType, number>;
 }
 
 // Interface for lesson quote data
@@ -61,6 +65,9 @@ export interface LessonQuote {
   updatedAt?: string;
   teacher?: Teacher;
   lessonRequest?: LessonRequest;
+  expired?: boolean;
+  getFormattedHourlyRate(): string;
+  getFormattedLessonPrice(): string;
 }
 
 // Interface for confirmed lesson data

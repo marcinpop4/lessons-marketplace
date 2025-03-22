@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { LessonType } from '../types/lesson';
-import '../styles/TeacherLessonRatesManager.css';
 import apiClient from '../api/apiClient';
 
 interface LessonRate {
@@ -160,104 +159,122 @@ const TeacherLessonRatesManager: React.FC<TeacherLessonRatesManagerProps> = ({
   };
 
   return (
-    <div className="teacher-lesson-rates-manager">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Form to add/update rates */}
-      <div className="rate-form-container">
-        <h3>Add or Update Lesson Rate</h3>
-        <form onSubmit={handleSubmit} className="rate-form">
-          <div className="form-group">
-            <label htmlFor="lessonType">Lesson Type:</label>
-            <select
-              id="lessonType"
-              value={selectedLessonType}
-              onChange={(e) => setSelectedLessonType(e.target.value)}
-              disabled={loading}
+      <div className="card card-accent h-fit">
+        <div className="card-header">
+          <h3 className="text-lg font-semibold">Add or Update Lesson Rate</h3>
+        </div>
+        <div className="card-body">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="form-control">
+              <label htmlFor="lessonType" className="label">
+                <span className="label-text">Lesson Type</span>
+              </label>
+              <select
+                id="lessonType"
+                value={selectedLessonType}
+                onChange={(e) => setSelectedLessonType(e.target.value)}
+                disabled={loading}
+                className="select select-bordered w-full"
+              >
+                <option value="">Select a lesson type</option>
+                {Object.values(LessonType).map(type => (
+                  <option key={type} value={type}>
+                    {type.charAt(0) + type.slice(1).toLowerCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-control">
+              <label htmlFor="rateInDollars" className="label">
+                <span className="label-text">Hourly Rate ($)</span>
+              </label>
+              <input
+                id="rateInDollars"
+                type="number"
+                min="0"
+                step="0.01"
+                value={rateInDollars}
+                onChange={(e) => setRateInDollars(e.target.value)}
+                disabled={loading}
+                placeholder="e.g. 45.00"
+                className="input input-bordered w-full"
+              />
+            </div>
+
+            <button 
+              type="submit" 
+              className="btn btn-primary w-full" 
+              disabled={loading || !selectedLessonType || !rateInDollars}
             >
-              <option value="">Select a lesson type</option>
-              {/* Show all lesson types for updating */}
-              {Object.values(LessonType).map(type => (
-                <option key={type} value={type}>
-                  {type.charAt(0) + type.slice(1).toLowerCase()}
-                </option>
-              ))}
-            </select>
-          </div>
+              {loading ? 'Saving...' : 'Save Rate'}
+            </button>
+          </form>
 
-          <div className="form-group">
-            <label htmlFor="rateInDollars">Hourly Rate ($):</label>
-            <input
-              id="rateInDollars"
-              type="number"
-              min="0"
-              step="0.01"
-              value={rateInDollars}
-              onChange={(e) => setRateInDollars(e.target.value)}
-              disabled={loading}
-              placeholder="e.g. 45.00"
-            />
-          </div>
-
-          <button 
-            type="submit" 
-            className="submit-button" 
-            disabled={loading || !selectedLessonType || !rateInDollars}
-          >
-            {loading ? 'Saving...' : 'Save Rate'}
-          </button>
-        </form>
-
-        {error && <div className="error-message">{error}</div>}
-        {success && <div className="success-message">{success}</div>}
+          {error && <div className="alert alert-error mt-4">{error}</div>}
+          {success && <div className="alert alert-success mt-4">{success}</div>}
+        </div>
       </div>
 
       {/* Display current rates */}
-      <div className="current-rates">
-        <h3>Your Current Lesson Rates</h3>
-        {lessonRates.length === 0 ? (
-          <p className="no-rates-message">You haven't set any lesson rates yet.</p>
-        ) : (
-          <table className="rates-table">
-            <thead>
-              <tr>
-                <th>Lesson Type</th>
-                <th>Rate (hourly)</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lessonRates.map(rate => (
-                <tr key={rate.id} className={rate.isActive ? 'active-rate' : 'inactive-rate'}>
-                  <td>{rate.type.charAt(0) + rate.type.slice(1).toLowerCase()}</td>
-                  <td>${formatDollars(rate.rateInCents)}</td>
-                  <td className="status-cell">
-                    <span className={`status-indicator ${rate.isActive ? 'active' : 'inactive'}`}></span>
-                    {rate.isActive ? 'Active' : 'Inactive'}
-                  </td>
-                  <td>
-                    {rate.isActive ? (
-                      <button 
-                        className="deactivate-button" 
-                        onClick={() => handleDeactivate(rate.type)}
-                        disabled={loading}
-                      >
-                        Deactivate
-                      </button>
-                    ) : (
-                      <button 
-                        className="reactivate-button" 
-                        onClick={() => handleReactivate(rate.type)}
-                        disabled={loading}
-                      >
-                        Reactivate
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      <div className="card card-accent">
+        <div className="card-header">
+          <h3 className="text-lg font-semibold">Your Current Lesson Rates</h3>
+        </div>
+        <div className="card-body">
+          {lessonRates.length === 0 ? (
+            <p className="text-center text-gray-500">You haven't set any lesson rates yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table w-full">
+                <thead>
+                  <tr>
+                    <th>Lesson Type</th>
+                    <th>Rate (hourly)</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lessonRates.map(rate => (
+                    <tr key={rate.id}>
+                      <td>{rate.type.charAt(0) + rate.type.slice(1).toLowerCase()}</td>
+                      <td>${formatDollars(rate.rateInCents)}</td>
+                      <td>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          rate.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {rate.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td>
+                        {rate.isActive ? (
+                          <button 
+                            className="btn btn-error btn-sm" 
+                            onClick={() => handleDeactivate(rate.type)}
+                            disabled={loading}
+                          >
+                            Deactivate
+                          </button>
+                        ) : (
+                          <button 
+                            className="btn btn-success btn-sm" 
+                            onClick={() => handleReactivate(rate.type)}
+                            disabled={loading}
+                          >
+                            Reactivate
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

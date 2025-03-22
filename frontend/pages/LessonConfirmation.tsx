@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getLessonById } from '../api/lessonApi';
 import { Lesson, LessonQuote, Teacher, LessonRequest, Address } from '../types/lesson';
-import '../styles/LessonConfirmation.css';
 
 // Extended lesson type that includes the quote data
 interface LessonWithDetails extends Lesson {
@@ -49,6 +48,18 @@ const LessonConfirmation: React.FC = () => {
     return `$${(priceInCents / 100).toFixed(2)}`;
   };
   
+  // Calculate hourly rate
+  const calculateHourlyRate = (costInCents: number, durationMinutes: number): number => {
+    return Math.round(costInCents * 60 / durationMinutes);
+  };
+
+  // Format hourly rate for display
+  const formatHourlyRate = (quote: LessonQuote): string => {
+    if (!quote.lessonRequest) return 'Not available';
+    const hourlyRate = calculateHourlyRate(quote.costInCents, quote.lessonRequest.durationMinutes);
+    return `${formatPrice(hourlyRate)}/hour`;
+  };
+  
   // Format date for display
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
@@ -67,15 +78,26 @@ const LessonConfirmation: React.FC = () => {
   };
   
   if (loading) {
-    return <div className="lesson-confirmation-loading">Loading lesson details...</div>;
+    return (
+      <div className="card card-primary">
+        <div className="card-body">
+          <p className="text-center">Loading lesson details...</p>
+        </div>
+      </div>
+    );
   }
   
   if (error || !lesson) {
     return (
-      <div className="lesson-confirmation-error">
-        <h2>Error</h2>
-        <p>{error || 'Failed to load lesson details'}</p>
-        <button onClick={handleCreateNewLesson} className="new-lesson-button">Create a New Lesson</button>
+      <div className="card card-primary">
+        <div className="card-body">
+          <div className="alert alert-error mb-4">
+            <p>{error || 'Failed to load lesson details'}</p>
+          </div>
+          <button onClick={handleCreateNewLesson} className="btn btn-primary w-full">
+            Create a New Lesson
+          </button>
+        </div>
       </div>
     );
   }
@@ -85,68 +107,71 @@ const LessonConfirmation: React.FC = () => {
   const { teacher, lessonRequest } = quote;
   
   return (
-    <div className="lesson-confirmation-container">
-      <div className="confirmation-header">
-        <div className="confirmation-header-content">
-          <div className="confirmation-icon">✓</div>
-          <div className="confirmation-text">
-            <h2>Lesson Confirmed!</h2>
-            <p>Your lesson has been successfully booked and confirmed.</p>
-          </div>
+    <div className="space-y-6">
+      <div className="card card-primary">
+        <div className="card-header">
+          <h3 className="text-xl font-semibold">Lesson Confirmed</h3>
         </div>
-        <button 
-          className="new-lesson-button"
-          onClick={handleCreateNewLesson}
-        >
-          Book Another Lesson
-        </button>
-      </div>
-      
-      <div className="lesson-details-section">
-        <div className="lesson-details-card">
-          <h3>Lesson Details</h3>
+        <div className="card-body">
+          <div className="alert alert-success mb-6">
+            Your lesson has been successfully booked and confirmed.
+          </div>
           
-          <div className="lesson-info">
-            <div className="info-columns">
-              <div className="info-column">
-                <div className="info-item">
-                  <div className="info-label">Teacher</div>
-                  <div className="info-value">{teacher?.firstName} {teacher?.lastName}</div>
+          <div className="card card-secondary">
+            <div className="card-header">
+              <h3 className="text-lg font-semibold">Lesson Details</h3>
+            </div>
+            <div className="card-body">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium">Teacher</p>
+                    <p>{teacher?.firstName} {teacher?.lastName}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm font-medium">Lesson Type</p>
+                    <p>{lessonRequest?.type}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm font-medium">Date</p>
+                    <p>{lessonRequest?.startTime ? formatDate(lessonRequest.startTime) : 'Not specified'}</p>
+                  </div>
                 </div>
                 
-                <div className="info-item">
-                  <div className="info-label">Lesson Type</div>
-                  <div className="info-value">{lessonRequest?.type}</div>
-                </div>
-                
-                <div className="info-item">
-                  <div className="info-label">Date</div>
-                  <div className="info-value">{lessonRequest?.startTime ? formatDate(lessonRequest.startTime) : 'Not specified'}</div>
-                </div>
-              </div>
-              
-              <div className="info-column">
-                <div className="info-item">
-                  <div className="info-label">Duration</div>
-                  <div className="info-value">{lessonRequest?.durationMinutes} minutes</div>
-                </div>
-                
-                <div className="info-item">
-                  <div className="info-label">Location</div>
-                  <div className="info-value">{lessonRequest?.address ? formatAddress(lessonRequest.address) : 'No address specified'}</div>
-                </div>
-                
-                <div className="info-item">
-                  <div className="info-label">Price</div>
-                  <div className="info-value">{quote?.costInCents ? formatPrice(quote.costInCents) : 'Not specified'}</div>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium">Duration</p>
+                    <p>{lessonRequest?.durationMinutes} minutes</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm font-medium">Location</p>
+                    <p>{lessonRequest?.address ? formatAddress(lessonRequest.address) : 'No address specified'}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm font-medium">Price</p>
+                    <div className="space-y-1">
+                      <p>Rate: {formatHourlyRate(quote)}</p>
+                      <p>Lesson Price: {formatPrice(quote.costInCents)}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-        
-        <div className="confirmation-footer">
-          <p className="teacher-contact-note">Your teacher will contact you shortly to confirm the details.</p>
+          
+          <div className="mt-6">
+            <p className="text-sm text-center mb-4">Your teacher will contact you shortly to confirm the details.</p>
+            <button 
+              onClick={handleCreateNewLesson}
+              className="btn btn-primary w-full"
+            >
+              Book Another Lesson
+            </button>
+          </div>
         </div>
       </div>
     </div>

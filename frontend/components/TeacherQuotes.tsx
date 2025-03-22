@@ -6,7 +6,6 @@ import { getAvailableTeachers, createLessonQuote } from '../api/teacherQuoteApi'
 import { getLessonRequestById } from '../api/lessonRequestApi';
 import { getLessonsByQuoteId } from '../api/lessonApi';
 import { LessonQuote, LessonRequest, Address } from '../types/lesson';
-import '../styles/TeacherQuotes.css';
 
 interface TeacherQuotesProps {
   lessonRequestId: string;
@@ -30,6 +29,28 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
   // Use the prop if available, otherwise use the URL param
   // Will throw error if both are undefined
   const effectiveLessonRequestId = propLessonRequestId || paramLessonRequestId;
+
+  // Format price for display
+  const formatPrice = (priceInCents: number): string => {
+    return `$${(priceInCents / 100).toFixed(2)}`;
+  };
+
+  // Calculate hourly rate
+  const calculateHourlyRate = (costInCents: number, durationMinutes: number): number => {
+    return Math.round(costInCents * 60 / durationMinutes);
+  };
+
+  // Format hourly rate for display
+  const formatHourlyRate = (quote: LessonQuote): string => {
+    if (!quote.lessonRequest) return 'Not available';
+    const hourlyRate = calculateHourlyRate(quote.costInCents, quote.lessonRequest.durationMinutes);
+    return `${formatPrice(hourlyRate)}/hour`;
+  };
+
+  // Check if quote is expired
+  const isQuoteExpired = (quote: LessonQuote): boolean => {
+    return new Date() > new Date(quote.expiresAt);
+  };
 
   // Function to fetch quotes
   const fetchQuotes = async () => {
@@ -165,11 +186,6 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
     fetchQuotes();
   }, [effectiveLessonRequestId]);
 
-  // Format price for display
-  const formatPrice = (priceInCents: number): string => {
-    return `$${(priceInCents / 100).toFixed(2)}`;
-  };
-
   // Format date for display
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
@@ -243,68 +259,69 @@ const TeacherQuotes: React.FC<TeacherQuotesProps> = ({ lessonRequestId: propLess
   }
 
   return (
-    <div className="teacher-quotes-container">
-      <h2>Teacher Quotes</h2>
-      
-      {/* Lesson Request Details - More Compact */}
-      {lessonRequest && (
-        <div className="lesson-request-card">
-          <div className="lesson-request-details">
-            <p><span>Lesson Type:</span> {lessonRequest.type}</p>
-            <p><span>Duration:</span> {lessonRequest.durationMinutes} minutes</p>
-            <p><span>Date:</span> {formatDate(lessonRequest.startTime)}</p>
-            <p><span>Location:</span> {typeof lessonRequest.address === 'object' ? formatAddress(lessonRequest.address) : lessonRequest.address}</p>
+    <div className="card card-primary">
+      <div className="card-header">
+        <h3 className="text-xl font-semibold">Teacher Quotes</h3>
+        {lessonRequest && (
+          <div className="mt-2">
+            <p className="text-sm"><span className="font-medium">Lesson Type:</span> {lessonRequest.type}</p>
+            <p className="text-sm"><span className="font-medium">Duration:</span> {lessonRequest.durationMinutes} minutes</p>
+            <p className="text-sm"><span className="font-medium">Date:</span> {formatDate(lessonRequest.startTime)}</p>
+            <p className="text-sm"><span className="font-medium">Location:</span> {typeof lessonRequest.address === 'object' ? formatAddress(lessonRequest.address) : lessonRequest.address}</p>
           </div>
-        </div>
-      )}
-      
-      <p className="teacher-quotes-subheading">Choose your preferred teacher below:</p>
-      
-      {/* Teacher Quotes Grid */}
-      <div className="quotes-grid">
-        {quotes.map((quote) => {
-          // Validate required properties exist before rendering
-          if (!quote.teacher || !quote.lessonRequest || !quote.id) {
-            console.error('Invalid quote data:', quote);
-            return null; // Skip rendering this quote
-          }
-          
-          // Store the ID in a local variable to ensure TypeScript knows it's not undefined
-          const quoteId = quote.id;
-          
-          return (
-            <div key={quoteId} className="quote-card" data-quote-id={quoteId}>
-              <div className="quote-header">
-                <h3>{quote.teacher.firstName}</h3>
-                <p className="quote-price">{formatPrice(quote.costInCents)}</p>
-              </div>
-              
-              <div className="quote-details">
-                <p className="quote-rate"><span>Hourly Rate:</span> {formatPrice(quote.costInCents * 60 / quote.lessonRequest.durationMinutes)}</p>
-                {quote.teacher && 'experience' in quote.teacher && (
-                  <p className="teacher-bio-preview">Experience: {typeof quote.teacher.experience === 'string' ? quote.teacher.experience.substring(0, 60) : ''}...</p>
-                )}
-              </div>
-              
-              <div className="quote-footer">
-                {acceptSuccess === quoteId ? (
-                  <div className="success-message">Quote accepted!</div>
-                ) : (
-                  <button 
-                    className="accept-quote-button" 
-                    onClick={() => handleAcceptQuote(quoteId)}
-                    disabled={acceptingQuote === quoteId || acceptSuccess !== null || creatingLesson}
-                  >
-                    {acceptingQuote === quoteId ? 'Processing...' : creatingLesson ? 'Creating...' : 'Accept Quote'}
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        )}
       </div>
       
-      <button onClick={onBack} className="back-button">Back to Lesson Request</button>
+      <div className="card-body">
+        <p className="mb-4 text-sm">Choose your preferred teacher below:</p>
+        
+        {/* Teacher Quotes Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {quotes.map((quote) => {
+            // Validate required properties exist before rendering
+            if (!quote.teacher || !quote.lessonRequest || !quote.id) {
+              console.error('Invalid quote data:', quote);
+              return null; // Skip rendering this quote
+            }
+            
+            return (
+              <div key={quote.id} className="card card-secondary" data-quote-id={quote.id}>
+                <div className="card-header">
+                  <h3 className="text-lg font-semibold">{quote.teacher.firstName} {quote.teacher.lastName}</h3>
+                </div>
+                <div className="card-body">
+                  <div className="space-y-2">
+                    {quote.teacher.experience && (
+                      <p>Experience: {quote.teacher.experience} years</p>
+                    )}
+                    {quote.teacher.bio && (
+                      <p className="text-sm">{quote.teacher.bio}</p>
+                    )}
+                    <p>Rate: {formatHourlyRate(quote)}</p>
+                    <p>Lesson Price: {formatPrice(quote.costInCents)}</p>
+                    {quote.teacher.specialties && (
+                      <p className="text-sm">
+                        Specialties: {quote.teacher.specialties.join(', ')}
+                      </p>
+                    )}
+                    <button
+                      onClick={() => quote.id && handleAcceptQuote(quote.id)}
+                      className="btn btn-primary w-full mt-4"
+                      disabled={!!acceptingQuote || isQuoteExpired(quote)}
+                    >
+                      {acceptingQuote === quote.id ? 'Accepting...' : 'Accept Quote'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        
+        <div className="mt-4">
+          <button onClick={onBack} className="btn btn-secondary">Back to Lesson Request</button>
+        </div>
+      </div>
     </div>
   );
 };

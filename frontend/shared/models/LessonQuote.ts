@@ -59,6 +59,32 @@ export class LessonQuote {
   }
 
   /**
+   * Calculate the hourly rate in cents based on the lesson duration and cost
+   * @returns The hourly rate in cents
+   */
+  getHourlyRateInCents(): number {
+    return Math.round(this.costInCents * 60 / this.lessonRequest.durationMinutes);
+  }
+
+  /**
+   * Format the hourly rate as a currency string
+   * @returns Formatted currency string with /hour suffix
+   */
+  getFormattedHourlyRate(): string {
+    const hourlyRateInDollars = centsToDisplayDollars(this.getHourlyRateInCents());
+    return `$${hourlyRateInDollars.toFixed(2)}/hour`;
+  }
+
+  /**
+   * Format the lesson price as a currency string
+   * @returns Formatted currency string
+   */
+  getFormattedLessonPrice(): string {
+    const priceInDollars = centsToDisplayDollars(this.costInCents);
+    return `$${priceInDollars.toFixed(2)}`;
+  }
+
+  /**
    * Format the cost as a currency string
    * Note: This should only be used in client-side code for display purposes
    * @param locale The locale to use for formatting (defaults to en-US)

@@ -11,8 +11,12 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ThemeProvider from './contexts/ThemeContext';
 import ThemeSwitcher from './components/ThemeSwitcher';
-// Import directly to remove dependency on SVG file
-import './App.css';
+
+// Import CSS in the correct order: base styles, theme, components
+import './index.css';
+import './styles/theme.css';
+import './styles/components.css';
+import './styles/auth.css';
 
 // Root redirect component to handle user type specific redirects
 const RootRedirect = () => {
@@ -53,14 +57,19 @@ const AppRoutes = () => {
 
   return (
     <div className="app-container">
-      <header className="header animate-fade-in">
+      <header className="header">
         <div className="logo-container">
           <img 
             src="/assets/images/lessons-marketplace.png" 
             alt="Lessons Marketplace Logo" 
             className="logo" 
           />
-          <h1>Lessons Marketplace</h1>
+          <Link to="/" className="hover:text-primary-600 transition-colors">
+            <h1>Take lessons and Git Gud!</h1>
+          </Link>
+        </div>
+        <div className="flex items-center">
+          <ThemeSwitcher className="flex items-center" />
         </div>
       </header>
       
@@ -115,15 +124,17 @@ const AppRoutes = () => {
         </Routes>
       </main>
       
-      <footer className="footer flex justify-between items-center px-4">
-        <p className="read-the-docs">
+      <footer className="footer">
+        <p>
           Welcome to the Lessons Marketplace project
         </p>
-        <div className="flex items-center space-x-4">
-          <Link to="/theme-demo" className="text-primary-600 hover:text-primary-700 text-sm">
+        <div className="flex items-center gap-4">
+          <Link to="/theme-demo">
             Theme Demo
           </Link>
-          <ThemeSwitcher className="flex items-center" />
+          <Link to="/auth">
+            Login / Register
+          </Link>
         </div>
       </footer>
     </div>

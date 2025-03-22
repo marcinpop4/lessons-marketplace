@@ -11,14 +11,14 @@ async function attemptRegistration(page, userData) {
   // Navigate to auth page and wait for the app to be ready
   await page.goto('/auth');
   
-  // Wait for the app to be ready (React logo to be loaded)
-  await page.waitForSelector('img[src*="lessons-marketplace"]', { timeout: 2000 });
+  // Wait for the app to be ready
+  await page.waitForSelector('.auth-form', { timeout: 2000 });
   
   // Switch to registration form
-  await page.click('button:text("Register")', { timeout: 2000 });
+  await page.click('button.auth-tab:has-text("Register")', { timeout: 2000 });
   
   // Wait for the registration form to be visible
-  await expect(page.locator('.register-form')).toBeVisible({ timeout: 2000 });
+  await expect(page.locator('form')).toBeVisible({ timeout: 2000 });
   
   // Fill in the registration form
   await page.fill('#firstName', userData.firstName, { timeout: 2000 });
@@ -35,20 +35,18 @@ async function attemptRegistration(page, userData) {
   }
   
   // Submit the form
-  const form = page.locator('.register-form');
-  const submitButton = form.locator('button[type="submit"]');
-  await submitButton.click();
+  await page.locator('form button[type="submit"]').click();
   
   // Wait for either a navigation to a dashboard or an error message
   const expectedPath = userData.userType === 'TEACHER' ? '/teacher-dashboard' : '/lesson-request';
   
   await Promise.race([
     page.waitForURL(new RegExp(`.*${expectedPath}.*`), { timeout: 2000 }),
-    page.waitForSelector('.error-message', { timeout: 2000 })
+    page.waitForSelector('.alert-error', { timeout: 2000 })
   ]);
   
   // Check if there's an error message
-  const errorMessage = page.locator('.error-message');
+  const errorMessage = page.locator('.alert-error');
   const hasError = await errorMessage.isVisible();
   let errorText = null;
   

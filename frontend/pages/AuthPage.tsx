@@ -1,10 +1,9 @@
-// CACHE-BUSTER: 20250320101632
+// CACHE-BUSTER: 20250320103245
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import LoginForm from '../components/auth/LoginForm';
 import RegisterForm from '../components/auth/RegisterForm';
 import { useAuth } from '../contexts/AuthContext';
-import '../styles/AuthPage.css';
 
 const AuthPage: React.FC = () => {
   const navigate = useNavigate();
@@ -43,24 +42,29 @@ const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="auth-page-container">
-      <div className="auth-content">
-        <div className="auth-tabs">
-          <button
-            className={`auth-tab ${activeTab === 'login' ? 'active' : ''}`}
-            onClick={() => setActiveTab('login')}
-          >
-            Login
-          </button>
-          <button
-            className={`auth-tab ${activeTab === 'register' ? 'active' : ''}`}
-            onClick={() => setActiveTab('register')}
-          >
-            Register
-          </button>
+    <div className="auth-container">
+      <div className="card card-primary auth-card">
+        <div className="card-header">
+          <h3 className="text-xl font-semibold">Welcome to Lessons Marketplace</h3>
+          <p>Sign in to your account or create a new one</p>
         </div>
         
-        <div className="auth-form-wrapper">
+        <div className="card-body">
+          <div className="auth-tabs">
+            <button
+              className={`auth-tab ${activeTab === 'login' ? 'active' : ''}`}
+              onClick={() => setActiveTab('login')}
+            >
+              Login
+            </button>
+            <button
+              className={`auth-tab ${activeTab === 'register' ? 'active' : ''}`}
+              onClick={() => setActiveTab('register')}
+            >
+              Register
+            </button>
+          </div>
+          
           {activeTab === 'login' ? (
             <LoginForm onSuccess={handleSuccess} />
           ) : (

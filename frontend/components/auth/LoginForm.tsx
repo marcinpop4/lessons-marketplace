@@ -1,7 +1,6 @@
 // CACHE-BUSTER: 20250320101632
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import '../../styles/LoginForm.css';
 
 interface LoginFormProps {
   onSuccess?: () => void;
@@ -76,17 +75,25 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   };
 
   return (
-    <div className="login-form-container">
-      <h2>Login to Your Account</h2>
-      
+    <div className="auth-form">
       {success && (
-        <div className="success-message">
+        <div className="alert alert-success">
+          <div className="alert-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+          </div>
           You have successfully logged in!
         </div>
       )}
       
       {displayError && (
-        <div className="error-message">
+        <div className="alert alert-error">
+          <div className="alert-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+          </div>
           {displayError}
           <button 
             onClick={() => {
@@ -101,7 +108,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
         </div>
       )}
       
-      <form onSubmit={handleSubmit} className="login-form">
+      <form onSubmit={handleSubmit}>
         <div className="form-row">
           <div className="form-group">
             <label htmlFor="email">Email Address</label>
@@ -113,7 +120,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
               required
             />
           </div>
-          
+        </div>
+        
+        <div className="form-row">
           <div className="form-group">
             <label htmlFor="password">Password</label>
             <input
@@ -126,7 +135,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
           </div>
         </div>
         
-        <div className="form-row user-type-container">
+        <div className="user-type-container">
           <label className="user-type-label">I am a:</label>
           <div className="user-type-options">
             <label className="user-type-option">
@@ -150,15 +159,16 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
               Teacher
             </label>
           </div>
+        </div>
         
-          <div className="form-actions">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Logging in...' : 'Login'}
-            </button>
-          </div>
+        <div className="form-actions">
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'Logging in...' : 'Login'}
+          </button>
         </div>
       </form>
     </div>

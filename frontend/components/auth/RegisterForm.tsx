@@ -1,8 +1,6 @@
-// CACHE-BUSTER: 20250320101632
+// CACHE-BUSTER: 20250320102127
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import '../../styles/RegisterForm.css';
-import { useNavigate } from 'react-router-dom';
 
 interface RegisterFormProps {
   onSuccess?: () => void;
@@ -10,108 +8,211 @@ interface RegisterFormProps {
 
 const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
   const { register, error: authError, clearError } = useAuth();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    firstName: '',
-    lastName: '',
-    phoneNumber: '',
-    dateOfBirth: '',
-    userType: 'STUDENT' as 'STUDENT' | 'TEACHER',
-  });
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [userType, setUserType] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState('');
   const [success, setSuccess] = useState(false);
-  const navigate = useNavigate();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Clear password error when either password field changes
-    if (name === 'password' || name === 'confirmPassword') {
-      setPasswordError('');
+  // Use the authError from context if it exists
+  const displayError = error || authError;
+
+  // Reset error when user makes changes to the form
+  const resetErrorOnUserAction = () => {
+    if (displayError) {
+      setError(null);
+      clearError();
     }
+  };
+
+  const handleFirstNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFirstName(e.target.value);
+    resetErrorOnUserAction();
+  };
+
+  const handleLastNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLastName(e.target.value);
+    resetErrorOnUserAction();
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value);
+    resetErrorOnUserAction();
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPassword(e.target.value);
+    resetErrorOnUserAction();
+  };
+
+  const handleConfirmPasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setConfirmPassword(e.target.value);
+    resetErrorOnUserAction();
+  };
+
+  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhoneNumber(e.target.value);
+    resetErrorOnUserAction();
+  };
+
+  const handleDateOfBirthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDateOfBirth(e.target.value);
+    resetErrorOnUserAction();
+  };
+
+  const handleUserTypeChange = (newUserType: 'STUDENT' | 'TEACHER') => {
+    setUserType(newUserType);
+    resetErrorOnUserAction();
+  };
+
+  const validateForm = () => {
+    // Password validation
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return false;
+    }
+    
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return false;
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address');
+      return false;
+    }
+    
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     
-    // Validate passwords match
-    if (formData.password !== formData.confirmPassword) {
-      setPasswordError('Passwords do not match');
+    // Basic validation
+    if (!firstName || !lastName || !email || !password || !confirmPassword || !phoneNumber || !dateOfBirth) {
+      setError('Please fill in all fields');
+      return;
+    }
+    
+    if (!validateForm()) {
       return;
     }
     
     setIsSubmitting(true);
     
     try {
-      // Omit confirmPassword from the data sent to the API
-      const { confirmPassword, ...registerData } = formData;
+      const registerSuccess = await register({
+        firstName,
+        lastName,
+        email,
+        password,
+        phoneNumber,
+        dateOfBirth,
+        userType
+      });
       
-      const userData = await register(registerData);
-      
-      // Store success message flag
-      sessionStorage.setItem('registrationSuccess', 'true');
-      
-      // Short delay to ensure authentication state is fully processed
-      setTimeout(() => {
-        // Determine destination based on user type
-        const destination = registerData.userType === 'TEACHER' 
-          ? '/teacher-dashboard' 
-          : '/lesson-request';
+      if (registerSuccess) {
+        setSuccess(true);
+        // Reset form
+        setFirstName('');
+        setLastName('');
+        setEmail('');
+        setPassword('');
+        setConfirmPassword('');
+        setPhoneNumber('');
+        setDateOfBirth('');
         
-        // Use navigate function directly for cleaner redirects within React Router
-        // This helps maintain React context and authentication state
-        navigate(destination);
-      }, 200);
-    } catch (error) {
-      setError((error as Error).message || 'Registration failed. Please try again.');
+        if (onSuccess) {
+          onSuccess();
+        }
+      }
+      // If register returned false, the error should already be set in auth context
+    } catch (error: any) {
+      // This should only happen for unexpected errors
+      console.error('Unexpected error:', error);
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Use the authError from context if it exists
-  const displayError = error || authError;
-
   return (
-    <div className="register-form-container">
-      <h2>Create Your Account</h2>
-      
+    <div className="auth-form">
       {success && (
-        <div className="success-message">
-          You have successfully registered!
+        <div className="alert alert-success">
+          <div className="alert-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+          </div>
+          Registration successful! You can now log in.
         </div>
       )}
       
       {displayError && (
-        <div className="error-message">
+        <div className="alert alert-error">
+          <div className="alert-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+          </div>
           {displayError}
-          {authError && (
-            <button 
-              onClick={clearError}
-              className="clear-error-btn"
-            >
-              <span>&times;</span>
-            </button>
-          )}
+          <button 
+            onClick={() => {
+              setError(null);
+              clearError();
+            }}
+            className="clear-error-btn"
+            aria-label="Clear error message"
+          >
+            <span>&times;</span>
+          </button>
         </div>
       )}
       
-      <form onSubmit={handleSubmit} className="register-form">
+      <form onSubmit={handleSubmit}>
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="firstName">First Name</label>
+            <input
+              id="firstName"
+              type="text"
+              value={firstName}
+              onChange={handleFirstNameChange}
+              required
+            />
+          </div>
+        </div>
+        
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="lastName">Last Name</label>
+            <input
+              id="lastName"
+              type="text"
+              value={lastName}
+              onChange={handleLastNameChange}
+              required
+            />
+          </div>
+        </div>
+        
         <div className="form-row">
           <div className="form-group">
             <label htmlFor="email">Email Address</label>
             <input
               id="email"
-              name="email"
               type="email"
-              value={formData.email}
-              onChange={handleChange}
+              value={email}
+              onChange={handleEmailChange}
               required
             />
           </div>
@@ -122,52 +223,22 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
             <label htmlFor="password">Password</label>
             <input
               id="password"
-              name="password"
               type="password"
-              value={formData.password}
-              onChange={handleChange}
+              value={password}
+              onChange={handlePasswordChange}
               required
             />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="confirmPassword">Confirm Password</label>
-            <input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              className={passwordError ? 'error' : ''}
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              required
-            />
-            {passwordError && (
-              <p className="error-text">{passwordError}</p>
-            )}
           </div>
         </div>
         
         <div className="form-row">
           <div className="form-group">
-            <label htmlFor="firstName">First Name</label>
+            <label htmlFor="confirmPassword">Confirm Password</label>
             <input
-              id="firstName"
-              name="firstName"
-              type="text"
-              value={formData.firstName}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="lastName">Last Name</label>
-            <input
-              id="lastName"
-              name="lastName"
-              type="text"
-              value={formData.lastName}
-              onChange={handleChange}
+              id="confirmPassword"
+              type="password"
+              value={confirmPassword}
+              onChange={handleConfirmPasswordChange}
               required
             />
           </div>
@@ -178,62 +249,61 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
             <label htmlFor="phoneNumber">Phone Number</label>
             <input
               id="phoneNumber"
-              name="phoneNumber"
               type="tel"
-              value={formData.phoneNumber}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="dateOfBirth">Date of Birth</label>
-            <input
-              id="dateOfBirth"
-              name="dateOfBirth"
-              type="date"
-              value={formData.dateOfBirth}
-              onChange={handleChange}
+              value={phoneNumber}
+              onChange={handlePhoneNumberChange}
               required
             />
           </div>
         </div>
         
         <div className="form-row">
-          <div className="form-group" style={{ flex: '0 0 auto' }}>
-            <label>I am a:</label>
-            <div className="user-type-options">
-              <label className="user-type-option">
-                <input
-                  type="radio"
-                  name="userType"
-                  value="STUDENT"
-                  checked={formData.userType === 'STUDENT'}
-                  onChange={() => setFormData(prev => ({ ...prev, userType: 'STUDENT' }))}
-                />
-                Student
-              </label>
-              <label className="user-type-option">
-                <input
-                  type="radio"
-                  name="userType"
-                  value="TEACHER"
-                  checked={formData.userType === 'TEACHER'}
-                  onChange={() => setFormData(prev => ({ ...prev, userType: 'TEACHER' }))}
-                />
-                Teacher
-              </label>
-            </div>
+          <div className="form-group">
+            <label htmlFor="dateOfBirth">Date of Birth</label>
+            <input
+              id="dateOfBirth"
+              type="date"
+              value={dateOfBirth}
+              onChange={handleDateOfBirthChange}
+              required
+            />
           </div>
-          
-          <div className="form-actions">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Registering...' : 'Register'}
-            </button>
+        </div>
+        
+        <div className="user-type-container">
+          <label className="user-type-label">I am a:</label>
+          <div className="user-type-options">
+            <label className="user-type-option">
+              <input
+                type="radio"
+                name="userType"
+                value="STUDENT"
+                checked={userType === 'STUDENT'}
+                onChange={() => handleUserTypeChange('STUDENT')}
+              />
+              Student
+            </label>
+            <label className="user-type-option">
+              <input
+                type="radio"
+                name="userType"
+                value="TEACHER"
+                checked={userType === 'TEACHER'}
+                onChange={() => handleUserTypeChange('TEACHER')}
+              />
+              Teacher
+            </label>
           </div>
+        </div>
+        
+        <div className="form-actions">
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'Creating Account...' : 'Create Account'}
+          </button>
         </div>
       </form>
     </div>

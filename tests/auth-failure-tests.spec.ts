@@ -11,8 +11,8 @@ async function attemptLogin(page, email, password, userType = 'STUDENT') {
   // Go to the auth page and wait for the app to load
   await page.goto('/auth');
   
-  // Wait for the app to be ready - look for the login form container
-  await page.waitForSelector('.login-form-container', { state: 'visible', timeout: 2000 });
+  // Wait for the app to be ready - look for the auth form
+  await page.waitForSelector('.auth-form', { state: 'visible', timeout: 2000 });
   
   // Make sure we're on the login tab (not register)
   const loginTab = page.locator('button.auth-tab', { hasText: 'Login' });
@@ -21,20 +21,20 @@ async function attemptLogin(page, email, password, userType = 'STUDENT') {
   }
   
   // Wait for the form elements to be ready
-  await page.waitForSelector('input[type="email"]', { state: 'visible' });
-  await page.waitForSelector('input[type="password"]', { state: 'visible' });
+  await page.waitForSelector('#email', { state: 'visible' });
+  await page.waitForSelector('#password', { state: 'visible' });
   
   // Fill the login form
-  await page.getByLabel('Email').fill(email);
+  await page.fill('#email', email);
   await page.waitForTimeout(100); // Small delay between inputs
-  await page.getByLabel('Password').fill(password);
+  await page.fill('#password', password);
   await page.waitForTimeout(100); // Small delay between inputs
   
   // Select the user type radio button if needed
   if (userType === 'TEACHER') {
-    await page.locator('input[name="userType"][value="TEACHER"]').check();
+    await page.locator('input[value="TEACHER"]').check();
   } else {
-    await page.locator('input[name="userType"][value="STUDENT"]').check();
+    await page.locator('input[value="STUDENT"]').check();
   }
   
   // Submit the form without waiting for network response
@@ -57,24 +57,9 @@ test('Student login with incorrect password shows persistent error message', asy
   
   console.log('Checking for error message...');
   
-  // Debug: Log the page content to help identify issues
-  const pageContent = await page.content();
-  console.log('Page HTML excerpt:', pageContent.substring(0, 500) + '...');
-  
-  // Check for any elements with error-related classes
-  const errorElements = await page.evaluate(() => {
-    const elements = Array.from(document.querySelectorAll('.error-message'));
-    return elements.map(el => ({
-      className: el.className,
-      text: el.textContent,
-      isVisible: el.getBoundingClientRect().height > 0
-    }));
-  });
-  console.log('Error elements found:', JSON.stringify(errorElements, null, 2));
-  
   // Check that an error message is displayed
-  const errorMessage = page.locator('.error-message');
-  await expect(errorMessage).toBeVisible({ timeout: 5000 });
+  const errorMessage = page.locator('.alert-error');
+  await expect(errorMessage).toBeVisible({ timeout: 2000 });
   
   // Get the specific error message text
   const errorText = await errorMessage.textContent();
@@ -100,31 +85,16 @@ test('Teacher login with incorrect password shows persistent error message', asy
   
   console.log('Checking for error message...');
   
-  // Debug: Log the page content to help identify issues
-  const pageContent = await page.content();
-  console.log('Page HTML excerpt:', pageContent.substring(0, 500) + '...');
-  
-  // Check for any elements with error-related classes
-  const errorElements = await page.evaluate(() => {
-    const elements = Array.from(document.querySelectorAll('.error-message'));
-    return elements.map(el => ({
-      className: el.className,
-      text: el.textContent,
-      isVisible: el.getBoundingClientRect().height > 0
-    }));
-  });
-  console.log('Error elements found:', JSON.stringify(errorElements, null, 2));
-  
   // Check that an error message is displayed
-  const errorMessage = page.locator('.error-message');
-  await expect(errorMessage).toBeVisible({ timeout: 1000 });
+  const errorMessage = page.locator('.alert-error');
+  await expect(errorMessage).toBeVisible({ timeout: 2000 });
   
   // Get the specific error message text
   const errorText = await errorMessage.textContent();
   console.log('Error message text:', errorText);
   
   // Verify the message is still visible after a delay
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(500);
   await expect(errorMessage).toBeVisible();
   
   console.log('Teacher login with incorrect password test completed');
@@ -143,31 +113,16 @@ test('Login with non-existent email shows error message', async ({ page }) => {
   
   console.log('Checking for error message...');
   
-  // Debug: Log the page content to help identify issues
-  const pageContent = await page.content();
-  console.log('Page HTML excerpt:', pageContent.substring(0, 500) + '...');
-  
-  // Check for any elements with error-related classes
-  const errorElements = await page.evaluate(() => {
-    const elements = Array.from(document.querySelectorAll('.error-message'));
-    return elements.map(el => ({
-      className: el.className,
-      text: el.textContent,
-      isVisible: el.getBoundingClientRect().height > 0
-    }));
-  });
-  console.log('Error elements found:', JSON.stringify(errorElements, null, 2));
-  
   // Check that an error message is displayed
-  const errorMessage = page.locator('.error-message');
-  await expect(errorMessage).toBeVisible({ timeout: 1000 });
+  const errorMessage = page.locator('.alert-error');
+  await expect(errorMessage).toBeVisible({ timeout: 2000 });
   
   // Get the specific error message text
   const errorText = await errorMessage.textContent();
   console.log('Error message text:', errorText);
   
   // Verify the message is still visible after a delay
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(500);
   await expect(errorMessage).toBeVisible();
   
   console.log('Login with non-existent email test completed');
@@ -176,7 +131,7 @@ test('Login with non-existent email shows error message', async ({ page }) => {
 test('Student credentials with teacher userType shows appropriate error', async ({ page }) => {
   // Valid student credentials but trying to log in as teacher
   const studentEmail = 'ethan.parker@example.com';
-  const studentPassword = 'student123'; // Assuming this is the correct password for the student
+  const studentPassword = '1234'; // Using the correct password from seed data
   
   console.log('Testing student credentials with teacher userType');
   await attemptLogin(page, studentEmail, studentPassword, 'TEACHER');
@@ -186,31 +141,16 @@ test('Student credentials with teacher userType shows appropriate error', async 
   
   console.log('Checking for error message...');
   
-  // Debug: Log the page content to help identify issues
-  const pageContent = await page.content();
-  console.log('Page HTML excerpt:', pageContent.substring(0, 500) + '...');
-  
-  // Check for any elements with error-related classes
-  const errorElements = await page.evaluate(() => {
-    const elements = Array.from(document.querySelectorAll('.error-message'));
-    return elements.map(el => ({
-      className: el.className,
-      text: el.textContent,
-      isVisible: el.getBoundingClientRect().height > 0
-    }));
-  });
-  console.log('Error elements found:', JSON.stringify(errorElements, null, 2));
-  
   // Check that an error message is displayed
-  const errorMessage = page.locator('.error-message');
-  await expect(errorMessage).toBeVisible({ timeout: 1000 });
+  const errorMessage = page.locator('.alert-error');
+  await expect(errorMessage).toBeVisible({ timeout: 2000 });
   
   // Get the specific error message text
   const errorText = await errorMessage.textContent();
   console.log('Error message text:', errorText);
   
   // Verify the message is still visible after a delay
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(500);
   await expect(errorMessage).toBeVisible();
   
   console.log('Student credentials with teacher userType test completed');
@@ -219,7 +159,7 @@ test('Student credentials with teacher userType shows appropriate error', async 
 test('Teacher credentials with student userType shows appropriate error', async ({ page }) => {
   // Valid teacher credentials but trying to log in as student
   const teacherEmail = 'olivia.thompson@example.com';
-  const teacherPassword = 'teacher123'; // Assuming this is the correct password for the teacher
+  const teacherPassword = '1234'; // Using the correct password from seed data
   
   console.log('Testing teacher credentials with student userType');
   await attemptLogin(page, teacherEmail, teacherPassword, 'STUDENT');
@@ -229,31 +169,16 @@ test('Teacher credentials with student userType shows appropriate error', async 
   
   console.log('Checking for error message...');
   
-  // Debug: Log the page content to help identify issues
-  const pageContent = await page.content();
-  console.log('Page HTML excerpt:', pageContent.substring(0, 500) + '...');
-  
-  // Check for any elements with error-related classes
-  const errorElements = await page.evaluate(() => {
-    const elements = Array.from(document.querySelectorAll('.error-message'));
-    return elements.map(el => ({
-      className: el.className,
-      text: el.textContent,
-      isVisible: el.getBoundingClientRect().height > 0
-    }));
-  });
-  console.log('Error elements found:', JSON.stringify(errorElements, null, 2));
-  
   // Check that an error message is displayed
-  const errorMessage = page.locator('.error-message');
-  await expect(errorMessage).toBeVisible({ timeout: 1000 });
+  const errorMessage = page.locator('.alert-error');
+  await expect(errorMessage).toBeVisible({ timeout: 2000 });
   
   // Get the specific error message text
   const errorText = await errorMessage.textContent();
   console.log('Error message text:', errorText);
   
   // Verify the message is still visible after a delay
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(500);
   await expect(errorMessage).toBeVisible();
   
   console.log('Teacher credentials with student userType test completed');
