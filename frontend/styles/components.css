@@ -441,6 +441,12 @@ h1, .text-3xl {
   font-weight: bold;
 }
 
+body[data-theme="dark"] h1, 
+body[data-theme="dark"] .text-3xl {
+  color: var(--color-primary-100);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
 h2, .text-2xl {
   font-size: 1.5rem;
   line-height: 2rem;

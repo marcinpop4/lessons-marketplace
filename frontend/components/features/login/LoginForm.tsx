@@ -1,6 +1,7 @@
 // CACHE-BUSTER: 20250320101632
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '@frontend/contexts/AuthContext';
+import './LoginForm.css';
 
 interface LoginFormProps {
   onSuccess?: () => void;
@@ -75,7 +76,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   };
 
   return (
-    <div className="auth-form">
+    <div className="login-form">
       {success && (
         <div className="alert alert-success">
           <div className="alert-icon">
@@ -138,26 +139,28 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
         <div className="user-type-container">
           <label className="user-type-label">I am a:</label>
           <div className="user-type-options">
-            <label className="user-type-option">
+            <div className="user-type-option">
               <input
                 type="radio"
+                id="student"
                 name="userType"
                 value="STUDENT"
                 checked={userType === 'STUDENT'}
                 onChange={() => handleUserTypeChange('STUDENT')}
               />
-              Student
-            </label>
-            <label className="user-type-option">
+              <label htmlFor="student">Student</label>
+            </div>
+            <div className="user-type-option">
               <input
                 type="radio"
+                id="teacher"
                 name="userType"
                 value="TEACHER"
                 checked={userType === 'TEACHER'}
                 onChange={() => handleUserTypeChange('TEACHER')}
               />
-              Teacher
-            </label>
+              <label htmlFor="teacher">Teacher</label>
+            </div>
           </div>
         </div>
         

@@ -1,0 +1,93 @@
+/* Lesson Rate Form component styles */
+.lesson-rate-form {
+  background-color: var(--color-secondary-50);
+  padding: 1.5rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-secondary-200);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+body[data-theme="dark"] .lesson-rate-form {
+  background-color: var(--color-secondary-800);
+  border-color: var(--color-secondary-700);
+}
+
+.lesson-rate-form .form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.lesson-rate-form .form-group {
+  flex: 1 1 0;
+  min-width: 200px;
+}
+
+.lesson-rate-form label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.lesson-rate-form input,
+.lesson-rate-form select {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--color-secondary-200);
+  border-radius: var(--radius-md);
+  background-color: white;
+  appearance: auto;
+}
+
+body[data-theme="dark"] .lesson-rate-form input,
+body[data-theme="dark"] .lesson-rate-form select {
+  background-color: var(--color-secondary-700);
+  border-color: var(--color-secondary-600);
+  color: var(--color-secondary-100);
+}
+
+.lesson-rate-form .input-error,
+.lesson-rate-form .select-error {
+  border-color: #ef4444;
+}
+
+.lesson-rate-form .error-message {
+  color: #ef4444;
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.lesson-rate-form .rate-input-wrapper {
+  position: relative;
+}
+
+.lesson-rate-form .currency-symbol {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.lesson-rate-form input[type="number"] {
+  padding-left: 1.75rem;
+}
+
+.lesson-rate-form form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.lesson-rate-form .form-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: auto;
+  padding-top: 1.5rem;
+}
+
+.lesson-rate-form .ml-2 {
+  margin-left: 0.5rem;
+} 

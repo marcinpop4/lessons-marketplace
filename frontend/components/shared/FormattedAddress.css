@@ -1,0 +1,27 @@
+.formatted-address {
+  font-family: var(--font-sans);
+  color: var(--color-secondary-900);
+  white-space: pre-line;
+}
+
+.formatted-address-loading {
+  color: var(--color-secondary-500);
+  font-style: italic;
+}
+
+.formatted-address-error {
+  color: #b91c1c;
+  font-style: italic;
+}
+
+body[data-theme="dark"] .formatted-address {
+  color: var(--color-secondary-100);
+}
+
+body[data-theme="dark"] .formatted-address-loading {
+  color: var(--color-secondary-400);
+}
+
+body[data-theme="dark"] .formatted-address-error {
+  color: #f87171;
+} 

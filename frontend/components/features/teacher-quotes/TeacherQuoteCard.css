@@ -1,0 +1,114 @@
+.card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-header {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-header h3 {
+  margin: 0;
+  width: 100%;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.card-header .price-amount {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem;
+  gap: 0.75rem;
+}
+
+.teacher-info {
+  margin-bottom: 1rem;
+}
+
+.teacher-name h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.quote-details {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background-color: var(--bg-secondary);
+  border-radius: 0.5rem;
+}
+
+.quote-price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.price-label {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.price-amount {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.price-rate {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.hourly-rate {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.quote-actions {
+  margin-top: auto;
+}
+
+.quote-actions button {
+  width: 100%;
+  padding: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .teacher-info,
+  .quote-details {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .teacher-experience,
+  .quote-expiry {
+    text-align: left;
+    justify-content: flex-start;
+  }
+} 

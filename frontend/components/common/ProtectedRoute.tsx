@@ -1,7 +1,7 @@
 // CACHE-BUSTER: 20250320101632
 import React from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '@frontend/contexts/AuthContext';
 
 interface ProtectedRouteProps {
   userTypes?: ('STUDENT' | 'TEACHER')[];
@@ -22,7 +22,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ userTypes }) => {
 
   // If not authenticated, redirect to login page
   if (!user) {
-    return <Navigate to="/auth" state={{ from: location }} replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   // If userTypes is specified, check if the user has the required type

@@ -1,6 +1,7 @@
 import axios from 'axios';
 import apiClient from './apiClient';
 import { LessonQuote } from '../types/lesson';
+import { getLessonById } from './lessonApi';
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {
@@ -33,15 +34,30 @@ export const getLessonQuotesByRequestId = async (lessonRequestId: string): Promi
  * Accept a lesson quote
  * This will also create a lesson and expire all other quotes for the same lesson request
  * @param quoteId - Lesson quote ID
- * @returns Accepted lesson quote with created lesson
+ * @returns Accepted lesson quote with created lesson ID
  */
-export const acceptLessonQuote = async (quoteId: string): Promise<{ 
-  id: string;
-  lesson: { id: string } 
-}> => {
+export const acceptLessonQuote = async (quoteId: string): Promise<{ id: string; lesson: { id: string } }> => {
   try {
+    // Log the API call details
+    console.log(`Accepting quote with ID: ${quoteId}`);
+    
     const response = await apiClient.post(`/lesson-quotes/${quoteId}/accept`);
-    return response.data;
+    
+    // Log the response for debugging
+    console.log('Accept quote response:', response.data);
+    
+    // Validate that the response contains the expected data structure
+    if (!response.data || !response.data.lesson || !response.data.lesson.id) {
+      console.error('Invalid response structure from quote acceptance:', response.data);
+      throw new Error('Invalid response format from server. Missing lesson ID in response.');
+    }
+    
+    return {
+      id: response.data.id,
+      lesson: {
+        id: response.data.lesson.id
+      }
+    };
   } catch (error) {
     console.error('Error accepting lesson quote:', error);
     throw error;

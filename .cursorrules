@@ -1,13 +1,19 @@
-When writing end to end tests, keep timeouts short, 2s max, since at least locally, the app is very quick and I want to optimize for quick feedback
+When writing end to end tests, keep timeouts short, 2s max, since at least locally, the app is very quick and I want to optimize for quick feedback.
 
-Only create typescript files and avoid creating javascript files
+Only create typescript files and avoid creating javascript files.
 
-Don't implement any fallbacks for things that are not loaded correctly or missing. I don't want to mask problems, and get the feedback right away, via a failure, that something is missing.
+If there something wrong in code, I want to fail fast. Do not implement fallbacks.
 
-Avoid using !important in css and make the rules work as a whole system
+Avoid using !important in css and make the rules work as a whole system.
 
-Avoid hardcoding styles, variables etc, to keep the application well maintained
+Avoid hardcoding styles, variables etc, to keep the application well maintained.
 
-Avoid inline css and javascript
+Avoid inline css and javascript.
 
-Do not increase test timeouts before asking me
+Do not increase test timeouts before asking me.
+
+Do not infer statuses anywhere, if we need a status, it needs to be explicitly as a result of an event.
+
+Keep business logic or calculations in the models, or service classes if multiple models are involved. Avoid business logic or calculations in the frontend.
+
+Do not attempt an operation several times in APIs, if it fail, it fails. If I want to implement retry logic, I'll have it at a worker level.

@@ -8,14 +8,8 @@ const generateUniqueEmail = () => {
 
 // Helper function to attempt registration
 async function attemptRegistration(page, userData) {
-  // Navigate to auth page and wait for the app to be ready
-  await page.goto('/auth');
-  
-  // Wait for the app to be ready
-  await page.waitForSelector('.auth-form', { timeout: 2000 });
-  
-  // Switch to registration form
-  await page.click('button.auth-tab:has-text("Register")', { timeout: 2000 });
+  // Navigate directly to register page
+  await page.goto('/register');
   
   // Wait for the registration form to be visible
   await expect(page.locator('form')).toBeVisible({ timeout: 2000 });
@@ -102,8 +96,8 @@ test('Student registration with existing email fails', async ({ page }) => {
   // Registration should fail with appropriate error
   expect(result.success).toBe(false);
   
-  // Verify we're still on the auth page
-  await expect(page).toHaveURL('/auth', { timeout: 2000 });
+  // Verify we're still on the register page
+  await expect(page).toHaveURL('/register', { timeout: 2000 });
 });
 
 test('Teacher registration with new credentials succeeds', async ({ page }) => {

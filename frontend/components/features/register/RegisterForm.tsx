@@ -1,6 +1,7 @@
 // CACHE-BUSTER: 20250320102127
 import React, { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '@frontend/contexts/AuthContext';
+import './RegisterForm.css';
 
 interface RegisterFormProps {
   onSuccess?: () => void;
@@ -145,7 +146,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
   };
 
   return (
-    <div className="auth-form">
+    <div className="register-form">
       {success && (
         <div className="alert alert-success">
           <div className="alert-icon">
@@ -190,9 +191,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
               required
             />
           </div>
-        </div>
-        
-        <div className="form-row">
+          
           <div className="form-group">
             <label htmlFor="lastName">Last Name</label>
             <input
@@ -216,6 +215,17 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
               required
             />
           </div>
+          
+          <div className="form-group">
+            <label htmlFor="phoneNumber">Phone Number</label>
+            <input
+              id="phoneNumber"
+              type="tel"
+              value={phoneNumber}
+              onChange={handlePhoneNumberChange}
+              required
+            />
+          </div>
         </div>
         
         <div className="form-row">
@@ -229,9 +239,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
               required
             />
           </div>
-        </div>
-        
-        <div className="form-row">
+          
           <div className="form-group">
             <label htmlFor="confirmPassword">Confirm Password</label>
             <input
@@ -239,19 +247,6 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
               type="password"
               value={confirmPassword}
               onChange={handleConfirmPasswordChange}
-              required
-            />
-          </div>
-        </div>
-        
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="phoneNumber">Phone Number</label>
-            <input
-              id="phoneNumber"
-              type="tel"
-              value={phoneNumber}
-              onChange={handlePhoneNumberChange}
               required
             />
           </div>
@@ -268,31 +263,35 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
               required
             />
           </div>
-        </div>
-        
-        <div className="user-type-container">
-          <label className="user-type-label">I am a:</label>
-          <div className="user-type-options">
-            <label className="user-type-option">
-              <input
-                type="radio"
-                name="userType"
-                value="STUDENT"
-                checked={userType === 'STUDENT'}
-                onChange={() => handleUserTypeChange('STUDENT')}
-              />
-              Student
-            </label>
-            <label className="user-type-option">
-              <input
-                type="radio"
-                name="userType"
-                value="TEACHER"
-                checked={userType === 'TEACHER'}
-                onChange={() => handleUserTypeChange('TEACHER')}
-              />
-              Teacher
-            </label>
+          
+          <div className="form-group">
+            <div className="user-type-container">
+              <label className="user-type-label">I am a:</label>
+              <div className="user-type-options">
+                <div className="user-type-option">
+                  <input
+                    type="radio"
+                    id="student"
+                    name="userType"
+                    value="STUDENT"
+                    checked={userType === 'STUDENT'}
+                    onChange={() => handleUserTypeChange('STUDENT')}
+                  />
+                  <label htmlFor="student">Student</label>
+                </div>
+                <div className="user-type-option">
+                  <input
+                    type="radio"
+                    id="teacher"
+                    name="userType"
+                    value="TEACHER"
+                    checked={userType === 'TEACHER'}
+                    onChange={() => handleUserTypeChange('TEACHER')}
+                  />
+                  <label htmlFor="teacher">Teacher</label>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         

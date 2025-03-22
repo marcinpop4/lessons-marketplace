@@ -64,13 +64,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Configure axios to include credentials
   axios.defaults.withCredentials = true;
 
-  // Set auth token from localStorage if it exists when the app loads
-  useEffect(() => {
+  // Initialize auth state
+  const initializeAuth = async () => {
     const token = localStorage.getItem('auth_token');
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     }
-  }, []);
+  };
 
   // Check if user is already logged in on mount
   useEffect(() => {
@@ -83,23 +83,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setLoading(false);
           return;
         }
+
+        // Initialize auth headers
+        await initializeAuth();
         
-        // Try to get user data using the refresh token
+        // Try to get user data first
+        try {
+          const userResponse = await apiClient.get(`/auth/me`);
+          setUser(userResponse.data);
+          setLoading(false);
+          return;
+        } catch (userError) {
+          // If user data fetch fails, try to refresh the token
+          console.log('User data fetch failed, attempting token refresh');
+        }
+
+        // Try to refresh the token
         const response = await apiClient.post(`/auth/refresh-token`, {});
         
-        // Save the new access token to localStorage
+        // Save the new access token
         localStorage.setItem('auth_token', response.data.accessToken);
-        
-        // Set the new access token in axios defaults
         axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
         
-        // Get user data
+        // Get user data with new token
         const userResponse = await apiClient.get(`/auth/me`);
-        
         setUser(userResponse.data);
       } catch (error) {
         console.error('Auth check failed:', error);
-        // Clear user if not authenticated
+        // Clear auth state if not authenticated
         localStorage.removeItem('auth_token');
         delete axios.defaults.headers.common['Authorization'];
         setUser(null);

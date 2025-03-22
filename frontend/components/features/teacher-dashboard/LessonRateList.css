@@ -1,0 +1,146 @@
+/* Lesson Rate List component styles */
+.lesson-rate-list {
+  width: 100%;
+}
+
+.lesson-rate-list .empty-state {
+  text-align: center;
+  padding: 2rem;
+  background-color: var(--color-secondary-50);
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--color-secondary-300);
+  color: var(--color-secondary-500);
+}
+
+body[data-theme="dark"] .lesson-rate-list .empty-state {
+  background-color: var(--color-secondary-800);
+  border-color: var(--color-secondary-700);
+  color: var(--color-secondary-400);
+}
+
+.lesson-rate-list .rates-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.lesson-rate-list th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  border-bottom: 2px solid var(--color-secondary-200);
+}
+
+.lesson-rate-list td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-secondary-200);
+}
+
+body[data-theme="dark"] .lesson-rate-list th,
+body[data-theme="dark"] .lesson-rate-list td {
+  border-color: var(--color-secondary-700);
+}
+
+.lesson-rate-list .inactive-rate {
+  opacity: 0.7;
+}
+
+.lesson-rate-list .status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.lesson-rate-list .status-badge.active {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.lesson-rate-list .status-badge.inactive {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+body[data-theme="dark"] .lesson-rate-list .status-badge.active {
+  background-color: #064e3b;
+  color: #a7f3d0;
+}
+
+body[data-theme="dark"] .lesson-rate-list .status-badge.inactive {
+  background-color: #7f1d1d;
+  color: #fecaca;
+}
+
+.lesson-rate-list .actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.lesson-rate-list .btn-edit,
+.lesson-rate-list .btn-toggle {
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition-colors);
+}
+
+.lesson-rate-list .btn-edit {
+  background-color: var(--color-secondary-100);
+  color: var(--color-secondary-800);
+}
+
+.lesson-rate-list .btn-edit:hover {
+  background-color: var(--color-secondary-200);
+}
+
+.lesson-rate-list .btn-toggle.activate {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.lesson-rate-list .btn-toggle.activate:hover {
+  background-color: #a7f3d0;
+}
+
+.lesson-rate-list .btn-toggle.deactivate {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+.lesson-rate-list .btn-toggle.deactivate:hover {
+  background-color: #fecaca;
+}
+
+body[data-theme="dark"] .lesson-rate-list .btn-edit {
+  background-color: var(--color-secondary-700);
+  color: var(--color-secondary-200);
+}
+
+body[data-theme="dark"] .lesson-rate-list .btn-edit:hover {
+  background-color: var(--color-secondary-600);
+}
+
+body[data-theme="dark"] .lesson-rate-list .btn-toggle.activate {
+  background-color: #064e3b;
+  color: #a7f3d0;
+}
+
+body[data-theme="dark"] .lesson-rate-list .btn-toggle.activate:hover {
+  background-color: #065f46;
+}
+
+body[data-theme="dark"] .lesson-rate-list .btn-toggle.deactivate {
+  background-color: #7f1d1d;
+  color: #fecaca;
+}
+
+body[data-theme="dark"] .lesson-rate-list .btn-toggle.deactivate:hover {
+  background-color: #991b1b;
+}
+
+.lesson-rate-list .overflow-x-auto {
+  overflow-x: auto;
+} 

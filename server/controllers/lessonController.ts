@@ -78,7 +78,12 @@ export const lessonController = {
             quote: {
               include: {
                 teacher: true,
-                lessonRequest: true
+                lessonRequest: {
+                  include: {
+                    student: true,
+                    address: true
+                  }
+                }
               }
             }
           }
@@ -126,7 +131,8 @@ export const lessonController = {
               teacher: true,
               lessonRequest: {
                 include: {
-                  student: true
+                  student: true,
+                  address: true
                 }
               }
             }
@@ -168,7 +174,8 @@ export const lessonController = {
               teacher: true,
               lessonRequest: {
                 include: {
-                  student: true
+                  student: true,
+                  address: true
                 }
               }
             }

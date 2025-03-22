@@ -1,0 +1,8 @@
+.formatted-datetime {
+  font-family: var(--font-sans);
+  color: var(--color-secondary-900);
+}
+
+body[data-theme="dark"] .formatted-datetime {
+  color: var(--color-secondary-100);
+} 

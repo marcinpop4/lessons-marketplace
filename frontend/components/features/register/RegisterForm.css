@@ -1,0 +1,95 @@
+/* Register form specific styles */
+.register-form {
+  width: 100%;
+}
+
+.register-form-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.register-card {
+  width: 100%;
+  max-width: 800px;
+}
+
+.register-form .form-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.register-form .form-row.full-width {
+  grid-column: 1 / -1;
+}
+
+.register-form .form-group {
+  margin-bottom: 0;
+}
+
+/* User type styles */
+.user-type-container {
+  margin: 1.5rem 0;
+}
+
+.user-type-label {
+  font-weight: 500;
+  margin-bottom: 0.75rem;
+  color: var(--color-text-primary);
+}
+
+.user-type-options {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.user-type-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: var(--color-text-primary);
+}
+
+.user-type-option input[type="radio"] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  cursor: pointer;
+}
+
+.user-type-option label {
+  cursor: pointer;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Form actions */
+.form-actions {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Error text */
+.error-text {
+  color: var(--color-error-600);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+/* Responsive design */
+@media (max-width: 640px) {
+  .register-form .form-row {
+    grid-template-columns: 1fr;
+  }
+} 

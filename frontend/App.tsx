@@ -1,29 +1,30 @@
 // CACHE-BUSTER: 20250320101632
-import React, { useState } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, Link } from 'react-router-dom';
-import LessonRequestForm from './components/LessonRequestForm';
-import TeacherQuotes from './components/TeacherQuotes';
-import AuthPage from './pages/AuthPage';
-import LessonConfirmation from './pages/LessonConfirmation';
-import TeacherDashboard from './pages/TeacherDashboard';
-import ThemeDemoPage from './pages/ThemeDemoPage';
-import ProtectedRoute from './components/auth/ProtectedRoute';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import ThemeProvider from './contexts/ThemeContext';
-import ThemeSwitcher from './components/ThemeSwitcher';
+import { useAuth, AuthProvider } from '@frontend/contexts/AuthContext';
+import LoginPage from '@frontend/pages/login';
+import RegisterPage from '@frontend/pages/register';
+import LessonRequestPage from '@frontend/pages/lesson-request';
+import TeacherQuotesPage from './pages/teacher-quotes';
+import LessonConfirmation from '@frontend/pages/lesson-confirmation';
+import TeacherDashboard from '@frontend/pages/TeacherDashboard';
+import ThemeDemoPage from '@frontend/pages/ThemeDemoPage';
+import ProtectedRoute from '@frontend/components/common/ProtectedRoute';
+import ThemeSwitcher from '@frontend/components/ThemeSwitcher';
+import ThemeProvider from '@frontend/contexts/ThemeContext';
+import './App.css';
 
 // Import CSS in the correct order: base styles, theme, components
-import './index.css';
-import './styles/theme.css';
-import './styles/components.css';
-import './styles/auth.css';
+import '@frontend/index.css';
+import '@frontend/styles/theme.css';
+import '@frontend/styles/components.css';
 
 // Root redirect component to handle user type specific redirects
 const RootRedirect = () => {
   const { user } = useAuth();
   
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/login" replace />;
   }
   
   if (user.userType === 'TEACHER') {
@@ -34,23 +35,14 @@ const RootRedirect = () => {
     return <Navigate to="/lesson-request" replace />;
   }
   
-  return <Navigate to="/auth" replace />;
+  return <Navigate to="/login" replace />;
 };
 
 // Inner component to use hooks
-const AppRoutes = () => {
-  // State to store the created lesson request ID
-  const [lessonRequestId, setLessonRequestId] = useState<string | null>(null);
+const AppRoutes: React.FC = () => {
+  const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Function to handle lesson request submission
-  const handleLessonRequestSubmit = (id: string) => {
-    setLessonRequestId(id);
-    // Use React Router's navigate instead of window.location.href
-    navigate(`/teacher-quotes/${id}`);
-  };
-
-  // Function to handle going back from teacher quotes
   const handleBackFromQuotes = () => {
     navigate('/lesson-request');
   };
@@ -76,18 +68,15 @@ const AppRoutes = () => {
       <main className="main-content animate-slide-up">
         <Routes>
           {/* Public routes */}
-          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
           <Route path="/theme-demo" element={<ThemeDemoPage />} />
           
           {/* Protected routes - Student only */}
           <Route element={<ProtectedRoute userTypes={['STUDENT']} />}>
             <Route 
               path="/lesson-request" 
-              element={
-                <LessonRequestForm 
-                  onSubmitSuccess={handleLessonRequestSubmit} 
-                />
-              } 
+              element={<LessonRequestPage />} 
             />
           </Route>
           
@@ -103,10 +92,7 @@ const AppRoutes = () => {
           <Route element={<ProtectedRoute />}>
             <Route 
               path="/teacher-quotes/:lessonRequestId" 
-              element={<TeacherQuotes 
-                lessonRequestId={lessonRequestId || ''} 
-                onBack={handleBackFromQuotes} 
-              />} 
+              element={<TeacherQuotesPage />} 
             />
             
             {/* Lesson confirmation route */}
@@ -120,23 +106,18 @@ const AppRoutes = () => {
           <Route path="/" element={<RootRedirect />} />
           
           {/* Catch all route */}
-          <Route path="*" element={<Navigate to="/auth" replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </main>
       
-      <footer className="footer">
-        <p>
-          Welcome to the Lessons Marketplace project
-        </p>
+      <div className="footer">
+        <p>Welcome to the Lessons Marketplace project</p>
         <div className="flex items-center gap-4">
-          <Link to="/theme-demo">
-            Theme Demo
-          </Link>
-          <Link to="/auth">
-            Login / Register
-          </Link>
+          <Link to="/theme-demo">Theme Demo</Link>
+          <Link to="/login">Login</Link>
+          <Link to="/register">Register</Link>
         </div>
-      </footer>
+      </div>
     </div>
   );
 };

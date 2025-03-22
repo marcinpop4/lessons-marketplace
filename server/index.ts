@@ -21,6 +21,7 @@ import teacherRoutes from './routes/teacherRoutes.js';
 import lessonRoutes from './routes/lessonRoutes.js';
 import authRoutes from './routes/auth/authRoutes.js';
 import lessonQuoteRoutes from './routes/lessonQuoteRoutes.js';
+import addressRoutes from './routes/addressRoutes.js';
 
 // Initialize express app
 const app = express();
@@ -75,6 +76,7 @@ app.use('/api/v1/lesson-requests', lessonRequestRoutes);
 app.use('/api/v1/teachers', teacherRoutes);
 app.use('/api/v1/lessons', lessonRoutes);
 app.use('/api/v1/lesson-quotes', lessonQuoteRoutes);
+app.use('/api/v1/addresses', addressRoutes);
 
 // API documentation for root route
 app.get('/', (req, res) => {
@@ -86,7 +88,8 @@ app.get('/', (req, res) => {
       '/api/v1/lesson-requests': 'Lesson request endpoints (v1)',
       '/api/v1/teachers': 'Teacher endpoints (v1)',
       '/api/v1/lessons': 'Lesson endpoints (v1)',
-      '/api/v1/lesson-quotes': 'Lesson quotes endpoints (v1)'
+      '/api/v1/lesson-quotes': 'Lesson quotes endpoints (v1)',
+      '/api/v1/addresses': 'Address endpoints (v1)'
     }
   });
 });

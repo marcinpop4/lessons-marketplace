@@ -57,16 +57,17 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@api': resolve(__dirname, './api'),
-      '@components': resolve(__dirname, './components'),
-      '@contexts': resolve(__dirname, './contexts'),
-      '@pages': resolve(__dirname, './pages'),
-      '@styles': resolve(__dirname, './styles'),
-      '@types': resolve(__dirname, './types'),
-      '@hooks': resolve(__dirname, './hooks'),
-      '@utils': resolve(__dirname, './utils'),
-      '@theme': resolve(__dirname, './theme'),
-      '@shared': resolve(__dirname, './shared')
+      '@frontend': resolve(__dirname, '.'),
+      '@frontend/api': resolve(__dirname, './api'),
+      '@frontend/components': resolve(__dirname, './components'),
+      '@frontend/contexts': resolve(__dirname, './contexts'),
+      '@frontend/hooks': resolve(__dirname, './hooks'),
+      '@frontend/pages': resolve(__dirname, './pages'),
+      '@frontend/styles': resolve(__dirname, './styles'),
+      '@frontend/theme': resolve(__dirname, './theme'),
+      '@frontend/types': resolve(__dirname, './types'),
+      '@frontend/utils': resolve(__dirname, './utils'),
+      '@frontend/shared': resolve(__dirname, './shared')
     }
   }
 })

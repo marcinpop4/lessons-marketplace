@@ -1,0 +1,75 @@
+.lesson-confirmation {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.lesson-details {
+  margin-top: 2rem;
+}
+
+.lesson-details-header {
+  margin-bottom: 1.5rem;
+}
+
+.lesson-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+}
+
+.lesson-detail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.lesson-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.lesson-detail-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.lesson-detail-value {
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.price-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.confirmation-actions {
+  border-top: 1px solid var(--color-secondary-200);
+  padding-top: 2rem;
+  margin-top: 2rem;
+}
+
+.confirmation-message {
+  color: var(--color-secondary-600);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .lesson-details-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  
+  .lesson-confirmation {
+    margin: 1rem auto;
+  }
+  
+  .confirmation-actions {
+    padding-top: 1.5rem;
+  }
+} 

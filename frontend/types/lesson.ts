@@ -30,14 +30,16 @@ export interface Student {
 
 // Interface for lesson request data
 export interface LessonRequest {
-  id?: string;
-  type: LessonType;
-  startTime: string; // ISO string format
+  id: string;
+  type: string;
   durationMinutes: number;
-  address: Address; // Now required and renamed from addressObj
+  startTime: string;
+  addressId: string;
   studentId: string;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  student?: Student;
+  address: Address;
 }
 
 // Interface for teacher data
@@ -45,36 +47,29 @@ export interface Teacher {
   id: string;
   firstName: string;
   lastName: string;
-  email: string;
-  phoneNumber?: string;
-  dateOfBirth?: string;
-  experience?: number;
-  bio?: string;
-  specialties?: string[];
-  lessonHourlyRates: Record<LessonType, number>;
+  lessonsCompleted: number;
+  lessonHourlyRates: Record<string, number>;
 }
 
 // Interface for lesson quote data
 export interface LessonQuote {
-  id?: string;
+  id: string;
+  lessonRequest: LessonRequest;
+  teacher: Teacher;
   costInCents: number;
+  hourlyRateInCents: number;
   expiresAt: string;
-  lessonRequestId: string;
-  teacherId: string;
-  createdAt?: string;
-  updatedAt?: string;
-  teacher?: Teacher;
-  lessonRequest?: LessonRequest;
-  expired?: boolean;
-  getFormattedHourlyRate(): string;
-  getFormattedLessonPrice(): string;
+  createdAt: string;
+  status: 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'REJECTED';
 }
 
 // Interface for confirmed lesson data
 export interface Lesson {
-  id?: string;
-  confirmedAt: string;
-  quoteId: string;
-  createdAt?: string;
-  updatedAt?: string;
+  id: string;
+  lessonRequest: LessonRequest;
+  teacher: Teacher;
+  quote: LessonQuote;
+  status: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
+  createdAt: string;
+  updatedAt: string;
 } 

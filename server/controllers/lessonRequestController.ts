@@ -69,6 +69,36 @@ export class LessonRequestController {
   }
 
   /**
+   * Format a lesson request for the frontend
+   * @param lessonRequest - The lesson request from the database
+   * @returns Formatted lesson request
+   */
+  private formatLessonRequest(lessonRequest: any) {
+    const startTime = new Date(lessonRequest.startTime);
+    
+    // Format date as YYYY-MM-DD
+    const date = startTime.toISOString().split('T')[0];
+    
+    // Format time as HH:mm
+    const time = startTime.toLocaleTimeString('en-US', { 
+      hour12: false, 
+      hour: '2-digit', 
+      minute: '2-digit'
+    });
+
+    // Format date and time for display
+    const formattedDateTime = startTime.toLocaleDateString() + ' at ' + 
+      startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    return {
+      ...lessonRequest,
+      date,
+      time,
+      formattedDateTime
+    };
+  }
+
+  /**
    * Get a lesson request by ID
    * @route GET /api/lesson-requests/:id
    * @param req - Express request
@@ -86,7 +116,8 @@ export class LessonRequestController {
         });
       }
 
-      return res.json(lessonRequest);
+      const formattedRequest = this.formatLessonRequest(lessonRequest);
+      return res.json(formattedRequest);
     } catch (error) {
       console.error('Error fetching lesson request:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -105,7 +136,8 @@ export class LessonRequestController {
       const { studentId } = req.params;
       const lessonRequests = await lessonRequestService.getLessonRequestsByStudent(studentId);
       
-      return res.json(lessonRequests);
+      const formattedRequests = lessonRequests.map(request => this.formatLessonRequest(request));
+      return res.json(formattedRequests);
     } catch (error) {
       console.error('Error fetching student lesson requests:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

@@ -1,5 +1,24 @@
 import apiClient from './apiClient';
-import { Lesson } from '../types/lesson';
+import { Lesson, LessonRequest } from '../types/lesson';
+
+const validateLessonResponse = (data: any): data is Lesson => {
+  if (!data || typeof data !== 'object') {
+    console.error('Data is null or not an object');
+    return false;
+  }
+  
+  if (!data.quote || typeof data.quote !== 'object') {
+    console.error('Quote is missing or not an object');
+    return false;
+  }
+  
+  if (!data.quote.lessonRequest || typeof data.quote.lessonRequest !== 'object') {
+    console.error('LessonRequest is missing or not an object');
+    return false;
+  }
+  
+  return true;
+};
 
 /**
  * Create a new lesson from a quote
@@ -25,6 +44,11 @@ export const createLessonFromQuote = async (quoteId: string): Promise<Lesson> =>
 export const getLessonById = async (lessonId: string): Promise<Lesson> => {
   try {
     const response = await apiClient.get(`/lessons/${lessonId}`);
+    
+    if (!validateLessonResponse(response.data)) {
+      throw new Error('Invalid lesson data structure received from API');
+    }
+    
     return response.data;
   } catch (error) {
     console.error('Error fetching lesson:', error);

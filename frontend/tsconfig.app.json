@@ -25,7 +25,18 @@
     /* Path aliases */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@frontend": ["."],
+      "@frontend/*": ["./*"],
+      "@frontend/api/*": ["./api/*"],
+      "@frontend/components/*": ["./components/*"],
+      "@frontend/contexts/*": ["./contexts/*"],
+      "@frontend/hooks/*": ["./hooks/*"],
+      "@frontend/pages/*": ["./pages/*"],
+      "@frontend/styles/*": ["./styles/*"],
+      "@frontend/theme/*": ["./theme/*"],
+      "@frontend/types/*": ["./types/*"],
+      "@frontend/utils/*": ["./utils/*"],
+      "@frontend/shared/*": ["./shared/*"]
     }
   },
   "include": [

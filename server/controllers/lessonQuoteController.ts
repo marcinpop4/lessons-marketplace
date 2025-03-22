@@ -158,7 +158,6 @@ export const lessonQuoteController = {
       }
 
       // Get the lesson quotes with teacher and lesson request details
-      // Limit to 5 quotes and order by most recent first
       const quotes = await prisma.lessonQuote.findMany({
         where: {
           lessonRequestId,
@@ -176,11 +175,16 @@ export const lessonQuoteController = {
         },
         orderBy: {
           createdAt: 'desc'
-        },
-        take: 5 // Limit to 5 quotes
+        }
       });
 
-      return res.json(quotes);
+      // Transform quotes to include hourlyRateInCents
+      const quotesWithRates = quotes.map(quote => ({
+        ...quote,
+        hourlyRateInCents: Math.round((quote.costInCents * 60) / quote.lessonRequest.durationMinutes)
+      }));
+
+      return res.json(quotesWithRates);
     } catch (error) {
       console.error('Error fetching lesson quotes:', error);
       return res.status(500).json({ error: 'Failed to fetch lesson quotes' });

@@ -12,7 +12,7 @@ async function attemptLogin(page, email, password, userType = 'STUDENT') {
   await page.goto('/auth');
   
   // Wait for the app to be ready - look for the auth form
-  await page.waitForSelector('.auth-form', { state: 'visible', timeout: 2000 });
+  await page.waitForSelector('.login-form', { state: 'visible', timeout: 2000 });
   
   // Make sure we're on the login tab (not register)
   const loginTab = page.locator('button.auth-tab', { hasText: 'Login' });

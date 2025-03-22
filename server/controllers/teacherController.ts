@@ -43,25 +43,33 @@ export const teacherController = {
     try {
       const { lessonType, limit } = req.query;
       
-      // Validate lessonType if provided
-      let lessonTypeFilter: LessonType | undefined;
-      if (lessonType) {
-        // Check if the provided lessonType is valid
-        if (Object.values(LessonType).includes(lessonType as LessonType)) {
-          lessonTypeFilter = lessonType as LessonType;
-        } else {
-          res.status(400).json({ 
-            message: `Invalid lesson type. Must be one of: ${Object.values(LessonType).join(', ')}` 
-          });
-          return;
-        }
+      // Validate lessonType is provided and valid
+      if (!lessonType) {
+        res.status(400).json({ message: 'Lesson type is required' });
+        return;
+      }
+
+      // Check if the provided lessonType is valid
+      if (!Object.values(LessonType).includes(lessonType as LessonType)) {
+        res.status(400).json({ 
+          message: `Invalid lesson type. Must be one of: ${Object.values(LessonType).join(', ')}` 
+        });
+        return;
       }
       
-      // Parse limit parameter, default to 5 if not provided
-      const limitValue = limit ? parseInt(limit as string, 10) : 5;
+      // Parse and validate limit parameter
+      if (!limit) {
+        res.status(400).json({ message: 'Limit parameter is required' });
+        return;
+      }
       
-      // Check if limit is a valid number
-      if (isNaN(limitValue) || limitValue < 1) {
+      if (!/^\d+$/.test(limit as string)) {
+        res.status(400).json({ message: 'Limit must be a positive number' });
+        return;
+      }
+
+      const limitValue = Number(limit);
+      if (limitValue < 1) {
         res.status(400).json({ message: 'Limit must be a positive number' });
         return;
       }
@@ -70,27 +78,24 @@ export const teacherController = {
         // Execute the query
         const teachers = await prisma.$transaction(async (tx) => {
           const query: any = {
+            where: {
+              teacherLessonHourlyRates: {
+                some: {
+                  type: lessonType as LessonType,
+                  deactivatedAt: null
+                }
+              }
+            },
             include: {
               teacherLessonHourlyRates: {
                 where: {
+                  type: lessonType as LessonType,
                   deactivatedAt: null
                 }
               }
             },
             take: limitValue
           };
-          
-          // Add where clause if filtering by lesson type
-          if (lessonTypeFilter) {
-            query.where = {
-              teacherLessonHourlyRates: {
-                some: {
-                  type: lessonTypeFilter,
-                  deactivatedAt: null
-                }
-              }
-            };
-          }
           
           return await tx.teacher.findMany(query);
         });
@@ -204,7 +209,7 @@ export const teacherController = {
         return;
       }
 
-      const { lessonType, rateInCents } = req.body;
+      const { lessonType, rateInCents, id } = req.body;
 
       // Validate inputs
       if (!lessonType || !Object.values(LessonType).includes(lessonType)) {
@@ -229,19 +234,65 @@ export const teacherController = {
         return;
       }
 
-      // Create or update the hourly rate
-      const hourlyRate = await prisma.teacherLessonHourlyRate.upsert({
+      // If we have an ID, we're updating an existing rate
+      if (id) {
+        // Verify the rate exists and belongs to this teacher
+        const existingRate = await prisma.teacherLessonHourlyRate.findFirst({
+          where: {
+            id,
+            teacherId
+          }
+        });
+
+        if (!existingRate) {
+          res.status(404).json({ message: 'Rate not found or does not belong to you' });
+          return;
+        }
+
+        // Update the rate
+        const updatedRate = await prisma.teacherLessonHourlyRate.update({
+          where: {
+            id
+          },
+          data: {
+            rateInCents,
+            deactivatedAt: null // Ensure it's active when updated
+          } as any
+        });
+
+        res.status(200).json({
+          id: updatedRate.id,
+          type: updatedRate.type,
+          rateInCents: updatedRate.rateInCents,
+          isActive: true,
+          deactivatedAt: null,
+          createdAt: updatedRate.createdAt.toISOString(),
+          updatedAt: updatedRate.updatedAt.toISOString()
+        });
+        return;
+      }
+
+      // Check if the rate already exists for this lesson type when creating new
+      const existingRate = await prisma.teacherLessonHourlyRate.findUnique({
         where: {
           teacherId_type: {
             teacherId,
             type: lessonType as LessonType
           }
-        },
-        update: {
-          rateInCents,
-          deactivatedAt: null // Ensure it's active when updated
-        } as any,
-        create: {
+        }
+      });
+
+      // If we're creating a new rate and the rate already exists
+      if (existingRate) {
+        res.status(409).json({ 
+          message: `You already have a rate for ${lessonType} lessons. Please edit the existing rate instead.` 
+        });
+        return;
+      }
+
+      // Create a new hourly rate
+      const hourlyRate = await prisma.teacherLessonHourlyRate.create({
+        data: {
           teacherId,
           type: lessonType as LessonType,
           rateInCents
@@ -253,6 +304,7 @@ export const teacherController = {
         type: hourlyRate.type,
         rateInCents: hourlyRate.rateInCents,
         isActive: true,
+        deactivatedAt: null,
         createdAt: hourlyRate.createdAt.toISOString(),
         updatedAt: hourlyRate.updatedAt.toISOString()
       });

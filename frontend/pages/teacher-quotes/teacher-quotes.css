@@ -1,0 +1,46 @@
+.teacher-quotes-page {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.teacher-quotes-header {
+  margin-bottom: 2rem;
+  text-align: left;
+}
+
+.teacher-quotes-header h2 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.teacher-quotes-header p {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.teacher-quotes-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.teacher-quotes-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+@media (max-width: 768px) {
+  .teacher-quotes-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .teacher-quotes-header h2 {
+    font-size: 1.5rem;
+  }
+} 
