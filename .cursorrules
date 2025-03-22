@@ -9,3 +9,5 @@ Avoid using !important in css and make the rules work as a whole system
 Avoid hardcoding styles, variables etc, to keep the application well maintained
 
 Avoid inline css and javascript
+
+Do not increase test timeouts before asking me

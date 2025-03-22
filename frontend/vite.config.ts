@@ -57,13 +57,16 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, './src'),
       '@api': resolve(__dirname, './api'),
       '@components': resolve(__dirname, './components'),
       '@contexts': resolve(__dirname, './contexts'),
       '@pages': resolve(__dirname, './pages'),
       '@styles': resolve(__dirname, './styles'),
-      '@types': resolve(__dirname, './types')
+      '@types': resolve(__dirname, './types'),
+      '@hooks': resolve(__dirname, './hooks'),
+      '@utils': resolve(__dirname, './utils'),
+      '@theme': resolve(__dirname, './theme'),
+      '@shared': resolve(__dirname, './shared')
     }
   }
 })
