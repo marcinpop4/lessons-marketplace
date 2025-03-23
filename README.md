@@ -172,33 +172,63 @@ This project includes a Docker Compose configuration (compose.yaml) for local de
 
 ## Deployment
 
-This project uses a modern deployment approach with separate frontend and backend deployments.
-
 ### Deploying to Fly.io
 
-To deploy the application to Fly.io:
+This project is configured for easy deployment to Fly.io using a unified Docker build approach. The same Dockerfile used for local development is used for production deployment, with environment variables controlling the behavior.
 
-```bash
-# Simple deployment without database setup
-pnpm deploy:fly
+#### Prerequisites
 
-# Deployment with database setup (password setup, connection, etc.)
-pnpm deploy:fly:with-db
-```
+1. Install the Fly.io CLI:
+   ```bash
+   # For macOS/Linux
+   curl -L https://fly.io/install.sh | sh
+   
+   # For Windows (in PowerShell)
+   iwr https://fly.io/install.ps1 -useb | iex
+   ```
 
-The `deploy:fly` command will deploy both the API and frontend applications without attempting to modify the database configuration, which is useful for routine deployments where database settings remain unchanged.
+2. Login to Fly.io:
+   ```bash
+   flyctl auth login
+   ```
 
-Use the `deploy:fly:with-db` flag when you need to:
-- Set up the database for the first time
-- Update database credentials
-- Recreate the DATABASE_URL secret
-- Reconnect to the database if connection issues occur
+3. Ensure you have a `.env.production` file with your production environment variables.
 
-### Deployment Architecture
+#### Deployment Steps
 
-- **Frontend**: Static React app served by Nginx
-- **Backend**: Node.js API server
-- **Database**: PostgreSQL on Fly.io
+1. Deploy both frontend and backend:
+   ```bash
+   pnpm deploy:fly
+   ```
+
+2. Deploy with a new Postgres database (first time only):
+   ```bash
+   pnpm deploy:fly:with-db
+   ```
+
+#### Checking Deployment Status
+
+1. Check logs:
+   ```bash
+   # For backend
+   flyctl logs -a lessons-marketplace-server
+   
+   # For frontend
+   flyctl logs -a lessons-marketplace-frontend
+   ```
+
+2. Open the deployed application:
+   ```bash
+   flyctl open -a lessons-marketplace-frontend
+   ```
+
+#### Configuration
+
+The deployment uses the following structure:
+- The main `Dockerfile` is used for both local development and production
+- Environment variables control differences between environments
+- The server automatically detects if it's running in Fly.io and adapts accordingly
+- The frontend configuration is generated at runtime to connect to the correct API endpoint
 
 ## Database Schema
 

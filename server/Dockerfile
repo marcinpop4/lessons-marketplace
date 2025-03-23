@@ -17,7 +17,8 @@ WORKDIR /app
 # Copy package files for better layer caching
 COPY package.json pnpm-lock.yaml ./
 COPY server/package.json ./server/
-RUN mkdir -p ./shared/
+COPY frontend/package.json ./frontend/
+COPY shared/package.json ./shared/
 
 # Install dependencies
 RUN pnpm install --no-frozen-lockfile
@@ -49,7 +50,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     openssl \
     postgresql-client && \
-    npm install -g pnpm && \
+    npm install -g pnpm tsx && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -63,8 +64,9 @@ RUN pnpm install --no-frozen-lockfile --prod
 COPY --from=build /app/dist/server ./dist/server
 COPY --from=build /app/dist/shared ./dist/shared
 
-# Copy Prisma schema and migrations (these are source files needed for runtime database operations)
+# Copy Prisma schema and migrations (for runtime database operations)
 COPY --from=build /app/server/prisma ./server/prisma
+COPY --from=build /app/server/entrypoint.ts ./server/
 
 # Generate Prisma client in the production image
 RUN npx prisma generate --schema=server/prisma/schema.prisma
@@ -72,5 +74,5 @@ RUN npx prisma generate --schema=server/prisma/schema.prisma
 # Expose the server port
 EXPOSE 3000
 
-# Start the server using the TypeScript entrypoint
-CMD ["node", "dist/server/entrypoint.js"]
+# Start the server using the entrypoint script
+CMD ["tsx", "./server/entrypoint.ts"]

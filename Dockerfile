@@ -1,7 +1,8 @@
 FROM node:20-slim AS build
 
 # Install OpenSSL for Prisma and other build essentials
-RUN apt-get update && apt-get install -y openssl && \
+RUN apt-get update && \
+    apt-get install -y openssl python3 make g++ postgresql-client && \
     npm install -g pnpm && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -12,9 +13,14 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 COPY server/package.json ./server/
 COPY frontend/package.json ./frontend/
+# Create shared directory (no package.json needed)
+RUN mkdir -p ./shared/
 
 # Install dependencies
 RUN pnpm install --no-frozen-lockfile
+
+# Rebuild bcrypt for current platform
+RUN cd node_modules/bcrypt && npm rebuild
 
 # Copy the rest of the application
 COPY . .
@@ -30,6 +36,9 @@ RUN pnpm clean && \
 
 # Production stage for frontend with Nginx
 FROM nginx:alpine AS frontend
+
+# Set container environment flag
+ENV CONTAINER_ENV=true
 
 # Install Node.js for running the config generator
 RUN apk add --update nodejs npm
@@ -64,6 +73,7 @@ FROM node:20-slim AS server
 
 # Set shell for proper environment setup
 ENV SHELL=/bin/bash
+ENV CONTAINER_ENV=true
 
 # Install OpenSSL for Prisma and PostgreSQL client for database checks
 RUN apt-get update && \
@@ -83,7 +93,6 @@ COPY --from=build /app/dist/server ./dist/server
 COPY --from=build /app/dist/shared ./dist/shared
 COPY --from=build /app/server/prisma ./server/prisma
 COPY --from=build /app/server/entrypoint.ts ./server/
-COPY --from=build /app/deploy.ts ./
 
 # Generate Prisma client in the production image
 RUN npx prisma generate --schema=server/prisma/schema.prisma

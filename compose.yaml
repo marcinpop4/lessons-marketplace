@@ -3,15 +3,15 @@ services:
   db:
     image: postgres:15
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER:?DB_USER environment variable is required}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD environment variable is required}
+      POSTGRES_DB: ${DB_NAME:?DB_NAME environment variable is required}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:?DB_USER environment variable is required}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -25,35 +25,37 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=${NODE_ENV}
-      - PORT=${PORT}
-      # Database connection - use .env values
+      - NODE_ENV=${NODE_ENV:?NODE_ENV environment variable is required}
+      - PORT=${PORT:?PORT environment variable is required}
+      # Database connection - use .env values with fail-fast
       - DB_HOST=db
-      - DB_PORT=${DB_PORT}
-      - DB_NAME=${DB_NAME}
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_SSL=${DB_SSL}
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT}/${DB_NAME}?schema=public
+      - DB_PORT=${DB_PORT:?DB_PORT environment variable is required}
+      - DB_NAME=${DB_NAME:?DB_NAME environment variable is required}
+      - DB_USER=${DB_USER:?DB_USER environment variable is required}
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD environment variable is required}
+      - DB_SSL=${DB_SSL:?DB_SSL environment variable is required}
+      - DATABASE_URL=postgresql://${DB_USER:?DB_USER not set}:${DB_PASSWORD:?DB_PASSWORD not set}@db:${DB_PORT:?DB_PORT not set}/${DB_NAME:?DB_NAME not set}?schema=public
       # JWT settings
-      - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
-      - REFRESH_TOKEN_EXPIRES_IN=${REFRESH_TOKEN_EXPIRES_IN}
-      # Frontend URL for Docker
-      - FRONTEND_URL=http://frontend
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET environment variable is required}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:?JWT_EXPIRES_IN environment variable is required}
+      - REFRESH_TOKEN_EXPIRES_IN=${REFRESH_TOKEN_EXPIRES_IN:?REFRESH_TOKEN_EXPIRES_IN environment variable is required}
+      # Frontend URL from .env file
+      - FRONTEND_URL=${FRONTEND_URL:?FRONTEND_URL environment variable is required}
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - ./server:/app/server
       - ./shared:/app/shared
-    # Fix the recursive command issue - run db migrations then start the server directly
+    # Run entrypoint.ts which handles DB connection, migrations, and starts the server
     command: >
-      sh -c "
-        npx prisma generate --schema=server/prisma/schema.prisma &&
-        npx prisma migrate deploy --schema=server/prisma/schema.prisma &&
-        npx tsx server/index.ts"
+      sh -c "npx tsx server/entrypoint.ts --run-migrations-only && npx tsx server/index.ts"
     restart: on-failure:3
+    # Add memory limits to prevent container being killed
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     # Add a network alias to ensure the frontend can reach the API by hostname
     networks:
       default:
@@ -69,12 +71,12 @@ services:
     ports:
       - "5173:80"
     environment:
-      - NODE_ENV=${NODE_ENV}
-      # For Docker, the frontend needs to connect to itself for API calls
-      - VITE_API_BASE_URL=http://localhost:5173
+      - NODE_ENV=${NODE_ENV:?NODE_ENV environment variable is required}
+      # API URL from .env file with fail-fast
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:?VITE_API_BASE_URL environment variable is required}
     depends_on:
       - api
-    # Add a network alias to ensure the frontend can reach the API
+    # Add a network alias to ensure the frontend can reach itself
     networks:
       default:
         aliases:

@@ -1,5 +1,5 @@
 // File Type Requirements
-Always create TypeScript files (.ts, .tsx) and never JavaScript files (.js, .jsx). TypeScript code should be properly typed with explicit types rather than using 'any' where possible.
+Always create TypeScript files (.ts, .tsx) and never JavaScript files (.js, .jsx). TypeScript code should be properly typed with explicit types rather than using 'any' where possible. Never create shell scripts, create ts files instead.
 
 // Error Handling & Configuration
 Never implement fallbacks for missing environment variables, configuration values, or error conditions. Explicitly check that required values exist and throw errors immediately if they don't. The application should fail fast rather than continue running with default values that might mask problems.
@@ -33,3 +33,6 @@ Always maintain package.json in alphabetical order when adding new dependencies.
 
 // Frontend Development
 Never create placeholder or sample pages for deployment. Always implement the actual functionality to catch real issues early. The application should fail fast rather than displaying dummy content that masks underlying problems.
+
+//File structure
+Alwasy put scripts in the ./scripts folder. Add subfolders to keep the folder organized.

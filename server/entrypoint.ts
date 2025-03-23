@@ -4,7 +4,7 @@
  * Server entrypoint script
  * 
  * This script prepares the database connection, runs migrations,
- * and starts the server.
+ * and starts the server. It works in both local development and Fly.io environments.
  */
 
 import { execSync, spawn, spawnSync } from 'child_process';
@@ -15,42 +15,50 @@ import * as path from 'path';
 const GREEN = '\x1b[32m';
 const YELLOW = '\x1b[33m';
 const RED = '\x1b[31m';
-const NC = '\x1b[0m'; // No color
+const NC = '\x1b[0m'; // No Color
 
-// Get environment variables
-const dbHost = process.env.DB_HOST;
-const dbPort = process.env.DB_PORT;
-const dbName = process.env.DB_NAME;
-const dbUser = process.env.DB_USER;
-const dbPassword = process.env.DB_PASSWORD;
+// Check for command line arguments
+const runMigrationsOnly = process.argv.includes('--run-migrations-only');
+const isProduction = process.env.NODE_ENV === 'production';
+const isFlyIo = process.env.FLY_APP_NAME !== undefined;
 
-// Check if NODE_ENV is set
-if (!process.env.NODE_ENV) {
-  throw new Error("NODE_ENV environment variable is required");
+// Get and validate required environment variables
+const requiredEnvVars = [
+  'NODE_ENV',
+  'DB_HOST',
+  'DB_PORT',
+  'DB_NAME',
+  'DB_USER',
+  'DB_PASSWORD',
+  'JWT_SECRET',
+  'FRONTEND_URL'
+];
+
+// Check for missing required variables and fail fast
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+if (missingVars.length > 0) {
+  console.error(`${RED}ERROR: Missing required environment variables: ${missingVars.join(', ')}${NC}`);
+  console.error(`${RED}Please set these variables in your .env or .env.production file${NC}`);
+  process.exit(1);
 }
-const nodeEnv = process.env.NODE_ENV;
 
-const databaseUrl = process.env.DATABASE_URL;
+// All required variables are now available
+const dbHost = process.env.DB_HOST!;
+const dbPort = process.env.DB_PORT!;
+const dbName = process.env.DB_NAME!;
+const dbUser = process.env.DB_USER!;
+const dbPassword = process.env.DB_PASSWORD!;
+const dbSsl = process.env.DB_SSL === 'true';
+const nodeEnv = process.env.NODE_ENV!;
+const frontendUrl = process.env.FRONTEND_URL!;
 
-// Validate required environment variables
-function validateEnvironment() {
-  const required = {
-    DB_HOST: dbHost,
-    DB_PORT: dbPort,
-    DB_NAME: dbName,
-    DB_USER: dbUser,
-    DB_PASSWORD: dbPassword
-  };
+// Construct the DATABASE_URL for Prisma
+const databaseUrl = `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}?schema=public${dbSsl ? '&sslmode=require' : ''}`;
+process.env.DATABASE_URL = databaseUrl;
 
-  const missing = Object.entries(required)
-    .filter(([_, value]) => !value)
-    .map(([key]) => key);
-
-  if (missing.length > 0) {
-    console.error(`${RED}Missing required environment variables: ${missing.join(', ')}${NC}`);
-    process.exit(1);
-  }
-}
+console.log(`${YELLOW}Environment: NODE_ENV=${nodeEnv}, Running in ${isFlyIo ? 'Fly.io' : 'local'} environment${NC}`);
+console.log(`${YELLOW}Using DB Host: ${dbHost}, Port: ${dbPort}, Name: ${dbName}, User: ${dbUser}${NC}`);
+console.log(`${YELLOW}Frontend URL: ${frontendUrl}${NC}`);
 
 async function checkDatabaseConnection(): Promise<boolean> {
   console.log(`${YELLOW}Checking database connection...${NC}`);
@@ -60,17 +68,17 @@ async function checkDatabaseConnection(): Promise<boolean> {
   
   while (retryCount < maxRetries) {
     try {
-      // Try to connect to the database using individual parameters
-      console.log(`${YELLOW}Using connection parameters: Host=${dbHost}, DB=${dbName}, User=${dbUser}${NC}`);
+      // Try to connect to the database using psql
+      console.log(`${YELLOW}Attempting database connection to: ${dbHost}:${dbPort}/${dbName}${NC}`);
       
       const result = spawnSync('psql', [
-        '-h', dbHost as string,
-        '-U', dbUser as string,
-        '-d', dbName as string,
+        '-h', dbHost,
+        '-U', dbUser,
+        '-d', dbName,
         '-c', 'SELECT 1'
       ], {
-        env: { ...process.env, PGPASSWORD: dbPassword as string },
-        stdio: 'pipe' // Change to pipe to capture error output
+        env: { ...process.env, PGPASSWORD: dbPassword },
+        stdio: 'pipe'
       });
       
       if (result.status === 0) {
@@ -99,21 +107,14 @@ async function runMigrations(): Promise<boolean> {
   console.log(`${YELLOW}Running database migrations...${NC}`);
   
   try {
-    // Construct the DATABASE_URL from individual parameters
-    const constructedUrl = `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}?sslmode=disable`;
-    console.log(`${YELLOW}Using constructed DATABASE_URL for Prisma${NC}`);
+    // Use the DATABASE_URL set earlier
+    console.log(`${YELLOW}Using DATABASE_URL for Prisma migrations${NC}`);
     
-    // Set the DATABASE_URL directly in the environment for this process
-    process.env.DATABASE_URL = constructedUrl;
-    
-    // Run migrations with the environment variable now set
+    // Run migrations
     execSync('npx prisma migrate deploy --schema=server/prisma/schema.prisma', { 
       stdio: 'inherit',
-      env: { ...process.env, DATABASE_URL: constructedUrl }
+      env: { ...process.env }
     });
-    
-    // Keep DATABASE_URL set for the rest of the application
-    process.env.DATABASE_URL = constructedUrl;
     
     console.log(`${GREEN}Migrations completed successfully!${NC}`);
     return true;
@@ -127,12 +128,12 @@ function startServer() {
   console.log(`${YELLOW}Starting server in ${nodeEnv} mode...${NC}`);
   
   // Ensure HOST and PORT are set in the environment
-  process.env.HOST = '0.0.0.0';
-  process.env.PORT = '3000';
+  process.env.HOST = process.env.HOST || '0.0.0.0';
+  process.env.PORT = process.env.PORT || '3000';
   
   if (nodeEnv === 'development') {
-    // Use npm run start:ts for development
-    const server = spawn('npm', ['run', 'start:ts'], { 
+    // Run server/index.ts directly instead of recursively calling this script
+    const server = spawn('tsx', ['server/index.ts'], { 
       stdio: 'inherit',
       detached: false 
     });
@@ -155,8 +156,8 @@ function startServer() {
       detached: false,
       env: {
         ...process.env,
-        HOST: '0.0.0.0',
-        PORT: '3000'
+        HOST: process.env.HOST || '0.0.0.0',
+        PORT: process.env.PORT || '3000'
       }
     });
     
@@ -174,28 +175,33 @@ function startServer() {
 }
 
 async function main() {
-  // Validate environment variables first
-  validateEnvironment();
+  try {
+    // Check database connection
+    const dbConnected = await checkDatabaseConnection();
+    if (!dbConnected) {
+      console.error(`${RED}Database connection failed. Exiting.${NC}`);
+      process.exit(1);
+    }
+    
+    // Run migrations
+    const migrationsSuccessful = await runMigrations();
+    if (!migrationsSuccessful) {
+      console.error(`${RED}Database migrations failed. Exiting.${NC}`);
+      process.exit(1);
+    }
 
-  // Set DATABASE_URL right at the start
-  const constructedUrl = `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}?sslmode=disable`;
-  process.env.DATABASE_URL = constructedUrl;
-  console.log(`${YELLOW}Set DATABASE_URL for the application${NC}`);
-
-  // Check database connection
-  const dbConnected = await checkDatabaseConnection();
-  if (!dbConnected) {
+    // If --run-migrations-only flag is provided, exit after migrations
+    if (runMigrationsOnly) {
+      console.log(`${GREEN}Migrations completed successfully. Exiting as requested.${NC}`);
+      process.exit(0);
+    }
+    
+    // Start the server
+    startServer();
+  } catch (error) {
+    console.error(`${RED}An unexpected error occurred:${NC}`, error);
     process.exit(1);
   }
-  
-  // Run migrations
-  const migrationsSuccessful = await runMigrations();
-  if (!migrationsSuccessful) {
-    process.exit(1);
-  }
-  
-  // Start the server
-  startServer();
 }
 
 // Handle exit signals
