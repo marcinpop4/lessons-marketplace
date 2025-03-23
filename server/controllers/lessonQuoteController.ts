@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import logger from '../utils/logger.js';
 
 const prisma = new PrismaClient();
 
@@ -58,7 +59,6 @@ export const lessonQuoteController = {
       
       // If a quote already exists, return it instead of creating a new one
       if (existingQuote) {
-        console.log(`Quote already exists for teacher ${teacherId} and lesson request ${lessonRequestId}. Returning existing quote.`);
         res.status(200).json(existingQuote);
         return;
       }
@@ -79,7 +79,7 @@ export const lessonQuoteController = {
       
       res.status(201).json(lessonQuote);
     } catch (error) {
-      console.error('Error creating lesson quote:', error);
+      logger.error('Error creating lesson quote:', error);
       res.status(500).json({ 
         message: 'An error occurred while creating the lesson quote',
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -113,7 +113,7 @@ export const lessonQuoteController = {
       
       res.status(200).json(lessonQuote);
     } catch (error) {
-      console.error('Error fetching lesson quote:', error);
+      logger.error('Error fetching lesson quote:', error);
       res.status(500).json({ 
         message: 'An error occurred while fetching the lesson quote',
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -139,7 +139,7 @@ export const lessonQuoteController = {
       
       res.status(200).json(lessonQuotes);
     } catch (error) {
-      console.error('Error fetching lesson quotes:', error);
+      logger.error('Error fetching lesson quotes:', error);
       res.status(500).json({ 
         message: 'An error occurred while fetching lesson quotes',
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -186,7 +186,7 @@ export const lessonQuoteController = {
 
       return res.json(quotesWithRates);
     } catch (error) {
-      console.error('Error fetching lesson quotes:', error);
+      logger.error('Error fetching lesson quotes:', error);
       return res.status(500).json({ error: 'Failed to fetch lesson quotes' });
     }
   },
@@ -263,7 +263,7 @@ export const lessonQuoteController = {
 
       return res.status(200).json(result);
     } catch (error) {
-      console.error('Error accepting lesson quote:', error);
+      logger.error('Error accepting lesson quote:', error);
       return res.status(500).json({ error: 'Failed to accept lesson quote' });
     }
   },

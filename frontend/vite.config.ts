@@ -67,7 +67,7 @@ export default defineConfig({
       '@frontend/theme': resolve(__dirname, './theme'),
       '@frontend/types': resolve(__dirname, './types'),
       '@frontend/utils': resolve(__dirname, './utils'),
-      '@frontend/shared': resolve(__dirname, './shared')
+      '@shared': resolve(__dirname, '../shared')
     }
   }
 })

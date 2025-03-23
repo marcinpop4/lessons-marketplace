@@ -1,6 +1,7 @@
 // API client for making requests to the backend
 
 import axios from 'axios';
+import logger from '../utils/logger.js';
 
 // Type declaration for the global window object with API_CONFIG
 declare global {
@@ -36,7 +37,8 @@ const API_VERSION = '/v1';
 // Full API base URL with version
 const VERSIONED_API_BASE_URL = `${API_BASE_URL}${API_VERSION}`;
 
-console.log('API client initialized with base URL:', VERSIONED_API_BASE_URL);
+// Log API URL at debug level
+logger.debug('API URL:', VERSIONED_API_BASE_URL);
 
 // Create a custom axios instance
 const apiClient = axios.create({
@@ -92,7 +94,7 @@ apiClient.interceptors.response.use(
           return apiClient(originalRequest);
         }
       } catch (refreshError) {
-        console.error('Token refresh failed:', refreshError);
+        logger.error('Token refresh failed:', refreshError);
         // If refresh fails, redirect to login only if not already on login page
         if (!window.location.pathname.includes('/auth')) {
           localStorage.removeItem('auth_token');

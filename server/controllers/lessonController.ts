@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma.js';
+import logger from '../utils/logger.js';
 
 /**
  * Controller for lesson-related operations
@@ -59,7 +60,6 @@ export const lessonController = {
       });
       
       if (existingLesson) {
-        console.log(`Lesson already exists for quote ${quoteId}. Returning existing lesson.`);
         res.status(200).json(existingLesson);
         return;
       }
@@ -106,7 +106,7 @@ export const lessonController = {
       
       res.status(201).json(result);
     } catch (error) {
-      console.error('Error creating lesson:', error);
+      logger.error('Error creating lesson:', error);
       res.status(500).json({ 
         message: 'An error occurred while creating the lesson',
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -149,7 +149,7 @@ export const lessonController = {
       
       res.status(200).json(lesson);
     } catch (error) {
-      console.error('Error fetching lesson:', error);
+      logger.error('Error fetching lesson:', error);
       res.status(500).json({ 
         message: 'An error occurred while fetching the lesson',
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -185,7 +185,7 @@ export const lessonController = {
       
       res.status(200).json(lessons);
     } catch (error) {
-      console.error('Error fetching lessons by quote:', error);
+      logger.error('Error fetching lessons by quote:', error);
       res.status(500).json({ 
         message: 'An error occurred while fetching the lessons',
         error: error instanceof Error ? error.message : 'Unknown error'

@@ -5,6 +5,7 @@ import compression from 'compression';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
+import logger from './utils/logger.js';
 
 // Load environment variables
 dotenv.config();
@@ -30,14 +31,26 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 // Middleware
 app.use(helmet()); // Security headers
 app.use(compression()); // Compress responses
-app.use(morgan('combined')); // Logging
+
+// Configure logging based on environment variables
+// Use a simple format by default and a more detailed one when DEBUG=true
+const isDebugMode = process.env.DEBUG === 'true';
+if (isDebugMode) {
+  app.use(morgan('combined')); // Detailed logs for debugging
+  logger.info('Debug mode: Verbose logging enabled');
+} else {
+  // Use a minimal format for regular operation
+  app.use(morgan('[:date[iso]] :method :url :status :response-time ms'));
+}
 
 // Enhanced CORS configuration using only environment variables
 const frontendUrl = process.env.FRONTEND_URL || '';
 const allowedOrigins = frontendUrl.split(',').map(url => url.trim()).filter(url => url);
 
 // Log the allowed origins for debugging
-console.log('CORS allowed origins:', allowedOrigins);
+if (isDebugMode) {
+  logger.debug('CORS allowed origins:', allowedOrigins);
+}
 
 app.use(cors({ 
   origin: function(origin, callback) {
@@ -47,7 +60,7 @@ app.use(cors({
     if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
       callback(null, true);
     } else {
-      console.warn(`Origin ${origin} not allowed by CORS`);
+      logger.warn(`Origin ${origin} not allowed by CORS`);
       callback(null, true); // Still allow for now, but log a warning
     }
   },
@@ -64,7 +77,7 @@ app.get('/api/health', async (req, res) => {
     await prisma.$queryRaw`SELECT 1`;
     res.status(200).json({ status: 'ok', database: 'connected' });
   } catch (error: unknown) {
-    console.error('Database connection error:', error);
+    logger.error('Database connection error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown database error';
     res.status(500).json({ status: 'error', database: 'disconnected', error: errorMessage });
   }
@@ -96,13 +109,13 @@ app.get('/', (req, res) => {
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
+  logger.error(err.stack || err.message || 'Unknown error');
   res.status(500).send({ error: 'Something went wrong!' });
 });
 
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+  logger.info(`Server running on port ${PORT}`);
 });
 
 // Graceful shutdown

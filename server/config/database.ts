@@ -11,6 +11,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import logger from '../utils/logger.js';
 
 /**
  * Load environment variables from a specific path
@@ -52,11 +53,15 @@ export const getDatabaseUrl = (options?: {
   ssl?: boolean;
   useEnvUrl?: boolean;
 }): string => {
+  const isDebugMode = process.env.DEBUG === 'true';
+  
   // Check if DATABASE_URL is directly provided and should be used
   if (process.env.DATABASE_URL) {
-    console.log('Using DATABASE_URL from environment variables');
-    const maskedUrl = maskDatabaseUrl(process.env.DATABASE_URL);
-    console.log(`Database URL: ${maskedUrl}`);
+    if (isDebugMode) {
+      logger.debug('Using DATABASE_URL from environment variables');
+      const maskedUrl = maskDatabaseUrl(process.env.DATABASE_URL);
+      logger.debug(`Database URL: ${maskedUrl}`);
+    }
     
     return process.env.DATABASE_URL;
   } else {
@@ -91,9 +96,11 @@ export const getDatabaseUrl = (options?: {
     
     const url = `postgresql://${DB_USER}${passwordPart}@${DB_HOST}:${DB_PORT}/${DB_NAME}${sslParam}`;
     
-    // Log the database URL (with masked password for security)
-    const maskedUrl = maskDatabaseUrl(url);
-    console.log(`Built database URL from environment variables: ${maskedUrl}`);
+    // Log the database URL (with masked password for security) only in debug mode
+    if (isDebugMode) {
+      const maskedUrl = maskDatabaseUrl(url);
+      logger.debug(`Built database URL from environment variables: ${maskedUrl}`);
+    }
     
     return url;
   }

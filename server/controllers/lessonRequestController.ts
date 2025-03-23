@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { lessonRequestService } from '../services/database/lessonRequestService.js';
+import logger from '../utils/logger.js';
 
 export class LessonRequestController {
   constructor() {
@@ -26,7 +27,7 @@ export class LessonRequestController {
       } = req.body;
 
       // Log the request body for debugging
-      console.log('Received lesson request data:', req.body);
+      logger.debug('Received lesson request data:', req.body);
 
       // Validate required fields
       if (!type || !startTime || !durationMinutes || !addressObj || !studentId) {

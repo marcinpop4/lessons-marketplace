@@ -23,20 +23,20 @@
     "noUncheckedSideEffectImports": true,
     
     /* Path aliases */
-    "baseUrl": ".",
+    "baseUrl": "..",
     "paths": {
-      "@frontend": ["."],
-      "@frontend/*": ["./*"],
-      "@frontend/api/*": ["./api/*"],
-      "@frontend/components/*": ["./components/*"],
-      "@frontend/contexts/*": ["./contexts/*"],
-      "@frontend/hooks/*": ["./hooks/*"],
-      "@frontend/pages/*": ["./pages/*"],
-      "@frontend/styles/*": ["./styles/*"],
-      "@frontend/theme/*": ["./theme/*"],
-      "@frontend/types/*": ["./types/*"],
-      "@frontend/utils/*": ["./utils/*"],
-      "@frontend/shared/*": ["./shared/*"]
+      "@frontend": ["./frontend"],
+      "@frontend/*": ["./frontend/*"],
+      "@frontend/api/*": ["./frontend/api/*"],
+      "@frontend/components/*": ["./frontend/components/*"],
+      "@frontend/contexts/*": ["./frontend/contexts/*"],
+      "@frontend/hooks/*": ["./frontend/hooks/*"],
+      "@frontend/pages/*": ["./frontend/pages/*"],
+      "@frontend/styles/*": ["./frontend/styles/*"],
+      "@frontend/theme/*": ["./frontend/theme/*"],
+      "@frontend/types/*": ["./frontend/types/*"],
+      "@frontend/utils/*": ["./frontend/utils/*"],
+      "@shared/*": ["./shared/*"]
     }
   },
   "include": [
@@ -44,7 +44,8 @@
     "./**/*.tsx",
     "./**/*.js",
     "./**/*.jsx",
-    "./vite-env.d.ts"
+    "./vite-env.d.ts",
+    "../shared/**/*"
   ],
   "exclude": ["node_modules"]
 }

@@ -27,5 +27,7 @@ declare namespace NodeJS {
     // Server
     PORT?: string;
     NODE_ENV?: 'development' | 'production' | 'test';
+    DEBUG?: string;
+    LOG_LEVEL?: string;
   }
 } 

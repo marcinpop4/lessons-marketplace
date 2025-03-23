@@ -5,8 +5,8 @@
     "moduleResolution": "NodeNext",
     "target": "ES2022",
     "outDir": "../dist/server",
-    "rootDir": ".",
-    "baseUrl": ".",
+    "rootDir": "..",
+    "baseUrl": "..",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
@@ -24,17 +24,17 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["node"],
     "paths": {
-      "@shared/*": ["../dist/shared/*"]
+      "@shared/*": ["shared/*"]
     }
   },
   "include": [
-    "./**/*"
+    "./**/*",
+    "../shared/**/*"
   ],
   "exclude": [
     "../node_modules",
     "../dist",
     "../frontend",
-    "dist",
-    "./shared"
+    "dist"
   ]
 } 

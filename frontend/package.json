@@ -1,23 +1,21 @@
 {
   "name": "lessons-marketplace",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
   "scripts": {
-    "dev": "vite --config vite.config.ts",
-    "dev:server": "tsx watch server/index.ts",
-    "dev:full": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "build": "tsc --project tsconfig.app.json --skipLibCheck && vite build --config vite.config.ts",
-    "build:server": "tsc --project server/tsconfig.server.json --skipLibCheck && mkdir -p dist/server && cp -r server/dist/* dist/server/",
     "build:full": "npm run build && npm run build:server",
-    "start": "node dist/server/index.js",
+    "build:server": "tsc --project server/tsconfig.server.json --skipLibCheck && mkdir -p dist/server && cp -r server/dist/* dist/server/",
+    "db:reset": "prisma migrate reset --force --schema=server/prisma/schema.prisma",
+    "dev": "vite --config vite.config.ts",
+    "dev:full": "concurrently \"npm run dev\" \"npm run dev:server\"",
+    "dev:server": "tsx watch server/index.ts",
     "lint": "eslint .",
     "preview": "vite preview --config vite.config.ts",
     "prisma:generate": "prisma generate --schema=server/prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema=server/prisma/schema.prisma",
-    "prisma:studio": "prisma studio --schema=server/prisma/schema.prisma",
     "prisma:seed": "tsx server/prisma/seed.ts",
-    "db:reset": "prisma migrate reset --force --schema=server/prisma/schema.prisma"
+    "prisma:studio": "prisma studio --schema=server/prisma/schema.prisma",
+    "start": "node dist/server/index.js"
   },
   "dependencies": {
     "amqplib": "^0.10.3",
@@ -72,5 +70,7 @@
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.24.1",
     "vite": "^6.2.0"
-  }
+  },
+  "type": "module",
+  "version": "0.0.0"
 }
