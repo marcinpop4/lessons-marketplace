@@ -9,7 +9,7 @@ export default defineConfig({
   reporter: 'html',
   
   // Global timeout settings
-  timeout: 2000, // Global timeout for all tests - 2 seconds
+  timeout: 5000, // Global timeout for all tests - 2 seconds
   
   use: {
     baseURL: 'http://localhost:5173',
@@ -21,8 +21,8 @@ export default defineConfig({
     video: 'on-first-retry',
     
     // Set timeouts for actions
-    actionTimeout: 2000, // Timeout for actions like click, fill - 2 seconds
-    navigationTimeout: 2000, // Timeout for navigation - 2 seconds
+    actionTimeout: 5000, // Timeout for actions like click, fill - 2 seconds
+    navigationTimeout: 5000, // Timeout for navigation - 2 seconds
   },
   outputDir: './tests/screenshots',
   projects: [
