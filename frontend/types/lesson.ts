@@ -31,7 +31,7 @@ export interface Student {
 // Interface for lesson request data
 export interface LessonRequest {
   id: string;
-  type: string;
+  type: LessonType;
   durationMinutes: number;
   startTime: string;
   addressId: string;

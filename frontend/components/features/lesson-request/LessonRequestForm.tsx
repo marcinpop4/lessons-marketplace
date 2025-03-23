@@ -27,9 +27,11 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
   const [formData, setFormData] = useState<Omit<LessonRequest, 'address'> & { 
     addressObj: Address;
   }>({
+    id: '',
     type: LessonType.GUITAR,
     startTime: '',
     durationMinutes: 30,
+    addressId: '',
     addressObj: {
       street: '',
       city: '',
@@ -37,7 +39,9 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
       postalCode: '',
       country: 'USA'
     },
-    studentId: ''
+    studentId: '',
+    createdAt: '',
+    updatedAt: ''
   });
 
   const [loading, setLoading] = useState(false);
@@ -115,9 +119,14 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
 
   const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
+    // Convert string value to LessonType enum - ensure it's a valid enum value
+    const lessonType = Object.values(LessonType).includes(value as LessonType) 
+      ? value as LessonType 
+      : LessonType.GUITAR;
+      
     setFormData(prevData => ({
       ...prevData,
-      [name]: value
+      [name]: lessonType
     }));
   };
 
@@ -188,9 +197,11 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
       }
       
       setFormData({
+        id: '',
         type: LessonType.GUITAR,
         startTime: '',
         durationMinutes: 30,
+        addressId: '',
         addressObj: {
           street: '',
           city: '',
@@ -198,7 +209,9 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
           postalCode: '',
           country: 'USA'
         },
-        studentId: user?.id || ''
+        studentId: user?.id || '',
+        createdAt: '',
+        updatedAt: ''
       });
       
       setSelectedTime('');
