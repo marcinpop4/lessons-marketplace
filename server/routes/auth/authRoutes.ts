@@ -17,8 +17,15 @@ const cookieOptions = {
 };
 
 // JWT configuration
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is required");
+}
+
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
+if (!JWT_EXPIRES_IN) {
+  throw new Error("JWT_EXPIRES_IN environment variable is required");
+}
 const REFRESH_TOKEN_EXPIRES_IN = 7; // days
 
 // Hash password

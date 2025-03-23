@@ -1,8 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-// JWT Secret
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is required");
+}
+
+// Assertion to satisfy TypeScript
+const secretKey: string = JWT_SECRET;
 
 // Interface for JWT payload
 interface JwtPayload {
@@ -32,7 +37,7 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
 
   try {
     // Verify token
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    const decoded = jwt.verify(token, secretKey) as JwtPayload;
     req.user = decoded;
     return next();
   } catch (error) {

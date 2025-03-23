@@ -3,9 +3,25 @@ import jwt, { Secret, SignOptions } from 'jsonwebtoken';
 import prisma from '../../prisma.js';
 import { AuthMethod, UserType } from '@prisma/client';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
-const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is required");
+}
+
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
+if (!JWT_EXPIRES_IN) {
+  throw new Error("JWT_EXPIRES_IN environment variable is required");
+}
+
+const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN;
+if (!REFRESH_TOKEN_EXPIRES_IN) {
+  throw new Error("REFRESH_TOKEN_EXPIRES_IN environment variable is required");
+}
+
+// Assertion to satisfy TypeScript since we've already checked that these are defined
+const secretKey: string = JWT_SECRET;
+const expiresIn: string = JWT_EXPIRES_IN;
+const refreshExpiresIn: string = REFRESH_TOKEN_EXPIRES_IN;
 
 interface TokenPayload {
   id: string;
@@ -62,17 +78,17 @@ class AuthService {
 
   // Generate JWT token
   generateToken(payload: TokenPayload): string {
-    return jwt.sign(payload, JWT_SECRET as Secret, { expiresIn: JWT_EXPIRES_IN } as SignOptions);
+    return jwt.sign(payload, secretKey as Secret, { expiresIn: expiresIn } as SignOptions);
   }
 
   // Generate refresh token
   async generateRefreshToken(userId: string, userType: UserType): Promise<string> {
     // Calculate expiration date
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + parseInt(REFRESH_TOKEN_EXPIRES_IN));
+    expiresAt.setDate(expiresAt.getDate() + parseInt(refreshExpiresIn));
 
     // Generate a random token
-    const token = jwt.sign({ id: userId, type: userType }, JWT_SECRET as Secret);
+    const token = jwt.sign({ id: userId, type: userType }, secretKey as Secret);
 
     // Store in database
     const refreshToken = await prisma.refreshToken.create({
@@ -90,7 +106,7 @@ class AuthService {
   // Verify JWT token
   verifyToken(token: string): TokenPayload {
     try {
-      return jwt.verify(token, JWT_SECRET as Secret) as TokenPayload;
+      return jwt.verify(token, secretKey as Secret) as TokenPayload;
     } catch (error) {
       throw new Error('Invalid token');
     }

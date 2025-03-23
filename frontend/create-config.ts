@@ -9,6 +9,8 @@ if (!apiBaseUrl) {
   throw new Error('VITE_API_BASE_URL environment variable is required');
 }
 
+console.log(`Creating frontend config with API URL: ${apiBaseUrl}`);
+
 // Create the config content with the correct API path
 // The frontend nginx will proxy /api to the API service
 const configContent = `window.API_CONFIG = { BASE_URL: "${apiBaseUrl}" };`;

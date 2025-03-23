@@ -23,7 +23,13 @@ const dbPort = process.env.DB_PORT;
 const dbName = process.env.DB_NAME;
 const dbUser = process.env.DB_USER;
 const dbPassword = process.env.DB_PASSWORD;
-const nodeEnv = process.env.NODE_ENV || 'development'; // Keep this fallback as it's a standard practice
+
+// Check if NODE_ENV is set
+if (!process.env.NODE_ENV) {
+  throw new Error("NODE_ENV environment variable is required");
+}
+const nodeEnv = process.env.NODE_ENV;
+
 const databaseUrl = process.env.DATABASE_URL;
 
 // Validate required environment variables

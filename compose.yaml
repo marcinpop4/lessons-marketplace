@@ -54,6 +54,11 @@ services:
         npx prisma migrate deploy --schema=server/prisma/schema.prisma &&
         npx tsx server/index.ts"
     restart: on-failure:3
+    # Add a network alias to ensure the frontend can reach the API by hostname
+    networks:
+      default:
+        aliases:
+          - api
 
   # Frontend development server
   frontend:

@@ -1,19 +1,35 @@
-Only create typescript files and avoid creating javascript files.
+// File Type Requirements
+Always create TypeScript files (.ts, .tsx) and never JavaScript files (.js, .jsx). TypeScript code should be properly typed with explicit types rather than using 'any' where possible.
 
-If there something wrong in code, I want to fail fast. Do not implement fallbacks.
+// Error Handling & Configuration
+Never implement fallbacks for missing environment variables, configuration values, or error conditions. Explicitly check that required values exist and throw errors immediately if they don't. The application should fail fast rather than continue running with default values that might mask problems.
 
-Avoid using !important in css and make the rules work as a whole system.
+// CSS Best Practices
+Never use '!important' in CSS rules. Structure CSS selectors with appropriate specificity to avoid specificity conflicts. Design CSS as a cohesive system where rules work together without overrides.
 
-Avoid hardcoding styles, variables etc, to keep the application well maintained.
+// Code Maintainability
+Never hardcode values directly in components or functions. Extract all magic numbers, URLs, timeouts, and configuration values into named constants or environment variables with clear, descriptive names.
 
-Avoid inline css and javascript.
+// HTML/CSS/JS Structure
+Never use inline CSS (style attributes) or inline JavaScript (onclick attributes). Always use separate files for styles and scripts, and use proper event binding in TypeScript files.
 
-Do not increase test timeouts before asking me.
+// Testing
+Never increase test timeouts without explicit permission. If tests are timing out, investigate and fix the underlying performance issue rather than extending the timeout.
 
-Do not infer statuses anywhere, if we need a status, it needs to be explicitly as a result of an event.
+// State Management
+Never infer state or status values. All status changes must be explicit results of specific events or actions. Status transitions should be clearly defined and traceable to specific triggers.
 
-Keep business logic or calculations in the models, or service classes if multiple models are involved. Avoid business logic or calculations in the frontend.
+// Architecture
+Always keep business logic and calculations in the appropriate layer:
+- For single-model operations: Place logic in the model itself
+- For multi-model operations: Use dedicated service classes
+- Never implement business logic or calculations directly in UI components or controllers
 
-Do not attempt an operation several times in APIs, if it fail, it fails. If I want to implement retry logic, I'll have it at a worker level.
+// API Design
+Never implement retry logic in API endpoints. If an operation fails, return the appropriate error immediately. Retry logic should only be implemented at the worker or client level if explicitly requested.
 
-Keep package.json organized in aplha order, whenever you change it
+// Package Management
+Always maintain package.json in alphabetical order when adding new dependencies. This applies to both dependencies and devDependencies sections.
+
+// Frontend Development
+Never create placeholder or sample pages for deployment. Always implement the actual functionality to catch real issues early. The application should fail fast rather than displaying dummy content that masks underlying problems.

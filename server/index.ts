@@ -26,7 +26,19 @@ import addressRoutes from './routes/addressRoutes.js';
 
 // Initialize express app
 const app = express();
-const PORT = parseInt(process.env.PORT || '3000', 10);
+
+// Get port from environment or default to 3000
+const PORT_ENV = process.env.PORT;
+if (!PORT_ENV) {
+  throw new Error("PORT environment variable is required");
+}
+const PORT = parseInt(PORT_ENV, 10);
+
+// Get frontend URL from environment
+const frontendUrl = process.env.FRONTEND_URL;
+if (!frontendUrl) {
+  throw new Error("FRONTEND_URL environment variable is required");
+}
 
 // Middleware
 app.use(helmet()); // Security headers
@@ -44,7 +56,6 @@ if (isDebugMode) {
 }
 
 // Enhanced CORS configuration using only environment variables
-const frontendUrl = process.env.FRONTEND_URL || '';
 const allowedOrigins = frontendUrl.split(',').map(url => url.trim()).filter(url => url);
 
 // Log the allowed origins for debugging
