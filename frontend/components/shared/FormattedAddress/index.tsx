@@ -7,7 +7,7 @@ interface FormattedAddressProps {
   className?: string;
 }
 
-export const FormattedAddress: React.FC<FormattedAddressProps> = ({
+const FormattedAddress: React.FC<FormattedAddressProps> = ({
   addressObject,
   className
 }) => {
@@ -25,4 +25,7 @@ export const FormattedAddress: React.FC<FormattedAddressProps> = ({
       {formatAddress()}
     </span>
   );
-}; 
+};
+
+export { FormattedAddress };
+export default FormattedAddress; 

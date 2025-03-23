@@ -8,9 +8,9 @@ import LessonRequestPage from '@frontend/pages/lesson-request';
 import TeacherQuotesPage from './pages/teacher-quotes';
 import LessonConfirmation from '@frontend/pages/lesson-confirmation';
 import TeacherDashboard from '@frontend/pages/TeacherDashboard';
-import ThemeDemoPage from '@frontend/pages/ThemeDemoPage';
+import ThemeDemoPage from '@frontend/pages/theme-demo';
 import ProtectedRoute from '@frontend/components/common/ProtectedRoute';
-import ThemeSwitcher from '@frontend/components/ThemeSwitcher';
+import { ThemeSwitcher } from '@frontend/components/shared';
 import ThemeProvider from '@frontend/contexts/ThemeContext';
 import './App.css';
 

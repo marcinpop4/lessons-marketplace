@@ -6,7 +6,7 @@ interface FormattedDateTimeProps {
   className?: string;
 }
 
-export const FormattedDateTime: React.FC<FormattedDateTimeProps> = ({ 
+const FormattedDateTime: React.FC<FormattedDateTimeProps> = ({ 
   timestamp,
   className
 }) => {
@@ -27,4 +27,7 @@ export const FormattedDateTime: React.FC<FormattedDateTimeProps> = ({
       {formatDateTime()}
     </span>
   );
-}; 
+};
+
+export { FormattedDateTime };
+export default FormattedDateTime; 

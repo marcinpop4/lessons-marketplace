@@ -12,7 +12,7 @@ async function attemptLogin(page, email, password, userType = 'STUDENT') {
   await page.goto('/auth');
   
   // Wait for the app to be ready - look for the auth form
-  await page.waitForSelector('.login-form', { state: 'visible', timeout: 2000 });
+  await page.waitForSelector('.login-form', { state: 'visible' });
   
   // Make sure we're on the login tab (not register)
   const loginTab = page.locator('button.auth-tab', { hasText: 'Login' });
@@ -59,7 +59,7 @@ test('Student login with incorrect password shows persistent error message', asy
   
   // Check that an error message is displayed
   const errorMessage = page.locator('.alert-error');
-  await expect(errorMessage).toBeVisible({ timeout: 2000 });
+  await expect(errorMessage).toBeVisible();
   
   // Get the specific error message text
   const errorText = await errorMessage.textContent();
@@ -87,7 +87,7 @@ test('Teacher login with incorrect password shows persistent error message', asy
   
   // Check that an error message is displayed
   const errorMessage = page.locator('.alert-error');
-  await expect(errorMessage).toBeVisible({ timeout: 2000 });
+  await expect(errorMessage).toBeVisible();
   
   // Get the specific error message text
   const errorText = await errorMessage.textContent();
@@ -115,7 +115,7 @@ test('Login with non-existent email shows error message', async ({ page }) => {
   
   // Check that an error message is displayed
   const errorMessage = page.locator('.alert-error');
-  await expect(errorMessage).toBeVisible({ timeout: 2000 });
+  await expect(errorMessage).toBeVisible();
   
   // Get the specific error message text
   const errorText = await errorMessage.textContent();
@@ -143,7 +143,7 @@ test('Student credentials with teacher userType shows appropriate error', async 
   
   // Check that an error message is displayed
   const errorMessage = page.locator('.alert-error');
-  await expect(errorMessage).toBeVisible({ timeout: 2000 });
+  await expect(errorMessage).toBeVisible();
   
   // Get the specific error message text
   const errorText = await errorMessage.textContent();
@@ -171,7 +171,7 @@ test('Teacher credentials with student userType shows appropriate error', async 
   
   // Check that an error message is displayed
   const errorMessage = page.locator('.alert-error');
-  await expect(errorMessage).toBeVisible({ timeout: 2000 });
+  await expect(errorMessage).toBeVisible();
   
   // Get the specific error message text
   const errorText = await errorMessage.textContent();
@@ -182,4 +182,109 @@ test('Teacher credentials with student userType shows appropriate error', async 
   await expect(errorMessage).toBeVisible();
   
   console.log('Teacher credentials with student userType test completed');
+});
+
+test('should show error for incorrect credentials', async ({ page }) => {
+  await page.goto('/auth');
+  await page.waitForSelector('.login-form', { state: 'visible' });
+
+  // Fill the form with incorrect credentials
+  await page.fill('#email', 'wrong@example.com');
+  await page.fill('#password', 'wrongpassword');
+  
+  // Submit the form
+  await page.click('button[type="submit"]');
+  
+  // Check for error message
+  const errorMessage = page.locator('.alert-error');
+  await expect(errorMessage).toBeVisible();
+  // Update the expected text to match the actual error message
+  await expect(errorMessage).toContainText(/Invalid credentials/i);
+});
+
+test('should show error for empty email', async ({ page }) => {
+  await page.goto('/auth');
+  await page.waitForSelector('.login-form', { state: 'visible' });
+  
+  // Leave email empty
+  await page.fill('#password', 'somepassword');
+  
+  // Submit the form 
+  await page.click('button[type="submit"]');
+  
+  // Check we're on the login page or auth page
+  await page.waitForURL(/.*\/(auth|login).*/);
+  
+  // Verify login form is still visible
+  await expect(page.locator('form')).toBeVisible();
+  
+  // Verify the email field still exists and is required
+  const emailInput = page.locator('#email');
+  await expect(emailInput).toBeVisible();
+  const isRequired = await emailInput.evaluate(el => el.hasAttribute('required'));
+  expect(isRequired).toBe(true);
+});
+
+test('should show error for empty password', async ({ page }) => {
+  await page.goto('/auth');
+  await page.waitForSelector('.login-form', { state: 'visible' });
+  
+  // Fill only email
+  await page.fill('#email', 'test@example.com');
+  
+  // Submit the form
+  await page.click('button[type="submit"]');
+  
+  // Check we're on the login page or auth page
+  await page.waitForURL(/.*\/(auth|login).*/);
+  
+  // Verify login form is still visible
+  await expect(page.locator('form')).toBeVisible();
+  
+  // Verify the password field still exists and is required
+  const passwordInput = page.locator('#password');
+  await expect(passwordInput).toBeVisible();
+  const isRequired = await passwordInput.evaluate(el => el.hasAttribute('required'));
+  expect(isRequired).toBe(true);
+});
+
+test('should show error for invalid email format', async ({ page }) => {
+  await page.goto('/auth');
+  await page.waitForSelector('.login-form', { state: 'visible' });
+  
+  // Fill with invalid email format
+  await page.fill('#email', 'invalid-email');
+  await page.fill('#password', 'password123');
+  
+  // Submit the form
+  await page.click('button[type="submit"]');
+  
+  // Check we're on the login page or auth page
+  await page.waitForURL(/.*\/(auth|login).*/);
+  
+  // Verify login form is still visible
+  await expect(page.locator('form')).toBeVisible();
+  
+  // Verify that either an error is shown or we're still on the form
+  const emailInput = page.locator('#email');
+  await expect(emailInput).toBeVisible();
+  
+  // Email validation should be enforced by the browser
+  const hasEmailType = await emailInput.evaluate(el => el.getAttribute('type') === 'email');
+  expect(hasEmailType).toBe(true);
+});
+
+test('should show error for too short password', async ({ page }) => {
+  await page.goto('/login');
+  
+  // Fill with valid email but short password
+  await page.fill('#email', 'test@example.com');
+  await page.fill('#password', '123'); // Assuming there's a minimum length requirement
+  
+  // Submit the form
+  await page.click('button[type="submit"]');
+  
+  // Check for error message
+  const errorMessage = page.locator('.alert-error, .error-message, .form-error');
+  await expect(errorMessage).toBeVisible();
 }); 

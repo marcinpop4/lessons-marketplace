@@ -12,20 +12,20 @@ async function attemptRegistration(page, userData) {
   await page.goto('/register');
   
   // Wait for the registration form to be visible
-  await expect(page.locator('form')).toBeVisible({ timeout: 2000 });
+  await expect(page.locator('form')).toBeVisible();
   
   // Fill in the registration form
-  await page.fill('#firstName', userData.firstName, { timeout: 2000 });
-  await page.fill('#lastName', userData.lastName, { timeout: 2000 });
-  await page.fill('#email', userData.email, { timeout: 2000 });
-  await page.fill('#password', userData.password, { timeout: 2000 });
-  await page.fill('#confirmPassword', userData.password, { timeout: 2000 });
-  await page.fill('#phoneNumber', userData.phoneNumber, { timeout: 2000 });
-  await page.fill('#dateOfBirth', userData.dateOfBirth, { timeout: 2000 });
+  await page.fill('#firstName', userData.firstName);
+  await page.fill('#lastName', userData.lastName);
+  await page.fill('#email', userData.email);
+  await page.fill('#password', userData.password);
+  await page.fill('#confirmPassword', userData.password);
+  await page.fill('#phoneNumber', userData.phoneNumber);
+  await page.fill('#dateOfBirth', userData.dateOfBirth);
   
   // Select user type
   if (userData.userType === 'TEACHER') {
-    await page.click('input[value="TEACHER"]', { timeout: 2000 });
+    await page.click('input[value="TEACHER"]');
   }
   
   // Submit the form
@@ -35,8 +35,8 @@ async function attemptRegistration(page, userData) {
   const expectedPath = userData.userType === 'TEACHER' ? '/teacher-dashboard' : '/lesson-request';
   
   await Promise.race([
-    page.waitForURL(new RegExp(`.*${expectedPath}.*`), { timeout: 2000 }),
-    page.waitForSelector('.alert-error', { timeout: 2000 })
+    page.waitForURL(new RegExp(`.*${expectedPath}.*`)),
+    page.waitForSelector('.alert-error')
   ]);
   
   // Check if there's an error message
@@ -73,7 +73,7 @@ test('Student registration with new credentials succeeds', async ({ page }) => {
   expect(result.success).toBe(true);
   
   // Additional check: verify we're on the lesson request page
-  await expect(page).toHaveURL(/.*\/lesson-request.*/, { timeout: 2000 });
+  await expect(page).toHaveURL(/.*\/lesson-request.*/);
 });
 
 test('Student registration with existing email fails', async ({ page }) => {
@@ -97,7 +97,7 @@ test('Student registration with existing email fails', async ({ page }) => {
   expect(result.success).toBe(false);
   
   // Verify we're still on the register page
-  await expect(page).toHaveURL('/register', { timeout: 2000 });
+  await expect(page).toHaveURL('/register');
 });
 
 test('Teacher registration with new credentials succeeds', async ({ page }) => {
@@ -121,5 +121,5 @@ test('Teacher registration with new credentials succeeds', async ({ page }) => {
   expect(result.success).toBe(true);
   
   // Additional check: verify we're on the teacher dashboard
-  await expect(page).toHaveURL(/.*\/teacher-dashboard.*/, { timeout: 2000 });
+  await expect(page).toHaveURL(/.*\/teacher-dashboard.*/);
 }); 

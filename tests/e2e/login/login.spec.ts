@@ -35,8 +35,7 @@ test('Student login form submission', async ({ page }) => {
   console.log('Submitting login form');
   const [loginResponse] = await Promise.all([
     page.waitForResponse(
-      response => response.url().includes('/api/v1/auth/login') && response.request().method() === 'POST',
-      { timeout: 2000 }
+      response => response.url().includes('/api/v1/auth/login') && response.request().method() === 'POST'
     ),
     page.locator('form button[type="submit"]').click()
   ]);
@@ -79,8 +78,7 @@ test('Teacher login form submission', async ({ page }) => {
   console.log('Submitting login form');
   const [loginResponse] = await Promise.all([
     page.waitForResponse(
-      response => response.url().includes('/api/v1/auth/login') && response.request().method() === 'POST',
-      { timeout: 2000 }
+      response => response.url().includes('/api/v1/auth/login') && response.request().method() === 'POST'
     ),
     page.locator('form button[type="submit"]').click()
   ]);

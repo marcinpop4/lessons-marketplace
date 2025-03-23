@@ -7,6 +7,10 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
+  
+  // Global timeout settings
+  timeout: 2000, // Global timeout for all tests - 2 seconds
+  
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'on-first-retry',
@@ -15,6 +19,10 @@ export default defineConfig({
       fullPage: true
     },
     video: 'on-first-retry',
+    
+    // Set timeouts for actions
+    actionTimeout: 2000, // Timeout for actions like click, fill - 2 seconds
+    navigationTimeout: 2000, // Timeout for navigation - 2 seconds
   },
   outputDir: './tests/screenshots',
   projects: [
