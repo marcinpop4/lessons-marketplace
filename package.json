@@ -41,6 +41,7 @@
     "test:e2e:html": "playwright test"
   },
   "dependencies": {
+    "@tailwindcss/oxide-linux-arm64-gnu": "^4.0.15",
     "amqplib": "^0.10.3",
     "axios": "^1.8.3",
     "bcrypt": "^5.1.1",
@@ -87,6 +88,7 @@
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^15.15.0",
+    "lightningcss-linux-arm64-gnu": "^1.29.2",
     "postcss": "^8.5.3",
     "prisma": "^6.5.0",
     "tailwindcss": "^4.0.15",
