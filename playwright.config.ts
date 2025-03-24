@@ -24,6 +24,9 @@ export default defineConfig({
   // Global timeout settings - strict 2s default 
   timeout: process.env.PLAYWRIGHT_TIMEOUT ? parseInt(process.env.PLAYWRIGHT_TIMEOUT) : 2000,
   
+  // Only include E2E tests, exclude unit tests
+  testMatch: 'tests/e2e/**/*.spec.ts',
+  
   use: {
     // Use the FRONTEND_URL from environment variables - with protocol if needed
     baseURL: frontendUrl,
