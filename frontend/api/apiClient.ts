@@ -24,18 +24,17 @@ export function getApiBaseUrl(): string {
     return '/api';
   }
   
-  // In production, use the environment variable
+  // In production, the environment variable MUST be defined
   if (!import.meta.env.VITE_API_BASE_URL) {
-    console.error('[API DEBUG] VITE_API_BASE_URL is missing in production!');
-    throw new Error('VITE_API_BASE_URL environment variable is required in production');
+    const errorMsg = 'VITE_API_BASE_URL environment variable is required in production';
+    console.error('[API DEBUG] ' + errorMsg);
+    logger.error(errorMsg);
+    throw new Error(errorMsg);
   }
   
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
-  
-  // Log production API URL
-  console.log('[API DEBUG] Using production API URL:', baseUrl);
-  logger.info('Using production API URL:', baseUrl);
-  
+  console.log('[API DEBUG] Using API URL from environment variable:', baseUrl);
+  logger.info('Using API URL from environment variable:', baseUrl);
   return baseUrl;
 }
 

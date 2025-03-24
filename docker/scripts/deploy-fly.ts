@@ -40,6 +40,40 @@ const serverToml = join(__dirname, '..', 'fly-config', 'fly.server.toml');
 const frontendToml = join(__dirname, '..', 'fly-config', 'fly.frontend.toml');
 const rootDir = join(__dirname, '..', '..');
 
+// Function to extract environment variables from fly.toml
+function extractEnvVarsFromToml(tomlPath: string): Record<string, string> {
+  try {
+    const tomlContent = fs.readFileSync(tomlPath, 'utf8');
+    const envSection = tomlContent.split('[env]')[1]?.split('[')[0];
+    
+    if (!envSection) {
+      console.log(`${YELLOW}No [env] section found in ${tomlPath}${NC}`);
+      return {};
+    }
+    
+    const envVars: Record<string, string> = {};
+    const lines = envSection.split('\n').filter(line => line.trim() && line.includes('='));
+    
+    for (const line of lines) {
+      const [key, value] = line.split('=').map(part => part.trim());
+      if (key && value) {
+        // Remove quotes if present
+        envVars[key] = value.replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1');
+      }
+    }
+    
+    console.log(`${GREEN}Extracted environment variables from ${tomlPath}:${NC}`);
+    for (const [key, value] of Object.entries(envVars)) {
+      console.log(`${CYAN}  ${key} = ${value}${NC}`);
+    }
+    
+    return envVars;
+  } catch (error) {
+    console.error(`${RED}Error extracting environment variables from ${tomlPath}: ${error}${NC}`);
+    return {};
+  }
+}
+
 // Determine the fly CLI command to use
 function getFlyCommand(): string {
   try {
@@ -198,6 +232,29 @@ if (!skipBuild) {
   console.log(`\n${YELLOW}=== BUILDING APPLICATION ===${NC}`);
   
   try {
+    // Extract environment variables from both TOML files for build process
+    const frontendEnvVars = extractEnvVarsFromToml(frontendToml);
+    const serverEnvVars = extractEnvVarsFromToml(serverToml);
+    
+    // Combine environment variables from both files
+    const buildEnvVars = {
+      ...serverEnvVars,
+      ...frontendEnvVars  // Frontend vars take precedence if there are any overlaps
+    };
+    
+    // Format the environment variables for command line
+    const envVarsString = Object.entries(buildEnvVars)
+      .filter(([key]) => key.startsWith('VITE_') || key === 'NODE_ENV')
+      .map(([key, value]) => `${key}=${value}`)
+      .join(' ');
+    
+    console.log(`${GREEN}Environment variables for build:${NC}`);
+    Object.entries(buildEnvVars)
+      .filter(([key]) => key.startsWith('VITE_') || key === 'NODE_ENV')
+      .forEach(([key, value]) => {
+        console.log(`${CYAN}  ${key}=${value}${NC}`);
+      });
+    
     // Check if the separate build scripts exist in package.json
     const packageJsonPath = join(rootDir, 'package.json');
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
@@ -211,20 +268,50 @@ if (!skipBuild) {
       await execAsync('pnpm run build:shared');
       
       console.log(`${YELLOW}Building server...${NC}`);
-      await execAsync('pnpm run build:server');
+      // Apply server-specific environment variables
+      const serverEnvString = Object.entries(serverEnvVars)
+        .map(([key, value]) => `${key}=${value}`)
+        .join(' ');
+      
+      if (serverEnvString) {
+        console.log(`${GREEN}Setting server build environment variables${NC}`);
+        await execAsync(`${serverEnvString} pnpm run build:server`);
+      } else {
+        await execAsync('pnpm run build:server');
+      }
       
       console.log(`${YELLOW}Building frontend...${NC}`);
       if (isProduction) {
         process.env.NODE_ENV = 'production';
       }
-      await execAsync('pnpm run build:frontend');
+      
+      // Apply frontend-specific environment variables
+      const frontendEnvString = Object.entries(frontendEnvVars)
+        .filter(([key]) => key.startsWith('VITE_'))
+        .map(([key, value]) => `${key}=${value}`)
+        .join(' ');
+      
+      if (frontendEnvString) {
+        console.log(`${GREEN}Setting frontend build environment variables${NC}`);
+        await execAsync(`${frontendEnvString} pnpm run build:frontend`);
+      } else {
+        console.log(`${YELLOW}No VITE_ environment variables found for frontend${NC}`);
+        await execAsync('pnpm run build:frontend');
+      }
     } else {
       // Fall back to the main build script
       console.log(`${YELLOW}Building all components with main build script...${NC}`);
       if (isProduction) {
         process.env.NODE_ENV = 'production';
       }
-      await execAsync('pnpm run build');
+      
+      if (envVarsString) {
+        console.log(`${GREEN}Setting build environment variables for all components${NC}`);
+        await execAsync(`${envVarsString} pnpm run build`);
+      } else {
+        console.log(`${YELLOW}No environment variables found in configuration files${NC}`);
+        await execAsync('pnpm run build');
+      }
     }
     
     console.log(`${GREEN}Build completed successfully.${NC}`);
