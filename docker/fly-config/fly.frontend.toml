@@ -10,7 +10,7 @@ primary_region = "ewr"
   CONTAINER_ENV = "true"
   NODE_ENV = "production"
   PORT = "80"
-  VITE_API_BASE_URL = "https://lessons-marketplace-server.fly.dev"
+  VITE_API_BASE_URL = "https://lessons-marketplace-server.fly.dev/api"
 
 [http_service]
   internal_port = 80

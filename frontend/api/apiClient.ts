@@ -1,54 +1,58 @@
 // API client for making requests to the backend
 
 import axios from 'axios';
-import logger from '../utils/logger.js';
+import logger from '@frontend/utils/logger';
+import { buildApiUrl } from './buildApiUrl';
 
-// Type declaration for the global window object with API_CONFIG
-declare global {
-  interface Window {
-    API_CONFIG?: {
-      BASE_URL: string;
-    };
-  }
-}
-
-// In development/test, always use the local API that gets proxied by Vite
-// In production, use the runtime configuration from config.js
-const isDevelopment = import.meta.env.MODE === 'development';
-const isTest = import.meta.env.MODE === 'test' || import.meta.env.VITE_TEST_MODE === 'true';
-
-// Use a different API URL based on the environment
-let API_BASE_URL: string;
-
-if (isDevelopment || isTest) {
+/**
+ * Determine the appropriate API base URL based on the environment
+ * @returns The API base URL to use
+ */
+export function getApiBaseUrl(): string {
+  const isDevelopment = import.meta.env.MODE === 'development';
+  const isTest = import.meta.env.MODE === 'test' || import.meta.env.VITE_TEST_MODE === 'true';
+  
   // In development or test, always use the relative path which gets proxied by Vite
-  API_BASE_URL = '/api';
-} else {
-  // In production, the API URL must be set in the config.js file
-  if (!window.API_CONFIG?.BASE_URL) {
-    throw new Error('API_CONFIG.BASE_URL is required in production. Make sure config.js is properly loaded.');
+  if (isDevelopment || isTest) {
+    return '/api';
   }
-  API_BASE_URL = window.API_CONFIG.BASE_URL;
+  
+  // In production, use the environment variable
+  if (!import.meta.env.VITE_API_BASE_URL) {
+    throw new Error('VITE_API_BASE_URL environment variable is required in production');
+  }
+  
+  const baseUrl = import.meta.env.VITE_API_BASE_URL;
+  
+  // Log production API URL
+  logger.info('Using production API URL:', baseUrl);
+  
+  return baseUrl;
 }
 
-// API version prefix
-const API_VERSION = '/v1';
+/**
+ * Build a complete API URL using the base URL and path
+ * @param basePath - The base path for the API
+ * @param path - The specific path/endpoint to access
+ * @returns The complete URL
+ */
+export { buildApiUrl };
 
-// Full API base URL with version
-const VERSIONED_API_BASE_URL = `${API_BASE_URL}${API_VERSION}`;
-
-// Log API URL at debug level
-logger.debug('API URL:', VERSIONED_API_BASE_URL);
+// Get the base URL for API requests
+const API_BASE_URL = getApiBaseUrl();
 
 // Create a custom axios instance
 const apiClient = axios.create({
-  baseURL: VERSIONED_API_BASE_URL,
+  baseURL: API_BASE_URL,
   withCredentials: true, // Allow cookies
   timeout: 10000, // 10 seconds timeout
   headers: {
     'Content-Type': 'application/json',
   }
 });
+
+// Log the base URL being used
+logger.debug('API base URL:', API_BASE_URL);
 
 // Add request interceptor to inject auth token
 apiClient.interceptors.request.use(
@@ -57,6 +61,16 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // In production, log the URL of each request for debugging
+    const isDevelopment = import.meta.env.MODE === 'development';
+    const isTest = import.meta.env.MODE === 'test' || import.meta.env.VITE_TEST_MODE === 'true';
+    
+    if (!isDevelopment && !isTest && config.url) {
+      const fullUrl = buildApiUrl(API_BASE_URL, config.url);
+      logger.info('Making API request to:', fullUrl);
+    }
+    
     return config;
   },
   (error) => {
@@ -68,6 +82,13 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Log API errors
+    if (error.response) {
+      logger.error(`API Error: ${error.response.status} - ${error.message}`, error.config?.url);
+    } else {
+      logger.error(`API Error: ${error.message}`);
+    }
+    
     const originalRequest = error.config;
     
     // Skip token refresh for login endpoint and if we've already retried
@@ -77,8 +98,8 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
       
       try {
-        // Try to refresh the token - update to use versioned URL
-        const refreshUrl = `${API_BASE_URL}${API_VERSION}/auth/refresh-token`;
+        // Try to refresh the token - caller must include version in their path
+        const refreshUrl = buildApiUrl(API_BASE_URL, '/v1/auth/refresh-token');
         
         const response = await axios.post(
           refreshUrl, 

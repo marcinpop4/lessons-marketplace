@@ -22,7 +22,7 @@ const getAuthHeaders = () => {
  */
 export const getLessonQuotesByRequestId = async (lessonRequestId: string): Promise<LessonQuote[]> => {
   try {
-    const response = await apiClient.get(`/lesson-quotes/request/${lessonRequestId}`);
+    const response = await apiClient.get(`/v1/lesson-quotes/request/${lessonRequestId}`);
     return response.data;
   } catch (error) {
     console.error('Error fetching lesson quotes:', error);
@@ -41,7 +41,7 @@ export const acceptLessonQuote = async (quoteId: string): Promise<{ id: string; 
     // Log the API call details
     console.log(`Accepting quote with ID: ${quoteId}`);
     
-    const response = await apiClient.post(`/lesson-quotes/${quoteId}/accept`);
+    const response = await apiClient.post(`/v1/lesson-quotes/${quoteId}/accept`);
     
     // Log the response for debugging
     console.log('Accept quote response:', response.data);

@@ -1,0 +1,46 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "strict": true,
+    "jsx": "react-jsx",
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    
+    /* Path aliases matching frontend config */
+    "baseUrl": ".",
+    "paths": {
+      "@frontend": ["./frontend"],
+      "@frontend/*": ["./frontend/*"],
+      "@frontend/api/*": ["./frontend/api/*"],
+      "@frontend/components/*": ["./frontend/components/*"],
+      "@frontend/contexts/*": ["./frontend/contexts/*"],
+      "@frontend/hooks/*": ["./frontend/hooks/*"],
+      "@frontend/pages/*": ["./frontend/pages/*"],
+      "@frontend/styles/*": ["./frontend/styles/*"],
+      "@frontend/theme/*": ["./frontend/theme/*"],
+      "@frontend/types/*": ["./frontend/types/*"],
+      "@frontend/utils/*": ["./frontend/utils/*"],
+      "@frontend/config/*": ["./frontend/config/*"],
+      "@shared/utils/*": ["./shared/utils/*"],
+    }
+  },
+  "include": [
+    "frontend/**/*.ts",
+    "frontend/**/*.tsx",
+    "server/**/*.ts",
+    "shared/**/*.ts",
+    "tests/**/*.ts",
+    "tests/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+} 

@@ -28,8 +28,8 @@ export const createLessonRequest = async (data: CreateLessonRequestPayload): Pro
     // Log the request payload for debugging
     console.log('Sending lesson request data:', data);
     
-    // Make sure we're using the correct API endpoint (without redundant '/api')
-    const response = await apiClient.post('/lesson-requests', data);
+    // Make sure we're using the correct API endpoint with version
+    const response = await apiClient.post('/v1/lesson-requests', data);
     return response.data;
   } catch (error) {
     console.error('Error creating lesson request:', error);
@@ -44,7 +44,7 @@ export const createLessonRequest = async (data: CreateLessonRequestPayload): Pro
  */
 export const getLessonRequestById = async (id: string): Promise<LessonRequest> => {
   try {
-    const response = await apiClient.get(`/lesson-requests/${id}`);
+    const response = await apiClient.get(`/v1/lesson-requests/${id}`);
     return response.data;
   } catch (error) {
     console.error('Error fetching lesson request:', error);
@@ -59,7 +59,7 @@ export const getLessonRequestById = async (id: string): Promise<LessonRequest> =
  */
 export const getLessonRequestsByStudent = async (studentId: string): Promise<LessonRequest[]> => {
   try {
-    const response = await apiClient.get(`/lesson-requests/student/${studentId}`);
+    const response = await apiClient.get(`/v1/lesson-requests/student/${studentId}`);
     return response.data;
   } catch (error) {
     console.error('Error fetching student lesson requests:', error);

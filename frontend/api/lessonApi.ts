@@ -28,7 +28,7 @@ const validateLessonResponse = (data: any): data is Lesson => {
  */
 export const createLessonFromQuote = async (quoteId: string): Promise<Lesson> => {
   try {
-    const response = await apiClient.post('/lessons', { quoteId });
+    const response = await apiClient.post('/v1/lessons', { quoteId });
     return response.data;
   } catch (error) {
     console.error('Error creating lesson:', error);
@@ -43,7 +43,7 @@ export const createLessonFromQuote = async (quoteId: string): Promise<Lesson> =>
  */
 export const getLessonById = async (lessonId: string): Promise<Lesson> => {
   try {
-    const response = await apiClient.get(`/lessons/${lessonId}`);
+    const response = await apiClient.get(`/v1/lessons/${lessonId}`);
     
     if (!validateLessonResponse(response.data)) {
       throw new Error('Invalid lesson data structure received from API');
@@ -63,7 +63,7 @@ export const getLessonById = async (lessonId: string): Promise<Lesson> => {
  */
 export const getLessonsByQuoteId = async (quoteId: string): Promise<Lesson[]> => {
   try {
-    const response = await apiClient.get(`/lessons/quote/${quoteId}`);
+    const response = await apiClient.get(`/v1/lessons/quote/${quoteId}`);
     return response.data;
   } catch (error) {
     console.error('Error fetching lessons by quote:', error);

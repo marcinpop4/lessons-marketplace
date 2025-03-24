@@ -19,7 +19,7 @@ export const getAvailableTeachers = async (
   limit: number = 5
 ): Promise<TeacherWithRates[]> => {
   try {
-    const response = await apiClient.get(`/teachers`, {
+    const response = await apiClient.get(`/v1/teachers`, {
       params: { lessonType, limit }
     });
 
@@ -47,7 +47,7 @@ export const createLessonQuote = async (
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
 
-    const response = await apiClient.post(`/lesson-quotes`, {
+    const response = await apiClient.post(`/v1/lesson-quotes`, {
       lessonRequestId,
       teacherId,
       costInCents,
@@ -70,7 +70,7 @@ export const bookLesson = async (quoteId: string): Promise<any> => {
   try {
     const confirmedAt = new Date().toISOString();
     
-    const response = await apiClient.post(`/lessons`, {
+    const response = await apiClient.post(`/v1/lessons`, {
       quoteId,
       confirmedAt,
     });

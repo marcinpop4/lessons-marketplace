@@ -38,7 +38,7 @@ const TeacherLessonRatesManager: React.FC<Props> = ({ lessonRates, onRatesUpdate
       };
       
       // Always use POST to /teachers/lesson-rates as the API uses upsert logic
-      const updatedRate = await apiClient.post('/teachers/lesson-rates', apiPayload);
+      const updatedRate = await apiClient.post('/v1/teachers/lesson-rates', apiPayload);
       
       // Update the rates list
       if (editingRate) {
@@ -90,8 +90,8 @@ const TeacherLessonRatesManager: React.FC<Props> = ({ lessonRates, onRatesUpdate
       
       // Use the appropriate endpoint based on current status
       const endpoint = rate.isActive 
-        ? '/teachers/lesson-rates/deactivate' 
-        : '/teachers/lesson-rates/reactivate';
+        ? '/v1/teachers/lesson-rates/deactivate' 
+        : '/v1/teachers/lesson-rates/reactivate';
       
       const updatedRate = await apiClient.post(endpoint, apiPayload);
       

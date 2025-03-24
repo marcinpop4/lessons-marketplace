@@ -2,7 +2,7 @@
  * Frontend-side implementation of the shared logger
  */
 
-import { Logger, LogLevel, getLogLevelFromEnv } from '../../shared/utils/logger.js';
+import { Logger, LogLevel, getLogLevelFromEnv } from '@shared/utils/logger';
 
 // Initialize the logger with the current environment
 const initialLogLevel = getLogLevelFromEnv({

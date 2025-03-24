@@ -85,8 +85,8 @@ const TeacherDashboardPage: React.FC = () => {
         
         // Use Promise.all to fetch profile and stats in parallel
         const [profileResponse, statsResponse] = await Promise.all([
-          apiClient.get('/teachers/profile'),
-          apiClient.get('/teachers/stats')
+          apiClient.get('/v1/teachers/profile'),
+          apiClient.get('/v1/teachers/stats')
         ]);
         
         setProfile(profileResponse.data);
