@@ -106,17 +106,17 @@ function runDatabaseMigrations(): void {
   try {
     // Wait a moment to ensure database is fully ready
     console.log('Waiting for database to be ready...');
-    execute(`docker-compose -f ${composeFile} exec -T database pg_isready -U ${process.env.DB_USER} -d ${process.env.DB_NAME}`);
+    execute(`docker compose --env-file ${envFile} -f ${composeFile} exec -T database pg_isready -U ${process.env.DB_USER} -d ${process.env.DB_NAME}`);
     
     // Run Prisma migrations using the server container
     console.log('Applying database migrations...');
-    execute(`docker-compose -f ${composeFile} exec -T server npx prisma migrate deploy --schema=server/prisma/schema.prisma`);
+    execute(`docker compose --env-file ${envFile} -f ${composeFile} exec -T server npx prisma migrate deploy --schema=server/prisma/schema.prisma`);
     
     console.log('Database migrations completed successfully!');
   } catch (error) {
     console.error('Failed to run migrations. The database may not be initialized properly.');
     console.error('Please check the logs and try running migrations manually with:');
-    console.error(`docker-compose -f ${composeFile} exec server npx prisma migrate deploy --schema=server/prisma/schema.prisma`);
+    console.error(`docker compose --env-file ${envFile} -f ${composeFile} exec server npx prisma migrate deploy --schema=server/prisma/schema.prisma`);
     // We don't exit here to allow the application to continue - the user can fix migrations later
   }
 }
@@ -131,10 +131,10 @@ if (!fs.existsSync(join(rootDir, 'dist'))) {
 console.log('Deploying to Docker...');
 
 // Stop and remove existing containers
-execute(`docker-compose -f ${composeFile} down`);
+execute(`docker compose --env-file ${envFile} -f ${composeFile} down`);
 
 // Build and start containers
-execute(`docker-compose -f ${composeFile} up -d --build`);
+execute(`docker compose --env-file ${envFile} -f ${composeFile} up -d --build`);
 
 // Run database migrations
 runDatabaseMigrations();
