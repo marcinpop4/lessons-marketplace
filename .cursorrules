@@ -36,3 +36,4 @@ Never create placeholder or sample pages for deployment. Always implement the ac
 
 //File structure
 Alwasy put scripts in the ./scripts folder. Add subfolders to keep the folder organized.
+Never create symlinks and always reference files where they are located

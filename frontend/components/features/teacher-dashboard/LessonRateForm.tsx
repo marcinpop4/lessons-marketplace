@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LessonType } from '../../../shared/models/LessonType';
+import { LessonType } from '@shared/models/LessonType';
 import './LessonRateForm.css';
 
 // Valid lesson types based on the API requirements

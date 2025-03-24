@@ -4,8 +4,8 @@ import { colors } from './theme';
 
 export default {
   content: [
-    './index.html',
-    './**/*.{js,ts,jsx,tsx}',
+    '../index.html',
+    '../**/*.{js,ts,jsx,tsx}',
   ],
   presets: [],
   theme: {

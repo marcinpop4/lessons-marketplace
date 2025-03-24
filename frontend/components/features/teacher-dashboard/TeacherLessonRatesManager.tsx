@@ -3,7 +3,7 @@ import LessonRateList from './LessonRateList';
 import LessonRateForm from './LessonRateForm';
 import apiClient from '../../../api/apiClient';
 import axios from 'axios';
-import { LessonType } from '../../../shared/models/LessonType';
+import { LessonType } from '@shared/models/LessonType';
 import './TeacherLessonRatesManager.css';
 
 interface LessonRate {
