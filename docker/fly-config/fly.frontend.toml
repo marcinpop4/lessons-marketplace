@@ -1,0 +1,27 @@
+# fly.toml app configuration file for lessons-marketplace-frontend
+app = "lessons-marketplace-frontend"
+primary_region = "ewr"
+
+[build]
+  dockerfile = "docker/frontend/Dockerfile"
+  context = "."
+
+[env]
+  CONTAINER_ENV = "true"
+  NODE_ENV = "production"
+  PORT = "80"
+  VITE_API_BASE_URL = "https://lessons-marketplace-server.fly.dev"
+
+[http_service]
+  internal_port = 80
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+  protocol = "tcp"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "1gb" 

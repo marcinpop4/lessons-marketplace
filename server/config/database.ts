@@ -91,7 +91,8 @@ export const getDatabaseUrl = (options?: {
     }
 
     // Build the database URL from individual components
-    const sslParam = DB_SSL ? '?sslmode=require' : '';
+    // Always include the sslmode parameter explicitly
+    const sslParam = DB_SSL ? '?sslmode=require' : '?sslmode=disable';
     const passwordPart = DB_PASSWORD ? `:${DB_PASSWORD}` : '';
     
     const url = `postgresql://${DB_USER}${passwordPart}@${DB_HOST}:${DB_PORT}/${DB_NAME}${sslParam}`;
@@ -100,6 +101,7 @@ export const getDatabaseUrl = (options?: {
     if (isDebugMode) {
       const maskedUrl = maskDatabaseUrl(url);
       logger.debug(`Built database URL from environment variables: ${maskedUrl}`);
+      logger.debug(`SSL mode: ${DB_SSL ? 'enabled (require)' : 'disabled'}`);
     }
     
     return url;

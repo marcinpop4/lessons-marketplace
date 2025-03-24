@@ -1,15 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
+import * as dotenv from 'dotenv';
 
-// Check for required environment variables
-if (!process.env.FRONTEND_URL) {
-  console.error('Error: FRONTEND_URL environment variable is required but not set.');
-  console.error('Please ensure this is set in your .env file or passed in the command.');
-  process.exit(1);
-}
+// Load environment variables from .env file
+dotenv.config();
+
+// Get FRONTEND_URL from environment - no fallback
+let frontendUrl = process.env.FRONTEND_URL;
 
 // Ensure FRONTEND_URL has the correct format (includes protocol)
-let frontendUrl = process.env.FRONTEND_URL;
-if (!frontendUrl.startsWith('http://') && !frontendUrl.startsWith('https://')) {
+if (frontendUrl && !frontendUrl.startsWith('http://') && !frontendUrl.startsWith('https://')) {
   frontendUrl = `http://${frontendUrl}`;
   console.log(`Adding protocol to FRONTEND_URL: ${frontendUrl}`);
 }
@@ -50,7 +49,7 @@ export default defineConfig({
   ],
   // Skip web server when testing against Docker
   webServer: process.env.SKIP_WEB_SERVER ? undefined : {
-    command: 'pnpm run dev:full',
+    command: 'NODE_OPTIONS="" pnpm run dev:full',
     url: frontendUrl,
     reuseExistingServer: !process.env.CI,
     stdout: 'pipe',
