@@ -2,7 +2,8 @@
  * Server-side implementation of the shared logger
  */
 
-import { Logger, LogLevel, getLogLevelFromEnv } from '@shared/utils/logger';
+// Use Node.js file URL import format for better resolution
+import { Logger, LogLevel, getLogLevelFromEnv } from '../../shared/utils/logger.js';
 
 // Initialize the logger with the current environment
 const initialLogLevel = getLogLevelFromEnv(process.env);
