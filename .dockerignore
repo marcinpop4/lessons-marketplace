@@ -1,0 +1,47 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Development
+node_modules
+.env
+.env.example
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# Editor directories and files
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+
+# Testing
+/test-results
+/playwright-report
+/playwright/.cache
+
+# Documentation
+/docs
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Logs
+logs
+*.log
+
+# Docker related
+.docker
+Dockerfile
+docker-compose.yml
+docker-compose.yaml
+
+# Legacy files
+/legacy-docker-config 

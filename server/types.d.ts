@@ -6,15 +6,6 @@
 // Declare global variables that TypeScript might not recognize
 declare namespace NodeJS {
   interface ProcessEnv {
-    // Messaging
-    MESSAGING_HOST?: string;
-    MESSAGING_PORT?: string;
-    MESSAGING_USER?: string;
-    MESSAGING_PASSWORD?: string;
-    MESSAGING_VHOST?: string;
-    MESSAGING_RETRY_ATTEMPTS?: string;
-    MESSAGING_RETRY_DELAY?: string;
-    
     // Database
     DB_HOST?: string;
     DB_PORT?: string;
@@ -26,8 +17,13 @@ declare namespace NodeJS {
     
     // Server
     PORT?: string;
-    NODE_ENV?: 'development' | 'production' | 'test';
-    DEBUG?: string;
+    JWT_SECRET?: string;
+    JWT_EXPIRES_IN?: string;
+    COOKIE_SECRET?: string;
+    FRONTEND_URL?: string;
+    
+    // Logging
     LOG_LEVEL?: string;
+    LOG_FILE?: string;
   }
 } 
