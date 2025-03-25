@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page, Response } from '@playwright/test';
 
 /**
  * Authentication failure tests
@@ -7,28 +7,19 @@ import { test, expect } from '@playwright/test';
  */
 
 // Helper function to fill login form and submit
-async function attemptLogin(page, email, password, userType = 'STUDENT') {
-  // Go to the auth page and wait for the app to load
-  await page.goto('/auth');
-  
-  // Wait for the app to be ready - look for the auth form
-  await page.waitForSelector('.login-form', { state: 'visible' });
-  
-  // Make sure we're on the login tab (not register)
-  const loginTab = page.locator('button.auth-tab', { hasText: 'Login' });
-  if (await loginTab.isVisible()) {
-    await loginTab.click();
-  }
-  
-  // Wait for the form elements to be ready
-  await page.waitForSelector('#email', { state: 'visible' });
-  await page.waitForSelector('#password', { state: 'visible' });
+async function attemptLogin(
+  page: Page,
+  email: string,
+  password: string,
+  userType: 'STUDENT' | 'TEACHER' = 'STUDENT'
+) {
+  // Go to the login page and wait for the app to load
+  await page.goto('/login');
+  await expect(page.locator('form')).toBeVisible();
   
   // Fill the login form
-  await page.fill('#email', email);
-  await page.waitForTimeout(100); // Small delay between inputs
-  await page.fill('#password', password);
-  await page.waitForTimeout(100); // Small delay between inputs
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
   
   // Select the user type radio button if needed
   if (userType === 'TEACHER') {
@@ -37,254 +28,201 @@ async function attemptLogin(page, email, password, userType = 'STUDENT') {
     await page.locator('input[value="STUDENT"]').check();
   }
   
-  // Submit the form without waiting for network response
-  await page.locator('form button[type="submit"]').click();
-  
-  // Wait a bit for any error message to appear in the DOM
-  await page.waitForTimeout(500);
+  // Submit the form and wait for error message
+  await Promise.all([
+    page.waitForResponse(
+      (response: Response) => response.url().includes('/api/v1/auth/login') && response.request().method() === 'POST'
+    ),
+    page.locator('form button[type="submit"]').click()
+  ]);
 }
 
-test('Student login with incorrect password shows persistent error message', async ({ page }) => {
-  // Valid email but wrong password
-  const studentEmail = 'ethan.parker@example.com';
-  const wrongPassword = 'wrong_password';
+test('Student login with incorrect password shows error message', async ({ page }) => {
+  // Go to the login page
+  await page.goto('/login');
   
-  console.log('Testing student login with incorrect password');
-  await attemptLogin(page, studentEmail, wrongPassword, 'STUDENT');
+  // Fill the login form with incorrect password
+  await page.getByLabel('Email').fill('ethan.parker@example.com');
+  await page.getByLabel('Password').fill('wrongpassword');
   
-  // Take a screenshot of the failed login
-  await page.screenshot({ path: 'tests/screenshots/student-wrong-password.png' });
+  // Submit the form
+  await page.locator('form button[type="submit"]').click();
   
-  console.log('Checking for error message...');
-  
-  // Check that an error message is displayed
+  // Verify error message
   const errorMessage = page.locator('.alert-error');
   await expect(errorMessage).toBeVisible();
+  await expect(errorMessage).toContainText(/Invalid credentials/i);
   
-  // Get the specific error message text
-  const errorText = await errorMessage.textContent();
-  console.log('Error message text:', errorText);
-  
-  // Verify the message is still visible after a delay
-  await page.waitForTimeout(500);
-  await expect(errorMessage).toBeVisible();
-  
-  console.log('Student login with incorrect password test completed');
+  // Verify we're still on the login page
+  await expect(page).toHaveURL(/.*\/login.*/);
 });
 
-test('Teacher login with incorrect password shows persistent error message', async ({ page }) => {
-  // Valid email but wrong password
-  const teacherEmail = 'olivia.thompson@example.com';
-  const wrongPassword = 'wrong_password';
+test('Teacher login with incorrect password shows error message', async ({ page }) => {
+  // Go to the login page
+  await page.goto('/login');
   
-  console.log('Testing teacher login with incorrect password');
-  await attemptLogin(page, teacherEmail, wrongPassword, 'TEACHER');
+  // Fill the login form with incorrect password
+  await page.getByLabel('Email').fill('emily.richardson@musicschool.com');
+  await page.getByLabel('Password').fill('wrongpassword');
+  await page.locator('input[value="TEACHER"]').check();
   
-  // Take a screenshot of the failed login
-  await page.screenshot({ path: 'tests/screenshots/teacher-wrong-password.png' });
+  // Submit the form
+  await page.locator('form button[type="submit"]').click();
   
-  console.log('Checking for error message...');
-  
-  // Check that an error message is displayed
+  // Verify error message
   const errorMessage = page.locator('.alert-error');
   await expect(errorMessage).toBeVisible();
+  await expect(errorMessage).toContainText(/Invalid credentials/i);
   
-  // Get the specific error message text
-  const errorText = await errorMessage.textContent();
-  console.log('Error message text:', errorText);
-  
-  // Verify the message is still visible after a delay
-  await page.waitForTimeout(500);
-  await expect(errorMessage).toBeVisible();
-  
-  console.log('Teacher login with incorrect password test completed');
+  // Verify we're still on the login page
+  await expect(page).toHaveURL(/.*\/login.*/);
 });
 
 test('Login with non-existent email shows error message', async ({ page }) => {
-  // Non-existent email
-  const nonExistentEmail = 'nonexistent-user@example.com';
-  const anyPassword = 'password123';
+  // Go to the login page
+  await page.goto('/login');
   
-  console.log('Testing login with non-existent email');
-  await attemptLogin(page, nonExistentEmail, anyPassword);
-  
-  // Take a screenshot of the failed login
-  await page.screenshot({ path: 'tests/screenshots/non-existent-email.png' });
-  
-  console.log('Checking for error message...');
-  
-  // Check that an error message is displayed
-  const errorMessage = page.locator('.alert-error');
-  await expect(errorMessage).toBeVisible();
-  
-  // Get the specific error message text
-  const errorText = await errorMessage.textContent();
-  console.log('Error message text:', errorText);
-  
-  // Verify the message is still visible after a delay
-  await page.waitForTimeout(500);
-  await expect(errorMessage).toBeVisible();
-  
-  console.log('Login with non-existent email test completed');
-});
-
-test('Student credentials with teacher userType shows appropriate error', async ({ page }) => {
-  // Valid student credentials but trying to log in as teacher
-  const studentEmail = 'ethan.parker@example.com';
-  const studentPassword = '1234'; // Using the correct password from seed data
-  
-  console.log('Testing student credentials with teacher userType');
-  await attemptLogin(page, studentEmail, studentPassword, 'TEACHER');
-  
-  // Take a screenshot of the failed login
-  await page.screenshot({ path: 'tests/screenshots/student-as-teacher.png' });
-  
-  console.log('Checking for error message...');
-  
-  // Check that an error message is displayed
-  const errorMessage = page.locator('.alert-error');
-  await expect(errorMessage).toBeVisible();
-  
-  // Get the specific error message text
-  const errorText = await errorMessage.textContent();
-  console.log('Error message text:', errorText);
-  
-  // Verify the message is still visible after a delay
-  await page.waitForTimeout(500);
-  await expect(errorMessage).toBeVisible();
-  
-  console.log('Student credentials with teacher userType test completed');
-});
-
-test('Teacher credentials with student userType shows appropriate error', async ({ page }) => {
-  // Valid teacher credentials but trying to log in as student
-  const teacherEmail = 'olivia.thompson@example.com';
-  const teacherPassword = '1234'; // Using the correct password from seed data
-  
-  console.log('Testing teacher credentials with student userType');
-  await attemptLogin(page, teacherEmail, teacherPassword, 'STUDENT');
-  
-  // Take a screenshot of the failed login
-  await page.screenshot({ path: 'tests/screenshots/teacher-as-student.png' });
-  
-  console.log('Checking for error message...');
-  
-  // Check that an error message is displayed
-  const errorMessage = page.locator('.alert-error');
-  await expect(errorMessage).toBeVisible();
-  
-  // Get the specific error message text
-  const errorText = await errorMessage.textContent();
-  console.log('Error message text:', errorText);
-  
-  // Verify the message is still visible after a delay
-  await page.waitForTimeout(500);
-  await expect(errorMessage).toBeVisible();
-  
-  console.log('Teacher credentials with student userType test completed');
-});
-
-test('should show error for incorrect credentials', async ({ page }) => {
-  await page.goto('/auth');
-  await page.waitForSelector('.login-form', { state: 'visible' });
-
-  // Fill the form with incorrect credentials
-  await page.fill('#email', 'wrong@example.com');
-  await page.fill('#password', 'wrongpassword');
+  // Fill the login form with non-existent email
+  await page.getByLabel('Email').fill('nonexistent@example.com');
+  await page.getByLabel('Password').fill('1234');
   
   // Submit the form
-  await page.click('button[type="submit"]');
+  await page.locator('form button[type="submit"]').click();
   
-  // Check for error message
+  // Verify error message
   const errorMessage = page.locator('.alert-error');
   await expect(errorMessage).toBeVisible();
-  // Update the expected text to match the actual error message
   await expect(errorMessage).toContainText(/Invalid credentials/i);
+  
+  // Verify we're still on the login page
+  await expect(page).toHaveURL(/.*\/login.*/);
+});
+
+test('Student credentials with teacher userType shows error', async ({ page }) => {
+  // Go to the login page
+  await page.goto('/login');
+  
+  // Fill the login form with student credentials but teacher type
+  await page.getByLabel('Email').fill('ethan.parker@example.com');
+  await page.getByLabel('Password').fill('1234');
+  await page.locator('input[value="TEACHER"]').check();
+  
+  // Submit the form
+  await page.locator('form button[type="submit"]').click();
+  
+  // Verify error message
+  const errorMessage = page.locator('.alert-error');
+  await expect(errorMessage).toBeVisible();
+  await expect(errorMessage).toContainText(/Invalid credentials/i);
+  
+  // Verify we're still on the login page
+  await expect(page).toHaveURL(/.*\/login.*/);
+});
+
+test('Teacher credentials with student userType shows error', async ({ page }) => {
+  // Go to the login page
+  await page.goto('/login');
+  
+  // Fill the login form with teacher credentials but student type
+  await page.getByLabel('Email').fill('emily.richardson@musicschool.com');
+  await page.getByLabel('Password').fill('1234');
+  await page.locator('input[value="STUDENT"]').check();
+  
+  // Submit the form
+  await page.locator('form button[type="submit"]').click();
+  
+  // Verify error message
+  const errorMessage = page.locator('.alert-error');
+  await expect(errorMessage).toBeVisible();
+  await expect(errorMessage).toContainText(/Invalid credentials/i);
+  
+  // Verify we're still on the login page
+  await expect(page).toHaveURL(/.*\/login.*/);
 });
 
 test('should show error for empty email', async ({ page }) => {
-  await page.goto('/auth');
-  await page.waitForSelector('.login-form', { state: 'visible' });
+  // Go to the login page
+  await page.goto('/login');
   
-  // Leave email empty
-  await page.fill('#password', 'somepassword');
+  // Get the email input and form
+  const emailInput = page.getByLabel('Email');
+  const form = page.locator('form');
   
-  // Submit the form 
-  await page.click('button[type="submit"]');
+  // Try to submit without email
+  await page.getByLabel('Password').fill('1234'); // Fill password to focus on email validation
+  await form.evaluate((f: HTMLFormElement) => f.requestSubmit()); // Use requestSubmit to trigger form validation
   
-  // Check we're on the login page or auth page
-  await page.waitForURL(/.*\/(auth|login).*/);
+  // Verify the input is invalid using HTML5 validation state
+  const isValid = await emailInput.evaluate((e: HTMLInputElement) => e.validity.valid);
+  expect(isValid).toBe(false);
   
-  // Verify login form is still visible
-  await expect(page.locator('form')).toBeVisible();
+  // Verify validation message
+  const validationMessage = await emailInput.evaluate((e: HTMLInputElement) => e.validationMessage);
+  expect(validationMessage).toBeTruthy();
   
-  // Verify the email field still exists and is required
-  const emailInput = page.locator('#email');
-  await expect(emailInput).toBeVisible();
-  const isRequired = await emailInput.evaluate(el => el.hasAttribute('required'));
-  expect(isRequired).toBe(true);
+  // Verify we're still on the login page
+  await expect(page).toHaveURL(/.*\/login.*/);
 });
 
 test('should show error for empty password', async ({ page }) => {
-  await page.goto('/auth');
-  await page.waitForSelector('.login-form', { state: 'visible' });
+  // Go to the login page
+  await page.goto('/login');
   
-  // Fill only email
-  await page.fill('#email', 'test@example.com');
+  // Get the password input and form
+  const passwordInput = page.getByLabel('Password');
+  const form = page.locator('form');
   
-  // Submit the form
-  await page.click('button[type="submit"]');
+  // Fill email but leave password empty
+  await page.getByLabel('Email').fill('test@example.com');
+  await form.evaluate((f: HTMLFormElement) => f.requestSubmit()); // Use requestSubmit to trigger form validation
   
-  // Check we're on the login page or auth page
-  await page.waitForURL(/.*\/(auth|login).*/);
+  // Verify the input is invalid using HTML5 validation state
+  const isValid = await passwordInput.evaluate((e: HTMLInputElement) => e.validity.valid);
+  expect(isValid).toBe(false);
   
-  // Verify login form is still visible
-  await expect(page.locator('form')).toBeVisible();
+  // Verify validation message
+  const validationMessage = await passwordInput.evaluate((e: HTMLInputElement) => e.validationMessage);
+  expect(validationMessage).toBeTruthy();
   
-  // Verify the password field still exists and is required
-  const passwordInput = page.locator('#password');
-  await expect(passwordInput).toBeVisible();
-  const isRequired = await passwordInput.evaluate(el => el.hasAttribute('required'));
-  expect(isRequired).toBe(true);
+  // Verify we're still on the login page
+  await expect(page).toHaveURL(/.*\/login.*/);
 });
 
 test('should show error for invalid email format', async ({ page }) => {
-  await page.goto('/auth');
-  await page.waitForSelector('.login-form', { state: 'visible' });
+  // Go to the login page
+  await page.goto('/login');
+  
+  // Get the email input
+  const emailInput = page.getByLabel('Email');
   
   // Fill with invalid email format
-  await page.fill('#email', 'invalid-email');
-  await page.fill('#password', 'password123');
+  await emailInput.fill('invalid-email');
+  await page.getByLabel('Password').click(); // Click away to trigger validation
   
-  // Submit the form
-  await page.click('button[type="submit"]');
+  // Verify the validation message
+  const validationMessage = await emailInput.evaluate((e: HTMLInputElement) => e.validationMessage);
+  expect(validationMessage).toContain("'invalid-email' is missing an '@'");
   
-  // Check we're on the login page or auth page
-  await page.waitForURL(/.*\/(auth|login).*/);
-  
-  // Verify login form is still visible
-  await expect(page.locator('form')).toBeVisible();
-  
-  // Verify that either an error is shown or we're still on the form
-  const emailInput = page.locator('#email');
-  await expect(emailInput).toBeVisible();
-  
-  // Email validation should be enforced by the browser
-  const hasEmailType = await emailInput.evaluate(el => el.getAttribute('type') === 'email');
-  expect(hasEmailType).toBe(true);
+  // Verify we're still on the login page
+  await expect(page).toHaveURL(/.*\/login.*/);
 });
 
 test('should show error for too short password', async ({ page }) => {
+  // Go to the login page
   await page.goto('/login');
   
-  // Fill with valid email but short password
-  await page.fill('#email', 'test@example.com');
-  await page.fill('#password', '123'); // Assuming there's a minimum length requirement
+  // Fill with too short password
+  await page.getByLabel('Email').fill('test@example.com');
+  await page.getByLabel('Password').fill('123');
   
   // Submit the form
-  await page.click('button[type="submit"]');
+  await page.locator('form button[type="submit"]').click();
   
-  // Check for error message
-  const errorMessage = page.locator('.alert-error, .error-message, .form-error');
+  // Verify error message
+  const errorMessage = page.locator('.alert-error');
   await expect(errorMessage).toBeVisible();
+  await expect(errorMessage).toContainText(/Invalid credentials/i);
+  
+  // Verify we're still on the login page
+  await expect(page).toHaveURL(/.*\/login.*/);
 }); 

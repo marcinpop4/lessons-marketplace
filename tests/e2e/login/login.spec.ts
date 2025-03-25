@@ -2,89 +2,101 @@ import { test, expect } from '@playwright/test';
 
 /**
  * Simple authentication tests
- * These tests fill the login form, submit it, and take screenshots
- * without waiting for redirects or checking any content.
+ * These tests fill the login form, submit it, and verify successful login
  */
 
 test('Student login form submission', async ({ page }) => {
-  // Go to the auth page
-  console.log('Navigating to the auth page');
-  await page.goto('/auth');
+  // Go to the login page
+  await page.goto('/login');
   
-  // Take a screenshot before login
-  await page.screenshot({ path: 'tests/screenshots/student-before-login.png' });
+  // Get form elements
+  const form = page.locator('form');
+  const emailInput = page.getByLabel('Email');
+  const passwordInput = page.getByLabel('Password');
+  const studentRadio = page.locator('input[value="STUDENT"]');
+  const submitButton = form.getByRole('button', { name: /login/i });
   
-  // Make sure we're on the login tab (not register)
-  console.log('Ensuring we are on the login tab');
-  const loginTab = page.locator('button.auth-tab', { hasText: 'Login' });
-  if (await loginTab.isVisible()) {
-    await loginTab.click();
-  }
-  
-  // Use a student from seed data
-  const studentEmail = 'ethan.parker@example.com';
-  const password = '1234';
-  
-  console.log(`Filling form as student: ${studentEmail}`);
-  
-  // Fill the login form
-  await page.getByLabel('Email').fill(studentEmail);
-  await page.getByLabel('Password').fill(password);
-  
-  // Submit the form and wait for API response
-  console.log('Submitting login form');
-  const [loginResponse] = await Promise.all([
-    page.waitForResponse(
-      response => response.url().includes('/api/v1/auth/login') && response.request().method() === 'POST'
-    ),
-    page.locator('form button[type="submit"]').click()
+  // Wait for form to be ready
+  await Promise.all([
+    expect(form).toBeVisible(),
+    expect(emailInput).toBeVisible(),
+    expect(passwordInput).toBeVisible(),
+    expect(studentRadio).toBeVisible(),
+    expect(submitButton).toBeVisible()
   ]);
   
-  // Take a screenshot after submission
-  await page.screenshot({ path: 'tests/screenshots/student-after-login.png' });
+  // Fill the login form
+  await emailInput.fill('ethan.parker@example.com');
+  await passwordInput.fill('1234');
+  await studentRadio.check();
   
-  console.log('Student login form submitted');
+  // Set up response promise before clicking
+  const responsePromise = page.waitForResponse(
+    response => response.url().includes('/api/v1/auth/login') && response.request().method() === 'POST'
+  );
+  
+  // Submit form
+  await submitButton.click();
+  
+  // Wait for response
+  const response = await responsePromise;
+  const status = response.status();
+  
+  // If login successful, wait for redirect
+  if (status === 200) {
+    await expect(page).toHaveURL(/.*\/lesson-request.*/, { timeout: 2000 });
+  } else {
+    // If login failed, verify error message
+    const errorMessage = page.locator('.alert-error');
+    await expect(errorMessage).toBeVisible();
+    throw new Error(`Login failed with status ${status}`);
+  }
 });
 
 test('Teacher login form submission', async ({ page }) => {
-  // Go to the auth page
-  console.log('Navigating to the auth page');
-  await page.goto('/auth');
+  // Go to the login page
+  await page.goto('/login');
   
-  // Take a screenshot before login
-  await page.screenshot({ path: 'tests/screenshots/teacher-before-login.png' });
+  // Get form elements
+  const form = page.locator('form');
+  const emailInput = page.getByLabel('Email');
+  const passwordInput = page.getByLabel('Password');
+  const teacherRadio = page.locator('input[value="TEACHER"]');
+  const submitButton = form.getByRole('button', { name: /login/i });
   
-  // Make sure we're on the login tab (not register)
-  console.log('Ensuring we are on the login tab');
-  const loginTab = page.locator('button.auth-tab', { hasText: 'Login' });
-  if (await loginTab.isVisible()) {
-    await loginTab.click();
-  }
-  
-  // Use a teacher from seed data
-  const teacherEmail = 'emily.richardson@musicschool.com';
-  const password = '1234';
-  
-  console.log(`Filling form as teacher: ${teacherEmail}`);
-  
-  // Fill the login form
-  await page.getByLabel('Email').fill(teacherEmail);
-  await page.getByLabel('Password').fill(password);
-  
-  // Select the teacher radio button
-  await page.locator('input[name="userType"][value="TEACHER"]').check();
-  
-  // Submit the form and wait for API response
-  console.log('Submitting login form');
-  const [loginResponse] = await Promise.all([
-    page.waitForResponse(
-      response => response.url().includes('/api/v1/auth/login') && response.request().method() === 'POST'
-    ),
-    page.locator('form button[type="submit"]').click()
+  // Wait for form to be ready
+  await Promise.all([
+    expect(form).toBeVisible(),
+    expect(emailInput).toBeVisible(),
+    expect(passwordInput).toBeVisible(),
+    expect(teacherRadio).toBeVisible(),
+    expect(submitButton).toBeVisible()
   ]);
   
-  // Take a screenshot after submission
-  await page.screenshot({ path: 'tests/screenshots/teacher-after-login.png' });
+  // Fill the login form
+  await emailInput.fill('emily.richardson@musicschool.com');
+  await passwordInput.fill('1234');
+  await teacherRadio.check();
   
-  console.log('Teacher login form submitted');
+  // Set up response promise before clicking
+  const responsePromise = page.waitForResponse(
+    response => response.url().includes('/api/v1/auth/login') && response.request().method() === 'POST'
+  );
+  
+  // Submit form
+  await submitButton.click();
+  
+  // Wait for response
+  const response = await responsePromise;
+  const status = response.status();
+  
+  // If login successful, wait for redirect
+  if (status === 200) {
+    await expect(page).toHaveURL(/.*\/teacher-dashboard.*/, { timeout: 2000 });
+  } else {
+    // If login failed, verify error message
+    const errorMessage = page.locator('.alert-error');
+    await expect(errorMessage).toBeVisible();
+    throw new Error(`Login failed with status ${status}`);
+  }
 }); 

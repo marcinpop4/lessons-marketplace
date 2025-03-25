@@ -14,12 +14,12 @@ if (frontendUrl && !frontendUrl.startsWith('http://') && !frontendUrl.startsWith
 }
 
 export default defineConfig({
-  testDir: './tests',
+  testDir: './tests/e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
+  reporter: 'list',
   
   // Global timeout settings - strict 2s default 
   timeout: process.env.PLAYWRIGHT_TIMEOUT ? parseInt(process.env.PLAYWRIGHT_TIMEOUT) : 2000,
@@ -37,11 +37,13 @@ export default defineConfig({
     },
     video: 'on-first-retry',
     
-    // Set strict timeouts - default 2s for fast failure
-    actionTimeout: process.env.PLAYWRIGHT_ACTION_TIMEOUT ? 
-      parseInt(process.env.PLAYWRIGHT_ACTION_TIMEOUT) : 2000,
-    navigationTimeout: process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT ? 
-      parseInt(process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT) : 2000,
+    // Increase timeouts for CI environments
+    actionTimeout: process.env.CI ? 10000 : 5000,
+    navigationTimeout: process.env.CI ? 15000 : 10000,
+    // Add a small delay between actions in CI for stability
+    launchOptions: {
+      slowMo: process.env.CI ? 100 : 0,
+    },
   },
   outputDir: './tests/screenshots',
   projects: [

@@ -68,7 +68,7 @@ const TeacherQuoteCard: React.FC<TeacherQuoteCardProps> = ({ quote, onAccept }) 
   };
 
   return (
-    <div className="card card-accent">
+    <div className="teacher-quote card card-accent">
       <div className="card-header">
         <h3>
           {quote.teacher.firstName} {quote.teacher.lastName[0]}.

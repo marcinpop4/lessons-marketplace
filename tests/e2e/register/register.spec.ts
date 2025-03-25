@@ -1,125 +1,119 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 
 // Helper function to generate a unique email
-const generateUniqueEmail = () => {
+const generateUniqueEmail = (): string => {
   const timestamp = new Date().getTime();
   return `test.user.${timestamp}@example.com`;
 };
 
 // Helper function to attempt registration
-async function attemptRegistration(page, userData) {
-  // Navigate directly to register page
+async function attemptRegistration(page: Page, email: string, password: string, userType: 'STUDENT' | 'TEACHER') {
+  // Go to register page
   await page.goto('/register');
   
-  // Wait for the registration form to be visible
-  await expect(page.locator('form')).toBeVisible();
+  // Wait for form to be ready
+  const form = page.locator('form');
+  const emailInput = page.getByLabel('Email');
+  const passwordInput = page.locator('#registerPassword');
+  const confirmPasswordInput = page.locator('#confirmPassword');
+  const firstNameInput = page.getByLabel('First Name');
+  const lastNameInput = page.getByLabel('Last Name');
+  const phoneInput = page.getByLabel('Phone Number');
+  const dobInput = page.getByLabel('Date of Birth');
+  const userTypeRadio = page.locator(`#${userType.toLowerCase()}Type`);
+  const submitButton = form.getByRole('button', { name: /register/i });
   
-  // Fill in the registration form
-  await page.fill('#firstName', userData.firstName);
-  await page.fill('#lastName', userData.lastName);
-  await page.fill('#email', userData.email);
-  await page.fill('#password', userData.password);
-  await page.fill('#confirmPassword', userData.password);
-  await page.fill('#phoneNumber', userData.phoneNumber);
-  await page.fill('#dateOfBirth', userData.dateOfBirth);
-  
-  // Select user type
-  if (userData.userType === 'TEACHER') {
-    await page.click('input[value="TEACHER"]');
-  }
-  
-  // Submit the form
-  await page.locator('form button[type="submit"]').click();
-  
-  // Wait for either a navigation to a dashboard or an error message
-  const expectedPath = userData.userType === 'TEACHER' ? '/teacher-dashboard' : '/lesson-request';
-  
-  await Promise.race([
-    page.waitForURL(new RegExp(`.*${expectedPath}.*`)),
-    page.waitForSelector('.alert-error')
+  // Wait for all form elements to be visible
+  await Promise.all([
+    expect(form).toBeVisible(),
+    expect(emailInput).toBeVisible(),
+    expect(passwordInput).toBeVisible(),
+    expect(confirmPasswordInput).toBeVisible(),
+    expect(firstNameInput).toBeVisible(),
+    expect(lastNameInput).toBeVisible(),
+    expect(phoneInput).toBeVisible(),
+    expect(dobInput).toBeVisible(),
+    expect(userTypeRadio).toBeVisible(),
+    expect(submitButton).toBeVisible()
   ]);
   
-  // Check if there's an error message
-  const errorMessage = page.locator('.alert-error');
-  const hasError = await errorMessage.isVisible();
-  let errorText = null;
+  // Fill the form
+  await firstNameInput.fill('Test');
+  await lastNameInput.fill('User');
+  await emailInput.fill(email);
+  await passwordInput.fill(password);
+  await confirmPasswordInput.fill(password);
+  await phoneInput.fill('123-456-7890');
+  await dobInput.fill('2000-01-01');
+  await userTypeRadio.check();
   
-  if (hasError) {
-    errorText = await errorMessage.textContent();
-    console.log(`Registration error: ${errorText}`);
+  // Set up response promise before clicking
+  const responsePromise = page.waitForResponse(
+    response => response.url().includes('/api/v1/auth/register') && response.request().method() === 'POST'
+  );
+  
+  // Submit form
+  await submitButton.click();
+  
+  // Wait for response
+  const response = await responsePromise;
+  const status = response.status();
+  
+  // Get error message if present
+  let errorText = '';
+  if (status !== 201) {
+    const errorMessage = page.locator('.alert-error');
+    await expect(errorMessage).toBeVisible();
+    errorText = await errorMessage.textContent() || '';
   }
   
-  return { success: !hasError, errorText };
+  return {
+    success: status === 201,
+    errorText,
+    status
+  };
 }
 
 test('Student registration with new credentials succeeds', async ({ page }) => {
-  const newUserData = {
-    firstName: 'Test',
-    lastName: 'User',
-    email: generateUniqueEmail(),
-    password: 'testpass123',
-    phoneNumber: '123-456-7890',
-    dateOfBirth: '2000-01-01',
-    userType: 'STUDENT'
-  };
+  // Generate unique email
+  const uniqueEmail = `student${Date.now()}@example.com`;
   
-  // Attempt registration
-  const result = await attemptRegistration(page, newUserData);
+  // Attempt registration with valid password (8+ characters)
+  const result = await attemptRegistration(page, uniqueEmail, 'password123', 'STUDENT');
   
-  // Take a screenshot
-  await page.screenshot({ path: 'tests/screenshots/student-registration.png' });
-  
-  // Check if registration was successful
+  // Registration should succeed
   expect(result.success).toBe(true);
   
-  // Additional check: verify we're on the lesson request page
+  // Should be redirected to lesson request page
   await expect(page).toHaveURL(/.*\/lesson-request.*/);
 });
 
 test('Student registration with existing email fails', async ({ page }) => {
-  const existingUserData = {
-    firstName: 'Ethan',
-    lastName: 'Parker',
-    email: 'ethan.parker@example.com', // This email exists in seeds
-    password: 'testpass123',
-    phoneNumber: '123-456-7890',
-    dateOfBirth: '2000-01-01',
-    userType: 'STUDENT'
-  };
+  // Use an email that already exists in seed data
+  const existingEmail = 'ethan.parker@example.com';
   
-  // Attempt registration
-  const result = await attemptRegistration(page, existingUserData);
-  
-  // Take a screenshot
-  await page.screenshot({ path: 'tests/screenshots/student-registration-existing-email.png' });
+  // Attempt registration with valid password (8+ characters)
+  const result = await attemptRegistration(page, existingEmail, 'password123', 'STUDENT');
   
   // Registration should fail with appropriate error
   expect(result.success).toBe(false);
+  expect(result.status).toBe(409); // Conflict status code
+  expect(result.errorText).toMatch(/unexpected error|already exists/i);
   
   // Verify we're still on the register page
   await expect(page).toHaveURL('/register');
 });
 
 test('Teacher registration with new credentials succeeds', async ({ page }) => {
-  const newUserData = {
-    firstName: 'Test',
-    lastName: 'Teacher',
-    email: generateUniqueEmail(),
-    password: 'testpass123',
-    phoneNumber: '123-456-7890',
-    dateOfBirth: '2000-01-01',
-    userType: 'TEACHER'
-  };
+  // Generate unique email
+  const uniqueEmail = `teacher${Date.now()}@musicschool.com`;
   
-  // Attempt registration
-  const result = await attemptRegistration(page, newUserData);
+  // Attempt registration with valid password (8+ characters)
+  const result = await attemptRegistration(page, uniqueEmail, 'password123', 'TEACHER');
   
-  // Take a screenshot
-  await page.screenshot({ path: 'tests/screenshots/teacher-registration.png' });
-  
-  // Check if registration was successful
+  // Registration should succeed
   expect(result.success).toBe(true);
   
-  // Additional check: verify we're on the teacher dashboard
+  // Should be redirected to teacher dashboard
   await expect(page).toHaveURL(/.*\/teacher-dashboard.*/);
 }); 

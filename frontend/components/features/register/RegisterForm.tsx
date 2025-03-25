@@ -204,18 +204,46 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
           </div>
         </div>
         
+        <div className="form-group">
+          <label htmlFor="email">Email</label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={handleEmailChange}
+            required
+          />
+        </div>
+        
         <div className="form-row">
           <div className="form-group">
-            <label htmlFor="email">Email Address</label>
+            <label htmlFor="registerPassword">Password</label>
             <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={handleEmailChange}
+              id="registerPassword"
+              name="password"
+              type="password"
+              value={password}
+              onChange={handlePasswordChange}
               required
+              aria-label="Create password"
             />
           </div>
           
+          <div className="form-group">
+            <label htmlFor="confirmPassword">Confirm Password</label>
+            <input
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              value={confirmPassword}
+              onChange={handleConfirmPasswordChange}
+              required
+              aria-label="Confirm password"
+            />
+          </div>
+        </div>
+        
+        <div className="form-row">
           <div className="form-group">
             <label htmlFor="phoneNumber">Phone Number</label>
             <input
@@ -226,33 +254,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
               required
             />
           </div>
-        </div>
-        
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={handlePasswordChange}
-              required
-            />
-          </div>
           
-          <div className="form-group">
-            <label htmlFor="confirmPassword">Confirm Password</label>
-            <input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={handleConfirmPasswordChange}
-              required
-            />
-          </div>
-        </div>
-        
-        <div className="form-row">
           <div className="form-group">
             <label htmlFor="dateOfBirth">Date of Birth</label>
             <input
@@ -263,47 +265,39 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
               required
             />
           </div>
-          
-          <div className="form-group">
-            <div className="user-type-container">
-              <label className="user-type-label">I am a:</label>
-              <div className="user-type-options">
-                <div className="user-type-option">
-                  <input
-                    type="radio"
-                    id="student"
-                    name="userType"
-                    value="STUDENT"
-                    checked={userType === 'STUDENT'}
-                    onChange={() => handleUserTypeChange('STUDENT')}
-                  />
-                  <label htmlFor="student">Student</label>
-                </div>
-                <div className="user-type-option">
-                  <input
-                    type="radio"
-                    id="teacher"
-                    name="userType"
-                    value="TEACHER"
-                    checked={userType === 'TEACHER'}
-                    onChange={() => handleUserTypeChange('TEACHER')}
-                  />
-                  <label htmlFor="teacher">Teacher</label>
-                </div>
-              </div>
-            </div>
+        </div>
+        
+        <div className="form-group user-type">
+          <div className="radio-group">
+            <input
+              id="studentType"
+              type="radio"
+              name="userType"
+              value="STUDENT"
+              checked={userType === 'STUDENT'}
+              onChange={() => handleUserTypeChange('STUDENT')}
+            />
+            <label htmlFor="studentType">Student</label>
+            
+            <input
+              id="teacherType"
+              type="radio"
+              name="userType"
+              value="TEACHER"
+              checked={userType === 'TEACHER'}
+              onChange={() => handleUserTypeChange('TEACHER')}
+            />
+            <label htmlFor="teacherType">Teacher</label>
           </div>
         </div>
         
-        <div className="form-actions">
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Creating Account...' : 'Create Account'}
-          </button>
-        </div>
+        <button 
+          type="submit" 
+          disabled={isSubmitting}
+          className={isSubmitting ? 'loading' : ''}
+        >
+          {isSubmitting ? 'Registering...' : 'Register'}
+        </button>
       </form>
     </div>
   );
