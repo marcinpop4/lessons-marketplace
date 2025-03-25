@@ -15,9 +15,6 @@ FROM base AS runner
 # Install required system packages
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
-# Set environment variables
-ENV NODE_ENV=production
-
 # Copy package.json and pnpm-lock.yaml
 COPY package.json pnpm-lock.yaml ./
 
@@ -40,7 +37,7 @@ COPY ./server/prisma/seed.ts ./server/prisma/seed.ts
 RUN npx prisma generate --schema=server/prisma/schema.prisma
 
 # Expose the port the app runs on
-EXPOSE ${PORT:-3000}
+EXPOSE ${PORT}
 
 # Start the application
 CMD ["node", "dist/server/index.js"] 
