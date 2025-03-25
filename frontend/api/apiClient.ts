@@ -5,28 +5,18 @@ import logger from '@frontend/utils/logger';
 import { buildApiUrl } from './buildApiUrl';
 
 /**
- * Determine the appropriate API base URL based on the environment
+ * Get the API base URL from environment variables
  * @returns The API base URL to use
  */
 export function getApiBaseUrl(): string {
-  const isDevelopment = import.meta.env.MODE === 'development';
-  const isTest = import.meta.env.MODE === 'test' || import.meta.env.VITE_TEST_MODE === 'true';
-  
-  // In development or test, always use the relative path which gets proxied by Vite
-  if (isDevelopment || isTest) {
-    logger.debug('Using development/test API URL: /api');
-    return '/api';
-  }
-  
-  // In production, the environment variable MUST be defined
-  if (!import.meta.env.VITE_API_BASE_URL) {
-    const errorMsg = 'VITE_API_BASE_URL environment variable is required in production';
+  const baseUrl = import.meta.env.VITE_API_BASE_URL;
+  if (!baseUrl) {
+    const errorMsg = 'VITE_API_BASE_URL environment variable is required';
     logger.error(errorMsg);
     throw new Error(errorMsg);
   }
   
-  const baseUrl = import.meta.env.VITE_API_BASE_URL;
-  logger.info('Using API URL from environment variable:', baseUrl);
+  logger.debug('Using API URL:', baseUrl);
   return baseUrl;
 }
 
@@ -61,13 +51,9 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // In production, log the URL of each request for debugging
-    const isDevelopment = import.meta.env.MODE === 'development';
-    const isTest = import.meta.env.MODE === 'test' || import.meta.env.VITE_TEST_MODE === 'true';
-    
-    if (!isDevelopment && !isTest && config.url) {
+    if (config.url) {
       const fullUrl = buildApiUrl(API_BASE_URL, config.url);
-      logger.info('Making API request to:', fullUrl);
+      logger.debug('Making API request to:', fullUrl);
     }
     
     return config;
@@ -97,11 +83,9 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
       
       try {
-        // Try to refresh the token - caller must include version in their path
-        const refreshUrl = buildApiUrl(API_BASE_URL, '/v1/auth/refresh-token');
-        
+        // Try to refresh the token
         const response = await axios.post(
-          refreshUrl, 
+          buildApiUrl(API_BASE_URL, '/v1/auth/refresh-token'), 
           {}, 
           { withCredentials: true }
         );

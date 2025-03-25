@@ -2,6 +2,10 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import fs from 'fs'
+import dotenv from 'dotenv'
+
+// Load environment variables from .env file
+dotenv.config({ path: resolve(__dirname, '../../.env') })
 
 // Custom logic to avoid looking for tsconfig in the wrong place
 const getTsConfigPath = () => {
@@ -23,12 +27,9 @@ export default defineConfig(({ mode }) => {
   // Load env files based on mode
   const env = loadEnv(mode, process.cwd(), '');
   
-  // Define variables to be replaced in the app
-  const envPrefix = 'VITE_';
-  
-  // If we're in production and VITE_API_BASE_URL isn't defined, set a default
-  if (mode === 'production' && !env.VITE_API_BASE_URL) {
-    throw new Error('VITE_API_BASE_URL must be defined in production. Make sure it is set in fly.frontend.toml');
+  // Check if API Base URL is defined
+  if (!env.VITE_API_BASE_URL) {
+    throw new Error('VITE_API_BASE_URL environment variable is required');
   }
   
   // Log the API URL being used
@@ -51,6 +52,8 @@ export default defineConfig(({ mode }) => {
         }
       }
     ],
+    // Ensure environment variables with VITE_ prefix are exposed to the client
+    envPrefix: 'VITE_',
     root: resolve(__dirname, '..'),
     build: {
       outDir: resolve(projectRoot, 'dist/frontend'),
