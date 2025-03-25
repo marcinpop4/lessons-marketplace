@@ -60,9 +60,14 @@ jobs:
         run: pnpm test
         # This will fail fast if tests don't pass
 
-      - name: Run end-to-end tests
-        run: pnpm test:e2e
-        # This will fail fast if tests don't pass
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Run end-to-end tests with Docker
+        run: pnpm docker:test:full
 
   deploy:
     name: Deploy to Fly.io
