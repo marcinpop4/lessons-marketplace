@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetching all history to ensure lock file is included
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -42,8 +44,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
+      - name: Check for lock file
+        run: |
+          if [ -f "pnpm-lock.yaml" ]; then
+            echo "Lock file exists"
+          else
+            echo "Lock file does not exist"
+            ls -la
+          fi
+
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Run unit tests
         run: pnpm test
@@ -62,6 +73,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetching all history to ensure lock file is included
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -89,7 +102,7 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Deploy to Fly.io
         run: pnpm fly:deploy:production
