@@ -89,7 +89,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         // Try to get user data first
         try {
-          const userResponse = await apiClient.get(`/v1/auth/me`);
+          const userResponse = await apiClient.get(`/api/v1/auth/me`);
           setUser(userResponse.data);
           setLoading(false);
           return;
@@ -99,14 +99,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
 
         // Try to refresh the token
-        const response = await apiClient.post(`/v1/auth/refresh-token`, {});
+        const response = await apiClient.post(`/api/v1/auth/refresh-token`, {});
         
         // Save the new access token
         localStorage.setItem('auth_token', response.data.accessToken);
         axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
         
         // Get user data with new token
-        const userResponse = await apiClient.get(`/v1/auth/me`);
+        const userResponse = await apiClient.get(`/api/v1/auth/me`);
         setUser(userResponse.data);
       } catch (error) {
         console.error('Auth check failed:', error);
@@ -128,7 +128,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
     
     try {
-      const response = await apiClient.post(`/v1/auth/login`, {
+      const response = await apiClient.post(`/api/v1/auth/login`, {
         email,
         password,
         userType,
@@ -159,7 +159,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log('Starting registration in AuthContext:', { ...registerData, password: '[REDACTED]' });
     
     try {
-      const response = await apiClient.post(`/v1/auth/register`, registerData);
+      const response = await apiClient.post(`/api/v1/auth/register`, registerData);
       console.log('Registration API response:', response.data);
       
       if (response.data && response.data.accessToken) {
@@ -187,7 +187,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(true);
     
     try {
-      await apiClient.post(`/v1/auth/logout`);
+      await apiClient.post(`/api/v1/auth/logout`);
       
       // Clear the access token from localStorage
       localStorage.removeItem('auth_token');

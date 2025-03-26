@@ -1,10 +1,10 @@
 services:
   database:
-    image: postgres:16
+    build:
+      context: ..
+      dockerfile: docker/database/Dockerfile
     container_name: lessons-marketplace-db
     restart: unless-stopped
-    env_file:
-      - ./.env
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -25,13 +25,8 @@ services:
     depends_on:
       database:
         condition: service_healthy
-    env_file:
-      - ./.env
     ports:
       - "3000:3000"
-    volumes:
-      - ../dist:/app/dist
-      - ../node_modules:/app/node_modules
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
       interval: 10s
@@ -48,13 +43,8 @@ services:
     restart: unless-stopped
     depends_on:
       - server
-    env_file:
-      - ./.env
     ports:
       - "5173:80"
-    volumes:
-      - ../dist:/app/dist
-      - ../node_modules:/app/node_modules
     profiles: ["default", "test"]
 
   # Test service using our dedicated test Dockerfile - standalone version
@@ -64,22 +54,27 @@ services:
       dockerfile: docker/test.Dockerfile
     container_name: lessons-marketplace-tests
     profiles: ["test"]
-    env_file:
-      - ./.env
+    depends_on:
+      - frontend
+      - server
+      - database
     environment:
       - JEST_JUNIT_OUTPUT_DIR=/app/test-results/
       - JEST_JUNIT_OUTPUT_NAME=junit.xml
-      - FRONTEND_URL=${DOCKER_FRONTEND_URL}
-      - SKIP_WEB_SERVER=true
-      - MOCK_API=true
       - PLAYWRIGHT_HEADLESS=true
+      - SKIP_WEB_SERVER=true
+      - MOCK_API=false
+      - PLAYWRIGHT_TIMEOUT=30000
+      - PLAYWRIGHT_ACTION_TIMEOUT=15000
+      - PLAYWRIGHT_NAVIGATION_TIMEOUT=20000
     volumes:
-      - test-results:/app/test-results
-      - playwright-report:/app/playwright-report
+      - ../tests/test-results:/app/test-results
+      - ../tests/playwright-report:/app/playwright-report
+      - ../tests/screenshots:/app/tests/screenshots
     ipc: host  # Recommended for Chrome to avoid memory issues
 
 volumes:
   postgres_data:
   test-results:
   playwright-report:
-  pnpm-store: # Add volume for pnpm store 
+  pnpm-store: # Add volume for pnpm store

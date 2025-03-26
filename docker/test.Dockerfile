@@ -1,18 +1,50 @@
 FROM mcr.microsoft.com/playwright:v1.51.0-noble
 
+# Install Node.js and pnpm
+RUN apt-get update && \
+    apt-get install -y curl && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g pnpm@latest && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set working directory
 WORKDIR /app
 
-# Install pnpm globally without prompts
-ENV PNPM_YES=true
-ENV NPM_CONFIG_YES=true
-ENV CI=true
-RUN npm install -g pnpm@latest
-
-# Copy package files first for better caching
+# Copy package files
 COPY package.json pnpm-lock.yaml ./
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile --unsafe-perm
+RUN pnpm install --frozen-lockfile
+
+# Copy all files
+COPY . .
+
+# Generate environment inside Docker container
+RUN pnpm env:docker /app
+
+# Generate Prisma client
+RUN npx prisma generate --schema=server/prisma/schema.prisma
+
+# Make directory for test results
+RUN mkdir -p /app/test-results
+
+# Playwright doesn't need browsers to be installed in the image
+# because it will use the browsers from the Playwright Docker image
+
+# Set Docker root directory environment variable so that scripts can adjust paths
+ENV DOCKER_ROOT_DIR=/app
+
+# Create a dummy entrypoint script with check for environment variables
+COPY docker/scripts/test-entrypoint.sh /test-entrypoint.sh
+RUN chmod +x /test-entrypoint.sh
+
+# Set the entrypoint
+ENTRYPOINT ["/test-entrypoint.sh"]
+
+# Default command (can be overridden)
+CMD ["npx", "jest"]
 
 # Copy necessary files for testing
 COPY package.json ./
@@ -25,6 +57,10 @@ COPY server/ ./server/
 COPY shared/ ./shared/
 COPY tests/ ./tests/
 COPY scripts/ ./scripts/
+COPY env/ ./env/
+
+# Generate environment configuration for tests
+RUN pnpm env:dev /app
 
 # Set environment variables
 ENV NODE_OPTIONS=--experimental-vm-modules
@@ -82,7 +118,4 @@ try {\n\
 }\n\
 ' > /app/scripts/docker-run-e2e-tests.js
 
-RUN chmod +x /app/scripts/docker-run-tests.js /app/scripts/docker-run-e2e-tests.js
-
-# Default command
-CMD ["node", "scripts/docker-run-tests.js", "tests/unit"] 
+RUN chmod +x /app/scripts/docker-run-tests.js /app/scripts/docker-run-e2e-tests.js 

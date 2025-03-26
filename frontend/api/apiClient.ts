@@ -4,44 +4,15 @@ import axios from 'axios';
 import logger from '@frontend/utils/logger';
 import { buildApiUrl } from './buildApiUrl';
 
-/**
- * Get the API base URL from environment variables
- * @returns The API base URL to use
- */
-export function getApiBaseUrl(): string {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL;
-  if (!baseUrl) {
-    const errorMsg = 'VITE_API_BASE_URL environment variable is required';
-    logger.error(errorMsg);
-    throw new Error(errorMsg);
-  }
-  
-  logger.debug('Using API URL:', baseUrl);
-  return baseUrl;
-}
-
-/**
- * Build a complete API URL using the base URL and path
- * @param basePath - The base path for the API
- * @param path - The specific path/endpoint to access
- * @returns The complete URL
- */
-export { buildApiUrl };
-
-// Get the base URL for API requests
-const API_BASE_URL = getApiBaseUrl();
-
 // Create a custom axios instance
 const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: '', // Using relative URLs to make requests go through nginx
   withCredentials: true, // Allow cookies
   timeout: 10000, // 10 seconds timeout
   headers: {
     'Content-Type': 'application/json',
   }
 });
-
-logger.debug('API base URL:', API_BASE_URL);
 
 // Add request interceptor to inject auth token
 apiClient.interceptors.request.use(
@@ -52,7 +23,7 @@ apiClient.interceptors.request.use(
     }
     
     if (config.url) {
-      const fullUrl = buildApiUrl(API_BASE_URL, config.url);
+      const fullUrl = buildApiUrl('', config.url);
       logger.debug('Making API request to:', fullUrl);
     }
     
@@ -85,7 +56,7 @@ apiClient.interceptors.response.use(
       try {
         // Try to refresh the token
         const response = await axios.post(
-          buildApiUrl(API_BASE_URL, '/v1/auth/refresh-token'), 
+          buildApiUrl('', '/api/v1/auth/refresh-token'), 
           {}, 
           { withCredentials: true }
         );

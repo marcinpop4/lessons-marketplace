@@ -15,7 +15,8 @@ Never use inline CSS (style attributes) or inline JavaScript (onclick attributes
 
 // Testing
 Never increase test timeouts without explicit permission. If tests are timing out, investigate and fix the underlying performance issue rather than extending the timeout.
-Never ever copy code into a test, to test it in isolation. We either make a function more testable or find a way to test it
+Never ever copy code into a test, to test it in isolation. We either make a function more testable or find a way to test it.
+Run tests in docker with --retries=0
 
 // State Management
 Never infer state or status values. All status changes must be explicit results of specific events or actions. Status transitions should be clearly defined and traceable to specific triggers.

@@ -242,6 +242,41 @@ The application uses PostgreSQL with Prisma ORM. The main entities are:
 
 ## Development
 
+### Environment Configuration
+
+The project includes a powerful environment configuration script that manages different environment settings:
+
+```bash
+# Generate development environment
+pnpm env:dev
+
+# Generate Docker environment
+pnpm env:docker
+
+# Generate production environment
+pnpm env:prod
+
+# Generate environment with custom output directory
+pnpm env:docker ./custom-output
+```
+
+You can also specify a custom output directory with any of the environment commands:
+
+```bash
+# Format: pnpm env:<environment> [output-directory]
+pnpm env:dev ./custom-path
+pnpm env:docker /some/other/path
+pnpm env:prod /tmp/prod-env
+```
+
+The script handles:
+- Loading environment variables from base and specific environment files
+- Generating .env files for local development
+- Creating Docker environment configurations
+- Building Fly.io deployment files
+
+### Database Exploration
+
 To explore the database visually:
 
 ```bash

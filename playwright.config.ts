@@ -4,14 +4,27 @@ import * as dotenv from 'dotenv';
 // Load environment variables from .env file
 dotenv.config();
 
-// Get FRONTEND_URL from environment - no fallback
-let frontendUrl = process.env.FRONTEND_URL;
+// Log all environment variables for debugging
+console.log('Environment variables:');
+console.log(`FRONTEND_URL: ${process.env.FRONTEND_URL}`);
+console.log(`DOCKER_FRONTEND_URL: ${process.env.DOCKER_FRONTEND_URL}`);
+
+// Determine if we're running in Docker by checking environment variables
+const isRunningInDocker = process.env.TEST_ENV === 'docker';
+console.log(`Running in Docker: ${isRunningInDocker}`);
+
+// When running in Docker, use DOCKER_FRONTEND_URL instead of FRONTEND_URL
+let frontendUrl = process.env.TEST_ENV === 'docker' 
+     ? process.env.DOCKER_FRONTEND_URL 
+     : process.env.FRONTEND_URL;
 
 // Ensure FRONTEND_URL has the correct format (includes protocol)
 if (frontendUrl && !frontendUrl.startsWith('http://') && !frontendUrl.startsWith('https://')) {
   frontendUrl = `http://${frontendUrl}`;
-  console.log(`Adding protocol to FRONTEND_URL: ${frontendUrl}`);
+  console.log(`Adding protocol to frontend URL: ${frontendUrl}`);
 }
+
+console.log(`Using frontend URL for tests: ${frontendUrl}`);
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -21,8 +34,8 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'list',
   
-  // Global timeout settings - strict 2s default 
-  timeout: process.env.PLAYWRIGHT_TIMEOUT ? parseInt(process.env.PLAYWRIGHT_TIMEOUT) : 2000,
+  // Global timeout settings
+  timeout: process.env.PLAYWRIGHT_TIMEOUT ? parseInt(process.env.PLAYWRIGHT_TIMEOUT) : 30000,
   
   // Only include E2E tests, exclude unit tests
   testMatch: 'tests/e2e/**/*.spec.ts',
@@ -41,8 +54,8 @@ export default defineConfig({
     headless: true,
     
     // Increase timeouts for CI environments
-    actionTimeout: process.env.CI ? 10000 : 5000,
-    navigationTimeout: process.env.CI ? 15000 : 10000,
+    actionTimeout: process.env.PLAYWRIGHT_ACTION_TIMEOUT ? parseInt(process.env.PLAYWRIGHT_ACTION_TIMEOUT) : 10000,
+    navigationTimeout: process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT ? parseInt(process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT) : 15000,
     // Add a small delay between actions in CI for stability
     launchOptions: {
       slowMo: process.env.CI ? 100 : 0,

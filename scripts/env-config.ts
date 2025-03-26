@@ -10,9 +10,12 @@
  * - Set Fly.io secrets
  * 
  * Usage:
- * - pnpm env:dev    (Generate .env for development)
- * - pnpm env:docker (Generate Docker environment)
- * - pnpm env:prod   (Generate production environment)
+ * - pnpm env:dev [outputDir]   (Generate .env for development)
+ * - pnpm env:docker [outputDir] (Generate Docker environment directly in outputDir)
+ * - pnpm env:prod [outputDir]  (Generate production environment)
+ * - pnpm env:fly-config [outputDir] (Generate Fly.io config)
+ * - pnpm env:fly-server (Set Fly.io server secrets)
+ * - pnpm env:fly-frontend (Set Fly.io frontend secrets)
  */
 
 import fs from 'fs';
@@ -24,15 +27,27 @@ import { parse } from 'dotenv';
 // Get the directory path in ES module format
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const rootDir = path.resolve(__dirname, '..');
 
-// Define supported environments
-type Environment = 'development' | 'docker' | 'test' | 'production';
+// Default root directory is the project root
+const rootDir = path.resolve(__dirname, '..');
 
 // Parse command line arguments
 const args = process.argv.slice(2);
-const targetEnv = (args[0] || process.env.NODE_ENV || 'development') as Environment;
-const generateMode = args[1] || 'env';
+const targetEnv = args[0] || process.env.NODE_ENV || 'development';
+const outputDir = args[1] || rootDir; // Optional 2nd argument for output directory
+
+// Map environment to appropriate generation mode
+let generateMode: string;
+if (targetEnv.startsWith('fly-')) {
+  // For Fly.io operations, use the full targetEnv as the mode
+  generateMode = targetEnv;
+} else {
+  // For regular environments, use appropriate mode based on environment
+  generateMode = targetEnv === 'docker' ? 'docker' : 'env';
+}
+
+// Determine the actual environment name for loading env files
+const actualEnv = targetEnv.startsWith('fly-') ? 'production' : targetEnv;
 
 // ANSI color codes for better output
 const GREEN = '\x1b[32m';
@@ -41,23 +56,28 @@ const RED = '\x1b[31m';
 const CYAN = '\x1b[36m';
 const NC = '\x1b[0m'; // No Color
 
-// Paths to environment files
+// Paths to environment files (input)
 const ENV_DIR = path.resolve(rootDir, 'env');
 const BASE_ENV_PATH = path.join(ENV_DIR, '.env.base');
-const ENV_PATH = path.join(ENV_DIR, `.env.${targetEnv}`);
+const ENV_PATH = path.join(ENV_DIR, `.env.${actualEnv}`);
 
 // Paths to fly.toml templates
 const SERVER_TEMPLATE_PATH = path.join(__dirname, 'templates/fly.server.template.toml');
 const FRONTEND_TEMPLATE_PATH = path.join(__dirname, 'templates/fly.frontend.template.toml');
 
-// Paths to generated fly.toml files
-const SERVER_TOML_PATH = path.resolve(rootDir, 'docker/fly-config/fly.server.toml');
-const FRONTEND_TOML_PATH = path.resolve(rootDir, 'docker/fly-config/fly.frontend.toml');
+// Print the current configuration for debugging
+console.log(`${YELLOW}Environment script configuration:${NC}`);
+console.log(`${YELLOW}- Target: ${targetEnv}${NC}`);
+console.log(`${YELLOW}- Actual environment: ${actualEnv}${NC}`);
+console.log(`${YELLOW}- Generate mode: ${generateMode}${NC}`);
+console.log(`${YELLOW}- Root directory (for input): ${rootDir}${NC}`);
+console.log(`${YELLOW}- Output directory: ${outputDir}${NC}`);
+console.log(`${YELLOW}- Input env files: ${BASE_ENV_PATH}, ${ENV_PATH}${NC}`);
 
 /**
  * Loads environment variables from base and target environment files
  */
-function loadEnvironment(env: Environment): Record<string, string> {
+function loadEnvironment(env: string): Record<string, string> {
   console.log(`${YELLOW}Loading base and ${env} environment variables...${NC}`);
   
   // Check if required files exist
@@ -84,26 +104,22 @@ function loadEnvironment(env: Environment): Record<string, string> {
 /**
  * Generates a .env file for local development
  */
-function generateEnvFile(config: Record<string, string>): void {
+function generateEnvFile(config: Record<string, string>, envPath: string): void {
   const envContent = Object.entries(config)
     .map(([key, value]) => `${key}=${value}`)
     .join('\n');
   
-  const envPath = path.resolve(rootDir, '.env');
   fs.writeFileSync(envPath, envContent);
-  console.log(`${GREEN}Generated .env file at ${envPath}${NC}`);
 }
 
 /**
- * Generates Docker environment configuration
+ * Generates a Docker environment file at the specified path
  */
-function generateDockerConfig(config: Record<string, string>): void {
+function generateDockerConfig(config: Record<string, string>, dockerEnvPath: string): void {
   // Generate environment file for Docker
   const dockerEnvContent = Object.entries(config)
     .map(([key, value]) => `${key}=${value}`)
     .join('\n');
-  
-  const dockerEnvPath = path.resolve(rootDir, 'docker/.env');
   
   // Ensure directory exists
   const dir = path.dirname(dockerEnvPath);
@@ -112,7 +128,6 @@ function generateDockerConfig(config: Record<string, string>): void {
   }
   
   fs.writeFileSync(dockerEnvPath, dockerEnvContent);
-  console.log(`${GREEN}Generated Docker environment file at ${dockerEnvPath}${NC}`);
 }
 
 /**
@@ -151,7 +166,11 @@ function setFlySecrets(config: Record<string, string>, appName: string): void {
 /**
  * Generates fly.toml files from templates using environment variables
  */
-function generateFlyConfig(config: Record<string, string>): void {
+function generateFlyConfig(
+  config: Record<string, string>,
+  serverTomlPath: string,
+  frontendTomlPath: string
+): void {
   console.log(`${YELLOW}Generating Fly.io configuration files...${NC}`);
   
   // Make sure template files exist
@@ -175,18 +194,14 @@ function generateFlyConfig(config: Record<string, string>): void {
   }
 
   // Ensure directory exists
-  const dir = path.dirname(SERVER_TOML_PATH);
+  const dir = path.dirname(serverTomlPath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 
   // Write generated files
-  fs.writeFileSync(SERVER_TOML_PATH, serverTemplate);
-  fs.writeFileSync(FRONTEND_TOML_PATH, frontendTemplate);
-  
-  console.log(`${GREEN}Generated Fly.io configuration files:${NC}`);
-  console.log(`${GREEN}- Server: ${SERVER_TOML_PATH}${NC}`);
-  console.log(`${GREEN}- Frontend: ${FRONTEND_TOML_PATH}${NC}`);
+  fs.writeFileSync(serverTomlPath, serverTemplate);
+  fs.writeFileSync(frontendTomlPath, frontendTemplate);
 }
 
 /**
@@ -219,20 +234,35 @@ try {
   console.log(`${CYAN}======================================${NC}`);
   console.log(`${CYAN}Environment Configuration: ${targetEnv}${NC}`);
   console.log(`${CYAN}Mode: ${generateMode}${NC}`);
+  console.log(`${CYAN}Output directory: ${outputDir}${NC}`);
   console.log(`${CYAN}======================================${NC}`);
   
-  const config = loadEnvironment(targetEnv);
+  const config = loadEnvironment(actualEnv);
+  
+  // Keep track of created files
+  const createdFiles: string[] = [];
   
   // Generate configuration based on mode
   switch (generateMode) {
+    case 'development':
+    case 'test':
+    case 'production':
     case 'env':
-      generateEnvFile(config);
+      const envPath = path.resolve(outputDir, '.env');
+      generateEnvFile(config, envPath);
+      createdFiles.push(envPath);
       break;
     case 'docker':
-      generateDockerConfig(config);
+      // For Docker mode, generate the .env file directly in the specified output directory
+      const dockerEnvPath = path.resolve(outputDir, '.env');
+      generateDockerConfig(config, dockerEnvPath);
+      createdFiles.push(dockerEnvPath);
       break;
     case 'fly-config':
-      generateFlyConfig(config);
+      const serverTomlPath = path.resolve(outputDir, 'docker/fly-config/fly.server.toml');
+      const frontendTomlPath = path.resolve(outputDir, 'docker/fly-config/fly.frontend.toml');
+      generateFlyConfig(config, serverTomlPath, frontendTomlPath);
+      createdFiles.push(serverTomlPath, frontendTomlPath);
       break;
     case 'fly-server':
       setFlySecrets(config, 'lessons-marketplace-server');
@@ -241,8 +271,28 @@ try {
       setFlySecrets(config, 'lessons-marketplace-frontend');
       break;
     default:
-      console.error(`${RED}Unknown generation mode: ${generateMode}${NC}`);
+      console.error(`${RED}Unknown target: ${targetEnv}${NC}`);
       process.exit(1);
+  }
+  
+  // Print summary of what was created
+  if (createdFiles.length > 0) {
+    console.log(`${CYAN}======================================${NC}`);
+    console.log(`${CYAN}Summary of created files:${NC}`);
+    
+    // Display files with appropriate labels based on the generate mode
+    for (const file of createdFiles) {
+      let fileType = '';
+      if (file.endsWith('.env')) {
+        fileType = generateMode === 'docker' ? 'Docker environment file' : 'Environment file';
+      } else if (file.includes('fly-config')) {
+        fileType = file.includes('server') ? 'Fly.io server config' : 'Fly.io frontend config';
+      }
+      
+      console.log(`${GREEN}${fileType}: ${file}${NC}`);
+    }
+    
+    console.log(`${CYAN}======================================${NC}`);
   }
   
   console.log(`${GREEN}Environment configuration completed successfully${NC}`);

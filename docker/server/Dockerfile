@@ -3,11 +3,21 @@ FROM node:20-slim AS base
 # Set working directory
 WORKDIR /app
 
+# Copy the entire codebase to have access to all files early in the build process
+COPY . .
+
 # Install dependencies
 FROM base AS dependencies
-COPY package.json pnpm-lock.yaml ./
 RUN npm install -g pnpm
 RUN pnpm install --frozen-lockfile
+
+# Now generate environment inside the Docker container
+# Use the npm script with output directory parameter
+RUN pnpm env:docker /app
+
+# Build stage - performs the build inside Docker
+FROM dependencies AS builder
+RUN pnpm build:server
 
 # Production image
 FROM base AS runner
@@ -25,8 +35,11 @@ COPY --from=dependencies /app/node_modules ./node_modules
 RUN npm uninstall -g esbuild
 RUN npm install -g esbuild
 
-# Copy built application
-COPY ./dist ./dist
+# Copy built application from builder stage
+COPY --from=builder /app/dist ./dist
+
+# Copy .env file generated in the dependencies stage
+COPY --from=dependencies /app/.env /app/.env
 
 # Copy Prisma schema and migrations for database setup
 COPY ./server/prisma/schema.prisma ./server/prisma/schema.prisma

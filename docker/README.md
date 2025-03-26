@@ -14,6 +14,9 @@ This directory contains all the Docker-related files and configurations for depl
 To deploy the application using Docker, run the following commands:
 
 ```bash
+# Generate environment files for Docker
+pnpm env:docker
+
 # Build the application
 npm run docker:build
 
@@ -29,6 +32,27 @@ npm run docker:build:production
 
 # Deploy the application for production
 npm run docker:deploy:production
+```
+
+## Environment Configuration
+
+The Dockerfiles use the project's environment configuration script to generate environment files during the build process. The script supports specifying a custom output directory, which is used by the Docker build process to ensure files are written to the correct location:
+
+```bash
+# Used in Dockerfiles to create environment files inside the container
+pnpm env:docker /app
+```
+
+This approach ensures that:
+1. Environment files are generated at build time inside the container
+2. No environment secrets need to be copied from the host
+3. Each container gets a clean environment specific to its needs
+
+You can also use this script to generate environment files for local Docker development:
+
+```bash
+# Generate environment files in a custom location
+pnpm env:docker ./my-custom-docker-env
 ```
 
 ## Available Commands
