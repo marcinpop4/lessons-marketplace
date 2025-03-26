@@ -55,9 +55,12 @@ services:
     container_name: lessons-marketplace-tests
     profiles: ["test"]
     depends_on:
-      - frontend
-      - server
-      - database
+      database:
+        condition: service_healthy
+      server:
+        condition: service_healthy
+      frontend:
+        condition: service_started
     environment:
       - JEST_JUNIT_OUTPUT_DIR=/app/test-results/
       - JEST_JUNIT_OUTPUT_NAME=junit.xml
@@ -67,6 +70,7 @@ services:
       - PLAYWRIGHT_TIMEOUT=30000
       - PLAYWRIGHT_ACTION_TIMEOUT=15000
       - PLAYWRIGHT_NAVIGATION_TIMEOUT=20000
+      - FRONTEND_URL=http://frontend:80
     volumes:
       - ../tests/test-results:/app/test-results
       - ../tests/playwright-report:/app/playwright-report
