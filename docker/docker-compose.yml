@@ -4,7 +4,7 @@ services:
       context: ..
       dockerfile: docker/database/Dockerfile
     container_name: lessons-marketplace-db
-    restart: unless-stopped
+    restart: "no"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -21,7 +21,7 @@ services:
       context: ..
       dockerfile: docker/server/Dockerfile
     container_name: lessons-marketplace-server
-    restart: unless-stopped
+    restart: "no"
     depends_on:
       database:
         condition: service_healthy
@@ -40,7 +40,7 @@ services:
       context: ..
       dockerfile: docker/frontend/Dockerfile
     container_name: lessons-marketplace-frontend
-    restart: unless-stopped
+    restart: "no"
     depends_on:
       - server
     ports:
