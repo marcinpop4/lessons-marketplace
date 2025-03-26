@@ -12,6 +12,8 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
+    env:
+      PNPM_VERSION: 10.3.0  # Match local environment version
 
     steps:
       - name: Checkout code
@@ -27,7 +29,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: ${{ env.PNPM_VERSION }}
           run_install: true
 
       - name: Install dependencies
@@ -37,7 +39,11 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and run tests in Docker
+        env:
+          DOCKER_BUILDKIT: 1
         run: |
+          # Update Dockerfile to use specific pnpm version
+          sed -i "s/pnpm@latest/pnpm@$PNPM_VERSION/g" docker/test.Dockerfile
           pnpm docker:deploy
           pnpm docker:test
         # This will deploy the application and run all tests in Docker 
