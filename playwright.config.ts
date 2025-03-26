@@ -37,6 +37,9 @@ export default defineConfig({
     },
     video: 'on-first-retry',
     
+    // Always use headless mode in Docker environments
+    headless: true,
+    
     // Increase timeouts for CI environments
     actionTimeout: process.env.CI ? 10000 : 5000,
     navigationTimeout: process.env.CI ? 15000 : 10000,

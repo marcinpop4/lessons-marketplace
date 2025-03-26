@@ -144,7 +144,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return false;
     } catch (error: any) {
       console.error('Login error:', error);
-      const errorMessage = error.response?.data?.error || 'Login failed. Please try again.';
+      const errorMessage = error.response?.data?.error;
       setError(errorMessage);
       return false;
     } finally {
