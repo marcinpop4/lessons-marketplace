@@ -11,19 +11,18 @@ FROM base AS dependencies
 RUN npm install -g pnpm
 RUN pnpm install --frozen-lockfile
 
-# Now generate environment inside the Docker container
-# Use the npm script with output directory parameter
-RUN pnpm env:docker /app
-
-# Build stage - performs the build inside Docker
+# Build stage
 FROM dependencies AS builder
+# Generate Prisma client
+RUN npx prisma generate --schema=server/prisma/schema.prisma
+# Build server code
 RUN pnpm build:server
 
 # Production image
 FROM base AS runner
 
 # Install required system packages
-RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y openssl curl && rm -rf /var/lib/apt/lists/*
 
 # Copy package.json and pnpm-lock.yaml
 COPY package.json pnpm-lock.yaml ./
@@ -31,23 +30,12 @@ COPY package.json pnpm-lock.yaml ./
 # Install only production dependencies
 COPY --from=dependencies /app/node_modules ./node_modules
 
-# Fix for esbuild platform compatibility issues
-RUN npm uninstall -g esbuild
-RUN npm install -g esbuild
-
-# Copy built application from builder stage
-COPY --from=builder /app/dist ./dist
-
-# Copy .env file generated in the dependencies stage
-COPY --from=dependencies /app/.env /app/.env
-
-# Copy Prisma schema and migrations for database setup
-COPY ./server/prisma/schema.prisma ./server/prisma/schema.prisma
-COPY ./server/prisma/migrations ./server/prisma/migrations
-COPY ./server/prisma/seed.ts ./server/prisma/seed.ts
-
-# Generate Prisma client - ensures we have a suitable client for the current environment
+# Copy Prisma schema and generate client
+COPY server/prisma/schema.prisma ./server/prisma/schema.prisma
 RUN npx prisma generate --schema=server/prisma/schema.prisma
+
+# Copy the built application
+COPY --from=builder /app/dist ./dist
 
 # Expose the port the app runs on
 EXPOSE ${PORT}

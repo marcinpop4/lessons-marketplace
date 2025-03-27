@@ -7,14 +7,29 @@ services:
     restart: "no"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    env_file:
+      - ../env/.env.${profile}
+    profiles: ["base", "ci", "prod"]
+
+  database-ci:
+    extends: database
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U marcin -d lessons_marketplace"]
       interval: 5s
       timeout: 5s
       retries: 5
-    ports:
-      - "5432:5432"
-    profiles: ["default", "test"]
+    profiles: ["ci"]
+
+  database-prod:
+    extends: database
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lessons_user3 -d lessons_marketplace_server"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    profiles: ["prod"]
 
   server:
     build:
@@ -22,18 +37,40 @@ services:
       dockerfile: docker/server/Dockerfile
     container_name: lessons-marketplace-server
     restart: "no"
+    ports:
+      - "3000:3000"
+    env_file:
+      - ../env/.env.${profile}
     depends_on:
       database:
         condition: service_healthy
-    ports:
-      - "3000:3000"
+    profiles: ["base", "ci", "prod"]
+
+  server-ci:
+    extends: server
+    depends_on:
+      database-ci:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 15s
-    profiles: ["default", "test"]
+    profiles: ["ci"]
+
+  server-prod:
+    extends: server
+    depends_on:
+      database-prod:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "https://lessons-marketplace-server.fly.dev/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    profiles: ["prod"]
 
   frontend:
     build:
@@ -41,26 +78,53 @@ services:
       dockerfile: docker/frontend/Dockerfile
     container_name: lessons-marketplace-frontend
     restart: "no"
-    depends_on:
-      - server
     ports:
       - "5173:80"
-    profiles: ["default", "test"]
-
-  # Test service using our dedicated test Dockerfile - standalone version
-  tests:
-    build:
-      context: ..
-      dockerfile: docker/test.Dockerfile
-    container_name: lessons-marketplace-tests
-    profiles: ["test"]
+    env_file:
+      - ../env/.env.${profile}
     depends_on:
-      database:
-        condition: service_healthy
       server:
         condition: service_healthy
-      frontend:
-        condition: service_started
+    profiles: ["base", "ci", "prod"]
+
+  frontend-ci:
+    extends: frontend
+    build:
+      args:
+        VITE_API_BASE_URL: http://server-ci:3000
+    depends_on:
+      server-ci:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/index.html"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    profiles: ["ci"]
+
+  frontend-prod:
+    extends: frontend
+    build:
+      args:
+        VITE_API_BASE_URL: https://lessons-marketplace-server.fly.dev
+    depends_on:
+      server-prod:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "https://lessons-marketplace-frontend.fly.dev/index.html"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    profiles: ["prod"]
+
+  # Test service using our dedicated test Dockerfile - standalone version
+  test:
+    build:
+      context: ..
+      dockerfile: docker/test/Dockerfile
+    container_name: lessons-marketplace-test
     environment:
       - JEST_JUNIT_OUTPUT_DIR=/app/test-results/
       - JEST_JUNIT_OUTPUT_NAME=junit.xml
@@ -70,12 +134,17 @@ services:
       - PLAYWRIGHT_TIMEOUT=30000
       - PLAYWRIGHT_ACTION_TIMEOUT=15000
       - PLAYWRIGHT_NAVIGATION_TIMEOUT=20000
-      - FRONTEND_URL=http://frontend:80
+      - FRONTEND_URL=http://frontend-ci:80
     volumes:
-      - ../tests/test-results:/app/test-results
-      - ../tests/playwright-report:/app/playwright-report
-      - ../tests/screenshots:/app/tests/screenshots
-    ipc: host  # Recommended for Chrome to avoid memory issues
+      - ../test-results:/app/test-results
+    depends_on:
+      database-ci:
+        condition: service_healthy
+      frontend-ci:
+        condition: service_healthy
+      server-ci:
+        condition: service_healthy
+    profiles: ["ci"]
 
 volumes:
   postgres_data:

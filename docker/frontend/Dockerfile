@@ -1,28 +1,30 @@
-FROM node:20-slim AS builder
+FROM node:20-slim AS base
 
 # Set working directory
 WORKDIR /app
 
-# Copy the entire codebase first
+# Copy the entire codebase to have access to all files early in the build process
 COPY . .
 
 # Install dependencies
+FROM base AS dependencies
 RUN npm install -g pnpm
 RUN pnpm install --frozen-lockfile
 
-# Generate environment inside Docker container with explicit output directory
-RUN pnpm env:docker /app
+# Build stage
+FROM dependencies AS builder
+# Make environment variables available during build
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 
-# Build frontend
-RUN pnpm build:frontend
+# Pass the environment variable explicitly to the build command
+RUN VITE_API_BASE_URL=${VITE_API_BASE_URL} pnpm build:frontend
 
-# Final nginx image
+# Production image
 FROM nginx:alpine
 
-# Install Node.js and pnpm
-RUN apk add --no-cache nodejs npm && \
-    npm install -g pnpm && \
-    apk del npm
+# Install curl for healthchecks
+RUN apk add --no-cache curl
 
 # Remove default nginx configuration and create log directory
 RUN rm -rf /etc/nginx/conf.d/* && \
@@ -32,15 +34,11 @@ RUN rm -rf /etc/nginx/conf.d/* && \
 # Copy custom nginx configuration template
 COPY frontend/config/nginx/nginx.conf /etc/nginx/templates/default.conf.template
 
-# Copy everything from builder stage
-WORKDIR /app
-COPY --from=builder /app /app
-
-# Copy built frontend files to nginx html directory
+# Copy built files from builder stage
 COPY --from=builder /app/dist/frontend /usr/share/nginx/html
 
 # Expose port 80
 EXPOSE 80
 
 # Process template and start nginx
-CMD ["/bin/sh", "-c", "set -a && . /app/.env && envsubst '$${VITE_API_BASE_URL}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"] 
+CMD ["/bin/sh", "-c", "envsubst '${VITE_API_BASE_URL}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"] 
