@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PNPM_VERSION: 10.3.0  # Match local environment version
+      profile: ci  # Set the profile for Docker commands
 
     steps:
       - name: Checkout code
@@ -43,7 +44,7 @@ jobs:
           DOCKER_BUILDKIT: 1
         run: |
           # Update Dockerfile to use specific pnpm version
-          sed -i "s/pnpm@latest/pnpm@$PNPM_VERSION/g" docker/test.Dockerfile
+          sed -i "s/pnpm@latest/pnpm@$PNPM_VERSION/g" docker/test/Dockerfile
           pnpm docker:deploy
           pnpm docker:test
         # This will deploy the application and run all tests in Docker 
