@@ -15,7 +15,7 @@
     "dev:full:clear-cache": "pnpm env:dev && concurrently \"pnpm run dev:clear-cache\" \"pnpm run dev:server\"",
     "dev:server": "pnpm env:dev && tsx watch server/index.ts",
     "dev:server:debug": "pnpm env:dev && cross-env DEBUG=true tsx watch server/index.ts",
-    "docker:clean": "docker ps -q | xargs -r docker stop && docker ps -aq | xargs -r docker rm && docker compose -f docker/docker-compose.yml down --remove-orphans --volumes --rmi all",
+    "docker:clean": "docker ps -q | xargs -r docker stop && docker ps -aq | xargs -r docker rm && docker compose -f docker/docker-compose.yml --profile ${profile} down --remove-orphans --volumes --rmi all",
     "docker:stop": "docker compose -f docker/docker-compose.yml --profile ${profile} stop",
     "docker:down": "pnpm docker:stop && docker compose -f docker/docker-compose.yml --profile ${profile} down --remove-orphans",
     "docker:up": "pnpm docker:down && docker compose -f docker/docker-compose.yml --profile ${profile} up -d",
