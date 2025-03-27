@@ -3,7 +3,7 @@ services:
     build:
       context: ..
       dockerfile: docker/database/Dockerfile
-    container_name: lessons-marketplace-db-base
+    container_name: lessons-marketplace-db
     restart: "no"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -11,103 +11,201 @@ services:
       - "5432:5432"
     env_file:
       - ../env/.env.${profile}
-    profiles: ["base"]
+    profiles: ["ci", "prod"]
 
   database-ci:
     extends: database
-    container_name: lessons-marketplace-db-ci
     ports:
       - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U marcin -d lessons_marketplace"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      interval: 2s      # Check more frequently
+      timeout: 3s
+      retries: 10       # More retries with shorter interval
+      start_period: 5s  # Allow minimal startup time
     profiles: ["ci"]
 
   database-prod:
     extends: database
-    container_name: lessons-marketplace-db-prod
     ports:
       - "5434:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U lessons_user3 -d lessons_marketplace_server"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      interval: 2s      # Check more frequently
+      timeout: 3s
+      retries: 15       # More retries for production
+      start_period: 10s
     profiles: ["prod"]
 
   server:
     build:
       context: ..
       dockerfile: docker/server/Dockerfile
-    container_name: lessons-marketplace-server-base
+    container_name: lessons-marketplace-server
     restart: "no"
     ports:
       - "3000:3000"
     env_file:
       - ../env/.env.${profile}
-    profiles: ["base"]
+    profiles: ["ci", "prod"]
+    # Base service should not have dependency on base database as it's not active
 
   server-ci:
     extends: server
-    container_name: lessons-marketplace-server-ci
+    depends_on:
+      database-ci:
+        condition: service_healthy
+        restart: true   # Restart dependency check if it fails
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+      interval: 5s      # Check more frequently
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     profiles: ["ci"]
 
   server-prod:
     extends: server
-    container_name: lessons-marketplace-server-prod
+    depends_on:
+      database-prod:
+        condition: service_healthy
+        restart: true   # Restart dependency check if it fails
     healthcheck:
       test: ["CMD", "curl", "-f", "https://lessons-marketplace-server.fly.dev/api/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      interval: 5s
+      timeout: 3s
+      retries: 10
       start_period: 15s
+    profiles: ["prod"]
+
+  # Base migration service
+  migration:
+    build:
+      context: ..
+      dockerfile: docker/server/Dockerfile
+    container_name: lessons-marketplace-migrate
+    profiles: ["ci", "prod"]
+    env_file:
+      - ../env/.env.${profile}
+
+  migration-ci:
+    extends: migration
+    container_name: lessons-marketplace-migrate-ci
+    command: >
+      sh -c "echo 'Waiting for server to be ready...' &&
+             echo 'Running migrations...' &&
+             npx prisma migrate deploy --schema=server/prisma/schema.prisma"
+    depends_on:
+      server-ci:
+        condition: service_healthy
+        restart: true
+    profiles: ["ci"]
+
+  migration-prod:
+    extends: migration
+    container_name: lessons-marketplace-migrate-prod
+    command: >
+      sh -c "echo 'Waiting for server to be ready...' &&
+             echo 'Running migrations...' &&
+             npx prisma migrate deploy --schema=server/prisma/schema.prisma"
+    depends_on:
+      server-prod:
+        condition: service_healthy
+        restart: true
+    profiles: ["prod"]
+
+  # Base seed service
+  seed:
+    build:
+      context: ..
+      dockerfile: docker/server/Dockerfile
+    container_name: lessons-marketplace-seed
+    env_file:
+      - ../env/.env.${profile}
+    restart: "no"
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]  # Always report as healthy while running
+      interval: 1s
+      timeout: 1s
+      retries: 1
+    profiles: ["ci", "prod"]
+
+  seed-ci:
+    extends: seed
+    container_name: lessons-marketplace-seed-ci
+    command: >
+      sh -c "echo 'Waiting for migrations to complete...' &&
+             echo 'Running seed data...' &&
+             node dist/server/prisma/seed.js"
+    depends_on:
+      migration-ci:
+        condition: service_completed_successfully
+        restart: true
+    profiles: ["ci"]
+
+  seed-prod:
+    extends: seed
+    container_name: lessons-marketplace-seed-prod
+    command: >
+      sh -c "echo 'Waiting for migrations to complete...' &&
+             echo 'Running seed data...' &&
+             node dist/server/prisma/seed.js"
+    depends_on:
+      migration-prod:
+        condition: service_completed_successfully
+        restart: true
     profiles: ["prod"]
 
   frontend:
     build:
       context: ..
       dockerfile: docker/frontend/Dockerfile
-    container_name: lessons-marketplace-frontend-base
+    container_name: lessons-marketplace-frontend
     restart: "no"
     ports:
       - "5173:80"
     env_file:
       - ../env/.env.${profile}
-    profiles: ["base"]
+    profiles: ["ci", "prod"]
+    # Base service should not have dependencies on base services as they're not active
 
   frontend-ci:
     extends: frontend
-    container_name: lessons-marketplace-frontend-ci
     build:
       args:
         VITE_API_BASE_URL: http://server-ci:3000
+    depends_on:
+      server-ci:
+        condition: service_healthy
+        restart: true
+      seed-ci:
+        condition: service_completed_successfully
+        restart: true
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/index.html"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     profiles: ["ci"]
 
   frontend-prod:
     extends: frontend
-    container_name: lessons-marketplace-frontend-prod
     build:
       args:
         VITE_API_BASE_URL: https://lessons-marketplace-server.fly.dev
+    depends_on:
+      server-prod:
+        condition: service_healthy
+        restart: true
+      seed-prod:
+        condition: service_completed_successfully
+        restart: true
     healthcheck:
       test: ["CMD", "curl", "-f", "https://lessons-marketplace-frontend.fly.dev/index.html"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      interval: 5s
+      timeout: 3s
+      retries: 10
       start_period: 15s
     profiles: ["prod"]
 
@@ -127,6 +225,16 @@ services:
       - PLAYWRIGHT_ACTION_TIMEOUT=15000
       - PLAYWRIGHT_NAVIGATION_TIMEOUT=20000
       - FRONTEND_URL=http://frontend-ci:80
+    depends_on:
+      database-ci:
+        condition: service_healthy
+        restart: true
+      server-ci:
+        condition: service_healthy
+        restart: true
+      frontend-ci:
+        condition: service_healthy
+        restart: true
     profiles: ["ci"]
 
 volumes:
