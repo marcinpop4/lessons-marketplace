@@ -47,17 +47,11 @@ services:
       - "3000:3000"
     env_file:
       - ../env/.env.${profile}
-    depends_on:
-      database:
-        condition: service_healthy
     profiles: ["base"]
 
   server-ci:
     extends: server
     container_name: lessons-marketplace-server-ci
-    depends_on:
-      database-ci:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 10s
@@ -69,9 +63,6 @@ services:
   server-prod:
     extends: server
     container_name: lessons-marketplace-server-prod
-    depends_on:
-      database-prod:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "https://lessons-marketplace-server.fly.dev/api/health"]
       interval: 10s
@@ -90,9 +81,6 @@ services:
       - "5173:80"
     env_file:
       - ../env/.env.${profile}
-    depends_on:
-      server:
-        condition: service_healthy
     profiles: ["base"]
 
   frontend-ci:
@@ -115,9 +103,6 @@ services:
     build:
       args:
         VITE_API_BASE_URL: https://lessons-marketplace-server.fly.dev
-    depends_on:
-      server-prod:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "https://lessons-marketplace-frontend.fly.dev/index.html"]
       interval: 10s
@@ -142,13 +127,6 @@ services:
       - PLAYWRIGHT_ACTION_TIMEOUT=15000
       - PLAYWRIGHT_NAVIGATION_TIMEOUT=20000
       - FRONTEND_URL=http://frontend-ci:80
-    depends_on:
-      database-ci:
-        condition: service_healthy
-      frontend-ci:
-        condition: service_healthy
-      server-ci:
-        condition: service_healthy
     profiles: ["ci"]
 
 volumes:
