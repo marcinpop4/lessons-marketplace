@@ -19,9 +19,10 @@ services:
       - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U marcin -d lessons_marketplace"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      interval: 2s      # Check more frequently
+      timeout: 3s
+      retries: 10       # More retries with shorter interval
+      start_period: 5s  # Allow minimal startup time
     profiles: ["ci"]
 
   database-prod:
@@ -30,9 +31,10 @@ services:
       - "5434:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U lessons_user3 -d lessons_marketplace_server"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      interval: 2s      # Check more frequently
+      timeout: 3s
+      retries: 15       # More retries for production
+      start_period: 10s
     profiles: ["prod"]
 
   server:
@@ -53,12 +55,13 @@ services:
     depends_on:
       database-ci:
         condition: service_healthy
+        restart: true   # Restart dependency check if it fails
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+      interval: 5s      # Check more frequently
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     profiles: ["ci"]
 
   server-prod:
@@ -66,12 +69,91 @@ services:
     depends_on:
       database-prod:
         condition: service_healthy
+        restart: true   # Restart dependency check if it fails
     healthcheck:
       test: ["CMD", "curl", "-f", "https://lessons-marketplace-server.fly.dev/api/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      interval: 5s
+      timeout: 3s
+      retries: 10
       start_period: 15s
+    profiles: ["prod"]
+
+  # Base migration service
+  migration:
+    build:
+      context: ..
+      dockerfile: docker/server/Dockerfile
+    container_name: lessons-marketplace-migrate
+    profiles: ["ci", "prod"]
+    env_file:
+      - ../env/.env.${profile}
+
+  migration-ci:
+    extends: migration
+    container_name: lessons-marketplace-migrate-ci
+    command: >
+      sh -c "echo 'Waiting for server to be ready...' &&
+             echo 'Running migrations...' &&
+             npx prisma migrate deploy --schema=server/prisma/schema.prisma"
+    depends_on:
+      server-ci:
+        condition: service_healthy
+        restart: true
+    profiles: ["ci"]
+
+  migration-prod:
+    extends: migration
+    container_name: lessons-marketplace-migrate-prod
+    command: >
+      sh -c "echo 'Waiting for server to be ready...' &&
+             echo 'Running migrations...' &&
+             npx prisma migrate deploy --schema=server/prisma/schema.prisma"
+    depends_on:
+      server-prod:
+        condition: service_healthy
+        restart: true
+    profiles: ["prod"]
+
+  # Base seed service
+  seed:
+    build:
+      context: ..
+      dockerfile: docker/server/Dockerfile
+    container_name: lessons-marketplace-seed
+    env_file:
+      - ../env/.env.${profile}
+    restart: "no"
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]  # Always report as healthy while running
+      interval: 1s
+      timeout: 1s
+      retries: 1
+    profiles: ["ci", "prod"]
+
+  seed-ci:
+    extends: seed
+    container_name: lessons-marketplace-seed-ci
+    command: >
+      sh -c "echo 'Waiting for migrations to complete...' &&
+             echo 'Running seed data...' &&
+             node dist/server/prisma/seed.js"
+    depends_on:
+      migration-ci:
+        condition: service_completed_successfully
+        restart: true
+    profiles: ["ci"]
+
+  seed-prod:
+    extends: seed
+    container_name: lessons-marketplace-seed-prod
+    command: >
+      sh -c "echo 'Waiting for migrations to complete...' &&
+             echo 'Running seed data...' &&
+             node dist/server/prisma/seed.js"
+    depends_on:
+      migration-prod:
+        condition: service_completed_successfully
+        restart: true
     profiles: ["prod"]
 
   frontend:
@@ -95,12 +177,16 @@ services:
     depends_on:
       server-ci:
         condition: service_healthy
+        restart: true
+      seed-ci:
+        condition: service_completed_successfully
+        restart: true
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/index.html"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     profiles: ["ci"]
 
   frontend-prod:
@@ -111,11 +197,15 @@ services:
     depends_on:
       server-prod:
         condition: service_healthy
+        restart: true
+      seed-prod:
+        condition: service_completed_successfully
+        restart: true
     healthcheck:
       test: ["CMD", "curl", "-f", "https://lessons-marketplace-frontend.fly.dev/index.html"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      interval: 5s
+      timeout: 3s
+      retries: 10
       start_period: 15s
     profiles: ["prod"]
 
@@ -138,10 +228,13 @@ services:
     depends_on:
       database-ci:
         condition: service_healthy
+        restart: true
       server-ci:
         condition: service_healthy
+        restart: true
       frontend-ci:
         condition: service_healthy
+        restart: true
     profiles: ["ci"]
 
 volumes:
