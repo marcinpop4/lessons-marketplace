@@ -45,6 +45,7 @@ jobs:
         run: |
           # Update Dockerfile to use specific pnpm version
           sed -i "s/pnpm@latest/pnpm@$PNPM_VERSION/g" docker/test/Dockerfile
+          pnpm docker:clean
           pnpm docker:deploy
           pnpm docker:test
         # This will deploy the application and run all tests in Docker 
