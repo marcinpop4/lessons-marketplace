@@ -43,7 +43,7 @@ jobs:
         run: export profile=ci && pnpm docker:clean
 
       - name: Deploy components
-        run: export profile=ci && pnpm docker:deploy
+        run: export profile=ci && pnpm docker:deploy:rebuild
 
       - name: Run tests
-        run: export profile=ci && pnpm docker:test
+        run: export profile=ci && pnpm docker:test:rebuild

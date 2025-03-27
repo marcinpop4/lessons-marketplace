@@ -3,7 +3,7 @@ services:
     build:
       context: ..
       dockerfile: docker/database/Dockerfile
-    container_name: lessons-marketplace-db-base
+    container_name: lessons-marketplace-db
     restart: "no"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -11,11 +11,10 @@ services:
       - "5432:5432"
     env_file:
       - ../env/.env.${profile}
-    profiles: ["base"]
+    profiles: ["ci", "prod"]
 
   database-ci:
     extends: database
-    container_name: lessons-marketplace-db-ci
     ports:
       - "5433:5432"
     healthcheck:
@@ -27,7 +26,6 @@ services:
 
   database-prod:
     extends: database
-    container_name: lessons-marketplace-db-prod
     ports:
       - "5434:5432"
     healthcheck:
@@ -41,17 +39,20 @@ services:
     build:
       context: ..
       dockerfile: docker/server/Dockerfile
-    container_name: lessons-marketplace-server-base
+    container_name: lessons-marketplace-server
     restart: "no"
     ports:
       - "3000:3000"
     env_file:
       - ../env/.env.${profile}
-    profiles: ["base"]
+    profiles: ["ci", "prod"]
+    # Base service should not have dependency on base database as it's not active
 
   server-ci:
     extends: server
-    container_name: lessons-marketplace-server-ci
+    depends_on:
+      database-ci:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 10s
@@ -62,7 +63,9 @@ services:
 
   server-prod:
     extends: server
-    container_name: lessons-marketplace-server-prod
+    depends_on:
+      database-prod:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "https://lessons-marketplace-server.fly.dev/api/health"]
       interval: 10s
@@ -75,20 +78,23 @@ services:
     build:
       context: ..
       dockerfile: docker/frontend/Dockerfile
-    container_name: lessons-marketplace-frontend-base
+    container_name: lessons-marketplace-frontend
     restart: "no"
     ports:
       - "5173:80"
     env_file:
       - ../env/.env.${profile}
-    profiles: ["base"]
+    profiles: ["ci", "prod"]
+    # Base service should not have dependencies on base services as they're not active
 
   frontend-ci:
     extends: frontend
-    container_name: lessons-marketplace-frontend-ci
     build:
       args:
         VITE_API_BASE_URL: http://server-ci:3000
+    depends_on:
+      server-ci:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/index.html"]
       interval: 10s
@@ -99,10 +105,12 @@ services:
 
   frontend-prod:
     extends: frontend
-    container_name: lessons-marketplace-frontend-prod
     build:
       args:
         VITE_API_BASE_URL: https://lessons-marketplace-server.fly.dev
+    depends_on:
+      server-prod:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "https://lessons-marketplace-frontend.fly.dev/index.html"]
       interval: 10s
@@ -127,6 +135,13 @@ services:
       - PLAYWRIGHT_ACTION_TIMEOUT=15000
       - PLAYWRIGHT_NAVIGATION_TIMEOUT=20000
       - FRONTEND_URL=http://frontend-ci:80
+    depends_on:
+      database-ci:
+        condition: service_healthy
+      server-ci:
+        condition: service_healthy
+      frontend-ci:
+        condition: service_healthy
     profiles: ["ci"]
 
 volumes:
