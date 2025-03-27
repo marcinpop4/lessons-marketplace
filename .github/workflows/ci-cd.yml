@@ -39,7 +39,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Clean Docker environment
-        run: profile=ci pnpm docker:clean
+        run: pnpm docker:clean
 
       - name: Deploy database
         run: profile=ci pnpm docker:db
