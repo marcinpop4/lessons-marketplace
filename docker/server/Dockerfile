@@ -34,6 +34,10 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY server/prisma/schema.prisma ./server/prisma/schema.prisma
 RUN npx prisma generate --schema=server/prisma/schema.prisma
 
+# Copy the scripts directory for Docker-specific operations
+COPY scripts ./scripts
+RUN chmod +x scripts/docker-seed.ts
+
 # Copy the built application
 COPY --from=builder /app/dist ./dist
 

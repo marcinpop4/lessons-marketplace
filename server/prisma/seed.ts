@@ -9,6 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import bcryptjs from 'bcryptjs';
+import { execSync } from 'child_process';
 
 // Load environment variables from .env file in the project root
 const __filename = fileURLToPath(import.meta.url);
@@ -19,6 +20,32 @@ const { PrismaClient } = pkg;
 
 // Initialize Prisma client with proper typing
 const prisma = new PrismaClient();
+
+// Ensure Prisma client is initialized before running the seed
+async function ensurePrismaClientIsInitialized() {
+  try {
+    // Test a simple database query
+    await prisma.$queryRaw`SELECT 1`;
+    console.log('✅ Prisma client is initialized and connected to the database');
+    return true;
+  } catch (error) {
+    console.error('❌ Prisma client is not initialized properly');
+    console.error('Attempting to generate Prisma client...');
+    
+    try {
+      execSync('npx prisma generate --schema=server/prisma/schema.prisma', { stdio: 'inherit' });
+      console.log('Prisma client generation completed');
+      
+      // Test connection again
+      await prisma.$queryRaw`SELECT 1`;
+      console.log('✅ Prisma client is now properly initialized');
+      return true;
+    } catch (generateError) {
+      console.error('Failed to generate Prisma client:', generateError);
+      return false;
+    }
+  }
+}
 
 // Define LessonType to match schema.prisma
 type LessonType = 'VOICE' | 'GUITAR' | 'BASS' | 'DRUMS';
@@ -100,6 +127,12 @@ const sampleAddresses = [
 
 async function main() {
   console.log('Starting database seeding...');
+
+  // Ensure Prisma client is initialized before proceeding
+  const isPrismaInitialized = await ensurePrismaClientIsInitialized();
+  if (!isPrismaInitialized) {
+    throw new Error('Failed to initialize Prisma client. Cannot proceed with seeding.');
+  }
 
   // Hash the common password "1234" once 
   const hashedPassword = await hashPassword("1234");
@@ -308,6 +341,7 @@ async function main() {
     console.log('Seeding completed successfully!');
   } catch (error) {
     console.error('Error during seeding:', error);
+    throw error; // Re-throw to ensure the process exits with an error code
   } finally {
     await prisma.$disconnect();
   }

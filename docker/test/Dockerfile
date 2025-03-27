@@ -2,7 +2,7 @@ FROM mcr.microsoft.com/playwright:v1.51.0-noble
 
 # Install Node.js and pnpm
 RUN apt-get update && \
-    apt-get install -y curl && \
+    apt-get install -y curl openssl && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && \
     npm install -g pnpm@latest && \
@@ -21,3 +21,6 @@ COPY . .
 
 # Generate Prisma client
 RUN npx prisma generate --schema=server/prisma/schema.prisma
+
+# Make seed script executable
+RUN chmod +x scripts/docker-seed.ts
