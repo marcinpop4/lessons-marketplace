@@ -101,9 +101,6 @@ services:
     build:
       args:
         VITE_API_BASE_URL: http://server-ci:3000
-    depends_on:
-      server-ci:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/index.html"]
       interval: 10s
