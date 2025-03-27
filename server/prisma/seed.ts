@@ -17,8 +17,8 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const { PrismaClient } = pkg;
 
-// Use type assertion for simplicity
-const prisma = new PrismaClient() as any;
+// Initialize Prisma client with proper typing
+const prisma = new PrismaClient();
 
 // Define LessonType to match schema.prisma
 type LessonType = 'VOICE' | 'GUITAR' | 'BASS' | 'DRUMS';

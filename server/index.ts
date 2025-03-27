@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import logger from './utils/logger.js';
+import { execSync } from 'child_process';
 
 // Load environment variables
 dotenv.config();
@@ -38,6 +39,16 @@ const PORT = parseInt(PORT_ENV, 10);
 const frontendUrl = process.env.FRONTEND_URL;
 if (!frontendUrl) {
   throw new Error("FRONTEND_URL environment variable is required");
+}
+
+// Ensure Prisma client is generated
+try {
+  logger.info('Generating Prisma client...');
+  execSync('npx prisma generate --schema=server/prisma/schema.prisma', { stdio: 'inherit' });
+  logger.info('Prisma client generated successfully');
+} catch (error) {
+  logger.error('Failed to generate Prisma client:', error);
+  process.exit(1);
 }
 
 // Middleware
