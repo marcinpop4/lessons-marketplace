@@ -68,9 +68,9 @@ export const getDatabaseUrl = (options?: {
     // Get database configuration from environment variables or options
     const DB_HOST = options?.host || process.env.DB_HOST;
     const DB_PORT = options?.port?.toString() || process.env.DB_PORT;
-    const DB_NAME = options?.name || process.env.DB_NAME;
-    const DB_USER = options?.user || process.env.DB_USER;
-    const DB_PASSWORD = options?.password || process.env.DB_PASSWORD;
+    const DB_NAME = options?.name || process.env.POSTGRES_DB;
+    const DB_USER = options?.user || process.env.POSTGRES_USER;
+    const DB_PASSWORD = options?.password || process.env.POSTGRES_PASSWORD;
     const DB_SSL = options?.ssl !== undefined ? options.ssl : (process.env.DB_SSL === 'true');
 
     // Validate all required parameters are present

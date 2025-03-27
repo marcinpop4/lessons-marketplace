@@ -20,6 +20,8 @@ primary_region = "ewr"
   FRONTEND_URL = "https://lessons-marketplace-frontend.fly.dev"
   JWT_EXPIRES_IN = "1h"
   REFRESH_TOKEN_EXPIRES_IN = "7d"
+  POSTGRES_DB = "lessons_marketplace_server"
+  POSTGRES_USER = "lessons_user3"
 
 # Run database migrations on deploy
 [deploy]

@@ -94,7 +94,10 @@ export function loadEnvironment(env: Environment = Environment.Development): Doc
     'DB_USER',
     'DB_PASSWORD',
     'PORT',
-    'JWT_SECRET'
+    'JWT_SECRET',
+    'POSTGRES_DB',
+    'POSTGRES_USER',
+    'POSTGRES_PASSWORD'
   ];
   
   for (const key of requiredVars) {
@@ -109,9 +112,9 @@ export function loadEnvironment(env: Environment = Environment.Development): Doc
     db: {
       host: process.env.DB_HOST!,
       port: parseInt(process.env.DB_PORT || '5432', 10),
-      name: process.env.DB_NAME!,
-      user: process.env.DB_USER!,
-      password: process.env.DB_PASSWORD!,
+      name: process.env.POSTGRES_DB!,
+      user: process.env.POSTGRES_USER!,
+      password: process.env.POSTGRES_PASSWORD!,
       ssl: process.env.DB_SSL === 'true',
       poolSize: parseInt(process.env.DB_POOL_SIZE || '10', 10)
     },

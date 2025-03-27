@@ -43,7 +43,10 @@ export function loadEnvVars(env: Environment = 'development'): Record<string, st
     'DB_USER',
     'DB_PASSWORD',
     'PORT',
-    'JWT_SECRET'
+    'JWT_SECRET',
+    'POSTGRES_DB',
+    'POSTGRES_USER',
+    'POSTGRES_PASSWORD'
   ];
   
   for (const key of required) {

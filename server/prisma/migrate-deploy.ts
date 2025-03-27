@@ -16,26 +16,26 @@ async function main() {
   // Additional logging to help debug database connection issues
   console.log(`Environment: ${process.env.NODE_ENV}`);
   console.log(`Host: ${process.env.DB_HOST}`);
-  console.log(`Database Name: ${process.env.DB_NAME}`);
+  console.log(`Database Name: ${process.env.POSTGRES_DB}`);
   console.log(`Fly.io Environment: ${process.env.FLY_APP_NAME ? 'Yes' : 'No'}`);
 
   try {
     // Check all required environment variables
-    const requiredEnvVars = ['DB_USER', 'DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_PASSWORD'];
+    const requiredEnvVars = ['POSTGRES_USER', 'DB_HOST', 'DB_PORT', 'POSTGRES_DB', 'POSTGRES_PASSWORD'];
     const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
     
     if (missingVars.length > 0) {
       throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
     }
 
-    // Use DB_PASSWORD from environment (should be set via Fly.io secrets)
-    const dbPassword = process.env.DB_PASSWORD;
+    // Use POSTGRES_PASSWORD from environment (should be set via Fly.io secrets)
+    const dbPassword = process.env.POSTGRES_PASSWORD;
     if (!dbPassword) {
-      throw new Error('DB_PASSWORD environment variable is not set');
+      throw new Error('POSTGRES_PASSWORD environment variable is not set');
     }
 
     // Construct database URL
-    const databaseUrl = `postgresql://${process.env.DB_USER}:${dbPassword}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}?sslmode=${process.env.DB_SSL === 'true' ? 'require' : 'disable'}`;
+    const databaseUrl = `postgresql://${process.env.POSTGRES_USER}:${dbPassword}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.POSTGRES_DB}?sslmode=${process.env.DB_SSL === 'true' ? 'require' : 'disable'}`;
 
     // Log a masked version of the connection string for debugging
     const maskedUrl = databaseUrl.replace(/:([^:@]+)@/, ':****@');

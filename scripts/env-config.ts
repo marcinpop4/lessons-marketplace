@@ -137,7 +137,7 @@ function setFlySecrets(config: Record<string, string>, appName: string): void {
   console.log(`${YELLOW}Setting secrets for Fly.io app: ${appName}${NC}`);
   
   // Identify sensitive variables that should be set as secrets
-  const sensitiveKeys = ['DB_PASSWORD', 'JWT_SECRET'];
+  const sensitiveKeys = ['POSTGRES_PASSWORD', 'JWT_SECRET'];
   
   // Find fly command
   const flyCommand = getFlyCommand();

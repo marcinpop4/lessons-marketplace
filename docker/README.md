@@ -78,9 +78,9 @@ Required environment variables:
 
 - `DB_HOST` - Database host
 - `DB_PORT` - Database port
-- `DB_NAME` - Database name
-- `DB_USER` - Database user
-- `DB_PASSWORD` - Database password
+- `POSTGRES_DB` - Database name
+- `POSTGRES_USER` - Database user
+- `POSTGRES_PASSWORD` - Database password (must be set as a secret in production, not in .env.production)
 - `PORT` - Server port
 - `JWT_SECRET` - JWT secret key
 
@@ -154,9 +154,9 @@ Required environment variables are the same as for the Docker deployment, but th
 
 - `DB_HOST` - Database host (usually something.internal on fly.io)
 - `DB_PORT` - Database port
-- `DB_NAME` - Database name
-- `DB_USER` - Database user
-- `DB_PASSWORD` - Database password (must be set as a secret in production, not in .env.production)
+- `POSTGRES_DB` - Database name
+- `POSTGRES_USER` - Database user
+- `POSTGRES_PASSWORD` - Database password (must be set as a secret in production, not in .env.production)
 - `JWT_SECRET` - JWT secret key (set as a secret)
 - `FRONTEND_URL` - URL of the frontend service
 - `VITE_API_BASE_URL` - URL of the backend API
@@ -166,7 +166,7 @@ For production deployments, you must manually set all secrets before running the
 
 ```bash
 # Set up the required secrets for the server
-fly secrets set DB_PASSWORD=your-secure-password -a lessons-marketplace-server
+fly secrets set POSTGRES_PASSWORD=your-secure-password -a lessons-marketplace-server
 fly secrets set JWT_SECRET=your-jwt-secret -a lessons-marketplace-server
 fly secrets set JWT_EXPIRES_IN=1h -a lessons-marketplace-server
 fly secrets set REFRESH_TOKEN_EXPIRES_IN=7d -a lessons-marketplace-server

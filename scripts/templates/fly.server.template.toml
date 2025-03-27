@@ -20,6 +20,8 @@ primary_region = "ewr"
   FRONTEND_URL = "{{FRONTEND_URL}}"
   JWT_EXPIRES_IN = "{{JWT_EXPIRES_IN}}"
   REFRESH_TOKEN_EXPIRES_IN = "{{REFRESH_TOKEN_EXPIRES_IN}}"
+  POSTGRES_DB = "{{POSTGRES_DB}}"
+  POSTGRES_USER = "{{POSTGRES_USER}}"
 
 # Run database migrations on deploy
 [deploy]

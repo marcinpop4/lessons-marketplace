@@ -78,8 +78,8 @@ sudo chmod +x /usr/local/bin/docker-compose
 
 3. **Note for macOS Homebrew users:**
    - Homebrew PostgreSQL installations use your system username as the default PostgreSQL user
-   - Make sure to update your .env file to use your username in the DB_USER variable
-   - Example: `DB_USER=yourusername` instead of `DB_USER=postgres`
+   - Make sure to update your .env file to use your username in the POSTGRES_USER variable
+   - Example: `POSTGRES_USER=yourusername` instead of `POSTGRES_USER=postgres`
 
 ### Option 2: Use Docker
 
@@ -96,6 +96,9 @@ sudo chmod +x /usr/local/bin/docker-compose
    DB_USER=postgres
    DB_PASSWORD=postgres
    DB_SSL=false
+   POSTGRES_DB=arts_marketplace
+   POSTGRES_USER=postgres
+   POSTGRES_PASSWORD=postgres
    ```
 
 ### Option 3: Use Docker Compose (Recommended)
