@@ -43,7 +43,19 @@ jobs:
         run: pnpm docker:clean
 
       - name: Deploy database
-        run: pnpm docker:deploy
+        run: profile=ci pnpm docker:db
+
+      - name: Deploy server
+        run: profile=ci pnpm docker:server
+
+      - name: Run migrations
+        run: profile=ci pnpm docker:server:migrate
+
+      - name: Seed database
+        run: profile=ci pnpm docker:server:seed
+
+      - name: Deploy frontend
+        run: profile=ci pnpm docker:frontend
 
       - name: Run tests
-        run: pnpm docker:test
+        run: profile=ci pnpm docker:test
