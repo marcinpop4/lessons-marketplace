@@ -14,7 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PNPM_VERSION: 10.3.0  # Match local environment version
-      profile: ci  # Set the profile for Docker commands
 
     steps:
       - name: Checkout code
@@ -40,10 +39,10 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Clean Docker environment
-        run: pnpm docker:clean
+        run: profile=ci pnpm docker:clean
 
       - name: Deploy application
-        run: pnpm docker:deploy
+        run: profile=ci pnpm docker:deploy
 
       - name: Run tests
-        run: pnpm docker:test
+        run: profile=ci pnpm docker:test
