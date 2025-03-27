@@ -19,7 +19,7 @@
     "docker:stop": "docker compose -f docker/docker-compose.yml --profile ${profile} stop",
     "docker:down": "pnpm docker:stop && docker compose -f docker/docker-compose.yml --profile ${profile} down --remove-orphans",
     "docker:up": "pnpm docker:down && docker compose -f docker/docker-compose.yml --profile ${profile} up -d",
-    "docker:deploy": "pnpm docker:clean && pnpm docker:db && pnpm docker:server && pnpm docker:server:migrate && pnpm docker:server:seed && pnpm docker:frontend",
+    "docker:deploy": "pnpm docker:db && pnpm docker:server && pnpm docker:server:migrate && pnpm docker:server:seed && pnpm docker:frontend",
     "docker:db": "docker compose -f docker/docker-compose.yml --profile ${profile} up -d database-${profile}",
     "docker:server": "docker compose -f docker/docker-compose.yml --profile ${profile} up -d server-${profile}",
     "docker:frontend": "docker compose -f docker/docker-compose.yml --profile ${profile} up -d frontend-${profile}",
