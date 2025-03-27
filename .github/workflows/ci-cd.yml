@@ -39,13 +39,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and run tests in Docker
-        env:
-          DOCKER_BUILDKIT: 1
-        run: |
-          # Update Dockerfile to use specific pnpm version
-          sed -i "s/pnpm@latest/pnpm@$PNPM_VERSION/g" docker/test/Dockerfile
-          pnpm docker:clean
-          pnpm docker:deploy
-          pnpm docker:test
-        # This will deploy the application and run all tests in Docker 
+      - name: Clean Docker environment
+        run: pnpm docker:clean
+
+      - name: Deploy application
+        run: pnpm docker:deploy
+
+      - name: Run tests
+        run: pnpm docker:test
