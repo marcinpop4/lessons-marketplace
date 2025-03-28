@@ -17,24 +17,9 @@ async function ensureLogsDirectoryExists() {
     // Try to create logs directory if it doesn't exist
     if (!existsSync('logs')) {
       try {
-        // Try with sudo first
-        await execAsync('sudo mkdir -p logs 2>/dev/null');
-        await execAsync('sudo chmod -R 777 logs 2>/dev/null');
-      } catch (error) {
-        // Fall back to regular mkdir
         mkdirSync('logs', { recursive: true });
-      }
-    }
-    
-    // Double-check directory exists and is writable
-    try {
-      await fs.access('logs', fs.constants.W_OK);
-    } catch (error) {
-      // Try to fix permissions
-      try {
-        await execAsync('sudo chmod -R 777 logs 2>/dev/null');
-      } catch (permError) {
-        console.error('Warning: logs directory exists but may not be writable');
+      } catch (mkdirError) {
+        console.error('Warning: Could not create logs directory:', mkdirError.message);
       }
     }
   } catch (error) {
@@ -45,17 +30,16 @@ async function ensureLogsDirectoryExists() {
 
 async function writeLogFile(filename, content) {
   try {
-    await fs.writeFile(filename, content);
-    console.log(`Logs saved to ${filename}`);
-  } catch (error) {
-    console.error(`Error writing to ${filename}:`, error);
-    // Try with sudo
+    await ensureLogsDirectoryExists();
+    
     try {
-      await execAsync(`sudo bash -c "echo '${content.replace(/'/g, "\\'")}' > ${filename}"`);
-      console.log(`Logs saved to ${filename} (using sudo)`);
-    } catch (sudoError) {
-      console.error(`Could not write logs even with sudo:`, sudoError);
+      await fs.writeFile(filename, content);
+      console.log(`Logs saved to ${filename}`);
+    } catch (error) {
+      console.error(`Error writing to ${filename}:`, error);
     }
+  } catch (error) {
+    console.error(`Error preparing to write logs:`, error);
   }
 }
 

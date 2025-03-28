@@ -16,12 +16,12 @@ timestamp=$(date +%Y%m%d_%H%M%S)
 debug_dir="logs/docker-debug-${profileName}-${timestamp}"
 
 # Ensure the logs directory exists with proper permissions
-sudo mkdir -p "logs" 2>/dev/null || mkdir -p "logs" 2>/dev/null || true
-sudo chmod -R 777 "logs" 2>/dev/null || chmod -R 777 "logs" 2>/dev/null || true
+mkdir -p "logs" 2>/dev/null || true
+chmod -R 777 "logs" 2>/dev/null || true
 
-# Create debug directory with timestamp (with sudo if available)
-sudo mkdir -p "${debug_dir}" 2>/dev/null || mkdir -p "${debug_dir}" 2>/dev/null || true
-sudo chmod -R 777 "${debug_dir}" 2>/dev/null || chmod -R 777 "${debug_dir}" 2>/dev/null || true
+# Create debug directory with timestamp
+mkdir -p "${debug_dir}" 2>/dev/null || true
+chmod -R 777 "${debug_dir}" 2>/dev/null || true
 
 # Define Docker Compose command
 COMPOSE_CMD="docker compose"
@@ -36,8 +36,7 @@ echo "Saving logs to ${debug_dir}"
 # Move log files from logs directory to debug directory
 for logfile in container-debug.log server-container-debug.log db-container-debug.log; do
   if [ -f "logs/$logfile" ]; then
-    # Try with sudo first, fallback to regular cp
-    sudo cp "logs/$logfile" "${debug_dir}/" 2>/dev/null || cp "logs/$logfile" "${debug_dir}/" 2>/dev/null || true
+    cp "logs/$logfile" "${debug_dir}/" 2>/dev/null || true
     echo "Saved logs/$logfile to ${debug_dir}"
   else
     echo "Warning: logs/$logfile not found"
@@ -45,11 +44,9 @@ for logfile in container-debug.log server-container-debug.log db-container-debug
 done
 
 # Save timestamp
-sudo bash -c "echo 'Debug completed at: $(date)' > '${debug_dir}/timestamp.txt'" 2>/dev/null || \
-  echo "Debug completed at: $(date)" > "${debug_dir}/timestamp.txt" 2>/dev/null || true
+echo "Debug completed at: $(date)" > "${debug_dir}/timestamp.txt" 2>/dev/null || true
 
 # Create symlink to latest debug directory
-sudo ln -sf "${debug_dir}" "logs/latest-docker-debug" 2>/dev/null || \
-  ln -sf "${debug_dir}" "logs/latest-docker-debug" 2>/dev/null || true
+ln -sf "${debug_dir}" "logs/latest-docker-debug" 2>/dev/null || true
 
 echo "Docker debug process completed. Logs saved to ${debug_dir}" 

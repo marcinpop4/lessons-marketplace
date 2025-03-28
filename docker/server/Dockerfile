@@ -13,8 +13,14 @@ RUN npm install -g pnpm
 # Install OpenSSL first for Prisma
 RUN apt-get update && apt-get install -y \
     openssl \
+    ca-certificates \
     curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Verify OpenSSL installation and configure for Prisma
+RUN openssl version && \
+    mkdir -p /etc/ssl && \
+    echo "OpenSSL configured for Prisma"
 
 # Generate client with OpenSSL available
 RUN pnpm install --frozen-lockfile
@@ -32,8 +38,14 @@ FROM base AS runner
 # Install required system packages - make sure OpenSSL is installed before Prisma uses it
 RUN apt-get update && apt-get install -y \
     openssl \
+    ca-certificates \
     curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Verify OpenSSL installation and configure for Prisma
+RUN openssl version && \
+    mkdir -p /etc/ssl && \
+    echo "OpenSSL configured for Prisma"
 
 # Copy package.json and pnpm-lock.yaml
 COPY package.json pnpm-lock.yaml ./
@@ -57,7 +69,7 @@ RUN echo '{"type":"module"}' > ./scripts/package.json
 COPY --from=builder /app/dist ./dist
 
 # Expose the port the app runs on
-EXPOSE ${PORT}
+EXPOSE ${PORT:-3000}
 
 # Set up command to run migrations, conditional seeding, and start the server
 CMD /bin/sh -c '\

@@ -69,7 +69,7 @@ services:
       start_period: 15s # Longer start period
     restart: on-failure # Restart on failure
     volumes:
-      - ../logs:/app/logs # Mount logs volume
+      - ../logs:/app/logs:rw # Mount logs volume with read-write permissions
     profiles: ["ci"]
 
   server-prod:
@@ -116,6 +116,8 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
+    volumes:
+      - ../logs:/usr/share/nginx/logs:rw # Mount logs volume with read-write permissions
     profiles: ["ci"]
 
   frontend-prod:
@@ -161,6 +163,8 @@ services:
       frontend-ci:
         condition: service_healthy
         restart: true
+    volumes:
+      - ../logs:/app/logs:rw # Mount logs volume with read-write permissions
     profiles: ["ci"]
 
 volumes:
