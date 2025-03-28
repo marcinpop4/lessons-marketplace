@@ -55,15 +55,15 @@ async function debugDockerContainers() {
     console.log('=== ALL CONTAINERS ===');
     console.log(containers);
     
-    // Get server container logs
-    const { stdout: containerId } = await execAsync(
-      `docker ps -aq --filter name=lessons-marketplace-server`
+    // Get server container logs - now with profile-specific naming
+    const { stdout: serverContainerId } = await execAsync(
+      `docker ps -aq --filter "name=lessons-marketplace-server-${profileName}"`
     );
     
-    if (containerId.trim()) {
+    if (serverContainerId.trim()) {
       console.log('=== SERVER CONTAINER LOGS ===');
       try {
-        const { stdout: logs } = await execAsync(`docker logs ${containerId.trim()}`);
+        const { stdout: logs } = await execAsync(`docker logs ${serverContainerId.trim()}`);
         console.log(logs);
         
         // Save logs to the logs directory
@@ -72,7 +72,7 @@ async function debugDockerContainers() {
         // Get container environment variables
         console.log('=== SERVER CONTAINER ENV VARS ===');
         try {
-          const { stdout: envVars } = await execAsync(`docker exec ${containerId.trim()} env`);
+          const { stdout: envVars } = await execAsync(`docker exec ${serverContainerId.trim()} env`);
           console.log(envVars);
         } catch (envError) {
           console.error('Could not get environment variables:', envError);
@@ -82,7 +82,7 @@ async function debugDockerContainers() {
         console.log('=== DATABASE CONNECTION TEST ===');
         try {
           const { stdout: dbTest } = await execAsync(
-            `docker exec ${containerId.trim()} curl -v database-${profileName}:5432`
+            `docker exec ${serverContainerId.trim()} curl -v database-${profileName}:5432`
           );
           console.log(dbTest);
         } catch (dbError) {
@@ -92,7 +92,7 @@ async function debugDockerContainers() {
           try {
             console.log('Attempting alternative database connection test...');
             const { stdout: altDbTest } = await execAsync(
-              `docker exec ${containerId.trim()} sh -c "nc -z -v database-${profileName} 5432 || echo 'Connection failed'"`
+              `docker exec ${serverContainerId.trim()} sh -c "nc -z -v database-${profileName} 5432 || echo 'Connection failed'"`
             );
             console.log(altDbTest);
           } catch (altDbError) {
@@ -101,7 +101,7 @@ async function debugDockerContainers() {
             // Try ping as last resort
             try {
               const { stdout: pingTest } = await execAsync(
-                `docker exec ${containerId.trim()} ping -c 3 database-${profileName}`
+                `docker exec ${serverContainerId.trim()} ping -c 3 database-${profileName}`
               );
               console.log(pingTest);
             } catch (pingError) {
@@ -113,7 +113,7 @@ async function debugDockerContainers() {
         // Copy container-debug.js to the container
         console.log('=== COPYING CONTAINER DEBUG SCRIPT ===');
         try {
-          await copyContainerDebugScript(containerId.trim());
+          await copyContainerDebugScript(serverContainerId.trim());
         } catch (copyError) {
           console.error('Failed to copy container debug script:', copyError);
         }
@@ -121,7 +121,7 @@ async function debugDockerContainers() {
         // Run container-debug.js in the container
         console.log('=== RUNNING CONTAINER DEBUG SCRIPT ===');
         try {
-          await runContainerDebugScript(containerId.trim());
+          await runContainerDebugScript(serverContainerId.trim());
         } catch (debugError) {
           console.error('Failed to run container debug script:', debugError);
         }
@@ -130,21 +130,21 @@ async function debugDockerContainers() {
         console.log('=== CHECKING OPENSSL IN CONTAINER ===');
         try {
           const { stdout: opensslVersion } = await execAsync(
-            `docker exec ${containerId.trim()} openssl version`
+            `docker exec ${serverContainerId.trim()} openssl version`
           );
           console.log(`OpenSSL version: ${opensslVersion}`);
         } catch (opensslError) {
           console.error('OpenSSL check failed, trying to find openssl binary:', opensslError);
           try {
             const { stdout: findOpenssl } = await execAsync(
-              `docker exec ${containerId.trim()} which openssl || echo "Not found"`
+              `docker exec ${serverContainerId.trim()} which openssl || echo "Not found"`
             );
             console.log(`OpenSSL binary: ${findOpenssl}`);
             
             // Check installed packages
             try {
               const { stdout: packages } = await execAsync(
-                `docker exec ${containerId.trim()} sh -c "apt list --installed 2>/dev/null | grep -E 'openssl|libssl' || echo 'Package info not available'"`
+                `docker exec ${serverContainerId.trim()} sh -c "apt list --installed 2>/dev/null | grep -E 'openssl|libssl' || echo 'Package info not available'"`
               );
               console.log('OpenSSL related packages:');
               console.log(packages);
@@ -160,7 +160,7 @@ async function debugDockerContainers() {
         console.log('=== CHECKING NODE MODULES IN CONTAINER ===');
         try {
           const { stdout: nodeModules } = await execAsync(
-            `docker exec ${containerId.trim()} sh -c "find /app/node_modules -name prisma -type d || echo 'Prisma not found'"`
+            `docker exec ${serverContainerId.trim()} sh -c "find /app/node_modules -name prisma -type d || echo 'Prisma not found'"`
           );
           console.log('Prisma modules:');
           console.log(nodeModules);
@@ -168,7 +168,7 @@ async function debugDockerContainers() {
           if (nodeModules.includes('prisma')) {
             try {
               const { stdout: prismaVersion } = await execAsync(
-                `docker exec ${containerId.trim()} sh -c "cat /app/node_modules/prisma/package.json | grep version || echo 'Version not found'"`
+                `docker exec ${serverContainerId.trim()} sh -c "cat /app/node_modules/prisma/package.json | grep version || echo 'Version not found'"`
               );
               console.log('Prisma version:', prismaVersion);
             } catch (versionError) {
@@ -184,14 +184,14 @@ async function debugDockerContainers() {
         try {
           // Show all network interfaces
           const { stdout: interfaces } = await execAsync(
-            `docker exec ${containerId.trim()} sh -c "ip addr show || ifconfig"`
+            `docker exec ${serverContainerId.trim()} sh -c "ip addr show || ifconfig"`
           );
           console.log('Network interfaces:');
           console.log(interfaces);
           
           // Check DNS resolution
           const { stdout: dnsTest } = await execAsync(
-            `docker exec ${containerId.trim()} sh -c "getent hosts database-${profileName} || echo 'DNS resolution failed'"`
+            `docker exec ${serverContainerId.trim()} sh -c "getent hosts database-${profileName} || echo 'DNS resolution failed'"`
           );
           console.log('DNS resolution for database:');
           console.log(dnsTest);
@@ -202,22 +202,38 @@ async function debugDockerContainers() {
         console.error('Could not get container logs:', logsError);
       }
     } else {
-      console.log('Server container not found');
+      // Fallback to old naming scheme
+      const { stdout: oldServerContainerId } = await execAsync(
+        `docker ps -aq --filter "name=lessons-marketplace-server"`
+      );
+      
+      if (oldServerContainerId.trim()) {
+        console.log('=== SERVER CONTAINER LOGS (old naming) ===');
+        try {
+          const { stdout: logs } = await execAsync(`docker logs ${oldServerContainerId.trim()}`);
+          console.log(logs);
+          
+          // Save logs to the logs directory
+          await writeLogFile('logs/server-container-debug.log', logs);
+        } catch (error) {
+          console.log('Could not get container logs:', error);
+        }
+      }
     }
     
-    // Check database logs
+    // Get database container logs - with profile-specific naming
     const { stdout: dbContainerId } = await execAsync(
-      `docker ps -aq --filter name=lessons-marketplace-db`
+      `docker ps -aq --filter "name=lessons-marketplace-db-${profileName}"`
     );
     
     if (dbContainerId.trim()) {
       console.log('=== DATABASE CONTAINER LOGS ===');
       try {
-        const { stdout: dbLogs } = await execAsync(`docker logs ${dbContainerId.trim()}`);
-        console.log(dbLogs);
+        const { stdout: logs } = await execAsync(`docker logs ${dbContainerId.trim()}`);
+        console.log(logs);
         
         // Save logs to the logs directory
-        await writeLogFile('logs/db-container-debug.log', dbLogs);
+        await writeLogFile('logs/db-container-debug.log', logs);
         
         // Check database container status
         console.log('=== DATABASE CONTAINER STATUS ===');
@@ -252,66 +268,72 @@ async function debugDockerContainers() {
         console.error('Could not get database logs:', dbLogsError);
       }
     } else {
-      console.log('Database container not found');
-    }
-    
-    // Check Docker network
-    console.log('=== DOCKER NETWORK INFO ===');
-    const { stdout: networkInfo } = await execAsync('docker network ls');
-    console.log(networkInfo);
-    
-    try {
-      const { stdout: inspectNetwork } = await execAsync('docker network inspect docker_default');
-      console.log(inspectNetwork);
+      // Fallback to old naming scheme
+      const { stdout: oldDbContainerId } = await execAsync(
+        `docker ps -aq --filter "name=lessons-marketplace-db"`
+      );
       
-      // Parse network info
-      const networkData = JSON.parse(inspectNetwork);
-      if (networkData && networkData.length > 0) {
-        console.log('\nNetwork Containers:');
-        const containers = networkData[0].Containers || {};
-        Object.keys(containers).forEach(id => {
-          const container = containers[id];
-          console.log(`- ${container.Name}: ${container.IPv4Address} (${id.substring(0, 12)})`);
-        });
+      if (oldDbContainerId.trim()) {
+        console.log('=== DATABASE CONTAINER LOGS (old naming) ===');
+        try {
+          const { stdout: logs } = await execAsync(`docker logs ${oldDbContainerId.trim()}`);
+          console.log(logs);
+          
+          // Save logs to the logs directory
+          await writeLogFile('logs/db-container-debug.log', logs);
+        } catch (error) {
+          console.log('Could not get database logs:', error);
+        }
       }
-    } catch (networkError) {
-      console.error('Could not inspect network:', networkError);
     }
     
-    // Check Docker volumes
-    console.log('=== DOCKER VOLUMES ===');
+    // Get Docker network information
+    try {
+      const { stdout: networkList } = await execAsync('docker network ls');
+      console.log('=== DOCKER NETWORK INFO ===');
+      console.log(networkList);
+      
+      // Get detailed network info for the docker_default network
+      try {
+        const { stdout: networkInspect } = await execAsync('docker network inspect docker_default');
+        console.log(networkInspect);
+        
+        // Parse the network inspection output to extract container details
+        const networkInfo = JSON.parse(networkInspect);
+        const containers = networkInfo[0]?.Containers || {};
+        
+        console.log('\nNetwork Containers:');
+        Object.entries(containers).forEach(([id, info]) => {
+          console.log(`- ${info.Name}: ${info.IPv4Address} (${id.substring(0, 12)})`);
+        });
+      } catch (error) {
+        console.log('Could not display network details:', error.message);
+      }
+    } catch (error) {
+      console.log('Could not get network information:', error.message);
+    }
+    
+    // Display volumes information
     try {
       const { stdout: volumes } = await execAsync('docker volume ls');
+      console.log('=== DOCKER VOLUMES ===');
       console.log(volumes);
-    } catch (volumeError) {
-      console.error('Could not list Docker volumes:', volumeError);
+    } catch (error) {
+      console.log('Could not get volumes information:', error.message);
     }
     
-    // Check Docker Compose file
-    console.log('=== DOCKER COMPOSE CONFIG ===');
+    // Display Docker Compose configuration
     try {
-      const { stdout: composeConfig } = await execAsync(`${DOCKER_COMPOSE_CMD} -f docker/docker-compose.yml --profile ${profileName} config`);
+      const { stdout: composeConfig } = await execAsync(
+        `${DOCKER_COMPOSE_CMD} -f docker/docker-compose.yml --profile ${profileName} config`
+      );
+      console.log('=== DOCKER COMPOSE CONFIG ===');
       console.log(composeConfig);
-    } catch (composeError) {
-      console.error('Could not display Docker Compose config:', composeError);
+    } catch (error) {
+      console.log('Could not display Docker Compose config:', error);
     }
-    
-    // Summarize findings
-    console.log('\n=== SUMMARY ===');
-    if (!containerId.trim()) {
-      console.log('❌ Server container is not running - this is the main issue.');
-    } else if (!dbContainerId.trim()) {
-      console.log('❌ Database container is not running - server depends on it.');
-    } else {
-      console.log('Both server and database containers are present.');
-      console.log('Check the logs for specific errors on why the server is failing.');
-    }
-    
-    // Create a debug report
-    await createDebugReport();
-    
   } catch (error) {
-    console.error('Debug error:', error);
+    console.error('Error debugging Docker containers:', error);
   }
 }
 

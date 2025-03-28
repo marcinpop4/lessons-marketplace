@@ -52,11 +52,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Clean Docker environment
+      - name: Thorough Docker cleanup
         run: |
           export profile=ci
-          docker builder prune -af
-          docker system prune -af --volumes
+          # Make script executable
+          chmod +x scripts/docker-cleanup.sh
+          # Execute thorough cleanup
+          sudo ./scripts/docker-cleanup.sh
           pnpm docker:clean
 
       - name: Deploy components

@@ -3,7 +3,7 @@ services:
     build:
       context: ..
       dockerfile: docker/database/Dockerfile
-    container_name: lessons-marketplace-db
+    container_name: lessons-marketplace-db-${profile}
     restart: "no"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -41,7 +41,7 @@ services:
     build:
       context: ..
       dockerfile: docker/server/Dockerfile
-    container_name: lessons-marketplace-server
+    container_name: lessons-marketplace-server-${profile}
     restart: "no"
     ports:
       - "3000:3000"
@@ -92,7 +92,7 @@ services:
     build:
       context: ..
       dockerfile: docker/frontend/Dockerfile
-    container_name: lessons-marketplace-frontend
+    container_name: lessons-marketplace-frontend-${profile}
     restart: "no"
     ports:
       - "5173:80"
@@ -142,7 +142,7 @@ services:
     build:
       context: ..
       dockerfile: docker/test/Dockerfile
-    container_name: lessons-marketplace-test
+    container_name: lessons-marketplace-test-${profile}
     environment:
       - JEST_JUNIT_OUTPUT_DIR=/app/test-results/
       - JEST_JUNIT_OUTPUT_NAME=junit.xml
