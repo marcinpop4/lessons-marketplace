@@ -1,26 +1,15 @@
 FROM mcr.microsoft.com/playwright:v1.51.0-noble
 
-# Install Node.js and pnpm
-RUN apt-get update && \
-    apt-get install -y curl openssl && \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
-    npm install -g pnpm@latest && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
 # Set working directory
 WORKDIR /app
 
 # Copy package files and install dependencies
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN npm install -g pnpm@latest && \
+    pnpm install --frozen-lockfile
 
 # Copy all files
 COPY . .
 
-# Generate Prisma client
-RUN npx prisma generate --schema=server/prisma/schema.prisma
-
-# Make seed script executable
-RUN chmod +x scripts/docker-seed.ts
+# Set the default command to run tests
+CMD ["pnpm", "test"]

@@ -30,7 +30,7 @@ ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 
 # Pass the environment variable explicitly to the build command
-RUN VITE_API_BASE_URL=${VITE_API_BASE_URL} pnpm build:frontend
+RUN pnpm build:frontend
 
 # Production image
 FROM nginx:alpine

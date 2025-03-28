@@ -21,7 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PNPM_VERSION: 10.3.0  # Match local environment version
-      profile: ci
+      ENV_TYPE: ci
+      RUN_SEED: true
 
     steps:
       - name: Checkout code
@@ -53,20 +54,11 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Thorough Docker cleanup
-        run: |
-          export profile=ci
-          # Make script executable
-          chmod +x scripts/docker-cleanup.sh
-          # Execute thorough cleanup
-          ./scripts/docker-cleanup.sh
-          pnpm docker:clean
+        run: pnpm docker:clean
 
       - name: Deploy components
         id: deploy
-        run: |
-          export profile=ci
-          export RUN_SEED=true
-          pnpm docker:deploy:rebuild
+        run: pnmp docker:deploy:rebuild
 
       - name: Debug Docker environment
         if: always() # Run even if previous step fails
@@ -100,4 +92,4 @@ jobs:
 
       - name: Run tests
         if: steps.deploy.outcome == 'success'
-        run: export profile=ci && pnpm docker:test:rebuild
+        run: pnpm docker:test:rebuild
