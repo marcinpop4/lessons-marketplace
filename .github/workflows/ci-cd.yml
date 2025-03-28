@@ -43,6 +43,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Create logs directory with proper permissions
+        run: |
+          sudo mkdir -p logs
+          sudo chmod -R 777 logs
+          echo "Created logs directory for storing debug and deployment logs"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -60,22 +66,22 @@ jobs:
           export RUN_SEED=true
           pnpm docker:deploy:rebuild
 
-      - name: Setup logs directory
-        run: |
-          mkdir -p logs
-          chmod -R 777 logs
-          echo "Created logs directory for storing debug and deployment logs"
-
       - name: Debug Docker environment
         if: always() # Run even if previous step fails
         run: |
-          # Create logs directory with proper permissions
-          chmod +x scripts/debug-docker.sh
+          # Ensure logs directory exists with proper permissions
+          sudo mkdir -p logs
+          sudo chmod -R 777 logs
+          
+          # Ensure script is executable and run it
+          sudo chmod +x scripts/debug-docker.sh
           ./scripts/debug-docker.sh
-          chmod -R 777 logs
+          
+          # Ensure logs are accessible
+          sudo chmod -R 777 logs
           
           # Copy debug files to logs directory for artifact upload
-          cp -r docker-debug-* logs/ 2>/dev/null || echo "No debug directory found"
+          sudo cp -r docker-debug-* logs/ 2>/dev/null || echo "No debug directory found"
           
           # If any debug files exist, list them
           echo "=== DEBUG FILES GENERATED ==="

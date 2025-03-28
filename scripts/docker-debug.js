@@ -11,7 +11,58 @@ const profileName = process.env.profile || 'ci';
 // Define docker compose command (without hyphen for GitHub Actions)
 const DOCKER_COMPOSE_CMD = 'docker compose';
 
+// Ensure logs directory exists before writing to it
+async function ensureLogsDirectoryExists() {
+  try {
+    // Try to create logs directory if it doesn't exist
+    if (!existsSync('logs')) {
+      try {
+        // Try with sudo first
+        await execAsync('sudo mkdir -p logs 2>/dev/null');
+        await execAsync('sudo chmod -R 777 logs 2>/dev/null');
+      } catch (error) {
+        // Fall back to regular mkdir
+        mkdirSync('logs', { recursive: true });
+      }
+    }
+    
+    // Double-check directory exists and is writable
+    try {
+      await fs.access('logs', fs.constants.W_OK);
+    } catch (error) {
+      // Try to fix permissions
+      try {
+        await execAsync('sudo chmod -R 777 logs 2>/dev/null');
+      } catch (permError) {
+        console.error('Warning: logs directory exists but may not be writable');
+      }
+    }
+  } catch (error) {
+    console.error('Error creating logs directory:', error);
+    console.log('Will try to continue with debug process anyway');
+  }
+}
+
+async function writeLogFile(filename, content) {
+  try {
+    await fs.writeFile(filename, content);
+    console.log(`Logs saved to ${filename}`);
+  } catch (error) {
+    console.error(`Error writing to ${filename}:`, error);
+    // Try with sudo
+    try {
+      await execAsync(`sudo bash -c "echo '${content.replace(/'/g, "\\'")}' > ${filename}"`);
+      console.log(`Logs saved to ${filename} (using sudo)`);
+    } catch (sudoError) {
+      console.error(`Could not write logs even with sudo:`, sudoError);
+    }
+  }
+}
+
 async function debugDockerContainers() {
+  // Ensure logs directory exists
+  await ensureLogsDirectoryExists();
+  
   try {
     console.log(`=== DEBUG INFO FOR PROFILE: ${profileName} ===`);
     
@@ -32,8 +83,7 @@ async function debugDockerContainers() {
         console.log(logs);
         
         // Save logs to the logs directory
-        await fs.writeFile('logs/server-container-debug.log', logs);
-        console.log('Logs saved to logs/server-container-debug.log');
+        await writeLogFile('logs/server-container-debug.log', logs);
         
         // Get container environment variables
         console.log('=== SERVER CONTAINER ENV VARS ===');
@@ -183,8 +233,7 @@ async function debugDockerContainers() {
         console.log(dbLogs);
         
         // Save logs to the logs directory
-        await fs.writeFile('logs/db-container-debug.log', dbLogs);
-        console.log('DB logs saved to logs/db-container-debug.log');
+        await writeLogFile('logs/db-container-debug.log', dbLogs);
         
         // Check database container status
         console.log('=== DATABASE CONTAINER STATUS ===');
@@ -315,8 +364,7 @@ async function runContainerDebugScript(serverId) {
     const { stdout, stderr } = await execAsync(`docker exec ${serverId} node /app/container-debug.mjs`);
     
     // Save logs to the logs directory
-    await fs.writeFile('logs/container-debug.log', stdout + '\n' + stderr);
-    console.log('Logs saved to logs/container-debug.log');
+    await writeLogFile('logs/container-debug.log', stdout + '\n' + stderr);
     return true;
   } catch (error) {
     console.error(`Failed to run container debug script: ${error}`);
@@ -325,41 +373,89 @@ async function runContainerDebugScript(serverId) {
 }
 
 async function createDebugReport() {
-  console.log('\n=== CREATING DEBUG REPORT ===');
   try {
-    // Create directories in logs folder
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/:/g, '')
+      .replace(/\..+/, '')
+      .replace('T', '_');
+    
+    const reportDir = `logs/docker-debug-report`;
+    
+    // Try to create the directory with proper permissions
     try {
-      mkdirSync('logs', { recursive: true });
-      const debugReportDir = 'logs/docker-debug-report';
-      mkdirSync(debugReportDir, { recursive: true });
-      
-      // Copy log files to the debug report directory
-      if (existsSync('logs/container-debug.log')) {
-        await fs.copyFile('logs/container-debug.log', `${debugReportDir}/container-debug.log`);
-        console.log('Container debug log copied to debug report');
+      await execAsync(`sudo mkdir -p ${reportDir} 2>/dev/null`);
+      await execAsync(`sudo chmod -R 777 ${reportDir} 2>/dev/null`);
+    } catch (error) {
+      // Fall back to regular mkdir
+      try {
+        mkdirSync(reportDir, { recursive: true });
+      } catch (mkdirError) {
+        console.error('Failed to create debug report directories:', mkdirError.message);
+        return false;
       }
-      
-      if (existsSync('logs/server-container-debug.log')) {
-        await fs.copyFile('logs/server-container-debug.log', `${debugReportDir}/server-container-debug.log`);
-        console.log('Server container debug log copied to debug report');
+    }
+    
+    // Copy log files to the report directory
+    let foundLogs = false;
+    
+    // Check for log files in the logs directory
+    const logFiles = ['container-debug.log', 'server-container-debug.log', 'db-container-debug.log'];
+    
+    for (const logFile of logFiles) {
+      try {
+        if (existsSync(`logs/${logFile}`)) {
+          await execAsync(`sudo cp logs/${logFile} ${reportDir}/ 2>/dev/null || cp logs/${logFile} ${reportDir}/`);
+          foundLogs = true;
+        }
+      } catch (error) {
+        console.error(`Failed to copy ${logFile}:`, error.message);
       }
-      
-      if (existsSync('logs/db-container-debug.log')) {
-        await fs.copyFile('logs/db-container-debug.log', `${debugReportDir}/db-container-debug.log`);
-        console.log('Database container debug log copied to debug report');
-      }
-      
-      // Add timestamp file
-      await fs.writeFile(`${debugReportDir}/timestamp.txt`, new Date().toString());
-      
-      console.log(`Debug report created in ${debugReportDir}/`);
+    }
+    
+    // Save Docker state
+    try {
+      const { stdout: dockerInfo } = await execAsync('docker info');
+      await writeLogFile(`${reportDir}/docker-info.txt`, dockerInfo);
+      foundLogs = true;
+    } catch (error) {
+      console.error('Failed to get Docker info:', error.message);
+    }
+    
+    // Save Docker network info
+    try {
+      const { stdout: networkInfo } = await execAsync('docker network ls');
+      await writeLogFile(`${reportDir}/docker-networks.txt`, networkInfo);
+      foundLogs = true;
+    } catch (error) {
+      console.error('Failed to get Docker network info:', error.message);
+    }
+    
+    // Save Docker volumes info
+    try {
+      const { stdout: volumeInfo } = await execAsync('docker volume ls');
+      await writeLogFile(`${reportDir}/docker-volumes.txt`, volumeInfo);
+      foundLogs = true;
+    } catch (error) {
+      console.error('Failed to get Docker volume info:', error.message);
+    }
+    
+    // Add timestamp file
+    try {
+      await writeLogFile(`${reportDir}/timestamp.txt`, `Debug report created at: ${new Date().toISOString()}`);
+    } catch (error) {
+      console.error('Failed to write timestamp file:', error.message);
+    }
+    
+    if (foundLogs) {
+      console.log(`Debug report created in ${reportDir}`);
       return true;
-    } catch (fsError) {
-      console.error(`Failed to create debug report directories: ${fsError.message}`);
+    } else {
+      console.log('No logs found to create debug report');
       return false;
     }
   } catch (error) {
-    console.error(`Failed to create debug report: ${error.message}`);
+    console.error('Failed to create debug report:', error.message);
     return false;
   }
 }

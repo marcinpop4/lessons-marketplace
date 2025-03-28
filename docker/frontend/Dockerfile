@@ -9,6 +9,11 @@ COPY . .
 # Install dependencies
 FROM base AS dependencies
 RUN npm install -g pnpm
+# Install OpenSSL which is required for Prisma
+RUN apt-get update && apt-get install -y \
+    openssl \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 RUN pnpm install --frozen-lockfile
 
 # Build stage
@@ -23,8 +28,8 @@ RUN VITE_API_BASE_URL=${VITE_API_BASE_URL} pnpm build:frontend
 # Production image
 FROM nginx:alpine
 
-# Install curl for healthchecks
-RUN apk add --no-cache curl
+# Install curl for healthchecks and openssl for runtime
+RUN apk add --no-cache curl openssl
 
 # Remove default nginx configuration and create log directory
 RUN rm -rf /etc/nginx/conf.d/* && \
