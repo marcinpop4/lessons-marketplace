@@ -47,6 +47,8 @@ services:
       - "3000:3000"
     env_file:
       - ../env/.env.${profile}
+    environment:
+      - RUN_SEED=${RUN_SEED:-false}  # Control seed behavior
     profiles: ["ci", "prod"]
     # Base service should not have dependency on base database as it's not active
 
@@ -56,12 +58,18 @@ services:
       database-ci:
         condition: service_healthy
         restart: true   # Restart dependency check if it fails
+    environment:
+      - DEBUG=true       # Enable debug mode for more verbose logging
+      - RUN_SEED=${RUN_SEED:-true}  # Default to true for CI
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 5s      # Check more frequently
       timeout: 3s
-      retries: 5
-      start_period: 10s
+      retries: 10       # More retries to account for slow startup
+      start_period: 15s # Longer start period
+    restart: on-failure # Restart on failure
+    volumes:
+      - ../logs:/app/logs # Mount logs volume
     profiles: ["ci"]
 
   server-prod:
@@ -70,90 +78,14 @@ services:
       database-prod:
         condition: service_healthy
         restart: true   # Restart dependency check if it fails
+    environment:
+      - RUN_SEED=${RUN_SEED:-false}  # Default to false for production
     healthcheck:
       test: ["CMD", "curl", "-f", "https://lessons-marketplace-server.fly.dev/api/health"]
       interval: 5s
       timeout: 3s
       retries: 10
       start_period: 15s
-    profiles: ["prod"]
-
-  # Base migration service
-  migration:
-    build:
-      context: ..
-      dockerfile: docker/server/Dockerfile
-    container_name: lessons-marketplace-migrate
-    profiles: ["ci", "prod"]
-    env_file:
-      - ../env/.env.${profile}
-
-  migration-ci:
-    extends: migration
-    container_name: lessons-marketplace-migrate-ci
-    command: >
-      sh -c "echo 'Waiting for server to be ready...' &&
-             echo 'Running migrations...' &&
-             npx prisma migrate deploy --schema=server/prisma/schema.prisma"
-    depends_on:
-      server-ci:
-        condition: service_healthy
-        restart: true
-    profiles: ["ci"]
-
-  migration-prod:
-    extends: migration
-    container_name: lessons-marketplace-migrate-prod
-    command: >
-      sh -c "echo 'Waiting for server to be ready...' &&
-             echo 'Running migrations...' &&
-             npx prisma migrate deploy --schema=server/prisma/schema.prisma"
-    depends_on:
-      server-prod:
-        condition: service_healthy
-        restart: true
-    profiles: ["prod"]
-
-  # Base seed service
-  seed:
-    build:
-      context: ..
-      dockerfile: docker/server/Dockerfile
-    container_name: lessons-marketplace-seed
-    env_file:
-      - ../env/.env.${profile}
-    restart: "no"
-    healthcheck:
-      test: ["CMD-SHELL", "exit 0"]  # Always report as healthy while running
-      interval: 1s
-      timeout: 1s
-      retries: 1
-    profiles: ["ci", "prod"]
-
-  seed-ci:
-    extends: seed
-    container_name: lessons-marketplace-seed-ci
-    command: >
-      sh -c "echo 'Waiting for migrations to complete...' &&
-             echo 'Running seed data...' &&
-             node dist/server/prisma/seed.js"
-    depends_on:
-      migration-ci:
-        condition: service_completed_successfully
-        restart: true
-    profiles: ["ci"]
-
-  seed-prod:
-    extends: seed
-    container_name: lessons-marketplace-seed-prod
-    command: >
-      sh -c "echo 'Waiting for migrations to complete...' &&
-             echo 'Running seed data...' &&
-             node dist/server/prisma/seed.js"
-    depends_on:
-      migration-prod:
-        condition: service_completed_successfully
-        restart: true
     profiles: ["prod"]
 
   frontend:
@@ -178,9 +110,6 @@ services:
       server-ci:
         condition: service_healthy
         restart: true
-      seed-ci:
-        condition: service_completed_successfully
-        restart: true
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/index.html"]
       interval: 5s
@@ -197,9 +126,6 @@ services:
     depends_on:
       server-prod:
         condition: service_healthy
-        restart: true
-      seed-prod:
-        condition: service_completed_successfully
         restart: true
     healthcheck:
       test: ["CMD", "curl", "-f", "https://lessons-marketplace-frontend.fly.dev/index.html"]

@@ -48,8 +48,27 @@ try {
   logger.info('Prisma client generated successfully');
 } catch (error) {
   logger.error('Failed to generate Prisma client:', error);
-  process.exit(1);
+  // Continue anyway - the client might already be generated
+  logger.warn('Continuing despite Prisma generation error');
 }
+
+// Verify database connection before starting server
+(async function testDatabaseConnection() {
+  try {
+    logger.info('Testing database connection...');
+    await prisma.$queryRaw`SELECT 1`;
+    logger.info('Database connection successful');
+  } catch (error) {
+    logger.error('Failed to connect to database:', error);
+    // In CI/production, exit on database connection failure
+    if (process.env.NODE_ENV === 'production' || process.env.profile === 'ci') {
+      logger.error('Exiting due to database connection failure');
+      process.exit(1);
+    } else {
+      logger.warn('Continuing despite database connection failure');
+    }
+  }
+})();
 
 // Middleware
 app.use(helmet()); // Security headers

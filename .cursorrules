@@ -1,5 +1,6 @@
 // File Type Requirements
-Always create TypeScript files (.ts, .tsx) and never JavaScript files (.js, .jsx). TypeScript code should be properly typed with explicit types rather than using 'any' where possible. Never create shell scripts, create ts files instead.
+Always create TypeScript files (.ts, .tsx) and never JavaScript files (.js, .jsx) for application code. TypeScript code should be properly typed with explicit types rather than using 'any' where possible.
+When creating ad-hoc scripts, for other than application purposes, create javascript files, to avoid difficulties or running typescript outside of the application context.
 
 // Error Handling & Configuration
 Never implement fallbacks for missing environment variables, configuration values, or error conditions. Explicitly check that required values exist and throw errors immediately if they don't. The application should fail fast rather than continue running with default values that might mask problems.
