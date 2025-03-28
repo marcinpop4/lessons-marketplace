@@ -1,12 +1,18 @@
 #!/bin/bash
 set -e
 
-# Create database user and set password
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
-  CREATE USER marcin WITH PASSWORD 'password';
-  ALTER USER marcin WITH SUPERUSER;
-  CREATE DATABASE lessons_marketplace;
-  GRANT ALL PRIVILEGES ON DATABASE lessons_marketplace TO marcin;
+# Create user if it doesn't exist
+psql -v ON_ERROR_STOP=0 -U postgres <<-EOSQL
+    DO \$\$
+    BEGIN
+        IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'marcin') THEN
+            CREATE USER marcin WITH PASSWORD 'password';
+        END IF;
+    END
+    \$\$;
+    
+    GRANT ALL PRIVILEGES ON DATABASE lessons_marketplace TO marcin;
+    ALTER USER marcin WITH SUPERUSER;
 EOSQL
 
 echo "Database initialization completed successfully." 
