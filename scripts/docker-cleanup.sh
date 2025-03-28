@@ -15,6 +15,11 @@ echo "Cleaning up Docker resources for profile: $profileName"
 echo "Stopping and removing containers..."
 docker ps -a -q --filter "name=lessons-marketplace" | xargs -r docker rm -f || true
 
+# Remove all volumes associated with our project
+echo "Removing project volumes..."
+docker volume ls -q --filter "name=lessons-marketplace" | xargs -r docker volume rm -f || true
+docker volume rm -f postgres_data lessons-marketplace_postgres_data || true
+
 # Remove any dangling images
 echo "Cleaning up dangling images..."
 docker image prune -f || true
