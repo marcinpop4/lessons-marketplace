@@ -37,13 +37,13 @@ try {
 
   // Build and start the containers with the test profile
   console.log(`${YELLOW}Starting Docker containers...${RESET}`);
-  execSync(`cd docker && docker-compose --profile test up -d`, {
+  execSync(`cd docker && docker compose --profile test up -d`, {
     stdio: 'inherit'
   });
 
   // Run the tests in the test container
   console.log(`${YELLOW}Running tests in Docker...${RESET}`);
-  execSync(`cd docker && docker-compose exec tests node scripts/docker-test-runner.js ${testType} ${testPattern}`, {
+  execSync(`cd docker && docker compose exec tests node scripts/docker-test-runner.js ${testType} ${testPattern}`, {
     stdio: 'inherit',
     env: {
       ...process.env,
@@ -59,7 +59,7 @@ try {
   // Clean up containers
   console.log(`${YELLOW}Cleaning up Docker containers...${RESET}`);
   try {
-    execSync(`cd docker && docker-compose --profile test down`, {
+    execSync(`cd docker && docker compose --profile test down`, {
       stdio: 'inherit'
     });
   } catch (cleanupError) {

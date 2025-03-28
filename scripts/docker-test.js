@@ -24,7 +24,7 @@ const CYAN = '\x1b[36m';
 const RESET = '\x1b[0m';
 
 // Docker Compose command base
-const DOCKER_COMPOSE_CMD = 'docker-compose -f docker/docker-compose.yml';
+const DOCKER_COMPOSE_CMD = 'docker compose -f docker/docker-compose.yml';
 
 console.log(`${CYAN}==========================================${RESET}`);
 console.log(`${CYAN}Docker Test Runner${RESET}`);

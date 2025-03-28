@@ -8,6 +8,13 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+  packages: read
+  checks: write
+  id-token: write
+  pages: write
+
 jobs:
   test:
     name: Run Tests
@@ -53,34 +60,38 @@ jobs:
           export RUN_SEED=true
           pnpm docker:deploy:rebuild
 
+      - name: Setup logs directory
+        run: |
+          mkdir -p logs
+          chmod -R 777 logs
+          echo "Created logs directory for storing debug and deployment logs"
+
       - name: Debug Docker environment
         if: always() # Run even if previous step fails
         run: |
-          # Create logs directory
-          mkdir -p logs
-          
-          # Make debug script executable
+          # Create logs directory with proper permissions
           chmod +x scripts/debug-docker.sh
-          
-          # Run comprehensive Docker debug script with detailed output
-          echo "=== RUNNING DOCKER DEBUG SCRIPT ==="
-          export profile=ci
-          ./scripts/debug-docker.sh | tee logs/docker-debug.log
+          ./scripts/debug-docker.sh
+          chmod -R 777 logs
           
           # Copy debug files to logs directory for artifact upload
-          cp -r docker-debug-* logs/ || echo "No debug directory found"
+          cp -r docker-debug-* logs/ 2>/dev/null || echo "No debug directory found"
           
           # If any debug files exist, list them
           echo "=== DEBUG FILES GENERATED ==="
           find logs -type f | sort
 
       - name: Upload debug logs
-        if: always()
         uses: actions/upload-artifact@v4
+        if: always() # Upload logs even if previous steps fail
         with:
-          name: debug-logs
-          path: logs/
-          retention-days: 5
+          name: docker-debug-logs
+          path: |
+            logs/**/*.log
+            logs/**/*.txt
+            logs/**/*
+          retention-days: 7
+          if-no-files-found: warn # Don't fail the build if no logs are found
 
       - name: Run tests
         if: steps.deploy.outcome == 'success'

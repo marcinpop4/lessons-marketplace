@@ -2,10 +2,14 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs/promises';
+import { mkdirSync, existsSync } from 'fs';
 
 const execAsync = promisify(exec);
 
 const profileName = process.env.profile || 'ci';
+
+// Define docker compose command (without hyphen for GitHub Actions)
+const DOCKER_COMPOSE_CMD = 'docker compose';
 
 async function debugDockerContainers() {
   try {
@@ -27,9 +31,9 @@ async function debugDockerContainers() {
         const { stdout: logs } = await execAsync(`docker logs ${containerId.trim()}`);
         console.log(logs);
         
-        // Save logs to file
-        await fs.writeFile('server-container-debug.log', logs);
-        console.log('Logs saved to server-container-debug.log');
+        // Save logs to the logs directory
+        await fs.writeFile('logs/server-container-debug.log', logs);
+        console.log('Logs saved to logs/server-container-debug.log');
         
         // Get container environment variables
         console.log('=== SERVER CONTAINER ENV VARS ===');
@@ -178,9 +182,9 @@ async function debugDockerContainers() {
         const { stdout: dbLogs } = await execAsync(`docker logs ${dbContainerId.trim()}`);
         console.log(dbLogs);
         
-        // Save DB logs to file
-        await fs.writeFile('db-container-debug.log', dbLogs);
-        console.log('DB logs saved to db-container-debug.log');
+        // Save logs to the logs directory
+        await fs.writeFile('logs/db-container-debug.log', dbLogs);
+        console.log('DB logs saved to logs/db-container-debug.log');
         
         // Check database container status
         console.log('=== DATABASE CONTAINER STATUS ===');
@@ -253,7 +257,7 @@ async function debugDockerContainers() {
     // Check Docker Compose file
     console.log('=== DOCKER COMPOSE CONFIG ===');
     try {
-      const { stdout: composeConfig } = await execAsync(`docker-compose -f docker/docker-compose.yml --profile ${profileName} config`);
+      const { stdout: composeConfig } = await execAsync(`${DOCKER_COMPOSE_CMD} -f docker/docker-compose.yml --profile ${profileName} config`);
       console.log(composeConfig);
     } catch (composeError) {
       console.error('Could not display Docker Compose config:', composeError);
@@ -310,8 +314,9 @@ async function runContainerDebugScript(serverId) {
     // Use .mjs extension when executing the script
     const { stdout, stderr } = await execAsync(`docker exec ${serverId} node /app/container-debug.mjs`);
     
-    await fs.promises.writeFile('container-debug.log', stdout + '\n' + stderr);
-    console.log('Logs saved to container-debug.log');
+    // Save logs to the logs directory
+    await fs.writeFile('logs/container-debug.log', stdout + '\n' + stderr);
+    console.log('Logs saved to logs/container-debug.log');
     return true;
   } catch (error) {
     console.error(`Failed to run container debug script: ${error}`);
@@ -322,32 +327,37 @@ async function runContainerDebugScript(serverId) {
 async function createDebugReport() {
   console.log('\n=== CREATING DEBUG REPORT ===');
   try {
-    // Create directories in logs folder instead of project root
-    fs.mkdirSync('logs', { recursive: true });
-    const debugReportDir = 'logs/docker-debug-report';
-    fs.mkdirSync(debugReportDir, { recursive: true });
-    
-    // Copy log files to the debug report directory
-    if (fs.existsSync('container-debug.log')) {
-      await fs.promises.copyFile('container-debug.log', `${debugReportDir}/container-debug.log`);
-      console.log('Container debug log copied to debug report');
+    // Create directories in logs folder
+    try {
+      mkdirSync('logs', { recursive: true });
+      const debugReportDir = 'logs/docker-debug-report';
+      mkdirSync(debugReportDir, { recursive: true });
+      
+      // Copy log files to the debug report directory
+      if (existsSync('logs/container-debug.log')) {
+        await fs.copyFile('logs/container-debug.log', `${debugReportDir}/container-debug.log`);
+        console.log('Container debug log copied to debug report');
+      }
+      
+      if (existsSync('logs/server-container-debug.log')) {
+        await fs.copyFile('logs/server-container-debug.log', `${debugReportDir}/server-container-debug.log`);
+        console.log('Server container debug log copied to debug report');
+      }
+      
+      if (existsSync('logs/db-container-debug.log')) {
+        await fs.copyFile('logs/db-container-debug.log', `${debugReportDir}/db-container-debug.log`);
+        console.log('Database container debug log copied to debug report');
+      }
+      
+      // Add timestamp file
+      await fs.writeFile(`${debugReportDir}/timestamp.txt`, new Date().toString());
+      
+      console.log(`Debug report created in ${debugReportDir}/`);
+      return true;
+    } catch (fsError) {
+      console.error(`Failed to create debug report directories: ${fsError.message}`);
+      return false;
     }
-    
-    if (fs.existsSync('server-container-debug.log')) {
-      await fs.promises.copyFile('server-container-debug.log', `${debugReportDir}/server-container-debug.log`);
-      console.log('Server container debug log copied to debug report');
-    }
-    
-    if (fs.existsSync('db-container-debug.log')) {
-      await fs.promises.copyFile('db-container-debug.log', `${debugReportDir}/db-container-debug.log`);
-      console.log('Database container debug log copied to debug report');
-    }
-    
-    // Add timestamp file
-    await fs.promises.writeFile(`${debugReportDir}/timestamp.txt`, new Date().toString());
-    
-    console.log(`Debug report created in ${debugReportDir}/`);
-    return true;
   } catch (error) {
     console.error(`Failed to create debug report: ${error.message}`);
     return false;
