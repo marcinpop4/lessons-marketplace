@@ -12,7 +12,7 @@ console.log('🌱 Docker Seed Script - Initializing database seeding process');
 
 // Define paths
 const schemaPath = 'server/prisma/schema.prisma';
-const seedPath = 'dist/server/prisma/seed.js';
+const seedPath = 'server/prisma/seed.js';
 
 // Check if files exist
 if (!fs.existsSync(schemaPath)) {

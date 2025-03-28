@@ -18,7 +18,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const { PrismaClient } = pkg;
 
-// Initialize Prisma client with proper typing
+// Initialize Prisma client
 const prisma = new PrismaClient();
 
 // Ensure Prisma client is initialized before running the seed
@@ -48,16 +48,15 @@ async function ensurePrismaClientIsInitialized() {
 }
 
 // Define LessonType to match schema.prisma
-type LessonType = 'VOICE' | 'GUITAR' | 'BASS' | 'DRUMS';
 const LessonType = {
-  VOICE: 'VOICE' as LessonType,
-  GUITAR: 'GUITAR' as LessonType,
-  BASS: 'BASS' as LessonType,
-  DRUMS: 'DRUMS' as LessonType
+  VOICE: 'VOICE',
+  GUITAR: 'GUITAR',
+  BASS: 'BASS',
+  DRUMS: 'DRUMS'
 };
 
 // Function to get base rate by lesson type (in cents)
-function getBaseRateInCents(lessonType: LessonType): number {
+function getBaseRateInCents(lessonType) {
   switch (lessonType) {
     case LessonType.VOICE:
       return 5000; // $50.00
@@ -73,7 +72,7 @@ function getBaseRateInCents(lessonType: LessonType): number {
 }
 
 // Helper function to add days/hours to a date
-function addToDate(date: Date, days: number, hours: number): Date {
+function addToDate(date, days, hours) {
   const newDate = new Date(date);
   newDate.setDate(newDate.getDate() + days);
   newDate.setHours(newDate.getHours() + hours);
@@ -81,7 +80,7 @@ function addToDate(date: Date, days: number, hours: number): Date {
 }
 
 // Hash password function
-async function hashPassword(password: string): Promise<string> {
+async function hashPassword(password) {
   const saltRounds = 10;
   return bcryptjs.hash(password, saltRounds);
 }
@@ -214,7 +213,7 @@ async function main() {
       const teacherRates = await Promise.all(
         Object.values(LessonType).map(async (lessonType) => {
           // Get base rate for this lesson type (in cents)
-          const baseRateInCents = getBaseRateInCents(lessonType as LessonType);
+          const baseRateInCents = getBaseRateInCents(lessonType);
           
           // Adding some variation to rates to make them more realistic (in cents)
           // Each increment is $5.00 (500 cents) and we add 0-9 increments randomly
@@ -225,7 +224,7 @@ async function main() {
           return prisma.teacherLessonHourlyRate.create({
             data: {
               teacherId: teacher.id,
-              type: lessonType as any, // Type casting to avoid TypeScript errors
+              type: lessonType,
               rateInCents: rateInCents, // Storing rate in cents
             },
           });
@@ -264,7 +263,7 @@ async function main() {
       
       const lessonRequest = await prisma.lessonRequest.create({
         data: {
-          type: lessonType as any, // Type casting to avoid TypeScript errors
+          type: lessonType,
           startTime,
           durationMinutes: 60, // 1-hour lessons
           address: {
@@ -354,4 +353,4 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
-  });
+  }); 

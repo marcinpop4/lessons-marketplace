@@ -48,6 +48,9 @@ RUN openssl version && \
     mkdir -p /etc/ssl && \
     echo "OpenSSL configured for Prisma"
 
+# Install pnpm globally
+RUN npm install -g pnpm
+
 # Copy package.json and pnpm-lock.yaml
 COPY package.json pnpm-lock.yaml ./
 
@@ -56,6 +59,7 @@ COPY --from=dependencies /app/node_modules ./node_modules
 
 # Copy Prisma schema and generate client
 COPY server/prisma/schema.prisma ./server/prisma/schema.prisma
+COPY server/prisma/seed.js ./server/prisma/seed.js
 RUN npx prisma generate --schema=server/prisma/schema.prisma
 
 # Install wait-on for database connection checking
@@ -76,22 +80,11 @@ RUN chmod +x /usr/local/bin/wait-for-db.sh
 # Expose the port the app runs on
 EXPOSE ${PORT:-3000}
 
-# Set up command to run migrations, conditional seeding, and start the server
+# Wait for database, run migrations, run seeds, then start server
 CMD ["/usr/local/bin/wait-for-db.sh", "sh", "-c", "\
     echo \"[INFO] Running database migrations...\" && \
-    npx prisma migrate deploy --schema=server/prisma/schema.prisma && \
-    if [ \"$RUN_SEED\" = \"true\" ]; then \
-        echo \"[INFO] Running database seed...\" && \
-        set +e && \
-        node dist/server/prisma/seed.js; \
-        SEED_RESULT=$?; \
-        set -e && \
-        if [ $SEED_RESULT -ne 0 ]; then \
-            echo \"[ERROR] Seed failed with exit code $SEED_RESULT. Continuing anyway...\" && \
-            echo \"[WARN] You may need to manually seed the database later\"; \
-        else \
-            echo \"[INFO] Seed completed successfully\"; \
-        fi \
-    fi && \
+    pnpm prisma:migrate && \
+    echo \"[INFO] Running database seed...\" && \
+    pnpm prisma:seed && \
     echo \"[INFO] Starting server...\" && \
     node dist/server/index.js"] 
