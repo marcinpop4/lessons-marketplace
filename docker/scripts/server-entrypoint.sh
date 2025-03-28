@@ -7,6 +7,12 @@ log() {
   echo "[$(date -u +"%Y-%m-%d %H:%M:%S UTC")] $1"
 }
 
+# Source environment variables if the temporary file exists
+if [ -f "/tmp/env_vars.sh" ]; then
+  log "Sourcing environment variables from .env.${ENV_TYPE}"
+  source /tmp/env_vars.sh
+fi
+
 # Log environment information
 log "=== ENVIRONMENT SETUP ==="
 log "Current directory: $(pwd)"
@@ -27,6 +33,9 @@ fi
 
 if [ -z "$ENV_TYPE" ]; then
   log "WARNING: ENV_TYPE is not set. This may affect .env file loading."
+  # Set a default ENV_TYPE if not provided
+  ENV_TYPE="ci"
+  log "Setting default ENV_TYPE=$ENV_TYPE"
 fi
 
 # Check if environment file exists
@@ -49,7 +58,7 @@ fi
 
 # Run database migrations
 log "=== RUNNING DATABASE MIGRATIONS ==="
-pnpm prisma:migrate
+ENV_TYPE=$ENV_TYPE pnpm prisma:migrate
 MIGRATE_EXIT_CODE=$?
 if [ $MIGRATE_EXIT_CODE -ne 0 ]; then
   log "ERROR: Database migrations failed with exit code $MIGRATE_EXIT_CODE"
@@ -60,7 +69,7 @@ fi
 # Run seeds if SEED_DB environment variable is set to true
 if [ "$SEED_DB" = "true" ]; then
   log "=== RUNNING DATABASE SEED ==="
-  pnpm prisma:seed
+  ENV_TYPE=$ENV_TYPE pnpm prisma:seed
   SEED_EXIT_CODE=$?
   if [ $SEED_EXIT_CODE -ne 0 ]; then
     log "ERROR: Database seed failed with exit code $SEED_EXIT_CODE"
@@ -73,8 +82,8 @@ fi
 log "=== STARTING SERVER ==="
 log "Command to run: $*"
 
-# Run the server
-"$@" 2>&1
+# Run the server with ENV_TYPE explicitly set
+ENV_TYPE=$ENV_TYPE "$@" 2>&1
 EXIT_CODE=$?
 
 if [ $EXIT_CODE -ne 0 ]; then
@@ -99,7 +108,7 @@ if [ $EXIT_CODE -ne 0 ]; then
   
   # Try running node with --trace-warnings to get more detailed error information
   log "=== ATTEMPTING TO RUN SERVER WITH TRACE WARNINGS ==="
-  NODE_OPTIONS="--trace-warnings" node dist/server/index.js 2>&1 || log "Failed to run with trace warnings"
+  ENV_TYPE=$ENV_TYPE NODE_OPTIONS="--trace-warnings" node dist/server/index.js 2>&1 || log "Failed to run with trace warnings"
 fi
 
 # Exit with the original exit code
