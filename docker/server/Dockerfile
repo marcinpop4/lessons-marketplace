@@ -82,7 +82,16 @@ CMD ["/usr/local/bin/wait-for-db.sh", "sh", "-c", "\
     npx prisma migrate deploy --schema=server/prisma/schema.prisma && \
     if [ \"$RUN_SEED\" = \"true\" ]; then \
         echo \"[INFO] Running database seed...\" && \
+        set +e && \
         node dist/server/prisma/seed.js; \
+        SEED_RESULT=$?; \
+        set -e && \
+        if [ $SEED_RESULT -ne 0 ]; then \
+            echo \"[ERROR] Seed failed with exit code $SEED_RESULT. Continuing anyway...\" && \
+            echo \"[WARN] You may need to manually seed the database later\"; \
+        else \
+            echo \"[INFO] Seed completed successfully\"; \
+        fi \
     fi && \
     echo \"[INFO] Starting server...\" && \
     node dist/server/index.js"] 
