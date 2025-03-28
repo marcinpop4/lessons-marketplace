@@ -88,12 +88,18 @@ services:
       - PLAYWRIGHT_TIMEOUT=30000
       - PLAYWRIGHT_ACTION_TIMEOUT=15000
       - PLAYWRIGHT_NAVIGATION_TIMEOUT=20000
-      - DOCKER_FRONTEND_URL=http://frontend:80
+      - DOCKER_FRONTEND_URL=http://frontend
       - TEST_ENV=docker
     external_links:
       - lessons-marketplace-db:database
       - lessons-marketplace-server:server
       - lessons-marketplace-frontend:frontend
+    depends_on:
+      frontend:
+        condition: service_healthy
+        restart: true
+    networks:
+      - default
 
 volumes:
   postgres_data:

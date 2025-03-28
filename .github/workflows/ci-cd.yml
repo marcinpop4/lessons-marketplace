@@ -60,6 +60,19 @@ jobs:
         id: deploy
         run: pnpm docker:deploy:rebuild
 
+      - name: Debug URL configuration before tests
+        if: always()
+        run: |
+          # Make the debug scripts executable
+          chmod +x scripts/debug-url-test.sh scripts/debug-url-issue.js
+          
+          # Run the debug scripts from the test container
+          docker-compose -f docker/docker-compose.yml --profile test run --rm test node /app/scripts/debug-url-issue.js
+          docker-compose -f docker/docker-compose.yml --profile test run --rm test /app/scripts/debug-url-test.sh
+          
+          # Show service status
+          docker-compose -f docker/docker-compose.yml ps
+
       - name: Debug Docker environment
         if: always() # Run even if previous step fails
         run: |

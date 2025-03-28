@@ -24,6 +24,13 @@ if (frontendUrl && !frontendUrl.startsWith('http://') && !frontendUrl.startsWith
   console.log(`Adding protocol to frontend URL: ${frontendUrl}`);
 }
 
+// Fix: Ensure that the URL doesn't have a trailing :80 port specification,
+// as this can cause issues when Playwright appends paths
+if (frontendUrl && frontendUrl.endsWith(':80')) {
+  frontendUrl = frontendUrl.replace(':80', '');
+  console.log(`Removed explicit port 80 for cleaner URL handling: ${frontendUrl}`);
+}
+
 console.log(`Using frontend URL for tests: ${frontendUrl}`);
 
 export default defineConfig({
