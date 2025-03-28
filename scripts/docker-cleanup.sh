@@ -13,22 +13,22 @@ echo "Cleaning up Docker resources for profile: $profileName"
 
 # Stop and remove any containers with our project name
 echo "Stopping and removing containers..."
-docker ps -a -q --filter "name=lessons-marketplace" | xargs -r docker rm -f
+docker ps -a -q --filter "name=lessons-marketplace" | xargs -r docker rm -f || true
 
 # Remove any dangling images
 echo "Cleaning up dangling images..."
-docker image prune -f
+docker image prune -f || true
 
 # Clean up unused volumes
 echo "Cleaning up unused volumes..."
-docker volume prune -f
+docker volume prune -f || true
 
 # Clean up unused networks
 echo "Cleaning up unused networks..."
-docker network prune -f
+docker network prune -f || true
 
 # Prune the Docker system
 echo "Pruning Docker system..."
-docker system prune -af --volumes
+docker system prune -af --volumes || true
 
 echo "Docker cleanup completed successfully!" 

@@ -111,17 +111,72 @@ app.use(express.json()); // Parse JSON request body
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded request body
 app.use(cookieParser()); // Parse cookies
 
-// Database connection test
+// Enhanced database health check with retry mechanism
 app.get('/api/health', async (req, res) => {
-  try {
-    // Test database connection
-    await prisma.$queryRaw`SELECT 1`;
-    res.status(200).json({ status: 'ok', database: 'connected' });
-  } catch (error: unknown) {
-    logger.error('Database connection error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown database error';
-    res.status(500).json({ status: 'error', database: 'disconnected', error: errorMessage });
+  const maxRetries = 3;
+  let lastError = null;
+
+  // Try multiple times to connect to the database
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Test database connection
+      await prisma.$queryRaw`SELECT 1 as health_check`;
+      
+      // Check database configuration
+      const dbConfig = {
+        host: process.env.DB_HOST || 'not_set',
+        port: process.env.DB_PORT || 'not_set',
+        database: process.env.POSTGRES_DB || 'not_set',
+        user: process.env.POSTGRES_USER || 'not_set',
+        url_set: Boolean(process.env.DATABASE_URL),
+        ssl: process.env.DB_SSL === 'true'
+      };
+      
+      return res.status(200).json({ 
+        status: 'ok', 
+        database: 'connected',
+        attempt,
+        databaseConfig: {
+          ...dbConfig,
+          // Mask sensitive data
+          password: process.env.POSTGRES_PASSWORD ? '******' : 'not_set'
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      lastError = error;
+      logger.error(`Database connection error (attempt ${attempt}/${maxRetries}):`, error);
+      
+      // Wait before retry (exponential backoff)
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+      }
+    }
   }
+
+  // All retries failed
+  const errorMessage = lastError instanceof Error ? lastError.message : 'Unknown database error';
+  const dbConfig = {
+    host: process.env.DB_HOST || 'not_set',
+    port: process.env.DB_PORT || 'not_set',
+    database: process.env.POSTGRES_DB || 'not_set',
+    user: process.env.POSTGRES_USER || 'not_set',
+    url_set: Boolean(process.env.DATABASE_URL),
+    ssl: process.env.DB_SSL === 'true'
+  };
+  
+  return res.status(500).json({ 
+    status: 'error', 
+    database: 'disconnected', 
+    error: errorMessage,
+    retries: maxRetries,
+    databaseConfig: {
+      ...dbConfig,
+      // Mask sensitive data
+      password: process.env.POSTGRES_PASSWORD ? '******' : 'not_set'
+    },
+    timestamp: new Date().toISOString()
+  });
 });
 
 // API routes with versioning

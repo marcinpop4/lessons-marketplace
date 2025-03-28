@@ -46,7 +46,7 @@ done
 # Save timestamp
 echo "Debug completed at: $(date)" > "${debug_dir}/timestamp.txt" 2>/dev/null || true
 
-# Create symlink to latest debug directory
-ln -sf "${debug_dir}" "logs/latest-docker-debug" 2>/dev/null || true
+# Create a file pointing to the latest debug directory instead of a symlink
+echo "${debug_dir}" > "logs/latest-docker-debug-path.txt" 2>/dev/null || true
 
 echo "Docker debug process completed. Logs saved to ${debug_dir}" 

@@ -45,8 +45,8 @@ jobs:
 
       - name: Create logs directory with proper permissions
         run: |
-          sudo mkdir -p logs
-          sudo chmod -R 777 logs
+          mkdir -p logs
+          chmod -R 777 logs
           echo "Created logs directory with permissions $(ls -ld logs)"
 
       - name: Set up Docker Buildx
@@ -58,7 +58,7 @@ jobs:
           # Make script executable
           chmod +x scripts/docker-cleanup.sh
           # Execute thorough cleanup
-          sudo ./scripts/docker-cleanup.sh
+          ./scripts/docker-cleanup.sh
           pnpm docker:clean
 
       - name: Deploy components
@@ -72,19 +72,19 @@ jobs:
         if: always() # Run even if previous step fails
         run: |
           # Ensure logs directory exists with proper permissions
-          sudo mkdir -p logs
-          sudo chmod -R 777 logs
+          mkdir -p logs
+          chmod -R 777 logs
           
-          # Ensure script is executable and run it with sudo
-          sudo chmod +x scripts/debug-docker.sh
-          sudo ./scripts/debug-docker.sh
+          # Ensure script is executable and run it
+          chmod +x scripts/debug-docker.sh
+          ./scripts/debug-docker.sh
           
           # Ensure logs are accessible
-          sudo chmod -R 777 logs
+          chmod -R 777 logs
           
           # List debug files if they exist
           echo "=== DEBUG FILES GENERATED ==="
-          sudo find logs -type f | sort
+          find logs -type f | sort
 
       - name: Upload debug logs
         uses: actions/upload-artifact@v4

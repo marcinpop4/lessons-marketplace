@@ -40,6 +40,7 @@ RUN apt-get update && apt-get install -y \
     openssl \
     ca-certificates \
     curl \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Verify OpenSSL installation and configure for Prisma
@@ -68,22 +69,20 @@ RUN echo '{"type":"module"}' > ./scripts/package.json
 # Copy the built application
 COPY --from=builder /app/dist ./dist
 
+# Copy the wait-for-db script
+COPY docker/server/wait-for-db.sh /usr/local/bin/wait-for-db.sh
+RUN chmod +x /usr/local/bin/wait-for-db.sh
+
 # Expose the port the app runs on
 EXPOSE ${PORT:-3000}
 
 # Set up command to run migrations, conditional seeding, and start the server
-CMD /bin/sh -c '\
-    echo "[INFO] Starting server container initialization..." && \
-    echo "[INFO] Waiting for database to be ready..." && \
-    DB_HOST_VALUE=${DB_HOST:-database} && \
-    DB_PORT_VALUE=${DB_PORT:-5432} && \
-    echo "[INFO] Connecting to database at $DB_HOST_VALUE:$DB_PORT_VALUE" && \
-    npx wait-on -t 60000 tcp:$DB_HOST_VALUE:$DB_PORT_VALUE && \
-    echo "[INFO] Running database migrations..." && \
+CMD ["/usr/local/bin/wait-for-db.sh", "sh", "-c", "\
+    echo \"[INFO] Running database migrations...\" && \
     npx prisma migrate deploy --schema=server/prisma/schema.prisma && \
-    if [ "$RUN_SEED" = "true" ]; then \
-        echo "[INFO] Running database seed..." && \
+    if [ \"$RUN_SEED\" = \"true\" ]; then \
+        echo \"[INFO] Running database seed...\" && \
         node dist/server/prisma/seed.js; \
     fi && \
-    echo "[INFO] Starting server..." && \
-    node dist/server/index.js' 
+    echo \"[INFO] Starting server...\" && \
+    node dist/server/index.js"] 
