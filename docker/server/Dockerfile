@@ -58,6 +58,9 @@ COPY --from=dependencies /app/node_modules ./node_modules
 # Copy server directory and Prisma files
 COPY server/prisma ./server/prisma
 COPY scripts ./scripts
+COPY env ./env
+
+# Copy entrypoint script
 COPY docker/scripts/server-entrypoint.sh /usr/local/bin/server-entrypoint.sh
 RUN chmod +x /usr/local/bin/server-entrypoint.sh
 
@@ -66,6 +69,10 @@ COPY --from=builder /app/dist ./dist
 
 # Set up module resolution for scripts
 RUN echo '{"type":"module"}' > ./scripts/package.json 
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV ENV_TYPE=ci
 
 # Expose the port the app runs on
 EXPOSE ${PORT:-3000}

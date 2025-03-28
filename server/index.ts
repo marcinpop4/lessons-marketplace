@@ -8,6 +8,16 @@ import cookieParser from 'cookie-parser';
 import logger from './utils/logger.js';
 import { execSync } from 'child_process';
 
+// Temporary debug code to diagnose startup issues
+console.log('=== SERVER STARTUP DEBUG ===');
+console.log('Current working directory:', process.cwd());
+console.log('Node version:', process.version);
+console.log('Environment variables (excluding sensitive data):');
+Object.keys(process.env)
+  .filter(key => !key.includes('PASSWORD') && !key.includes('SECRET') && !key.includes('KEY'))
+  .sort()
+  .forEach(key => console.log(`${key}: ${process.env[key]}`));
+
 // Load environment variables
 dotenv.config();
 
