@@ -58,7 +58,7 @@ jobs:
 
       - name: Deploy components
         id: deploy
-        run: pnmp docker:deploy:rebuild
+        run: pnpm docker:deploy:rebuild
 
       - name: Debug Docker environment
         if: always() # Run even if previous step fails
