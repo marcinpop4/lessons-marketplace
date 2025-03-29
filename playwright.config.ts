@@ -4,11 +4,6 @@ import * as dotenv from 'dotenv';
 // Load environment variables from .env file
 dotenv.config();
 
-// Log all environment variables for debugging
-console.log('Environment variables:');
-console.log(`FRONTEND_URL: ${process.env.FRONTEND_URL}`);
-console.log(`DOCKER_FRONTEND_URL: ${process.env.DOCKER_FRONTEND_URL}`);
-
 // Determine if we're running in Docker by checking environment variables
 const isRunningInDocker = process.env.TEST_ENV === 'docker';
 console.log(`Running in Docker: ${isRunningInDocker}`);
@@ -39,7 +34,6 @@ export default defineConfig({
   
   use: {
     baseURL,
-    trace: 'on-first-retry',
     screenshot: {
       mode: 'only-on-failure',
       fullPage: true
@@ -48,6 +42,13 @@ export default defineConfig({
     headless: true,
     actionTimeout: 15000,
     navigationTimeout: 20000,
+    trace: {
+      mode: 'on-first-retry',
+      snapshots: true,
+      screenshots: true,
+      sources: true,
+      attachments: true
+    }
   },
   outputDir: './tests/results/screenshots',
   projects: [

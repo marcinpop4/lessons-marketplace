@@ -66,17 +66,6 @@ else
   log "Database migrations completed successfully"
 fi
 
-# Run Prisma generate to ensure client is properly initialized
-log "=== GENERATING PRISMA CLIENT ==="
-ENV_TYPE=$ENV_TYPE pnpm prisma:generate
-GENERATE_EXIT_CODE=$?
-if [ $GENERATE_EXIT_CODE -ne 0 ]; then
-  log "ERROR: Prisma client generation failed with exit code $GENERATE_EXIT_CODE"
-  exit $GENERATE_EXIT_CODE
-else
-  log "Prisma client generated successfully"
-fi
-
 # Run seeds if RUN_SEED environment variable is set to true
 if [ "$RUN_SEED" = "true" ]; then
   log "=== RUNNING DATABASE SEED ==="

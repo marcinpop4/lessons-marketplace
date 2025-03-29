@@ -29,7 +29,8 @@ RUN pnpm install --frozen-lockfile
 # Copy application code
 COPY . .
 
-# Note: We'll generate the Prisma client at runtime to ensure correct schema context
+# Generate Prisma client before build
+RUN pnpm prisma:generate
 
 # Build stage
 FROM dependencies AS builder
@@ -58,8 +59,11 @@ COPY package.json pnpm-lock.yaml ./
 # Copy node_modules from dependencies stage
 COPY --from=dependencies /app/node_modules ./node_modules
 
-# Copy server directory and Prisma files
-COPY server/prisma ./server/prisma
+# Copy Prisma files and generated client
+COPY --from=dependencies /app/server/prisma ./server/prisma
+COPY --from=dependencies /app/node_modules/.pnpm/*@prisma+client*/node_modules/.prisma ./node_modules/.prisma
+
+# Copy other necessary files
 COPY scripts ./scripts
 COPY env ./env
 
