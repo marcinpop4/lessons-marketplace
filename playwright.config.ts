@@ -13,25 +13,12 @@ console.log(`DOCKER_FRONTEND_URL: ${process.env.DOCKER_FRONTEND_URL}`);
 const isRunningInDocker = process.env.TEST_ENV === 'docker';
 console.log(`Running in Docker: ${isRunningInDocker}`);
 
-// When running in Docker, use DOCKER_FRONTEND_URL instead of FRONTEND_URL
-let frontendUrl = process.env.TEST_ENV === 'docker' 
-     ? process.env.DOCKER_FRONTEND_URL 
-     : process.env.FRONTEND_URL;
+// In Docker, always use the frontend container URL
+const baseURL = process.env.TEST_ENV === 'docker' 
+  ? process.env.DOCKER_FRONTEND_URL
+  : process.env.FRONTEND_URL;
 
-// Ensure FRONTEND_URL has the correct format (includes protocol)
-if (frontendUrl && !frontendUrl.startsWith('http://') && !frontendUrl.startsWith('https://')) {
-  frontendUrl = `http://${frontendUrl}`;
-  console.log(`Adding protocol to frontend URL: ${frontendUrl}`);
-}
-
-// Fix: Ensure that the URL doesn't have a trailing :80 port specification,
-// as this can cause issues when Playwright appends paths
-if (frontendUrl && frontendUrl.endsWith(':80')) {
-  frontendUrl = frontendUrl.replace(':80', '');
-  console.log(`Removed explicit port 80 for cleaner URL handling: ${frontendUrl}`);
-}
-
-console.log(`Using frontend URL for tests: ${frontendUrl}`);
+console.log(`Using frontend URL for tests: ${baseURL}`);
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -48,25 +35,16 @@ export default defineConfig({
   testMatch: 'tests/e2e/**/*.spec.ts',
   
   use: {
-    // Use the FRONTEND_URL from environment variables - with protocol if needed
-    baseURL: frontendUrl,
+    baseURL,
     trace: 'on-first-retry',
     screenshot: {
       mode: 'only-on-failure',
       fullPage: true
     },
     video: 'on-first-retry',
-    
-    // Always use headless mode in Docker environments
     headless: true,
-    
-    // Increase timeouts for CI environments
-    actionTimeout: process.env.PLAYWRIGHT_ACTION_TIMEOUT ? parseInt(process.env.PLAYWRIGHT_ACTION_TIMEOUT) : 10000,
-    navigationTimeout: process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT ? parseInt(process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT) : 15000,
-    // Add a small delay between actions in CI for stability
-    launchOptions: {
-      slowMo: process.env.CI ? 100 : 0,
-    },
+    actionTimeout: 15000,
+    navigationTimeout: 20000,
   },
   outputDir: './tests/screenshots',
   projects: [
@@ -75,10 +53,10 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  // Skip web server when testing against Docker
-  webServer: process.env.SKIP_WEB_SERVER ? undefined : {
+  // Only start web server in local development
+  webServer: process.env.TEST_ENV === 'docker' ? undefined : {
     command: 'NODE_OPTIONS="" pnpm run dev:full',
-    url: frontendUrl,
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
     stdout: 'pipe',
     stderr: 'pipe',
