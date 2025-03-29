@@ -56,6 +56,16 @@ else
   ls -la dist/ 2>/dev/null || log "dist/ directory doesn't exist or is empty"
 fi
 
+# Generate Prisma client
+log "=== GENERATING PRISMA CLIENT ==="
+ENV_TYPE=$ENV_TYPE pnpm prisma:generate
+GENERATE_EXIT_CODE=$?
+if [ $GENERATE_EXIT_CODE -ne 0 ]; then
+  log "ERROR: Prisma client generation failed with exit code $GENERATE_EXIT_CODE"
+else
+  log "Prisma client generated successfully"
+fi
+
 # Run database migrations
 log "=== RUNNING DATABASE MIGRATIONS ==="
 ENV_TYPE=$ENV_TYPE pnpm prisma:migrate

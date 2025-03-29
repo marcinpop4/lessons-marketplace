@@ -59,6 +59,9 @@ COPY package.json pnpm-lock.yaml ./
 # Copy node_modules from dependencies stage
 COPY --from=dependencies /app/node_modules ./node_modules
 
+# Copy .pnpm directory to ensure Prisma client is available
+COPY --from=dependencies /app/node_modules/.pnpm ./node_modules/.pnpm
+
 # Copy Prisma schema
 COPY --from=dependencies /app/server/prisma ./server/prisma
 
