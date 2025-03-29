@@ -5,6 +5,10 @@
 
 # Testing
 /coverage
+tests/screenshots/
+test-results/
+playwright-report/
+tests/results/
 
 # Production build
 /build
@@ -50,8 +54,3 @@ ehthumbs.db
 Desktop.ini
 node_modules/
 frontend/node_modules/
-
-# Test artifacts
-tests/screenshots/
-test-results/
-playwright-report/

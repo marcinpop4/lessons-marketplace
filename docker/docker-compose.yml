@@ -88,7 +88,7 @@ services:
     container_name: lessons-marketplace-test
     network_mode: "container:lessons-marketplace-frontend"
     environment:
-      - JEST_JUNIT_OUTPUT_DIR=/app/test-results/
+      - JEST_JUNIT_OUTPUT_DIR=/app/tests/results/test-results/
       - JEST_JUNIT_OUTPUT_NAME=junit.xml
       - PLAYWRIGHT_HEADLESS=true
       - SKIP_WEB_SERVER=true
@@ -99,7 +99,10 @@ services:
       - DOCKER_FRONTEND_URL=http://localhost
       - TEST_ENV=docker
     volumes:
-      - ../test-results:/app/test-results:rw
+      - ../tests/results/test-results:/app/tests/results/test-results:rw
+      - ../tests/results/playwright-report:/app/tests/results/playwright-report:rw
+      - ../tests/results/screenshots:/app/tests/results/screenshots:rw
+      - ../tests/results/test-logs:/app/tests/results/test-logs:rw
     depends_on:
       database:
         condition: service_healthy

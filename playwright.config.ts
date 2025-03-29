@@ -26,7 +26,10 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: 'list',
+  reporter: [
+    ['html', { outputFolder: './tests/results/playwright-report', open: 'never' }],
+    ['list']
+  ],
   
   // Global timeout settings
   timeout: process.env.PLAYWRIGHT_TIMEOUT ? parseInt(process.env.PLAYWRIGHT_TIMEOUT) : 30000,
@@ -46,7 +49,7 @@ export default defineConfig({
     actionTimeout: 15000,
     navigationTimeout: 20000,
   },
-  outputDir: './tests/screenshots',
+  outputDir: './tests/results/screenshots',
   projects: [
     {
       name: 'chromium',

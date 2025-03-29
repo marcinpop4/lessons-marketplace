@@ -92,4 +92,40 @@ jobs:
 
       - name: Run tests
         if: steps.deploy.outcome == 'success'
-        run: pnpm docker:test:rebuild
+        run: |
+          mkdir -p tests/results/test-logs
+          DEBUG=pw:api pnpm docker:test:rebuild 2>&1 | tee tests/results/test-logs/test-output.log
+
+      - name: Upload test execution logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-execution-logs
+          path: tests/results/test-logs/
+          retention-days: 30
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: tests/results/playwright-report/
+          retention-days: 30
+          
+      - name: Upload Playwright test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-test-results
+          path: |
+            tests/results/test-results/
+            tests/results/screenshots/
+          retention-days: 30
+          
+      - name: Upload Playwright traces
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-traces
+          path: tests/results/test-results/traces/
+          retention-days: 30
