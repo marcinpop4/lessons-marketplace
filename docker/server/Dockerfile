@@ -29,8 +29,7 @@ RUN pnpm install --frozen-lockfile
 # Copy application code
 COPY . .
 
-# Generate Prisma client with ENV_TYPE
-RUN ENV_TYPE=${ENV_TYPE} pnpm prisma:generate
+# Note: We'll generate the Prisma client at runtime to ensure correct schema context
 
 # Build stage
 FROM dependencies AS builder

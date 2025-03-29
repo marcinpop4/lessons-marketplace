@@ -78,6 +78,17 @@ if [ "$SEED_DB" = "true" ]; then
   fi
 fi
 
+# Run Prisma generate to ensure client is properly initialized
+log "=== GENERATING PRISMA CLIENT ==="
+ENV_TYPE=$ENV_TYPE pnpm prisma:generate
+GENERATE_EXIT_CODE=$?
+if [ $GENERATE_EXIT_CODE -ne 0 ]; then
+  log "ERROR: Prisma client generation failed with exit code $GENERATE_EXIT_CODE"
+  exit $GENERATE_EXIT_CODE
+else
+  log "Prisma client generated successfully"
+fi
+
 # Start the server with enhanced error logging
 log "=== STARTING SERVER ==="
 log "Command to run: $*"
