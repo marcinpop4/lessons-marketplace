@@ -77,15 +77,6 @@ RUN echo '{"type":"module"}' > ./scripts/package.json
 ENV NODE_ENV=production
 # ENV_TYPE already set from base image
 
-# Load environment variables from the appropriate .env file if it exists
-RUN if [ -f "env/.env.${ENV_TYPE}" ]; then \
-    echo "Found env/.env.${ENV_TYPE} file, loading environment variables..."; \
-    grep -v '^#' env/.env.${ENV_TYPE} | xargs -I{} echo "export {}" > /tmp/env_vars.sh; \
-    chmod +x /tmp/env_vars.sh; \
-    else \
-    echo "WARNING: env/.env.${ENV_TYPE} file not found!"; \
-    fi
-
 # Expose the port the app runs on
 EXPOSE ${PORT:-3000}
 

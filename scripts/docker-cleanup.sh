@@ -1,39 +1,39 @@
 #!/bin/bash
 
 # Docker Cleanup Script
-# This script ensures that all Docker resources related to our project are properly cleaned up
-# before starting a new deployment to prevent conflicts
+# This script ensures a COMPLETE clean slate by removing ALL Docker resources
+# Use with caution as it removes ALL containers, volumes, networks, and images
 
-set -e
-echo "Starting Docker cleanup process..."
+echo "🧹 Starting deep Docker cleanup..."
 
-# Get profile name from environment or use ci as default
-profileName=${profile:-ci}
-echo "Cleaning up Docker resources for profile: $profileName"
+# Stop all running containers
+echo "Stopping all running containers..."
+docker stop $(docker ps -a -q) 2>/dev/null || true
 
-# Stop and remove any containers with our project name
-echo "Stopping and removing containers..."
-docker ps -a -q --filter "name=lessons-marketplace" | xargs -r docker rm -f || true
+# Remove all containers
+echo "Removing all containers..."
+docker rm -f $(docker ps -a -q) 2>/dev/null || true
 
-# Remove all volumes associated with our project
-echo "Removing project volumes..."
-docker volume ls -q --filter "name=lessons-marketplace" | xargs -r docker volume rm -f || true
-docker volume rm -f postgres_data lessons-marketplace_postgres_data || true
+# Remove all volumes (THIS IS IMPORTANT - THIS REMOVES ALL DATABASE DATA)
+echo "Removing all Docker volumes (including database data)..."
+docker volume rm $(docker volume ls -q) 2>/dev/null || true
 
-# Remove any dangling images
-echo "Cleaning up dangling images..."
-docker image prune -f || true
+# Remove all unused networks
+echo "Removing all Docker networks..."
+docker network prune -f
 
-# Clean up unused volumes
-echo "Cleaning up unused volumes..."
-docker volume prune -f || true
+# Remove unused images (optional, but ensures fresh builds)
+echo "Removing all Docker images..."
+docker rmi -f $(docker images -a -q) 2>/dev/null || true
 
-# Clean up unused networks
-echo "Cleaning up unused networks..."
-docker network prune -f || true
+# Remove build cache (ensures completely fresh builds)
+echo "Removing Docker build cache..."
+docker builder prune -af
 
-# Prune the Docker system
-echo "Pruning Docker system..."
-docker system prune -af --volumes || true
+# Final system prune to catch anything left
+echo "Performing final system prune..."
+docker system prune -af --volumes
 
-echo "Docker cleanup completed successfully!" 
+echo "✅ Docker deep clean completed!"
+echo "All containers, volumes, networks, and images have been removed."
+echo "Next docker deploy will start completely fresh with no persistent data." 
