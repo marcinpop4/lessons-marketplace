@@ -18,7 +18,7 @@
     "docker:deep-clean": "chmod +x scripts/docker-cleanup.sh && ./scripts/docker-cleanup.sh",
     "docker:deploy": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml down && docker compose -f docker/docker-compose.yml up -d",
     "docker:deploy:rebuild": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml down && docker compose -f docker/docker-compose.yml up -d --build",
-    "docker:deploy:fly": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml --profile deploy up deploy",
+    "docker:deploy:fly": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml --profile deploy up deploy --exit-code-from deploy",
     "docker:down": "pnpm docker:stop && docker compose -f docker/docker-compose.yml down --remove-orphans",
     "docker:frontend": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml rm -fs frontend && docker compose -f docker/docker-compose.yml up -d frontend",
     "docker:frontend:rebuild": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml rm -fs frontend && docker compose -f docker/docker-compose.yml up -d --build frontend",
