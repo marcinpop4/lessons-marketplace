@@ -23,12 +23,14 @@ RUN curl -L https://fly.io/install.sh | sh
 # Create a script to run the deployment with the correct path
 RUN echo '#!/bin/bash\n\
 export PATH="$PATH:/root/.fly/bin"\n\
+export TS_NODE_PROJECT="/app/docker/deploy/tsconfig.ci.json"\n\
 which flyctl\n\
 pnpm fly:deploy:server && pnpm fly:deploy:frontend\n\
 ' > /app/deploy.sh && chmod +x /app/deploy.sh
 
 # Set environment variables
 ENV ENV_TYPE=prod
+ENV TS_NODE_PROJECT=/app/docker/deploy/tsconfig.ci.json
 
 # The command will use our deploy script
 CMD ["/app/deploy.sh"]

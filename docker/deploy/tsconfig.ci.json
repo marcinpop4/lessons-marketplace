@@ -1,0 +1,25 @@
+{
+  "extends": "../../server/tsconfig.server.json",
+  "compilerOptions": {
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "strictFunctionTypes": false,
+    "noImplicitThis": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noImplicitReturns": false,
+    "noFallthroughCasesInSwitch": false,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": [
+    "../../server/**/*",
+    "../../shared/**/*"
+  ],
+  "exclude": [
+    "../../node_modules",
+    "../../dist",
+    "../../frontend",
+    "dist"
+  ]
+} 
