@@ -1,0 +1,31 @@
+# Frontend-related
+frontend/
+frontend/**/*
+**/frontend
+
+# Development files
+.git
+.github
+.vscode
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/tests
+**/__tests__
+
+# Build artifacts
+**/dist
+**/build
+**/.next
+**/.cache
+
+# Local environment
+.env*
+.DS_Store
+README.md
+*.log
+
+# DO NOT ignore these
+!**/node_modules
+!**/.pnpm 

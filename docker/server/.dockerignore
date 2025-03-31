@@ -1,0 +1,50 @@
+# Frontend-related
+frontend/
+frontend/**/*
+**/frontend
+
+# Development files
+.git
+.github
+.vscode
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/tests
+**/__tests__
+
+# Build artifacts
+**/dist
+**/build
+**/.next
+**/.cache
+
+# Local environment
+.env*
+.DS_Store
+README.md
+*.log
+
+# Documentation
+/docs
+/api-docs
+
+# Testing
+/test-results
+/playwright-report
+/playwright/.cache
+
+# Editor directories and files
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# DO NOT ignore these
+!**/node_modules
+!**/.pnpm
+!server/
+!shared/ 

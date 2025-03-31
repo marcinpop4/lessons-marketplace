@@ -128,11 +128,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
     
     try {
-      const response = await apiClient.post(`/api/v1/auth/login`, {
+      const payload = {
         email,
         password,
         userType,
-      });
+      };
+      console.log('Login request payload:', payload);
+      
+      const response = await apiClient.post(`/api/v1/auth/login`, payload);
       
       if (response.data && response.data.accessToken) {
         setUser(response.data.user);

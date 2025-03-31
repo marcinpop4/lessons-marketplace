@@ -42,6 +42,4 @@ logs
 Dockerfile
 docker-compose.yml
 docker-compose.yaml
-
-# Legacy files
-/legacy-docker-config 
+/docker

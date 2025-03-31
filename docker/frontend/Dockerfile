@@ -53,4 +53,4 @@ COPY --from=builder /app/dist/frontend /usr/share/nginx/html
 EXPOSE 80
 
 # Process template and start nginx
-CMD ["/bin/sh", "-c", "envsubst '${VITE_API_BASE_URL}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"] 
+CMD ["/bin/sh", "-c", "envsubst '${VITE_API_BASE_URL} ${ENV_TYPE}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'env ENV_TYPE;' -g 'daemon off;'"] 

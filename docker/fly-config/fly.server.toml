@@ -3,29 +3,38 @@ app = "lessons-marketplace-server"
 primary_region = "ewr"
 
 [build]
-  dockerfile = "docker/server/Dockerfile"
+  dockerfile = "server.Dockerfile"
   context = "."
 
-# Non-sensitive environment variables only
-# Sensitive values (DB_PASSWORD, JWT_SECRET) are set as secrets
+# Only include environment variables that are not in .env.prod
 [env]
+# START: Environment variables from .env.prod
+# Only include environment variables that are not in .env.prod
+  ENV_TYPE = "prod"
   NODE_ENV = "production"
+  PORT = "3000"
+  FRONTEND_PORT = "80"
+  POSTGRES_USER = "lessons_user3"
+  POSTGRES_DB = "lessons_marketplace_server"
   DB_HOST = "twilight-sky-6674.flycast"
   DB_PORT = "5432"
-  DB_NAME = "lessons_marketplace_server"
-  DB_USER = "lessons_user3"
   DB_SSL = "false"
   DB_POOL_SIZE = "10"
-  PORT = "3000"
+  VITE_API_BASE_URL = "https://lessons-marketplace-server.fly.dev"
   FRONTEND_URL = "https://lessons-marketplace-frontend.fly.dev"
+  FRONTEND_HEALTH_URL = "http://localhost:80/index.html"
   JWT_EXPIRES_IN = "1h"
   REFRESH_TOKEN_EXPIRES_IN = "7d"
-  POSTGRES_DB = "lessons_marketplace_server"
-  POSTGRES_USER = "lessons_user3"
+  LOG_LEVEL = "2"
+  VITE_LOG_LEVEL = "2"
+  TAILWIND_MODE = "build"
+# END: Environment variables from .env.prod
 
 # Run database migrations on deploy
 [deploy]
-  release_command = "node /app/dist/server/prisma/migrate-deploy.js"
+  release_command = "pnpm prisma:migrate"
+  strategy = "rolling"
+  wait_timeout = "5m"
 
 [http_service]
   internal_port = 3000
@@ -34,6 +43,20 @@ primary_region = "ewr"
   auto_start_machines = true
   min_machines_running = 1
   processes = ["app"]
+  
+  # Add health check configuration
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
+
+  [[http_service.checks]]
+    interval = "5s"
+    timeout = "5s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/api/health"
+    protocol = "http"
 
 [[vm]]
   memory = "1gb"

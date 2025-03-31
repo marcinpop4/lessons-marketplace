@@ -58,7 +58,7 @@ jobs:
 
       - name: Deploy components
         id: deploy
-        run: pnpm docker:deploy:rebuild
+        run: pnpm docker:deploy
 
       - name: Debug Docker environment
         if: always() # Run even if previous step fails
@@ -94,7 +94,7 @@ jobs:
         if: steps.deploy.outcome == 'success'
         run: |
           mkdir -p tests/results/test-logs
-          DEBUG=pw:api pnpm docker:test:rebuild 2>&1 | tee tests/results/test-logs/test-output.log
+          DEBUG=pw:api pnpm docker:test 2>&1 | tee tests/results/test-logs/test-output.log
 
       - name: Upload test execution logs
         uses: actions/upload-artifact@v4

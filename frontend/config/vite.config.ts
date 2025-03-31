@@ -1,11 +1,10 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import fs from 'fs'
-import dotenv from 'dotenv'
 
-// Load environment variables from .env file
-dotenv.config({ path: resolve(__dirname, '../../.env') })
+// Get absolute path to the project root directory
+const projectRoot = resolve(__dirname, '../..')
 
 // Custom logic to avoid looking for tsconfig in the wrong place
 const getTsConfigPath = () => {
@@ -19,21 +18,15 @@ const getTsConfigPath = () => {
   return resolve(__dirname, './tsconfig.app.json')
 }
 
-// Get absolute path to the project root directory
-const projectRoot = resolve(__dirname, '../..')
-
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  // Load env files based on mode
-  const env = loadEnv(mode, process.cwd(), '');
-  
   // Check if API Base URL is defined
-  if (!env.VITE_API_BASE_URL) {
+  if (!process.env.VITE_API_BASE_URL) {
     throw new Error('VITE_API_BASE_URL environment variable is required');
   }
   
   // Log the API URL being used
-  console.log(`Building for ${mode} with API URL: ${env.VITE_API_BASE_URL}`);
+  console.log(`Building for ${mode} with API URL: ${process.env.VITE_API_BASE_URL}`);
   
   return {
     plugins: [

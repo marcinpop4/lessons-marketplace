@@ -3,14 +3,31 @@ app = "lessons-marketplace-frontend"
 primary_region = "ewr"
 
 [build]
-  dockerfile = "docker/frontend/Dockerfile"
+  dockerfile = "frontend.Dockerfile"
   context = "."
 
 [env]
-  CONTAINER_ENV = "true"
+# START: Environment variables from .env.prod
+# Only include environment variables that are not in .env.prod
+  ENV_TYPE = "prod"
   NODE_ENV = "production"
-  PORT = "80"
-  VITE_API_BASE_URL = "https://lessons-marketplace-server.fly.dev/api"
+  PORT = "3000"
+  FRONTEND_PORT = "80"
+  POSTGRES_USER = "lessons_user3"
+  POSTGRES_DB = "lessons_marketplace_server"
+  DB_HOST = "twilight-sky-6674.flycast"
+  DB_PORT = "5432"
+  DB_SSL = "false"
+  DB_POOL_SIZE = "10"
+  VITE_API_BASE_URL = "https://lessons-marketplace-server.fly.dev"
+  FRONTEND_URL = "https://lessons-marketplace-frontend.fly.dev"
+  FRONTEND_HEALTH_URL = "http://localhost:80/index.html"
+  JWT_EXPIRES_IN = "1h"
+  REFRESH_TOKEN_EXPIRES_IN = "7d"
+  LOG_LEVEL = "2"
+  VITE_LOG_LEVEL = "2"
+  TAILWIND_MODE = "build"
+# END: Environment variables from .env.prod
 
 [http_service]
   internal_port = 80
@@ -19,9 +36,22 @@ primary_region = "ewr"
   auto_start_machines = true
   min_machines_running = 1
   processes = ["app"]
-  protocol = "tcp"
+
+  # Add health check configuration
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
+
+  [[http_service.checks]]
+    interval = "5s"
+    timeout = "3s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/index.html"
+    protocol = "http"
 
 [[vm]]
+  memory = "512mb"
   cpu_kind = "shared"
-  cpus = 1
-  memory = "1gb" 
+  cpus = 1 
