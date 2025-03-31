@@ -76,19 +76,13 @@ else
   log "Database migrations completed successfully"
 fi
 
-# Run seeds if RUN_SEED environment variable is set to true
-if [ "$RUN_SEED" = "true" ]; then
-  log "=== RUNNING DATABASE SEED ==="
-  log "RUN_SEED is set to: $RUN_SEED"
-  ENV_TYPE=$ENV_TYPE pnpm prisma:seed
-  SEED_EXIT_CODE=$?
-  if [ $SEED_EXIT_CODE -ne 0 ]; then
-    log "ERROR: Database seed failed with exit code $SEED_EXIT_CODE"
-  else
-    log "Database seed completed successfully"
-  fi
+log "=== RUNNING DATABASE SEED ==="
+ENV_TYPE=$ENV_TYPE pnpm prisma:seed
+SEED_EXIT_CODE=$?
+if [ $SEED_EXIT_CODE -ne 0 ]; then
+  log "ERROR: Database seed failed with exit code $SEED_EXIT_CODE"
 else
-  log "Skipping seed: RUN_SEED=$RUN_SEED"
+  log "Database seed completed successfully"
 fi
 
 # Start the server with enhanced error logging

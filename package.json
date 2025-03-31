@@ -3,8 +3,8 @@
   "private": true,
   "scripts": {
     "build:frontend": "dotenv -e env/.env.${ENV_TYPE} -- sh -c 'tsc --project frontend/config/tsconfig.app.json --skipLibCheck && VITE_TSCONFIG=frontend/config/tsconfig.app.json vite build --config frontend/config/vite.config.ts --emptyOutDir'",
-    "build:server": "pnpm run build:shared && tsc --project server/tsconfig.server.json --skipLibCheck",
-    "build:shared": "tsc --project shared/tsconfig.shared.json --skipLibCheck",
+    "build:server": "dotenv -e env/.env.${ENV_TYPE} -- sh -c 'pnpm run build:shared && tsc --project server/tsconfig.server.json --skipLibCheck'",
+    "build:shared": "dotenv -e env/.env.${ENV_TYPE} -- tsc --project shared/tsconfig.shared.json --skipLibCheck",
     "clean": "rm -rf dist && rm -rf node_modules",
     "dev:frontend": "cross-env VITE_TSCONFIG=frontend/config/tsconfig.app.json vite --config frontend/config/vite.config.ts --force",
     "dev:full": "concurrently \"pnpm run dev:frontend\" \"pnpm run dev:server\"",

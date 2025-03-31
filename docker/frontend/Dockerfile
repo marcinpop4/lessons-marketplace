@@ -43,8 +43,8 @@ RUN rm -rf /etc/nginx/conf.d/* && \
     mkdir -p /var/log/nginx && \
     chown -R nginx:nginx /var/log/nginx
 
-# Copy custom nginx configuration template
-COPY frontend/config/nginx/nginx.conf /etc/nginx/templates/default.conf.template
+# Copy CI nginx configuration template for Docker environment
+COPY frontend/config/nginx/nginx.ci.conf /etc/nginx/templates/default.conf.template
 
 # Copy built files from builder stage
 COPY --from=builder /app/dist/frontend /usr/share/nginx/html

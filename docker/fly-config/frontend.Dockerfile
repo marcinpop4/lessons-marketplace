@@ -58,8 +58,8 @@ RUN rm -rf /etc/nginx/conf.d/* && \
     mkdir -p /var/log/nginx && \
     chown -R nginx:nginx /var/log/nginx
 
-# Copy nginx configuration template - Updated to use the correct path
-COPY frontend/config/nginx/nginx.conf /etc/nginx/templates/default.conf.template
+# Copy nginx configuration template for production environment
+COPY frontend/config/nginx/nginx.prod.conf /etc/nginx/templates/default.conf.template
 
 # Copy built application from builder
 COPY --from=builder /app/dist/frontend /usr/share/nginx/html
@@ -71,4 +71,4 @@ COPY --from=builder /app/env /env
 EXPOSE 80
 
 # Process template and start nginx
-CMD ["/bin/sh", "-c", "envsubst '${VITE_API_BASE_URL}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"] 
+CMD ["/bin/sh", "-c", "envsubst '${VITE_API_BASE_URL} ${ENV_TYPE}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'env ENV_TYPE;' -g 'daemon off;'"] 
