@@ -114,5 +114,17 @@ services:
         condition: service_healthy
         restart: false
 
+  deploy:
+    profiles:
+      - deploy
+    build:
+      context: ..
+      dockerfile: docker/deploy/Dockerfile
+    container_name: lessons-marketplace-deploy
+    environment:
+      - FLY_API_TOKEN=${FLY_API_TOKEN}
+    volumes:
+      - ../logs:/app/logs:rw
+
 volumes:
   postgres_data:
