@@ -25,6 +25,14 @@ RUN echo '#!/bin/bash\n\
 export PATH="$PATH:/root/.fly/bin"\n\
 export TS_NODE_PROJECT="/app/docker/deploy/tsconfig.ci.json"\n\
 which flyctl\n\
+# Run TypeScript check first\n\
+echo "Running TypeScript check..."\n\
+pnpm tsc --project /app/docker/deploy/tsconfig.ci.json --noEmit\n\
+if [ $? -ne 0 ]; then\n\
+  echo "TypeScript check failed. Please fix the errors before deploying."\n\
+  exit 1\n\
+fi\n\
+# If TypeScript check passes, proceed with deployment\n\
 pnpm fly:deploy:server && pnpm fly:deploy:frontend\n\
 ' > /app/deploy.sh && chmod +x /app/deploy.sh
 
