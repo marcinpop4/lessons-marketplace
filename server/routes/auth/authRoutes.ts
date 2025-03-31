@@ -1,5 +1,5 @@
 import express from 'express';
-import type { Request, Response } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import prisma from '../../prisma.js';
 import bcryptjs from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -40,7 +40,7 @@ export const comparePasswords = async (password: string, hash: string): Promise<
 };
 
 // Register endpoint
-router.post('/register', async (req: Request, res: Response) => {
+router.post('/register', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { 
       email, 
@@ -54,12 +54,14 @@ router.post('/register', async (req: Request, res: Response) => {
 
     // Validate required fields
     if (!email || !password || !firstName || !lastName || !phoneNumber || !dateOfBirth || !userType) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      res.status(400).json({ error: 'Missing required fields' });
+      return;
     }
 
     // Validate userType
     if (userType !== 'STUDENT' && userType !== 'TEACHER') {
-      return res.status(400).json({ error: 'Invalid userType' });
+      res.status(400).json({ error: 'Invalid userType' });
+      return;
     }
 
     // Hash the password
@@ -95,7 +97,8 @@ router.post('/register', async (req: Request, res: Response) => {
       }
     } catch (error: any) {
       if (error.code === 'P2002') {
-        return res.status(409).json({ error: 'Email already exists' });
+        res.status(409).json({ error: 'Email already exists' });
+        return;
       }
       throw error;
     }
@@ -132,7 +135,7 @@ router.post('/register', async (req: Request, res: Response) => {
     res.cookie('refreshToken', refreshToken, cookieOptions);
 
     // Return user and access token
-    return res.status(201).json({
+    res.status(201).json({
       user: {
         id: user.id,
         email: user.email,
@@ -144,23 +147,25 @@ router.post('/register', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Registration error:', error);
-    return res.status(500).json({ error: 'Registration failed' });
+    res.status(500).json({ error: 'Registration failed' });
   }
 });
 
 // Login endpoint
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { email, password, userType } = req.body;
 
     // Validate required fields
     if (!email || !password || !userType) {
-      return res.status(400).json({ error: 'Email, password, and userType are required' });
+      res.status(400).json({ error: 'Email, password, and userType are required' });
+      return;
     }
 
     // Validate userType
     if (userType !== 'STUDENT' && userType !== 'TEACHER') {
-      return res.status(400).json({ error: 'Invalid userType' });
+      res.status(400).json({ error: 'Invalid userType' });
+      return;
     }
 
     // Find the user based on userType
@@ -173,23 +178,27 @@ router.post('/login', async (req: Request, res: Response) => {
 
     // Check if user exists
     if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      res.status(401).json({ error: 'Invalid credentials' });
+      return;
     }
 
     // Check if password is set
     if (!user.password) {
-      return res.status(401).json({ error: 'Password authentication not set up for this user' });
+      res.status(401).json({ error: 'Password authentication not set up for this user' });
+      return;
     }
 
     // Check if user's authMethods includes PASSWORD
     if (!user.authMethods.includes('PASSWORD')) {
-      return res.status(401).json({ error: 'Password authentication not enabled for this user' });
+      res.status(401).json({ error: 'Password authentication not enabled for this user' });
+      return;
     }
 
     // Verify password
     const isValidPassword = await comparePasswords(password, user.password);
     if (!isValidPassword) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      res.status(401).json({ error: 'Invalid credentials' });
+      return;
     }
 
     // Generate JWT token
@@ -224,7 +233,7 @@ router.post('/login', async (req: Request, res: Response) => {
     res.cookie('refreshToken', refreshToken, cookieOptions);
 
     // Return user and access token
-    return res.status(200).json({
+    res.status(200).json({
       user: {
         id: user.id,
         email: user.email,
@@ -236,17 +245,19 @@ router.post('/login', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    return res.status(500).json({ error: 'Authentication failed' });
+    res.status(500).json({ error: 'Authentication failed' });
   }
 });
 
 // Refresh token endpoint
-router.post('/refresh-token', async (req: Request, res: Response) => {
+router.post('/refresh-token', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const refreshToken = req.cookies.refreshToken;
 
     if (!refreshToken) {
-      return res.status(401).json({ error: 'Refresh token not provided' });
+      res.clearCookie('refreshToken');
+      res.status(401).json({ error: 'Refresh token not provided' });
+      return;
     }
 
     // Find the refresh token in the database
@@ -262,7 +273,8 @@ router.post('/refresh-token', async (req: Request, res: Response) => {
 
     if (!storedToken) {
       res.clearCookie('refreshToken');
-      return res.status(401).json({ error: 'Invalid refresh token' });
+      res.status(401).json({ error: 'Invalid refresh token' });
+      return;
     }
 
     // Verify the token
@@ -271,7 +283,8 @@ router.post('/refresh-token', async (req: Request, res: Response) => {
       decoded = jwt.verify(refreshToken, JWT_SECRET) as { id: string; type: string };
     } catch (error) {
       res.clearCookie('refreshToken');
-      return res.status(401).json({ error: 'Invalid refresh token' });
+      res.status(401).json({ error: 'Invalid refresh token' });
+      return;
     }
 
     // Generate new access token
@@ -311,16 +324,16 @@ router.post('/refresh-token', async (req: Request, res: Response) => {
     res.cookie('refreshToken', newRefreshToken, cookieOptions);
 
     // Return new access token
-    return res.status(200).json({ accessToken });
+    res.status(200).json({ accessToken });
   } catch (error) {
     console.error('Token refresh error:', error);
     res.clearCookie('refreshToken');
-    return res.status(401).json({ error: 'Failed to refresh token' });
+    res.status(401).json({ error: 'Failed to refresh token' });
   }
 });
 
 // Logout endpoint
-router.post('/logout', async (req: Request, res: Response) => {
+router.post('/logout', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const refreshToken = req.cookies.refreshToken;
 
@@ -335,20 +348,21 @@ router.post('/logout', async (req: Request, res: Response) => {
     // Clear refresh token cookie
     res.clearCookie('refreshToken');
 
-    return res.status(200).json({ message: 'Logged out successfully' });
+    res.status(200).json({ message: 'Logged out successfully' });
   } catch (error) {
     console.error('Logout error:', error);
-    return res.status(500).json({ error: 'Logout failed' });
+    res.status(500).json({ error: 'Logout failed' });
   }
 });
 
 // Get current user endpoint
-router.get('/me', async (req: Request, res: Response) => {
+router.get('/me', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     // Get authorization header
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Authorization token required' });
+      res.status(401).json({ error: 'Authorization token required' });
+      return;
     }
 
     // Extract token
@@ -359,7 +373,8 @@ router.get('/me', async (req: Request, res: Response) => {
     try {
       decoded = jwt.verify(token, JWT_SECRET) as { id: string; email: string; userType: string };
     } catch (error) {
-      return res.status(401).json({ error: 'Invalid token' });
+      res.status(401).json({ error: 'Invalid token' });
+      return;
     }
 
     const { id, userType } = decoded;
@@ -387,21 +402,23 @@ router.get('/me', async (req: Request, res: Response) => {
         },
       });
     } else {
-      return res.status(400).json({ error: 'Invalid user type' });
+      res.status(400).json({ error: 'Invalid user type' });
+      return;
     }
 
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      res.status(404).json({ error: 'User not found' });
+      return;
     }
 
     // Return user data with userType added
-    return res.status(200).json({
+    res.status(200).json({
       ...user,
       userType,
     });
   } catch (error) {
     console.error('Get current user error:', error);
-    return res.status(500).json({ error: 'Failed to get user data' });
+    res.status(500).json({ error: 'Failed to get user data' });
   }
 });
 

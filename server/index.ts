@@ -122,7 +122,7 @@ app.use(express.urlencoded({ extended: true })); // Parse URL-encoded request bo
 app.use(cookieParser()); // Parse cookies
 
 // Enhanced database health check with retry mechanism
-app.get('/api/health', async (req, res) => {
+app.get('/api/health', async (req: express.Request, res: express.Response, next: express.NextFunction): Promise<void> => {
   const maxRetries = 3;
   let lastError = null;
 
@@ -142,7 +142,7 @@ app.get('/api/health', async (req, res) => {
         ssl: process.env.DB_SSL === 'true'
       };
       
-      return res.status(200).json({ 
+      res.status(200).json({ 
         status: 'ok', 
         database: 'connected',
         attempt,
@@ -153,6 +153,7 @@ app.get('/api/health', async (req, res) => {
         },
         timestamp: new Date().toISOString()
       });
+      return;
     } catch (error) {
       lastError = error;
       logger.error(`Database connection error (attempt ${attempt}/${maxRetries}):`, error);
@@ -175,7 +176,7 @@ app.get('/api/health', async (req, res) => {
     ssl: process.env.DB_SSL === 'true'
   };
   
-  return res.status(500).json({ 
+  res.status(500).json({ 
     status: 'error', 
     database: 'disconnected', 
     error: errorMessage,
@@ -198,7 +199,7 @@ app.use('/api/v1/lesson-quotes', lessonQuoteRoutes);
 app.use('/api/v1/addresses', addressRoutes);
 
 // API documentation for root route
-app.get('/', (req, res) => {
+app.get('/', (req: express.Request, res: express.Response, next: express.NextFunction): void => {
   res.status(200).json({
     message: 'Lessons Marketplace API Server',
     endpoints: {

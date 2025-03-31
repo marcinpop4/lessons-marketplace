@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { lessonRequestService } from '../services/database/lessonRequestService.js';
 import logger from '../utils/logger.js';
 
@@ -15,8 +15,9 @@ export class LessonRequestController {
    * @route POST /api/lesson-requests
    * @param req - Express request
    * @param res - Express response
+   * @param next - Express next function
    */
-  async createLessonRequest(req: Request, res: Response) {
+  async createLessonRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const {
         type,
@@ -31,19 +32,21 @@ export class LessonRequestController {
 
       // Validate required fields
       if (!type || !startTime || !durationMinutes || !addressObj || !studentId) {
-        return res.status(400).json({
+        res.status(400).json({
           error: 'Missing required fields',
           message: 'Please provide type, startTime, durationMinutes, addressObj, and studentId'
         });
+        return;
       }
 
       // Convert string dates to Date objects
       const parsedStartTime = new Date(startTime);
       if (isNaN(parsedStartTime.getTime())) {
-        return res.status(400).json({
+        res.status(400).json({
           error: 'Invalid date format',
           message: 'startTime must be a valid date string'
         });
+        return;
       }
 
       // Create lesson request
@@ -55,17 +58,18 @@ export class LessonRequestController {
         studentId
       });
 
-      return res.status(201).json(lessonRequest);
+      res.status(201).json(lessonRequest);
     } catch (error) {
       console.error('Error creating lesson request:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
       // Handle specific errors
       if (errorMessage.includes('not found')) {
-        return res.status(404).json({ error: errorMessage });
+        res.status(404).json({ error: errorMessage });
+        return;
       }
       
-      return res.status(500).json({ error: 'Internal server error', message: errorMessage });
+      res.status(500).json({ error: 'Internal server error', message: errorMessage });
     }
   }
 
@@ -104,25 +108,27 @@ export class LessonRequestController {
    * @route GET /api/lesson-requests/:id
    * @param req - Express request
    * @param res - Express response
+   * @param next - Express next function
    */
-  async getLessonRequestById(req: Request, res: Response) {
+  async getLessonRequestById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
       const lessonRequest = await lessonRequestService.getLessonRequestById(id);
 
       if (!lessonRequest) {
-        return res.status(404).json({
+        res.status(404).json({
           error: 'Lesson request not found',
           message: `No lesson request found with ID ${id}`
         });
+        return;
       }
 
       const formattedRequest = this.formatLessonRequest(lessonRequest);
-      return res.json(formattedRequest);
+      res.json(formattedRequest);
     } catch (error) {
       console.error('Error fetching lesson request:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return res.status(500).json({ error: 'Internal server error', message: errorMessage });
+      res.status(500).json({ error: 'Internal server error', message: errorMessage });
     }
   }
 
@@ -131,18 +137,19 @@ export class LessonRequestController {
    * @route GET /api/lesson-requests/student/:studentId
    * @param req - Express request
    * @param res - Express response
+   * @param next - Express next function
    */
-  async getLessonRequestsByStudent(req: Request, res: Response) {
+  async getLessonRequestsByStudent(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { studentId } = req.params;
       const lessonRequests = await lessonRequestService.getLessonRequestsByStudent(studentId);
       
       const formattedRequests = lessonRequests.map(request => this.formatLessonRequest(request));
-      return res.json(formattedRequests);
+      res.json(formattedRequests);
     } catch (error) {
       console.error('Error fetching student lesson requests:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return res.status(500).json({ error: 'Internal server error', message: errorMessage });
+      res.status(500).json({ error: 'Internal server error', message: errorMessage });
     }
   }
 }

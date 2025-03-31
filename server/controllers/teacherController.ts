@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import prisma from '../prisma.js';
 
 // Define LessonType enum to match Prisma schema
@@ -38,8 +38,9 @@ export const teacherController = {
    * Get teachers filtered by lesson type and limit
    * @param req Request - can include lessonType and limit query parameters
    * @param res Response
+   * @param next NextFunction
    */
-  getTeachers: async (req: Request, res: Response): Promise<void> => {
+  getTeachers: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { lessonType, limit } = req.query;
       
@@ -142,8 +143,9 @@ export const teacherController = {
    * Get a teacher's profile including all lesson rates (active and inactive)
    * @param req Request - must include teacherId parameter
    * @param res Response
+   * @param next NextFunction
    */
-  getTeacherProfile: async (req: Request, res: Response): Promise<void> => {
+  getTeacherProfile: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       // Get the teacher ID from the authenticated user
       const teacherId = req.user?.id;
@@ -198,8 +200,9 @@ export const teacherController = {
    * Create or update a lesson hourly rate for a teacher
    * @param req Request - must include lessonType and rateInCents in body
    * @param res Response
+   * @param next NextFunction
    */
-  createOrUpdateLessonRate: async (req: Request, res: Response): Promise<void> => {
+  createOrUpdateLessonRate: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       // Get the teacher ID from the authenticated user
       const teacherId = req.user?.id;
@@ -321,8 +324,9 @@ export const teacherController = {
    * Deactivate a lesson hourly rate for a teacher
    * @param req Request - must include lessonType in body
    * @param res Response
+   * @param next NextFunction
    */
-  deactivateLessonRate: async (req: Request, res: Response): Promise<void> => {
+  deactivateLessonRate: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       // Get the teacher ID from the authenticated user
       const teacherId = req.user?.id;
@@ -389,8 +393,9 @@ export const teacherController = {
    * Reactivate a previously deactivated lesson hourly rate
    * @param req Request - must include lessonType in body
    * @param res Response
+   * @param next NextFunction
    */
-  reactivateLessonRate: async (req: Request, res: Response): Promise<void> => {
+  reactivateLessonRate: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       // Get the teacher ID from the authenticated user
       const teacherId = req.user?.id;
@@ -457,8 +462,9 @@ export const teacherController = {
    * Get statistics for a teacher
    * @param req Request - must include teacherId from authenticated user
    * @param res Response
+   * @param next NextFunction
    */
-  getTeacherStats: async (req: Request, res: Response): Promise<void> => {
+  getTeacherStats: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       // Get the teacher ID from the authenticated user
       const teacherId = req.user?.id;

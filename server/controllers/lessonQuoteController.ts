@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 import logger from '../utils/logger.js';
 
@@ -12,8 +12,9 @@ export const lessonQuoteController = {
    * Create a new lesson quote
    * @param req Request with lessonRequestId, teacherId, costInCents, and expiresAt in the body
    * @param res Response
+   * @param next NextFunction
    */
-  createLessonQuote: async (req: Request, res: Response): Promise<void> => {
+  createLessonQuote: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { lessonRequestId, teacherId, costInCents, expiresAt } = req.body;
       
@@ -91,8 +92,9 @@ export const lessonQuoteController = {
    * Get a lesson quote by ID
    * @param req Request with quoteId as a route parameter
    * @param res Response
+   * @param next NextFunction
    */
-  getLessonQuoteById: async (req: Request, res: Response): Promise<void> => {
+  getLessonQuoteById: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
       
@@ -125,8 +127,9 @@ export const lessonQuoteController = {
    * Get all lesson quotes for a lesson request
    * @param req Request with lessonRequestId as a route parameter
    * @param res Response
+   * @param next NextFunction
    */
-  getLessonQuotesByLessonRequest: async (req: Request, res: Response): Promise<void> => {
+  getLessonQuotesByLessonRequest: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { lessonRequestId } = req.params;
       
@@ -147,14 +150,20 @@ export const lessonQuoteController = {
     }
   },
 
-  // Get quotes for a specific lesson request
-  getLessonQuotesByRequestId: async (req: Request, res: Response) => {
+  /**
+   * Get quotes for a specific lesson request
+   * @param req Request with lessonRequestId as a route parameter
+   * @param res Response
+   * @param next NextFunction
+   */
+  getLessonQuotesByRequestId: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { lessonRequestId } = req.params;
 
       // Validate the request ID
       if (!lessonRequestId) {
-        return res.status(400).json({ error: 'Lesson request ID is required' });
+        res.status(400).json({ error: 'Lesson request ID is required' });
+        return;
       }
 
       // Get the lesson quotes with teacher and lesson request details
@@ -184,87 +193,98 @@ export const lessonQuoteController = {
         hourlyRateInCents: Math.round((quote.costInCents * 60) / quote.lessonRequest.durationMinutes)
       }));
 
-      return res.json(quotesWithRates);
+      res.json(quotesWithRates);
     } catch (error) {
       logger.error('Error fetching lesson quotes:', error);
-      return res.status(500).json({ error: 'Failed to fetch lesson quotes' });
+      res.status(500).json({ error: 'Failed to fetch lesson quotes' });
     }
   },
 
-  // Accept a lesson quote
-  acceptLessonQuote: async (req: Request, res: Response) => {
+  /**
+   * Accept a lesson quote
+   * @param req Request with quoteId as a route parameter
+   * @param res Response
+   * @param next NextFunction
+   */
+  acceptLessonQuote: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { quoteId } = req.params;
       const userId = req.user?.id;
       const userType = req.user?.userType;
 
-      // Validate the quote ID
-      if (!quoteId) {
-        return res.status(400).json({ error: 'Quote ID is required' });
+      // Check if the user is a student
+      if (userType !== 'STUDENT') {
+        res.status(403).json({ error: 'Only students can accept quotes' });
+        return;
       }
 
-      // Ensure the user is authenticated and is a student
-      if (!userId || userType !== 'STUDENT') {
-        return res.status(403).json({ error: 'Only students can accept quotes' });
-      }
-
-      // Find the quote
+      // Get the quote with the lesson request
       const quote = await prisma.lessonQuote.findUnique({
         where: { id: quoteId },
-        include: { lessonRequest: true },
+        include: {
+          lessonRequest: true,
+          teacher: true
+        }
       });
 
       if (!quote) {
-        return res.status(404).json({ error: 'Quote not found' });
+        res.status(404).json({ error: 'Quote not found' });
+        return;
       }
 
-      // Verify that the quote belongs to the student
+      // Check if the quote belongs to the student's request
       if (quote.lessonRequest.studentId !== userId) {
-        return res.status(403).json({ error: 'You are not authorized to accept this quote' });
+        res.status(403).json({ error: 'You can only accept quotes for your own lesson requests' });
+        return;
+      }
+
+      // Check if the quote has already been accepted (a lesson already exists)
+      const existingLesson = await prisma.lesson.findFirst({
+        where: {
+          quoteId
+        }
+      });
+
+      if (existingLesson) {
+        res.status(400).json({ error: 'This quote has already been accepted' });
+        return;
       }
 
       // Check if the quote has expired
       if (new Date(quote.expiresAt) < new Date()) {
-        return res.status(400).json({ error: 'This quote has expired' });
+        res.status(400).json({ error: 'This quote has expired' });
+        return;
       }
 
-      // Start a transaction to ensure all operations succeed or fail together
-      const result = await prisma.$transaction(async (tx) => {
-        // Create a confirmed lesson
-        const lesson = await tx.lesson.create({
+      // Create the lesson
+      const lesson = await prisma.$transaction(async (tx) => {
+        // Create the lesson
+        const newLesson = await tx.lesson.create({
           data: {
-            confirmedAt: new Date(),
-            quoteId,
+            quote: {
+              connect: { id: quoteId }
+            }
           },
           include: {
-            quote: true
+            quote: {
+              include: {
+                lessonRequest: true,
+                teacher: true
+              }
+            }
           }
         });
 
-        // Expire all other quotes for the same lesson request
-        await tx.lessonQuote.updateMany({
-          where: {
-            lessonRequestId: quote.lessonRequestId,
-            id: { not: quoteId },
-            expiresAt: { gt: new Date() } // Only update unexpired quotes
-          },
-          data: {
-            expiresAt: new Date() // Set to current time to expire immediately
-          }
-        });
-
-        return {
-          id: quoteId,
-          lesson: {
-            id: lesson.id
-          }
-        };
+        return newLesson;
       });
 
-      return res.status(200).json(result);
+      res.status(201).json({
+        message: 'Quote accepted successfully',
+        lesson
+      });
     } catch (error) {
       logger.error('Error accepting lesson quote:', error);
-      return res.status(500).json({ error: 'Failed to accept lesson quote' });
+      res.status(500).json({ error: 'Failed to accept lesson quote' });
     }
-  },
+  }
 }; 
