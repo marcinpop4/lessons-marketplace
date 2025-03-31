@@ -50,9 +50,4 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Deploy server to Fly.io
-        run: |
-          # Run the deployment command and stream output while capturing exit code
-          pnpm docker:deploy:fly --build || {
-            echo "Deployment failed with exit code $?"
-            exit $?
-          }
+        run: pnpm docker:deploy:fly --build --exit-code-from deploy
