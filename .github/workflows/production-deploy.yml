@@ -49,20 +49,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Setup Fly.io CLI
-        uses: superfly/flyctl-actions/setup-flyctl@master
-
       - name: Deploy server to Fly.io
-        run: |
-          export PATH="$PATH:/opt/hostedtoolcache/flyctl/*/x86_64"
-          pnpm fly:deploy:server
+        run: pnpm fly:deploy:server
 
       - name: Wait for server health check
         run: |
-          export PATH="$PATH:/opt/hostedtoolcache/flyctl/*/x86_64"
           echo "Waiting for server to be healthy..."
           for i in {1..30}; do
-            if flyctl status --app lessons-marketplace-server | grep -q "healthy"; then
+            if pnpm flyctl status --app lessons-marketplace-server | grep -q "healthy"; then
               echo "Server is healthy!"
               exit 0
             fi
@@ -73,16 +67,13 @@ jobs:
           exit 1
 
       - name: Deploy frontend to Fly.io
-        run: |
-          export PATH="$PATH:/opt/hostedtoolcache/flyctl/*/x86_64"
-          pnpm fly:deploy:frontend
+        run: pnpm fly:deploy:frontend
 
       - name: Wait for frontend health check
         run: |
-          export PATH="$PATH:/opt/hostedtoolcache/flyctl/*/x86_64"
           echo "Waiting for frontend to be healthy..."
           for i in {1..30}; do
-            if flyctl status --app lessons-marketplace-frontend | grep -q "healthy"; then
+            if pnpm flyctl status --app lessons-marketplace-frontend | grep -q "healthy"; then
               echo "Frontend is healthy!"
               exit 0
             fi
