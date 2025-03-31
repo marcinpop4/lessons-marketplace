@@ -50,7 +50,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Deploy server to Fly.io
-        run: pnpm fly:deploy:server --build
+        run: pnpm docker:deploy:fly --build
 
       - name: Wait for server health check
         run: |
@@ -65,9 +65,6 @@ jobs:
           done
           echo "Server failed to become healthy within 5 minutes"
           exit 1
-
-      - name: Deploy frontend to Fly.io
-        run: pnpm fly:deploy:frontend --build
 
       - name: Wait for frontend health check
         run: |
