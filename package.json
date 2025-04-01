@@ -68,6 +68,7 @@
     "@tailwindcss/oxide-darwin-x64": "^4.0.17",
     "@tailwindcss/oxide-linux-arm64-gnu": "^4.0.17",
     "@tailwindcss/oxide-linux-x64-gnu": "^4.0.17",
+    "@tailwindcss/postcss": "^4.0.17",
     "amqplib": "^0.10.7",
     "axios": "^1.8.4",
     "bcrypt": "^5.1.1",
