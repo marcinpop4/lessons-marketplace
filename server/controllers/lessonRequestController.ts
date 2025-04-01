@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { lessonRequestService } from '../services/database/lessonRequestService.js';
+import { lessonRequestService, CreateLessonRequestDTO } from '../services/database/lessonRequestService.js';
+import { LessonRequest } from '@prisma/client';
 import logger from '../utils/logger.js';
 
 export class LessonRequestController {
@@ -75,11 +76,20 @@ export class LessonRequestController {
 
   /**
    * Format a lesson request for the frontend
-   * @param lessonRequest - The lesson request from the database
+   * @param request - The lesson request from the database
    * @returns Formatted lesson request
    */
-  private formatLessonRequest(lessonRequest: any) {
-    const startTime = new Date(lessonRequest.startTime);
+  private formatLessonRequest(request: LessonRequest & {
+    address: {
+      street: string;
+      city: string;
+      state: string;
+      postalCode: string;
+      country: string;
+    };
+    lessonQuotes?: any[];
+  }) {
+    const startTime = new Date(request.startTime);
     
     // Format date as YYYY-MM-DD
     const date = startTime.toISOString().split('T')[0];
@@ -96,7 +106,7 @@ export class LessonRequestController {
       startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     return {
-      ...lessonRequest,
+      ...request,
       date,
       time,
       formattedDateTime

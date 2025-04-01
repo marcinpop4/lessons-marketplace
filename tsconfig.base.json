@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noImplicitAny": true,
+    "baseUrl": ".",
+    "paths": {
+      "@frontend/*": [
+        "./frontend/*"
+      ],
+      "@shared/*": [
+        "./shared/*"
+      ]
+    },
+    "noEmitOnError": true,
+    "sourceMap": true
+  },
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Express } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -36,7 +36,7 @@ import lessonQuoteRoutes from './routes/lessonQuoteRoutes.js';
 import addressRoutes from './routes/addressRoutes.js';
 
 // Initialize express app
-const app = express();
+const app: Express = express();
 
 // Get port from environment or default to 3000
 const PORT_ENV = process.env.PORT;
@@ -84,15 +84,19 @@ try {
 app.use(helmet()); // Security headers
 app.use(compression()); // Compress responses
 
-// Configure logging based on environment variables
-// Use a simple format by default and a more detailed one when DEBUG=true
-const isDebugMode = process.env.DEBUG === 'true';
-if (isDebugMode) {
-  app.use(morgan('combined')); // Detailed logs for debugging
-  logger.info('Debug mode: Verbose logging enabled');
-} else {
-  // Use a minimal format for regular operation
-  app.use(morgan('[:date[iso]] :method :url :status :response-time ms'));
+// Configure logging based on environment variables and LOG_LEVEL
+const logLevel = parseInt(process.env.LOG_LEVEL || '1', 10);
+const isDebugMode = process.env.DEBUG === 'true' || logLevel >= 3;
+
+// Only use morgan HTTP request logger if log level is appropriate
+if (logLevel >= 2) { // Only log HTTP requests at INFO level or higher
+  if (isDebugMode) {
+    app.use(morgan('combined')); // Detailed logs for debugging
+    logger.info('Debug mode: Verbose logging enabled');
+  } else {
+    // Use a minimal format for regular operation
+    app.use(morgan('[:date[iso]] :method :url :status :response-time ms'));
+  }
 }
 
 // Enhanced CORS configuration using only environment variables
@@ -103,11 +107,11 @@ if (isDebugMode) {
   logger.debug('CORS allowed origins:', allowedOrigins);
 }
 
-app.use(cors({ 
-  origin: function(origin, callback) {
+app.use(cors({
+  origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps, curl requests)
     if (!origin) return callback(null, true);
-    
+
     if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
       callback(null, true);
     } else {
@@ -116,7 +120,7 @@ app.use(cors({
     }
   },
   credentials: true, // Allow cookies to be sent with requests
-})); 
+}));
 app.use(express.json()); // Parse JSON request body
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded request body
 app.use(cookieParser()); // Parse cookies
@@ -131,7 +135,7 @@ app.get('/api/health', async (req: express.Request, res: express.Response, next:
     try {
       // Test database connection
       await prisma.$queryRaw`SELECT 1 as health_check`;
-      
+
       // Check database configuration
       const dbConfig = {
         host: process.env.DB_HOST || 'not_set',
@@ -141,9 +145,9 @@ app.get('/api/health', async (req: express.Request, res: express.Response, next:
         url_set: Boolean(process.env.DATABASE_URL),
         ssl: process.env.DB_SSL === 'true'
       };
-      
-      res.status(200).json({ 
-        status: 'ok', 
+
+      res.status(200).json({
+        status: 'ok',
         database: 'connected',
         attempt,
         databaseConfig: {
@@ -157,7 +161,7 @@ app.get('/api/health', async (req: express.Request, res: express.Response, next:
     } catch (error) {
       lastError = error;
       logger.error(`Database connection error (attempt ${attempt}/${maxRetries}):`, error);
-      
+
       // Wait before retry (exponential backoff)
       if (attempt < maxRetries) {
         await new Promise(resolve => setTimeout(resolve, attempt * 1000));
@@ -175,10 +179,10 @@ app.get('/api/health', async (req: express.Request, res: express.Response, next:
     url_set: Boolean(process.env.DATABASE_URL),
     ssl: process.env.DB_SSL === 'true'
   };
-  
-  res.status(500).json({ 
-    status: 'error', 
-    database: 'disconnected', 
+
+  res.status(500).json({
+    status: 'error',
+    database: 'disconnected',
     error: errorMessage,
     retries: maxRetries,
     databaseConfig: {

@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "checkJs": false,
+    "noEmit": true
+  },
+  "references": [
+    { "path": "./server/tsconfig.server.json" },
+    { "path": "./shared/tsconfig.shared.json" },
+    { "path": "./frontend/config/tsconfig.app.json" }
+  ],
+  "exclude": [
+    "node_modules", 
+    "dist",
+    "**/node_modules/*"
+  ]
+} 

@@ -1,8 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 import logger from '../utils/logger.js';
+import prisma from '../prisma.js';
+import { Prisma, LessonQuote } from '@prisma/client';
 
-const prisma = new PrismaClient();
+const prismaClient = new PrismaClient();
 
 /**
  * Controller for lesson quote-related operations
@@ -27,7 +29,7 @@ export const lessonQuoteController = {
       }
       
       // Validate that the lesson request exists
-      const lessonRequest = await prisma.lessonRequest.findUnique({
+      const lessonRequest = await prismaClient.lessonRequest.findUnique({
         where: { id: lessonRequestId }
       });
       
@@ -39,7 +41,7 @@ export const lessonQuoteController = {
       }
       
       // Validate that the teacher exists
-      const teacher = await prisma.teacher.findUnique({
+      const teacher = await prismaClient.teacher.findUnique({
         where: { id: teacherId }
       });
       
@@ -51,7 +53,7 @@ export const lessonQuoteController = {
       }
       
       // Check for existing quotes for this teacher and lesson request
-      const existingQuote = await prisma.lessonQuote.findFirst({
+      const existingQuote = await prismaClient.lessonQuote.findFirst({
         where: {
           lessonRequestId,
           teacherId,
@@ -65,7 +67,7 @@ export const lessonQuoteController = {
       }
       
       // Create the lesson quote
-      const lessonQuote = await prisma.lessonQuote.create({
+      const lessonQuote = await prismaClient.lessonQuote.create({
         data: {
           costInCents,
           expiresAt: new Date(expiresAt),
@@ -98,7 +100,7 @@ export const lessonQuoteController = {
     try {
       const { id } = req.params;
       
-      const lessonQuote = await prisma.lessonQuote.findUnique({
+      const lessonQuote = await prismaClient.lessonQuote.findUnique({
         where: { id },
         include: {
           lessonRequest: true,
@@ -133,7 +135,7 @@ export const lessonQuoteController = {
     try {
       const { lessonRequestId } = req.params;
       
-      const lessonQuotes = await prisma.lessonQuote.findMany({
+      const lessonQuotes = await prismaClient.lessonQuote.findMany({
         where: { lessonRequestId },
         include: {
           teacher: true
@@ -167,7 +169,7 @@ export const lessonQuoteController = {
       }
 
       // Get the lesson quotes with teacher and lesson request details
-      const quotes = await prisma.lessonQuote.findMany({
+      const quotes = await prismaClient.lessonQuote.findMany({
         where: {
           lessonRequestId,
         },
@@ -188,7 +190,7 @@ export const lessonQuoteController = {
       });
 
       // Transform quotes to include hourlyRateInCents
-      const quotesWithRates = quotes.map(quote => ({
+      const quotesWithRates = quotes.map((quote: LessonQuote & { lessonRequest: { durationMinutes: number } }) => ({
         ...quote,
         hourlyRateInCents: Math.round((quote.costInCents * 60) / quote.lessonRequest.durationMinutes)
       }));
@@ -219,7 +221,7 @@ export const lessonQuoteController = {
       }
 
       // Get the quote with the lesson request
-      const quote = await prisma.lessonQuote.findUnique({
+      const quote = await prismaClient.lessonQuote.findUnique({
         where: { id: quoteId },
         include: {
           lessonRequest: true,
@@ -239,7 +241,7 @@ export const lessonQuoteController = {
       }
 
       // Check if the quote has already been accepted (a lesson already exists)
-      const existingLesson = await prisma.lesson.findFirst({
+      const existingLesson = await prismaClient.lesson.findFirst({
         where: {
           quoteId
         }
@@ -257,7 +259,7 @@ export const lessonQuoteController = {
       }
 
       // Create the lesson
-      const lesson = await prisma.$transaction(async (tx) => {
+      const lesson = await prismaClient.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => {
         // Create the lesson
         const newLesson = await tx.lesson.create({
           data: {

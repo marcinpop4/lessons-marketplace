@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import prisma from '../../prisma.js';
 import bcryptjs from 'bcryptjs';
@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 import cookieParser from 'cookie-parser';
 import { Secret, SignOptions } from 'jsonwebtoken';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // Set cookie options
 const cookieOptions = {

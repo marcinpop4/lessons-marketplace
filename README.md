@@ -467,3 +467,46 @@ npm run docker:rebuild
 ```
 
 These commands replace the need for direct Docker commands or shell scripts.
+
+## TypeScript Path Alias Troubleshooting
+
+This project uses TypeScript path aliases (e.g., `@shared/*`, `@frontend/*`) to make imports cleaner and more maintainable. If you encounter issues with path aliases not being recognized by your editor, try the following steps:
+
+### Fix TypeScript Configuration
+
+We've provided a script to fix TypeScript configuration files and ensure path aliases work correctly:
+
+```bash
+# Fix TypeScript configuration files and rebuild references
+pnpm fix:typescript
+```
+
+### Editor Setup
+
+For VS Code users:
+1. Restart the TypeScript server: Press `Cmd+Shift+P` (or `Ctrl+Shift+P` on Windows/Linux) and select "TypeScript: Restart TS Server"
+2. Make sure you have the recommended extensions installed (a notification should appear)
+3. Open the project using the workspace file: `.vscode/typescript.code-workspace`
+
+### Path Alias Diagnostic
+
+To diagnose path alias issues:
+
+```bash
+# Run the TypeScript diagnostics tool
+pnpm diagnose:ts
+```
+
+### Last Resort Workaround
+
+If you still encounter issues in your editor while working on the project, you can temporarily use relative imports:
+
+```typescript
+// Instead of
+import { LessonType } from '@shared/models/LessonType';
+
+// You can use a relative path temporarily
+import { LessonType } from '../../../../shared/models/LessonType';
+```
+
+Note that the build process will still work with path aliases, so this is only needed if your editor is showing false errors.

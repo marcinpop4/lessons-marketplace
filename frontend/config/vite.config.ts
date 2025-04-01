@@ -13,7 +13,7 @@ const getTsConfigPath = () => {
   if (envTsConfig) {
     return resolve(process.cwd(), envTsConfig)
   }
-  
+
   // Default to the config directory
   return resolve(__dirname, './tsconfig.app.json')
 }
@@ -24,10 +24,15 @@ export default defineConfig(({ mode }) => {
   if (!process.env.VITE_API_BASE_URL) {
     throw new Error('VITE_API_BASE_URL environment variable is required');
   }
-  
-  // Log the API URL being used
-  console.log(`Building for ${mode} with API URL: ${process.env.VITE_API_BASE_URL}`);
-  
+
+  // Get log level from environment
+  const logLevel = parseInt(process.env.VITE_LOG_LEVEL || '1', 10);
+
+  // Only log in higher verbosity modes
+  if (logLevel >= 2) {
+    console.log(`Building for ${mode} with API URL: ${process.env.VITE_API_BASE_URL}`);
+  }
+
   return {
     plugins: [
       react(),
@@ -62,6 +67,8 @@ export default defineConfig(({ mode }) => {
       postcss: resolve(__dirname, './postcss.config.ts'),
     },
     server: {
+      // Configure based on log level
+      logLevel: logLevel >= 3 ? 'info' : logLevel >= 2 ? 'warn' : 'error',
       // Force Vite to always use new versions of files and not serve from memory cache
       hmr: {
         overlay: true,

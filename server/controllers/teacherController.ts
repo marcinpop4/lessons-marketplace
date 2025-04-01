@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../prisma.js';
+import { Prisma, PrismaClient } from '@prisma/client';
+import logger from '../utils/logger.js';
 
 // Define LessonType enum to match Prisma schema
 enum LessonType {
@@ -77,7 +79,7 @@ export const teacherController = {
       
       try {
         // Execute the query
-        const teachers = await prisma.$transaction(async (tx) => {
+        const teachers = await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => {
           const query: any = {
             where: {
               teacherLessonHourlyRates: {
@@ -175,7 +177,14 @@ export const teacherController = {
         email: teacher.email,
         phoneNumber: teacher.phoneNumber,
         dateOfBirth: teacher.dateOfBirth.toISOString(),
-        lessonRates: teacher.teacherLessonHourlyRates.map(rate => ({
+        lessonRates: teacher.teacherLessonHourlyRates.map((rate: {
+          id: string;
+          type: string;
+          rateInCents: number;
+          deactivatedAt: Date | null;
+          createdAt: Date;
+          updatedAt: Date;
+        }) => ({
           id: rate.id,
           type: rate.type,
           rateInCents: rate.rateInCents,
@@ -479,7 +488,7 @@ export const teacherController = {
       today.setHours(0, 0, 0, 0);
 
       // Get statistics using Prisma transactions
-      const stats = await prisma.$transaction(async (tx) => {
+      const stats = await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => {
         // Get all quotes for this teacher
         const quotes = await tx.lessonQuote.findMany({
           where: { teacherId },
@@ -490,7 +499,11 @@ export const teacherController = {
         });
         
         // Count active quotes (not expired and no lessons created)
-        const activeQuotes = quotes.filter(quote => 
+        const activeQuotes = quotes.filter((quote: {
+          id: string;
+          expiresAt: Date;
+          lessons: any[];
+        }) => 
           new Date(quote.expiresAt) > new Date() && quote.lessons.length === 0
         ).length;
 
@@ -514,7 +527,14 @@ export const teacherController = {
         const totalLessons = allLessons.length;
         
         // Count completed lessons (start time + duration is in the past)
-        const completedLessons = allLessons.filter(lesson => {
+        const completedLessons = allLessons.filter((lesson: {
+          quote: {
+            lessonRequest: {
+              startTime: Date;
+              durationMinutes: number;
+            }
+          }
+        }) => {
           const lessonRequest = lesson.quote.lessonRequest;
           const lessonEndTime = new Date(lessonRequest.startTime);
           lessonEndTime.setMinutes(lessonEndTime.getMinutes() + lessonRequest.durationMinutes);
@@ -522,7 +542,13 @@ export const teacherController = {
         }).length;
         
         // Count upcoming lessons (start time is in the future)
-        const upcomingLessons = allLessons.filter(lesson => {
+        const upcomingLessons = allLessons.filter((lesson: {
+          quote: {
+            lessonRequest: {
+              startTime: Date;
+            }
+          }
+        }) => {
           const lessonRequest = lesson.quote.lessonRequest;
           return new Date(lessonRequest.startTime) > new Date();
         }).length;

@@ -1,4 +1,5 @@
 import prisma from '../../prisma.js';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 export type LessonType = 'VOICE' | 'GUITAR' | 'BASS' | 'DRUMS';
 
@@ -36,7 +37,7 @@ export class LessonRequestService {
       }
 
       // Create the lesson request with the address relationship
-      return await prisma.$transaction(async (tx) => {
+      return await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => {
         // Create an Address record
         const addressRecord = await tx.address.create({
           data: {

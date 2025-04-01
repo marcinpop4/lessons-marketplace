@@ -1,7 +1,11 @@
 import bcryptjs from 'bcryptjs';
 import jwt, { Secret, SignOptions } from 'jsonwebtoken';
 import prisma from '../../prisma.js';
-import { AuthMethod, UserType } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
+
+// Use string literals that match Prisma's enums
+export type AuthMethod = 'PASSWORD' | 'GOOGLE' | 'FACEBOOK';
+export type UserType = 'STUDENT' | 'TEACHER';  // Removed 'ADMIN' since it's not in Prisma's enum
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -26,7 +30,7 @@ const refreshExpiresIn: string = REFRESH_TOKEN_EXPIRES_IN;
 interface TokenPayload {
   id: string;
   email: string;
-  userType: UserType;
+  userType: 'STUDENT' | 'TEACHER';
 }
 
 // Interface for auth providers
@@ -82,7 +86,7 @@ class AuthService {
   }
 
   // Generate refresh token
-  async generateRefreshToken(userId: string, userType: UserType): Promise<string> {
+  async generateRefreshToken(userId: string, userType: 'STUDENT' | 'TEACHER'): Promise<string> {
     // Calculate expiration date
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + parseInt(refreshExpiresIn));
@@ -95,7 +99,7 @@ class AuthService {
       data: {
         token,
         userId,
-        userType,
+        userType, // This now uses the literal type which matches Prisma's enum
         expiresAt,
       },
     });
@@ -131,7 +135,7 @@ class AuthService {
     return {
       id: refreshToken.userId,
       email: '', // We don't store email in refresh token
-      userType: refreshToken.userType,
+      userType: refreshToken.userType as 'STUDENT' | 'TEACHER', // Type assertion to match the TokenPayload type
     };
   }
 

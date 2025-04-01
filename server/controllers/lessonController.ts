@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma.js';
+import { Prisma, PrismaClient } from '@prisma/client';
 import logger from '../utils/logger.js';
 
 /**
@@ -65,7 +66,7 @@ export const lessonController = {
       }
       
       // Start a transaction to ensure all operations succeed or fail together
-      const result = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => {
         // Create the lesson
         const lesson = await tx.lesson.create({
           data: {

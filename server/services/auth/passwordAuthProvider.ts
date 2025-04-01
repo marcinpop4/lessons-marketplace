@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma.js';
 import authService, { AuthProvider } from './authService.js';
+import logger from '../../utils/logger.js';
 
 interface PasswordCredentials {
   email: string;
@@ -129,6 +130,7 @@ class PasswordAuthProvider implements AuthProvider {
           throw new Error('Email already exists');
         }
       }
+      // Rethrow the error
       throw error;
     }
 

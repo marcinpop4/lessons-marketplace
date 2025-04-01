@@ -3,7 +3,7 @@ import { LessonType } from '@shared/models/LessonType';
 import './LessonRateForm.css';
 
 // Valid lesson types based on the API requirements
-const VALID_LESSON_TYPES = ['VOICE', 'GUITAR', 'BASS', 'DRUMS'];
+const VALID_LESSON_TYPES = ['VOICE', 'GUITAR', 'BASS', 'DRUMS'] as const;
 
 interface LessonRate {
   id: string;
@@ -25,8 +25,8 @@ const LessonRateForm: React.FC<Props> = ({ rate, onSubmit, onCancel }) => {
   const [type, setType] = useState('');
   const [rateInCents, setRateInCents] = useState('');
   const [amountInDollars, setAmountInDollars] = useState('');
-  const [errors, setErrors] = useState<{type?: string, rate?: string}>({});
-  
+  const [errors, setErrors] = useState<{ type?: string, rate?: string }>({});
+
   // Reset form when rate changes (for editing)
   useEffect(() => {
     if (rate) {
@@ -46,7 +46,7 @@ const LessonRateForm: React.FC<Props> = ({ rate, onSubmit, onCancel }) => {
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setAmountInDollars(value);
-    
+
     // Convert dollars to cents
     if (value) {
       const cents = Math.round(parseFloat(value) * 100);
@@ -57,8 +57,8 @@ const LessonRateForm: React.FC<Props> = ({ rate, onSubmit, onCancel }) => {
   };
 
   const validateForm = () => {
-    const newErrors: {type?: string, rate?: string} = {};
-    
+    const newErrors: { type?: string, rate?: string } = {};
+
     if (!type.trim()) {
       newErrors.type = 'Lesson type is required';
     } else {
@@ -68,29 +68,29 @@ const LessonRateForm: React.FC<Props> = ({ rate, onSubmit, onCancel }) => {
         newErrors.type = `Type must be a valid lesson type`;
       }
     }
-    
+
     if (!amountInDollars) {
       newErrors.rate = 'Rate is required';
     } else if (isNaN(parseFloat(amountInDollars)) || parseFloat(amountInDollars) <= 0) {
       newErrors.rate = 'Rate must be a positive number';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
-    
+
     onSubmit({
       type,
       rateInCents: parseInt(rateInCents, 10)
     });
-    
+
     // Reset form if not editing
     if (!rate) {
       setType('');
@@ -109,7 +109,7 @@ const LessonRateForm: React.FC<Props> = ({ rate, onSubmit, onCancel }) => {
       <h3 className="text-lg font-medium mb-4">
         {rate ? 'Edit Lesson Rate' : 'Add New Rate'}
       </h3>
-      
+
       <form onSubmit={handleSubmit}>
         <div className="form-row">
           <div className="form-group">
@@ -129,7 +129,7 @@ const LessonRateForm: React.FC<Props> = ({ rate, onSubmit, onCancel }) => {
             </select>
             {errors.type && <div className="error-message">{errors.type}</div>}
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="lessonRate">Rate ($/hour)</label>
             <div className="rate-input-wrapper">
@@ -148,15 +148,15 @@ const LessonRateForm: React.FC<Props> = ({ rate, onSubmit, onCancel }) => {
             {errors.rate && <div className="error-message">{errors.rate}</div>}
           </div>
         </div>
-        
+
         <div className="form-actions">
           <button type="submit" className="btn btn-primary">
             {rate ? 'Update Rate' : 'Add Rate'}
           </button>
           {rate && (
-            <button 
-              type="button" 
-              onClick={onCancel} 
+            <button
+              type="button"
+              onClick={onCancel}
               className="btn btn-secondary ml-2"
             >
               Cancel

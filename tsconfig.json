@@ -1,46 +1,70 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "ESNext",
-    "moduleResolution": "node",
+    "target": "es2020",
+    "module": "esnext",
+    "moduleResolution": "node10",
     "esModuleInterop": true,
     "strict": true,
-    "jsx": "react-jsx",
     "skipLibCheck": true,
-    "sourceMap": true,
+    "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
-    "lib": ["DOM", "DOM.Iterable", "ESNext"],
-    
-    /* Path aliases matching frontend config */
-    "baseUrl": ".",
+    "noImplicitAny": true,
+    "baseUrl": "./",
     "paths": {
-      "@frontend": ["./frontend"],
-      "@frontend/*": ["./frontend/*"],
-      "@frontend/api/*": ["./frontend/api/*"],
-      "@frontend/components/*": ["./frontend/components/*"],
-      "@frontend/contexts/*": ["./frontend/contexts/*"],
-      "@frontend/hooks/*": ["./frontend/hooks/*"],
-      "@frontend/pages/*": ["./frontend/pages/*"],
-      "@frontend/styles/*": ["./frontend/styles/*"],
-      "@frontend/theme/*": ["./frontend/theme/*"],
-      "@frontend/types/*": ["./frontend/types/*"],
-      "@frontend/utils/*": ["./frontend/utils/*"],
-      "@frontend/config/*": ["./frontend/config/*"],
-      "@shared/utils/*": ["./shared/utils/*"],
-    }
+      "@shared/*": [
+        "./shared/*"
+      ],
+      "@server/*": [
+        "./server/*"
+      ],
+      "@frontend/*": [
+        "./frontend/*"
+      ],
+      "@/*": [
+        "./frontend/*"
+      ],
+      "@config/*": [
+        "./frontend/config/*"
+      ]
+    },
+    "allowSyntheticDefaultImports": true,
+    "preserveConstEnums": true,
+    "noImplicitThis": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "strictBuiltinIteratorReturn": true,
+    "alwaysStrict": true,
+    "useUnknownInCatchVariables": true
   },
+  "references": [
+    {
+      "path": "./shared/tsconfig.shared.json"
+    },
+    {
+      "path": "./server/tsconfig.server.json"
+    },
+    {
+      "path": "./frontend/config/tsconfig.app.json"
+    }
+  ],
+  "files": [
+    "./scripts/db-connection-test.ts",
+    "./scripts/docker-debug.ts",
+    "./scripts/docker-seed.ts",
+    "./scripts/docker-test-runner.ts",
+    "./scripts/install-jest-deps.ts",
+    "./scripts/test-alias.ts",
+    "./scripts/update-fly-deploy.ts",
+    "./playwright.config.ts"
+  ],
   "include": [
-    "frontend/**/*.ts",
-    "frontend/**/*.tsx",
-    "server/**/*.ts",
-    "shared/**/*.ts",
-    "tests/**/*.ts",
-    "tests/**/*.tsx"
+    "./scripts/**/*.ts",
+    "./*.ts"
   ],
   "exclude": [
-    "node_modules",
-    "dist"
+    "node_modules"
   ]
-} 
+}

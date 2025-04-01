@@ -2,14 +2,14 @@
   "name": "lessons-marketplace",
   "private": true,
   "scripts": {
-    "build:frontend": "dotenv -e env/.env.${ENV_TYPE} -- sh -c 'tsc --project frontend/config/tsconfig.app.json && VITE_TSCONFIG=frontend/config/tsconfig.app.json vite build --config frontend/config/vite.config.ts --emptyOutDir'",
-    "build:server": "dotenv -e env/.env.${ENV_TYPE} -- sh -c 'pnpm run build:shared && tsc --project server/tsconfig.server.json'",
-    "build:shared": "dotenv -e env/.env.${ENV_TYPE} -- tsc --project shared/tsconfig.shared.json",
+    "build:frontend": "tsc --project frontend/config/tsconfig.app.json --noEmit && dotenv -e env/.env.${ENV_TYPE} -- sh -c 'tsc --project frontend/config/tsconfig.app.json && VITE_TSCONFIG=frontend/config/tsconfig.app.json vite build --config frontend/config/vite.config.ts --emptyOutDir'",
+    "build:server": "tsc --project server/tsconfig.server.json --noEmit && dotenv -e env/.env.${ENV_TYPE} -- sh -c 'pnpm run build:shared && tsc --project server/tsconfig.server.json'",
+    "build:shared": "tsc --project shared/tsconfig.shared.json --noEmit && dotenv -e env/.env.${ENV_TYPE} -- tsc --project shared/tsconfig.shared.json",
     "clean": "rm -rf dist && rm -rf node_modules",
-    "dev:frontend": "cross-env VITE_TSCONFIG=frontend/config/tsconfig.app.json vite --config frontend/config/vite.config.ts --force",
-    "dev:full": "concurrently \"pnpm run dev:frontend\" \"pnpm run dev:server\"",
-    "dev:server": "tsx watch server/index.ts",
-    "dev:server:debug": "cross-env DEBUG=true tsx watch server/index.ts",
+    "dev:frontend": "dotenv -e env/.env.${ENV_TYPE:-dev} -- cross-env VITE_TSCONFIG=frontend/config/tsconfig.app.json vite --config frontend/config/vite.config.ts --force",
+    "dev:full": "cross-env ENV_TYPE=dev concurrently \"pnpm run dev:frontend\" \"pnpm run dev:server\"",
+    "dev:server": "dotenv -e env/.env.${ENV_TYPE:-dev} -- concurrently \"tsc --project server/tsconfig.server.json --watch --preserveWatchOutput\" \"tsx watch server/index.ts\"",
+    "dev:server:debug": "cross-env DEBUG=true ENV_TYPE=dev dotenv -e env/.env.dev -- tsx watch server/index.ts",
     "docker:clean": "docker compose -f docker/docker-compose.yml down --volumes --remove-orphans && docker ps -aq | xargs -r docker rm -f && docker volume prune -f && docker network prune -f",
     "docker:db": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml rm -fs database && docker compose -f docker/docker-compose.yml up -d database",
     "docker:db:rebuild": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml rm -fs database && docker compose -f docker/docker-compose.yml up -d --build database",
@@ -46,7 +46,21 @@
     "prisma:seed": "dotenv -e env/.env.${ENV_TYPE} -- node server/prisma/seed.js",
     "prisma:studio": "dotenv -e env/.env.${ENV_TYPE} -- prisma studio --schema=server/prisma/schema.prisma",
     "swagger:server": "tsx api-docs/serve-swagger.ts",
-    "test": "jest tests/unit && playwright test"
+    "test": "dotenv -e env/.env.${ENV_TYPE} -- jest tests/unit && NODE_OPTIONS=--no-warnings dotenv -e env/.env.${ENV_TYPE} -- playwright test",
+    "test:unit": "dotenv -e env/.env.${ENV_TYPE} -- jest tests/unit",
+    "test:e2e": "NODE_OPTIONS=--no-warnings dotenv -e env/.env.${ENV_TYPE} -- playwright test",
+    "typecheck": "ENV_TYPE=prod tsc --project server/tsconfig.server.json --noEmit",
+    "typecheck:server": "ENV_TYPE=prod tsc --project server/tsconfig.server.json --noEmit",
+    "typecheck:shared": "ENV_TYPE=prod tsc --project shared/tsconfig.shared.json --noEmit",
+    "typecheck:frontend": "ENV_TYPE=prod tsc --project frontend/config/tsconfig.app.json --noEmit",
+    "typecheck:all": "pnpm build:references && pnpm typecheck:server && pnpm typecheck:shared && pnpm typecheck:frontend",
+    "build:references": "tsc -b shared/tsconfig.shared.json server/tsconfig.server.json frontend/config/tsconfig.app.json",
+    "diagnose:ts": "node scripts/diagnose-typescript.js",
+    "fix:tsconfig": "node scripts/fix-tsconfig-json.js",
+    "fix:typescript": "pnpm fix:tsconfig && pnpm build:references && pnpm typecheck:all",
+    "check:deployment": "node scripts/check-build-errors.js",
+    "prepare": "husky install",
+    "lint-staged": "lint-staged"
   },
   "dependencies": {
     "@tailwindcss/oxide-darwin-arm64": "^4.0.17",
@@ -114,7 +128,10 @@
     "tsx": "^4.7.1",
     "typescript": "~5.8.2",
     "typescript-eslint": "^8.29.0",
-    "vite": "^6.2.4"
+    "vite": "^6.2.4",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0",
+    "tsc-files": "^1.1.4"
   },
   "type": "module",
   "version": "0.0.0",
@@ -125,6 +142,11 @@
       "bcrypt",
       "esbuild",
       "prisma"
+    ]
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "tsc-files --noEmit"
     ]
   }
 }

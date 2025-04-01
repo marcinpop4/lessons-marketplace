@@ -1,7 +1,7 @@
-import express from 'express';
+import express, { Router } from 'express';
 import { lessonController } from '../controllers/lessonController.js';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // Create a new lesson
 router.post('/', lessonController.createLesson);

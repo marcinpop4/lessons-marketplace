@@ -1,8 +1,8 @@
-import express from 'express';
+import express, { Router } from 'express';
 import { lessonRequestController } from '../controllers/lessonRequestController.js';
 import { authenticate, isStudent, isSpecificStudent } from '../middleware/auth/authMiddleware.js';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // Create a new lesson request - requires student authentication
 router.post('/', authenticate, isStudent, lessonRequestController.createLessonRequest);

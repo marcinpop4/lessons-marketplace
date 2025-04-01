@@ -1,8 +1,8 @@
-import express from 'express';
+import express, { Router } from 'express';
 import { teacherController } from '../controllers/teacherController.js';
 import { authenticate, isTeacher } from '../middleware/auth/authMiddleware.js';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // Public routes
 // GET /api/teachers - Get teachers, optionally filtered by lesson type

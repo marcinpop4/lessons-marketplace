@@ -1,35 +1,72 @@
 {
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "target": "ES2022",
-    "outDir": "../dist/shared",
-    "rootDir": ".",
-    "baseUrl": ".",
+    "target": "es2020",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noImplicitAny": true,
+    "baseUrl": "..",
+    "paths": {
+      "@server/*": [
+        "../server/*"
+      ],
+      "@frontend/*": [
+        "../frontend/*"
+      ],
+      "@/*": [
+        "../frontend/*"
+      ],
+      "@config/*": [
+        "../frontend/config/*"
+      ]
+    },
+    "outDir": "../dist/shared",
+    "rootDir": "./",
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "allowSyntheticDefaultImports": true,
+    "resolvePackageJsonExports": true,
+    "resolvePackageJsonImports": true,
+    "preserveConstEnums": true,
+    "incremental": true,
+    "noImplicitThis": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
-    "noImplicitThis": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noImplicitReturns": false,
-    "noFallthroughCasesInSwitch": true,
-    "types": ["node"]
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "strictBuiltinIteratorReturn": true,
+    "alwaysStrict": true,
+    "useUnknownInCatchVariables": true,
+    "noEmitOnError": true,
+    "sourceMap": true
   },
+  "files": [
+    "./models/Address.ts",
+    "./models/Lesson.ts",
+    "./models/LessonQuote.ts",
+    "./models/LessonRequest.ts",
+    "./models/LessonType.ts",
+    "./models/Person.ts",
+    "./models/Student.ts",
+    "./models/Teacher.ts",
+    "./models/TeacherLessonHourlyRate.ts",
+    "./models/index.ts",
+    "./types/CurrencyTypes.ts",
+    "./utils/logger.ts"
+  ],
   "include": [
-    "./**/*"
+    "./**/*.ts",
+    "./**/*.tsx"
   ],
   "exclude": [
-    "../node_modules",
-    "../dist",
-    "../frontend",
-    "../server"
+    "./node_modules",
+    "./dist"
   ]
-} 
+}

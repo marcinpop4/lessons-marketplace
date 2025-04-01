@@ -1,19 +1,22 @@
 import { defineConfig, devices } from '@playwright/test';
 import * as dotenv from 'dotenv';
+import * as path from 'path';
+import * as fs from 'fs';
+import { fileURLToPath } from 'url';
 
-// Load environment variables from .env file
-dotenv.config();
+// Get directory path in ESM context
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Determine if we're running in Docker by checking environment variables
-const isRunningInDocker = process.env.TEST_ENV === 'docker';
-console.log(`Running in Docker: ${isRunningInDocker}`);
+// Load environment variables - this assumes ENV_TYPE is set when the tests are run
+const envType = process.env.ENV_TYPE;
+const envFile = path.resolve(__dirname, `env/.env.${envType}`);
+dotenv.config({ path: envFile });
 
-// In Docker, always use the frontend container URL
-const baseURL = process.env.TEST_ENV === 'docker' 
-  ? process.env.DOCKER_FRONTEND_URL
-  : process.env.FRONTEND_URL;
-
-console.log(`Using frontend URL for tests: ${baseURL}`);
+// Check if running in Docker
+const isDocker = process.env.TEST_ENV === 'docker';
+const baseURL = process.env.FRONTEND_URL;
+const logLevel = process.env.LOG_LEVEL || '1';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -23,15 +26,12 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: [
     ['html', { outputFolder: './tests/results/playwright-report', open: 'never' }],
-    ['list']
+    ['list'] // More compact reporter for cleaner output
   ],
-  
+
   // Global timeout settings
-  timeout: process.env.PLAYWRIGHT_TIMEOUT ? parseInt(process.env.PLAYWRIGHT_TIMEOUT) : 30000,
-  
-  // Only include E2E tests, exclude unit tests
-  testMatch: 'tests/e2e/**/*.spec.ts',
-  
+  timeout: 30000,
+
   use: {
     baseURL,
     screenshot: {
@@ -42,13 +42,7 @@ export default defineConfig({
     headless: true,
     actionTimeout: 15000,
     navigationTimeout: 20000,
-    trace: {
-      mode: 'on-first-retry',
-      snapshots: true,
-      screenshots: true,
-      sources: true,
-      attachments: true
-    }
+    trace: 'retain-on-failure'
   },
   outputDir: './tests/results/screenshots',
   projects: [
@@ -58,11 +52,14 @@ export default defineConfig({
     },
   ],
   // Only start web server in local development
-  webServer: process.env.TEST_ENV === 'docker' ? undefined : {
-    command: 'NODE_OPTIONS="" pnpm run dev:full',
+  webServer: isDocker ? undefined : {
+    command: `NODE_NO_WARNINGS=1 LOG_LEVEL=${logLevel} VITE_LOG_LEVEL=${logLevel} ENV_TYPE=${envType} pnpm run dev:full`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
-    stdout: 'pipe',
-    stderr: 'pipe',
+    stdout: parseInt(logLevel, 10) >= 2 ? 'pipe' : 'ignore', // Only pipe stdout if log level is INFO or higher
+    stderr: 'pipe', // Always pipe stderr for critical errors
+    env: {
+      NODE_NO_WARNINGS: '1'  // Suppress experimental warnings
+    }
   },
 }); 

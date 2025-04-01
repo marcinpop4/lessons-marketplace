@@ -1,8 +1,8 @@
-import express from 'express';
+import express, { Router } from 'express';
 import { lessonQuoteController } from '../controllers/lessonQuoteController.js';
 import { authenticate, isStudent } from '../middleware/auth/authMiddleware.js';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // Create a new lesson quote
 router.post('/', authenticate, lessonQuoteController.createLessonQuote);
