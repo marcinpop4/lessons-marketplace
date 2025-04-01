@@ -94,7 +94,8 @@ jobs:
         if: steps.deploy.outcome == 'success'
         run: |
           mkdir -p tests/results/test-logs
-          DEBUG=pw:api pnpm docker:test:rebuild 2>&1 | tee tests/results/test-logs/test-output.log
+          set -e
+          DEBUG=pw:api pnpm docker:test:rebuild > tests/results/test-logs/test-output.log 2>&1
 
       - name: Upload test execution logs
         uses: actions/upload-artifact@v4

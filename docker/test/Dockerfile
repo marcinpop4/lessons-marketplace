@@ -5,7 +5,8 @@ WORKDIR /app
 
 # Copy package files and install dependencies
 COPY package.json pnpm-lock.yaml ./
-RUN npm install -g pnpm@latest && \
+RUN npm config set registry https://registry.npmjs.org/ && \
+    npm install -g pnpm@latest && \
     pnpm install --frozen-lockfile
 
 # Copy only the necessary files for testing
