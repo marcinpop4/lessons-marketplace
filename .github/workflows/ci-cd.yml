@@ -95,7 +95,8 @@ jobs:
         run: |
           mkdir -p tests/results/test-logs
           set -e
-          DEBUG=pw:api pnpm docker:test:rebuild > tests/results/test-logs/test-output.log 2>&1
+          # Run tests and tee output to both console and file
+          DEBUG=pw:api pnpm docker:test:rebuild 2>&1 | tee tests/results/test-logs/test-output.log
 
       - name: Upload test execution logs
         uses: actions/upload-artifact@v4
