@@ -29,7 +29,6 @@ ENV PATH="/root/.fly/bin:${PATH}"
 # Set environment variables
 ENV ENV_TYPE=prod
 
-# Run sync-fly-env.js script directly and deploy with --no-cache flags
 CMD flyctl version && \
     node scripts/sync-fly-env.js server && \
     flyctl deploy --config docker/server/fly.toml --no-cache && \
