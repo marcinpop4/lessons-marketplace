@@ -15,7 +15,8 @@ dotenv.config({ path: envFile });
 
 // Check if running in Docker
 const isDocker = process.env.TEST_ENV === 'docker';
-const baseURL = process.env.FRONTEND_URL;
+// Use DOCKER_FRONTEND_URL when running in Docker, otherwise use FRONTEND_URL
+const baseURL = isDocker ? process.env.DOCKER_FRONTEND_URL : process.env.FRONTEND_URL;
 const logLevel = process.env.LOG_LEVEL || '1';
 
 export default defineConfig({

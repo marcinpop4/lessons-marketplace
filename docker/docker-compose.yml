@@ -122,7 +122,7 @@ services:
       dockerfile: docker/deploy/Dockerfile
     container_name: lessons-marketplace-deploy
     environment:
-      - FLY_API_TOKEN=${FLY_API_TOKEN}
+      - FLY_API_TOKEN=${FLY_API_TOKEN:-''}
       - ENV_TYPE=${ENV_TYPE:-prod}
     restart: "no"
     volumes:
