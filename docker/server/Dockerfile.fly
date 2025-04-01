@@ -41,8 +41,8 @@ COPY env/ env/
 COPY shared/ shared/
 COPY tsconfig.json .
 
-# Build server code
-RUN ENV_TYPE=${ENV_TYPE} pnpm build:server
+RUN pnpm build:shared
+RUN pnpm build:server
 
 # Production image
 FROM base AS runner

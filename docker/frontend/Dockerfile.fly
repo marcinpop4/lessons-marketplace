@@ -44,8 +44,9 @@ RUN ls -la env/.env.${ENV_TYPE} && \
 # Make environment variables available during build
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
-RUN export $(cat env/.env.${ENV_TYPE} | grep -v '^#' | xargs) && \
-    pnpm build:frontend
+
+RUN pnpm build:shared
+RUN pnpm build:frontend
 
 # Production image
 FROM nginx:alpine AS runner

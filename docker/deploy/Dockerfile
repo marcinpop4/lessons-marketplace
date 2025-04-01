@@ -32,6 +32,6 @@ ENV ENV_TYPE=prod
 # Run sync-fly-env.js script directly and deploy with --no-cache flags
 CMD flyctl version && \
     node scripts/sync-fly-env.js server && \
-    flyctl deploy --config docker/fly-config/fly.server.toml --no-cache && \
+    flyctl deploy --config docker/server/fly.toml --no-cache && \
     node scripts/sync-fly-env.js frontend && \
-    flyctl deploy --config docker/fly-config/fly.frontend.toml --no-cache
+    flyctl deploy --config docker/frontend/fly.toml --no-cache

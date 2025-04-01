@@ -14,7 +14,7 @@ if (!target || !['frontend', 'server'].includes(target)) {
 
 // Read the .env.prod file
 const envFile = fs.readFileSync('env/.env.prod', 'utf8');
-const flyFile = fs.readFileSync(`docker/fly-config/fly.${target}.toml`, 'utf8');
+const flyFile = fs.readFileSync(`docker/${target}/fly.toml`, 'utf8');
 
 // Parse .env.prod file
 const envVars = envFile
@@ -51,6 +51,6 @@ const updatedFlyConfig = flyFile.replace(
 );
 
 // Write the updated fly.toml
-fs.writeFileSync(`docker/fly-config/fly.${target}.toml`, updatedFlyConfig);
+fs.writeFileSync(`docker/${target}/fly.toml`, updatedFlyConfig);
 
-console.log(`Successfully updated fly.${target}.toml with environment variables from .env.prod`); 
+console.log(`Successfully updated docker/${target}/fly.toml with environment variables from .env.prod`); 
