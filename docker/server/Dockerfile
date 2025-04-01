@@ -34,8 +34,9 @@ RUN pnpm prisma:generate
 
 # Build stage
 FROM dependencies AS builder
-# Build server code
-RUN ENV_TYPE=${ENV_TYPE} pnpm build:server
+# Build shared code first, then server
+RUN pnpm build:shared
+RUN pnpm build:server
 
 # Production image
 FROM base AS runner

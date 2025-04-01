@@ -29,6 +29,9 @@ FROM dependencies AS builder
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 
+# Build shared first since frontend may depend on it
+RUN pnpm build:shared
+
 # Pass the environment variable explicitly to the build command
 RUN pnpm build:frontend
 
