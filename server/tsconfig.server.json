@@ -1,5 +1,4 @@
 {
-  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "target": "es2022",
     "module": "nodenext",
@@ -15,8 +14,13 @@
     "paths": {
       "@server/*": [
         "./*"
+      ],
+      "@shared/*": [
+        "../shared/*"
       ]
     },
+    "noEmitOnError": true,
+    "sourceMap": true,
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -42,9 +46,7 @@
     "strictPropertyInitialization": true,
     "strictBuiltinIteratorReturn": true,
     "alwaysStrict": true,
-    "useUnknownInCatchVariables": true,
-    "noEmitOnError": true,
-    "sourceMap": true
+    "useUnknownInCatchVariables": true
   },
   "references": [
     {

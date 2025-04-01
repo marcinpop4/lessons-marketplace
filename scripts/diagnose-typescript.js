@@ -136,6 +136,9 @@ try {
   console.error(`${RED}✗ Error checking TypeScript version${RESET}`);
 }
 
+// Keep track of all temporary files created
+const tempFiles = [];
+
 // Function to test with a specific tsconfig
 function testWithConfig(configName, configPath) {
   console.log(`\nTesting with ${YELLOW}${configName}${RESET}...`);
@@ -155,7 +158,9 @@ const lessonTypes = Object.keys(LessonType);
 console.log('Available lesson types:', lessonTypes);
 `;
     cleanupFunc = () => {
-      if (fs.existsSync(testDestination)) fs.unlinkSync(testDestination);
+      if (fs.existsSync(testDestination)) {
+        tempFiles.push(testDestination);
+      }
     };
   } else if (configName === 'frontend tsconfig') {
     testDestination = path.join(projectRoot, 'frontend', 'temp-path-alias-test.ts');
@@ -167,7 +172,9 @@ const lessonTypes = Object.keys(LessonType);
 console.log('Available lesson types:', lessonTypes);
 `;
     cleanupFunc = () => {
-      if (fs.existsSync(testDestination)) fs.unlinkSync(testDestination);
+      if (fs.existsSync(testDestination)) {
+        tempFiles.push(testDestination);
+      }
     };
   } else if (configName === 'server tsconfig') {
     testDestination = path.join(projectRoot, 'server', 'temp-path-alias-test.ts');
@@ -179,7 +186,9 @@ const lessonTypes = Object.keys(LessonType);
 console.log('Available lesson types:', lessonTypes);
 `;
     cleanupFunc = () => {
-      if (fs.existsSync(testDestination)) fs.unlinkSync(testDestination);
+      if (fs.existsSync(testDestination)) {
+        tempFiles.push(testDestination);
+      }
     };
   } else if (configName === 'shared tsconfig') {
     testDestination = path.join(projectRoot, 'shared', 'temp-path-alias-test.ts');
@@ -195,7 +204,9 @@ const lessonTypes = Object.keys(LessonType);
 console.log('Available lesson types:', lessonTypes);
 `;
     cleanupFunc = () => {
-      if (fs.existsSync(testDestination)) fs.unlinkSync(testDestination);
+      if (fs.existsSync(testDestination)) {
+        tempFiles.push(testDestination);
+      }
     };
   }
   
@@ -285,6 +296,21 @@ if (fs.existsSync(tempDir)) {
   }
 }
 
+// Clean up all temporary files
+function cleanupTempFiles() {
+  console.log(`\n${CYAN}Cleaning up temporary files...${RESET}`);
+  tempFiles.forEach(file => {
+    try {
+      if (fs.existsSync(file)) {
+        fs.unlinkSync(file);
+        console.log(`${GREEN}✓ Removed temporary file: ${path.basename(file)}${RESET}`);
+      }
+    } catch (error) {
+      console.error(`${RED}Error removing temporary file ${file}: ${error.message}${RESET}`);
+    }
+  });
+}
+
 // Summary and recommendations
 console.log(`\n${CYAN}=== Diagnosis Summary ===${RESET}`);
 if (Object.values(results).every(Boolean)) {
@@ -334,4 +360,6 @@ console.log('5. shared/tsconfig.shared.json - For shared code used by both front
 console.log('\nPath alias recommendations:');
 console.log('- In frontend code: Use @shared/*, @frontend/*, and @/* path aliases');
 console.log('- In server code: Use relative imports (../shared/*) for shared code, @server/* for server code');
-console.log('- In shared code: Use relative imports (./models/*) within the shared directory'); 
+console.log('- In shared code: Use relative imports (./models/*) within the shared directory');
+
+cleanupTempFiles(); 

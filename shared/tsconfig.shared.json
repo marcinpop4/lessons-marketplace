@@ -1,5 +1,4 @@
 {
-  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "target": "es2020",
     "module": "esnext",
@@ -24,8 +23,13 @@
       ],
       "@config/*": [
         "../frontend/config/*"
+      ],
+      "@shared/*": [
+        "../shared/*"
       ]
     },
+    "noEmitOnError": true,
+    "sourceMap": true,
     "outDir": "../dist/shared",
     "rootDir": "./",
     "composite": true,
@@ -43,9 +47,7 @@
     "strictPropertyInitialization": true,
     "strictBuiltinIteratorReturn": true,
     "alwaysStrict": true,
-    "useUnknownInCatchVariables": true,
-    "noEmitOnError": true,
-    "sourceMap": true
+    "useUnknownInCatchVariables": true
   },
   "files": [
     "./models/Address.ts",

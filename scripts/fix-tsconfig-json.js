@@ -120,6 +120,21 @@ function backupFile(filePath) {
   return backupPath;
 }
 
+// Clean up backup files
+function cleanupBackupFiles() {
+  tsconfigFiles.forEach(configPath => {
+    const backupPath = path.join(projectRoot, `${configPath}.bak`);
+    if (fs.existsSync(backupPath)) {
+      try {
+        fs.unlinkSync(backupPath);
+        console.log(`${GREEN}✓ Removed backup file: ${path.basename(backupPath)}${RESET}`);
+      } catch (error) {
+        console.error(`${RED}Error removing backup file ${backupPath}: ${error.message}${RESET}`);
+      }
+    }
+  });
+}
+
 // Process each tsconfig file
 tsconfigFiles.forEach(configPath => {
   const fullPath = path.join(projectRoot, configPath);
@@ -194,6 +209,9 @@ tsconfigFiles.forEach(configPath => {
     console.error(`${RED}Error processing ${configPath}: ${error.message}${RESET}`);
   }
 });
+
+// Clean up backup files
+cleanupBackupFiles();
 
 console.log(`\n${GREEN}✓ Finished processing TypeScript configuration files${RESET}`);
 console.log(`\n${CYAN}Next steps:${RESET}`);
