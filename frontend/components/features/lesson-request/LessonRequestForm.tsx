@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { LessonType, LessonRequest, Address } from '@frontend/types/lesson';
 import { createLessonRequest } from '@frontend/api/lessonRequestApi';
 import { useAuth } from '@frontend/contexts/AuthContext';
+import { formatDisplayLabel } from '@shared/models/LessonType';
 import LessonDetailsForm from './LessonDetailsForm';
 import AddressForm from './AddressForm';
 import './LessonRequestForm.css';
@@ -23,8 +24,8 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
   const { user, justRegistered, clearJustRegistered } = useAuth();
   const navigate = useNavigate();
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  
-  const [formData, setFormData] = useState<Omit<LessonRequest, 'address'> & { 
+
+  const [formData, setFormData] = useState<Omit<LessonRequest, 'address'> & {
     addressObj: Address;
   }>({
     id: '',
@@ -54,18 +55,18 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
       navigate('/auth', { replace: true });
       return;
     }
-    
+
     if (user.userType !== 'STUDENT') {
       navigate('/', { replace: true });
       return;
     }
-    
+
     const today = new Date();
     const year = today.getFullYear();
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
     setSelectedDate(`${year}-${month}-${day}`);
-    
+
     setFormData(prevData => ({
       ...prevData,
       studentId: user.id
@@ -89,7 +90,7 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
       sessionStorage.removeItem('registrationSuccess');
     }
   }, []);
-  
+
   useEffect(() => {
     if (showSuccessMessage || justRegistered) {
       const timer = setTimeout(() => {
@@ -109,7 +110,7 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
   const handleTimeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newTime = e.target.value;
     setSelectedTime(newTime);
-    
+
     if (newTime && isLessonEndingAfter9pm(newTime, formData.durationMinutes)) {
       setError('Lesson cannot end after 9:00 PM. Please choose an earlier time or shorter duration.');
     } else if (error && error.includes('Lesson cannot end after 9:00 PM')) {
@@ -120,10 +121,10 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
   const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
     // Convert string value to LessonType enum - ensure it's a valid enum value
-    const lessonType = Object.values(LessonType).includes(value as LessonType) 
-      ? value as LessonType 
+    const lessonType = Object.values(LessonType).includes(value as LessonType)
+      ? value as LessonType
       : LessonType.GUITAR;
-      
+
     setFormData(prevData => ({
       ...prevData,
       [name]: lessonType
@@ -133,13 +134,13 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
   const handleDurationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
     const durationValue = parseInt(value, 10);
-    
+
     if (selectedTime && isLessonEndingAfter9pm(selectedTime, durationValue)) {
       setError('Lesson cannot end after 9:00 PM. Please choose an earlier time or shorter duration.');
     } else if (error && error.includes('Lesson cannot end after 9:00 PM')) {
       setError(null);
     }
-    
+
     setFormData(prevData => ({
       ...prevData,
       [name]: durationValue
@@ -160,26 +161,26 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedDate || !selectedTime) {
       setError('Please select both a date and time for the lesson.');
       return;
     }
-    
+
     if (isLessonEndingAfter9pm(selectedTime, formData.durationMinutes)) {
       setError('Lesson cannot end after 9:00 PM. Please choose an earlier time or shorter duration.');
       return;
     }
-    
+
     const { street, city, state, postalCode } = formData.addressObj;
     if (!street || !city || !state || !postalCode) {
       setError('Please fill in all address fields.');
       return;
     }
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       const payload = {
         type: formData.type,
@@ -188,14 +189,14 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
         addressObj: formData.addressObj,
         studentId: formData.studentId
       };
-      
+
       const result = await createLessonRequest(payload);
       setShowSuccessMessage(true);
-      
+
       if (onSubmitSuccess && result.id) {
         onSubmitSuccess(result.id);
       }
-      
+
       setFormData({
         id: '',
         type: LessonType.GUITAR,
@@ -213,10 +214,10 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
         createdAt: '',
         updatedAt: ''
       });
-      
+
       setSelectedTime('');
       setSelectedDate(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`);
-      
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred while submitting the form.');
     } finally {
@@ -232,9 +233,9 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
           Please fill out this form to request a lesson.
         </div>
       )}
-      
+
       {error && <div className="alert-error">{error}</div>}
-      
+
       <form onSubmit={handleSubmit} className="lesson-request-form">
         <LessonDetailsForm
           type={formData.type}
@@ -245,8 +246,9 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
           onDurationChange={handleDurationChange}
           onDateChange={handleDateChange}
           onTimeChange={handleTimeChange}
+          formatDisplayLabel={formatDisplayLabel}
         />
-        
+
         <AddressForm
           address={formData.addressObj}
           onChange={handleAddressChange}

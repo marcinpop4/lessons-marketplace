@@ -24,6 +24,11 @@ tests/results/
 out/
 storybook-static/
 
+# Temporary files
+/temp
+*.d.ts
+*.js.map
+
 # Misc
 .DS_Store
 .env

@@ -50,11 +50,6 @@ const LessonDetailsForm: React.FC<LessonDetailsFormProps> = ({
 }) => {
   const timeOptions = generateTimeOptions();
 
-  // Helper to format display label
-  const formatDisplayLabel = (type: string): string => {
-    return type.charAt(0) + type.slice(1).toLowerCase();
-  };
-
   return (
     <div className="card card-primary lesson-request-card">
       <div className="card-header">

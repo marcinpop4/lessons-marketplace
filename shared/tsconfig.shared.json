@@ -1,74 +1,11 @@
 {
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "target": "es2020",
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "esModuleInterop": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noImplicitAny": true,
     "baseUrl": "..",
-    "paths": {
-      "@server/*": [
-        "../server/*"
-      ],
-      "@frontend/*": [
-        "../frontend/*"
-      ],
-      "@/*": [
-        "../frontend/*"
-      ],
-      "@config/*": [
-        "../frontend/config/*"
-      ],
-      "@shared/*": [
-        "../shared/*"
-      ]
-    },
-    "noEmitOnError": true,
-    "sourceMap": true,
     "outDir": "../dist/shared",
-    "rootDir": "./",
-    "composite": true,
-    "declaration": true,
-    "declarationMap": true,
-    "allowSyntheticDefaultImports": true,
-    "resolvePackageJsonExports": true,
-    "resolvePackageJsonImports": true,
-    "preserveConstEnums": true,
-    "incremental": true,
-    "noImplicitThis": true,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true,
-    "strictBindCallApply": true,
-    "strictPropertyInitialization": true,
-    "strictBuiltinIteratorReturn": true,
-    "alwaysStrict": true,
-    "useUnknownInCatchVariables": true
+    "rootDir": ".",
+    "composite": true
   },
-  "files": [
-    "./models/Address.ts",
-    "./models/Lesson.ts",
-    "./models/LessonQuote.ts",
-    "./models/LessonRequest.ts",
-    "./models/LessonType.ts",
-    "./models/Person.ts",
-    "./models/Student.ts",
-    "./models/Teacher.ts",
-    "./models/TeacherLessonHourlyRate.ts",
-    "./models/index.ts",
-    "./types/CurrencyTypes.ts",
-    "./utils/logger.ts"
-  ],
-  "include": [
-    "./**/*.ts",
-    "./**/*.tsx"
-  ],
-  "exclude": [
-    "./node_modules",
-    "./dist"
-  ]
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }

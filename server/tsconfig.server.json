@@ -1,90 +1,14 @@
 {
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "target": "es2022",
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "esModuleInterop": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noImplicitAny": true,
     "baseUrl": "..",
-    "paths": {
-      "@server/*": [
-        "./*"
-      ],
-      "@shared/*": [
-        "../shared/*"
-      ]
-    },
-    "noEmitOnError": true,
-    "sourceMap": true,
-    "composite": true,
-    "declaration": true,
-    "declarationMap": true,
     "outDir": "../dist/server",
-    "rootDir": "./",
-    "allowSyntheticDefaultImports": true,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true,
-    "noImplicitThis": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noImplicitReturns": false,
-    "types": [
-      "node"
-    ],
-    "moduleDetection": "force",
-    "resolvePackageJsonExports": true,
-    "resolvePackageJsonImports": true,
-    "preserveConstEnums": true,
-    "incremental": true,
-    "useDefineForClassFields": true,
-    "strictBindCallApply": true,
-    "strictPropertyInitialization": true,
-    "strictBuiltinIteratorReturn": true,
-    "alwaysStrict": true,
-    "useUnknownInCatchVariables": true
+    "rootDir": ".",
+    "composite": true
   },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "dist"],
   "references": [
-    {
-      "path": "../shared/tsconfig.shared.json"
-    }
-  ],
-  "files": [
-    "./index.ts",
-    "./prisma.debug.ts",
-    "./prisma.ts",
-    "./types.d.ts",
-    "./config/database.ts",
-    "./controllers/addressController.ts",
-    "./controllers/lessonController.ts",
-    "./controllers/lessonQuoteController.ts",
-    "./controllers/lessonRequestController.ts",
-    "./controllers/teacherController.ts",
-    "./middleware/auth/authMiddleware.ts",
-    "./prisma/migrate-deploy.ts",
-    "./routes/addressRoutes.ts",
-    "./routes/healthRoutes.ts",
-    "./routes/lessonQuoteRoutes.ts",
-    "./routes/lessonRequestRoutes.ts",
-    "./routes/lessonRoutes.ts",
-    "./routes/teacherRoutes.ts",
-    "./routes/auth/authRoutes.ts",
-    "./services/auth/authService.ts",
-    "./services/auth/passwordAuthProvider.ts",
-    "./services/database/lessonRequestService.ts",
-    "./utils/logger.ts"
-  ],
-  "include": [
-    "./**/*.ts",
-    "./**/*.tsx"
-  ],
-  "exclude": [
-    "../node_modules",
-    "../dist",
-    "dist"
+    { "path": "../shared/tsconfig.shared.json" }
   ]
 }

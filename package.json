@@ -8,7 +8,7 @@
     "clean": "rm -rf dist && rm -rf node_modules",
     "dev:frontend": "dotenv -e env/.env.${ENV_TYPE:-dev} -- cross-env VITE_TSCONFIG=frontend/config/tsconfig.app.json vite --config frontend/config/vite.config.ts --force",
     "dev:full": "cross-env ENV_TYPE=dev concurrently \"pnpm run dev:frontend\" \"pnpm run dev:server\"",
-    "dev:server": "dotenv -e env/.env.${ENV_TYPE:-dev} -- concurrently \"tsc --project server/tsconfig.server.json --watch --preserveWatchOutput\" \"tsx watch server/index.ts\"",
+    "dev:server": "dotenv -e env/.env.${ENV_TYPE:-dev} -- tsx watch server/index.ts",
     "dev:server:debug": "cross-env DEBUG=true ENV_TYPE=dev dotenv -e env/.env.dev -- tsx watch server/index.ts",
     "docker:clean": "docker compose -f docker/docker-compose.yml down --volumes --remove-orphans && docker ps -aq | xargs -r docker rm -f && docker volume prune -f && docker network prune -f",
     "docker:db": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml rm -fs database && docker compose -f docker/docker-compose.yml up -d database",
@@ -129,7 +129,8 @@
     "tsx": "4.19.3",
     "typescript": "5.8.2",
     "typescript-eslint": "8.29.0",
-    "vite": "6.2.4"
+    "vite": "6.2.4",
+    "ts-node-dev": "^2.0.0"
   },
   "type": "module",
   "version": "0.0.0",

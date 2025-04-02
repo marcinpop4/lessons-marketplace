@@ -21,14 +21,14 @@ interface Props {
   onRatesUpdated: (rates: LessonRate[]) => void;
 }
 
-const TeacherLessonRatesManager: React.FC<Props> = ({ lessonRates, onRatesUpdated }) => {
+const TeacherLessonRatesManager: React.FC<Props> = ({ lessonRates = [], onRatesUpdated }) => {
   const [editingRate, setEditingRate] = useState<LessonRate | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleAddOrUpdate = async (rate: Partial<LessonRate>) => {
     try {
       setError(null);
-      
+
       // The API expects lessonType and rateInCents parameters
       // When editing, include the ID to ensure we're updating the correct rate
       const apiPayload = {
@@ -36,14 +36,14 @@ const TeacherLessonRatesManager: React.FC<Props> = ({ lessonRates, onRatesUpdate
         rateInCents: rate.rateInCents,
         ...(editingRate ? { id: editingRate.id } : {})
       };
-      
+
       // Always use POST to /teachers/lesson-rates as the API uses upsert logic
-      const updatedRate = await apiClient.post('/v1/teachers/lesson-rates', apiPayload);
-      
+      const updatedRate = await apiClient.post('/api/v1/teachers/lesson-rates', apiPayload);
+
       // Update the rates list
       if (editingRate) {
         // If editing, replace the old rate with the updated one
-        const updatedRates = lessonRates.map(r => 
+        const updatedRates = lessonRates.map(r =>
           r.id === editingRate.id ? updatedRate.data : r
         );
         onRatesUpdated(updatedRates);
@@ -51,14 +51,14 @@ const TeacherLessonRatesManager: React.FC<Props> = ({ lessonRates, onRatesUpdate
         // If adding new, append to the list
         onRatesUpdated([...lessonRates, updatedRate.data]);
       }
-      
+
       setEditingRate(null);
     } catch (err) {
       if (axios.isAxiosError(err)) {
         // Use HTTP status codes to better categorize errors
         const status = err.response?.status || 0;
         const apiError = err.response?.data?.message || err.message;
-        
+
         if (status === 409) {
           // 409 Conflict - Resource already exists
           setError(`You already have a rate for ${rate.type} lessons. Please edit the existing rate instead.`);
@@ -82,31 +82,31 @@ const TeacherLessonRatesManager: React.FC<Props> = ({ lessonRates, onRatesUpdate
   const handleToggleActive = async (rate: LessonRate) => {
     try {
       setError(null);
-      
+
       // The API expects lessonType in the body
       const apiPayload = {
         lessonType: rate.type
       };
-      
+
       // Use the appropriate endpoint based on current status
-      const endpoint = rate.isActive 
-        ? '/v1/teachers/lesson-rates/deactivate' 
-        : '/v1/teachers/lesson-rates/reactivate';
-      
+      const endpoint = rate.isActive
+        ? '/api/v1/teachers/lesson-rates/deactivate'
+        : '/api/v1/teachers/lesson-rates/reactivate';
+
       const updatedRate = await apiClient.post(endpoint, apiPayload);
-      
+
       // Update the rates list
-      const updatedRates = lessonRates.map(r => 
+      const updatedRates = lessonRates.map(r =>
         r.type === rate.type ? updatedRate.data : r
       );
-      
+
       onRatesUpdated(updatedRates);
     } catch (err) {
       if (axios.isAxiosError(err)) {
         // Use HTTP status codes to better categorize errors
         const status = err.response?.status || 0;
         const apiError = err.response?.data?.message || err.message;
-        
+
         if (status === 409) {
           // 409 Conflict
           setError(`Cannot update status for ${rate.type} rate. There may be a conflict.`);
@@ -142,19 +142,19 @@ const TeacherLessonRatesManager: React.FC<Props> = ({ lessonRates, onRatesUpdate
       </div>
       <div className="card-body">
         {error && <div className="alert alert-error mb-4">{error}</div>}
-        
+
         <div className="rates-layout">
           <div className="rates-form-container">
-            <LessonRateForm 
-              rate={editingRate} 
+            <LessonRateForm
+              rate={editingRate}
               onSubmit={handleAddOrUpdate}
               onCancel={handleCancel}
             />
           </div>
-          
+
           <div className="rates-list-container">
-            <LessonRateList 
-              rates={lessonRates} 
+            <LessonRateList
+              rates={lessonRates}
               onToggleActive={handleToggleActive}
               onEdit={handleEdit}
             />

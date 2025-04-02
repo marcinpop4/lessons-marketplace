@@ -28,9 +28,13 @@ export default defineConfig(({ mode }) => {
   // Get log level from environment
   const logLevel = parseInt(process.env.VITE_LOG_LEVEL || '1', 10);
 
+  // Check if we're in development mode
+  const isDev = process.env.ENV_TYPE === 'dev';
+
   // Only log in higher verbosity modes
   if (logLevel >= 2) {
     console.log(`Building for ${mode} with API URL: ${process.env.VITE_API_BASE_URL}`);
+    console.log(`Environment type: ${process.env.ENV_TYPE}`);
   }
 
   return {
@@ -53,6 +57,22 @@ export default defineConfig(({ mode }) => {
     // Ensure environment variables with VITE_ prefix are exposed to the client
     envPrefix: 'VITE_',
     root: resolve(__dirname, '..'),
+    // Disable caching in development
+    optimizeDeps: {
+      force: isDev,
+      esbuildOptions: {
+        tsconfigRaw: {
+          compilerOptions: {
+            baseUrl: '..',
+            paths: {
+              '@frontend/*': ['*'],
+              '@shared/*': ['../shared/*'],
+              '@config/*': ['config/*']
+            }
+          }
+        }
+      }
+    },
     build: {
       outDir: resolve(projectRoot, 'dist/frontend'),
       rollupOptions: {
@@ -69,17 +89,18 @@ export default defineConfig(({ mode }) => {
     server: {
       // Configure based on log level
       logLevel: logLevel >= 3 ? 'info' : logLevel >= 2 ? 'warn' : 'error',
-      // Force Vite to always use new versions of files and not serve from memory cache
+      // Force Vite to always use new versions of files
       hmr: {
         overlay: true,
       },
       watch: {
-        usePolling: true,
+        usePolling: isDev,
       },
-      headers: {
-        // Prevent browser caching in development mode
-        'Cache-Control': 'no-store'
-      },
+      headers: isDev ? {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      } : undefined,
       proxy: {
         // Versioned API routes
         '/api/v1/auth': {
@@ -128,20 +149,6 @@ export default defineConfig(({ mode }) => {
         '@frontend/utils': resolve(__dirname, '../utils'),
         '@shared': resolve(__dirname, '../../shared'),
         '@config': resolve(__dirname, '.') // Add an alias for the config directory
-      }
-    },
-    optimizeDeps: {
-      esbuildOptions: {
-        tsconfigRaw: {
-          compilerOptions: {
-            baseUrl: '..',
-            paths: {
-              '@frontend/*': ['*'],
-              '@shared/*': ['../shared/*'],
-              '@config/*': ['config/*']
-            }
-          }
-        }
       }
     }
   }

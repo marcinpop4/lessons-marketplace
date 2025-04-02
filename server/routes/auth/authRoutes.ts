@@ -42,14 +42,14 @@ export const comparePasswords = async (password: string, hash: string): Promise<
 // Register endpoint
 router.post('/register', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { 
-      email, 
-      password, 
-      firstName, 
-      lastName, 
-      phoneNumber, 
-      dateOfBirth, 
-      userType 
+    const {
+      email,
+      password,
+      firstName,
+      lastName,
+      phoneNumber,
+      dateOfBirth,
+      userType
     } = req.body;
 
     // Validate required fields
@@ -105,12 +105,12 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
 
     // Generate JWT token
     const accessToken = jwt.sign(
-      { 
-        id: user.id, 
-        email: user.email, 
-        userType 
-      }, 
-      JWT_SECRET as Secret, 
+      {
+        id: user.id,
+        email: user.email,
+        userType
+      },
+      JWT_SECRET as Secret,
       { expiresIn: JWT_EXPIRES_IN } as SignOptions
     );
 
@@ -203,12 +203,12 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction): P
 
     // Generate JWT token
     const accessToken = jwt.sign(
-      { 
-        id: user.id, 
-        email: user.email, 
-        userType 
-      }, 
-      JWT_SECRET as Secret, 
+      {
+        id: user.id,
+        email: user.email,
+        userType
+      },
+      JWT_SECRET as Secret,
       { expiresIn: JWT_EXPIRES_IN } as SignOptions
     );
 
@@ -252,48 +252,55 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction): P
 // Refresh token endpoint
 router.post('/refresh-token', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    // Get refresh token from cookie
     const refreshToken = req.cookies.refreshToken;
 
     if (!refreshToken) {
-      res.clearCookie('refreshToken');
-      res.status(401).json({ error: 'Refresh token not provided' });
+      res.status(401).json({ error: 'No refresh token provided' });
       return;
     }
 
-    // Find the refresh token in the database
-    const storedToken = await prisma.refreshToken.findUnique({
+    // Verify refresh token
+    const decoded = jwt.verify(refreshToken, JWT_SECRET as Secret) as { id: string; type: 'STUDENT' | 'TEACHER' };
+
+    // Find refresh token in database
+    const storedToken = await prisma.refreshToken.findFirst({
       where: {
         token: refreshToken,
-        revokedAt: null,
+        userId: decoded.id,
+        userType: decoded.type,
         expiresAt: {
-          gt: new Date(),
-        },
-      },
+          gt: new Date()
+        }
+      }
     });
 
     if (!storedToken) {
-      res.clearCookie('refreshToken');
       res.status(401).json({ error: 'Invalid refresh token' });
       return;
     }
 
-    // Verify the token
-    let decoded;
-    try {
-      decoded = jwt.verify(refreshToken, JWT_SECRET) as { id: string; type: string };
-    } catch (error) {
-      res.clearCookie('refreshToken');
-      res.status(401).json({ error: 'Invalid refresh token' });
+    // Find user based on token type
+    let user;
+    if (decoded.type === 'STUDENT') {
+      user = await prisma.student.findUnique({ where: { id: decoded.id } });
+    } else {
+      user = await prisma.teacher.findUnique({ where: { id: decoded.id } });
+    }
+
+    if (!user) {
+      res.status(401).json({ error: 'User not found' });
       return;
     }
 
     // Generate new access token
     const accessToken = jwt.sign(
-      { 
-        id: storedToken.userId, 
-        userType: storedToken.userType 
-      }, 
-      JWT_SECRET as Secret, 
+      {
+        id: user.id,
+        email: user.email,
+        userType: decoded.type
+      },
+      JWT_SECRET as Secret,
       { expiresIn: JWT_EXPIRES_IN } as SignOptions
     );
 
@@ -302,20 +309,13 @@ router.post('/refresh-token', async (req: Request, res: Response, next: NextFunc
     expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_EXPIRES_IN);
 
     // Generate new refresh token
-    const newRefreshToken = jwt.sign({ id: storedToken.userId, type: storedToken.userType }, JWT_SECRET as Secret);
+    const newRefreshToken = jwt.sign({ id: user.id, type: decoded.type }, JWT_SECRET as Secret);
 
-    // Revoke old refresh token
+    // Update refresh token in database
     await prisma.refreshToken.update({
-      where: { token: refreshToken },
-      data: { revokedAt: new Date() },
-    });
-
-    // Store new refresh token in database
-    await prisma.refreshToken.create({
+      where: { id: storedToken.id },
       data: {
         token: newRefreshToken,
-        userId: storedToken.userId,
-        userType: storedToken.userType,
         expiresAt,
       },
     });
@@ -323,30 +323,38 @@ router.post('/refresh-token', async (req: Request, res: Response, next: NextFunc
     // Set new refresh token cookie
     res.cookie('refreshToken', newRefreshToken, cookieOptions);
 
-    // Return new access token
-    res.status(200).json({ accessToken });
+    // Return user and new access token
+    res.status(200).json({
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        userType: decoded.type,
+      },
+      accessToken,
+    });
   } catch (error) {
     console.error('Token refresh error:', error);
-    res.clearCookie('refreshToken');
-    res.status(401).json({ error: 'Failed to refresh token' });
+    res.status(401).json({ error: 'Invalid refresh token' });
   }
 });
 
 // Logout endpoint
 router.post('/logout', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    // Get refresh token from cookie
     const refreshToken = req.cookies.refreshToken;
 
     if (refreshToken) {
-      // Revoke refresh token
-      await prisma.refreshToken.update({
-        where: { token: refreshToken },
-        data: { revokedAt: new Date() },
+      // Delete refresh token from database
+      await prisma.refreshToken.deleteMany({
+        where: { token: refreshToken }
       });
     }
 
     // Clear refresh token cookie
-    res.clearCookie('refreshToken');
+    res.clearCookie('refreshToken', cookieOptions);
 
     res.status(200).json({ message: 'Logged out successfully' });
   } catch (error) {
@@ -367,7 +375,7 @@ router.get('/me', async (req: Request, res: Response, next: NextFunction): Promi
 
     // Extract token
     const token = authHeader.split(' ')[1];
-    
+
     // Verify token
     let decoded;
     try {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { LessonRequest } from '@frontend/types/lesson';
 import { getLessonRequestById } from '@frontend/api/lessonRequestApi';
 import { FormattedAddress, FormattedDateTime } from '@frontend/components/shared';
+import { formatDisplayLabel } from '@shared/models/LessonType';
 import './LessonRequestCard.css';
 
 interface LessonRequestCardProps {
@@ -70,7 +71,7 @@ const LessonRequestCard: React.FC<LessonRequestCardProps> = ({ lessonRequestId }
         <div className="lesson-request-details">
           <div className="lesson-request-detail">
             <span className="detail-label">Lesson Type:</span>
-            <span className="detail-value">{lessonRequest.type}</span>
+            <span className="detail-value">{formatDisplayLabel(lessonRequest.type)}</span>
           </div>
 
           <div className="lesson-request-detail">

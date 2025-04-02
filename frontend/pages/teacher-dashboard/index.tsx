@@ -47,15 +47,15 @@ const TeacherDashboardPage: React.FC = () => {
   useEffect(() => {
     // Check for registration success in sessionStorage
     const registrationSuccess = sessionStorage.getItem('registrationSuccess');
-    
+
     if (registrationSuccess === 'true') {
       setShowSuccessMessage(true);
-      
+
       // Remove the success flag from sessionStorage
       sessionStorage.removeItem('registrationSuccess');
     }
   }, []);
-  
+
   useEffect(() => {
     // Hide success message after 5 seconds
     if (showSuccessMessage) {
@@ -82,13 +82,13 @@ const TeacherDashboardPage: React.FC = () => {
     const fetchTeacherData = async () => {
       try {
         setLoading(true);
-        
+
         // Use Promise.all to fetch profile and stats in parallel
         const [profileResponse, statsResponse] = await Promise.all([
-          apiClient.get('/v1/teachers/profile'),
-          apiClient.get('/v1/teachers/stats')
+          apiClient.get('/api/v1/teachers/profile'),
+          apiClient.get('/api/v1/teachers/stats')
         ]);
-        
+
         setProfile(profileResponse.data);
         setStats(statsResponse.data);
       } catch (err) {
@@ -142,18 +142,18 @@ const TeacherDashboardPage: React.FC = () => {
       {showSuccessMessage && (
         <div className="alert alert-success">Registration successful!</div>
       )}
-      
+
       <div className="dashboard-header">
         <h1 className="text-2xl font-semibold">Teacher Dashboard</h1>
         <button className="btn btn-secondary" onClick={handleLogout}>Logout</button>
       </div>
 
       {profile && (
-        <div className="dashboard-content space-y-6">         
+        <div className="dashboard-content space-y-6">
           <TeacherProfile profile={profile} />
 
-          <TeacherLessonRatesManager 
-            lessonRates={profile.lessonRates} 
+          <TeacherLessonRatesManager
+            lessonRates={profile.lessonRates}
             onRatesUpdated={(updatedRates) => {
               setProfile({
                 ...profile,

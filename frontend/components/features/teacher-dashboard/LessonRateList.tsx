@@ -18,7 +18,7 @@ interface Props {
   onEdit: (rate: LessonRate) => void;
 }
 
-const LessonRateList: React.FC<Props> = ({ rates, onToggleActive, onEdit }) => {
+const LessonRateList: React.FC<Props> = ({ rates = [], onToggleActive, onEdit }) => {
   // Format the amount in dollars
   const formatAmount = (cents: number) => {
     return `$${(cents / 100).toFixed(2)}`;
@@ -29,7 +29,7 @@ const LessonRateList: React.FC<Props> = ({ rates, onToggleActive, onEdit }) => {
     return new Date(dateString).toLocaleDateString();
   };
 
-  if (rates.length === 0) {
+  if (!rates || rates.length === 0) {
     return (
       <div className="lesson-rate-list">
         <h3 className="text-lg font-medium mb-4">Your Lesson Rates</h3>

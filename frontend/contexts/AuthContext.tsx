@@ -44,9 +44,9 @@ const AuthContext = createContext<AuthContextType>({
   justRegistered: false,
   login: async () => false,
   register: async () => null,
-  logout: async () => {},
-  clearError: () => {},
-  clearJustRegistered: () => {},
+  logout: async () => { },
+  clearError: () => { },
+  clearJustRegistered: () => { },
 });
 
 // Auth provider props
@@ -69,6 +69,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const token = localStorage.getItem('auth_token');
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     }
   };
 
@@ -77,7 +78,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const checkAuthStatus = async () => {
       try {
         const token = localStorage.getItem('auth_token');
-        
+
         // Skip attempting to refresh if we don't have a token yet
         if (!token) {
           setLoading(false);
@@ -86,33 +87,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Initialize auth headers
         await initializeAuth();
-        
-        // Try to get user data first
-        try {
-          const userResponse = await apiClient.get(`/api/v1/auth/me`);
-          setUser(userResponse.data);
-          setLoading(false);
-          return;
-        } catch (userError) {
-          // If user data fetch fails, try to refresh the token
-          console.log('User data fetch failed, attempting token refresh');
-        }
 
         // Try to refresh the token
-        const response = await apiClient.post(`/api/v1/auth/refresh-token`, {});
-        
-        // Save the new access token
-        localStorage.setItem('auth_token', response.data.accessToken);
-        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
-        
-        // Get user data with new token
-        const userResponse = await apiClient.get(`/api/v1/auth/me`);
-        setUser(userResponse.data);
+        try {
+          const response = await apiClient.post(`/api/v1/auth/refresh-token`, {});
+
+          // Save the new access token
+          localStorage.setItem('auth_token', response.data.accessToken);
+          axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
+          apiClient.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
+
+          // Set user data from refresh response
+          setUser(response.data.user);
+        } catch (error) {
+          console.error('Token refresh failed:', error);
+          // Clear auth state if not authenticated
+          localStorage.removeItem('auth_token');
+          delete axios.defaults.headers.common['Authorization'];
+          delete apiClient.defaults.headers.common['Authorization'];
+          setUser(null);
+        }
       } catch (error) {
         console.error('Auth check failed:', error);
         // Clear auth state if not authenticated
         localStorage.removeItem('auth_token');
         delete axios.defaults.headers.common['Authorization'];
+        delete apiClient.defaults.headers.common['Authorization'];
         setUser(null);
       } finally {
         setLoading(false);
@@ -126,7 +126,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string, userType: 'STUDENT' | 'TEACHER') => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const payload = {
         email,
@@ -134,20 +134,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         userType,
       };
       console.log('Login request payload:', payload);
-      
+
       const response = await apiClient.post(`/api/v1/auth/login`, payload);
-      
+      console.log('Login result:', response.data);
+
       if (response.data && response.data.accessToken) {
         setUser(response.data.user);
         localStorage.setItem('auth_token', response.data.accessToken);
         axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
+        apiClient.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
         return true;
       }
-      
+
       return false;
     } catch (error: any) {
       console.error('Login error:', error);
-      const errorMessage = error.response?.data?.error;
+      const errorMessage = error.response?.data?.error || 'Login failed';
       setError(errorMessage);
       return false;
     } finally {
@@ -160,19 +162,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(true);
     setError(null);
     console.log('Starting registration in AuthContext:', { ...registerData, password: '[REDACTED]' });
-    
+
     try {
       const response = await apiClient.post(`/api/v1/auth/register`, registerData);
       console.log('Registration API response:', response.data);
-      
+
       if (response.data && response.data.accessToken) {
         setUser(response.data.user);
         setJustRegistered(true);
         localStorage.setItem('auth_token', response.data.accessToken);
         axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
+        apiClient.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
         return response.data.user;
       }
-      
+
       return null;
     } catch (error: any) {
       console.error('Registration error in AuthContext:', error);
@@ -188,16 +191,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Logout function
   const logout = async () => {
     setLoading(true);
-    
+
     try {
       await apiClient.post(`/api/v1/auth/logout`);
-      
+
       // Clear the access token from localStorage
       localStorage.removeItem('auth_token');
-      
-      // Clear the access token
+
+      // Clear the access token from both axios instances
       delete axios.defaults.headers.common['Authorization'];
-      
+      delete apiClient.defaults.headers.common['Authorization'];
+
       // Clear user data
       setUser(null);
     } catch (error: any) {

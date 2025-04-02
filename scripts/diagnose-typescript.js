@@ -8,6 +8,13 @@ import { execSync } from 'child_process';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
+const tempDir = path.join(projectRoot, 'temp');
+
+// Ensure temp directory exists and is empty
+if (fs.existsSync(tempDir)) {
+  fs.rmSync(tempDir, { recursive: true, force: true });
+}
+fs.mkdirSync(tempDir);
 
 // Color constants for terminal output
 const RED = '\x1b[31m';
@@ -143,13 +150,17 @@ const tempFiles = [];
 function testWithConfig(configName, configPath) {
   console.log(`\nTesting with ${YELLOW}${configName}${RESET}...`);
   
+  // Create a temporary directory for this test
+  const testDir = path.join(tempDir, configName.replace(/\s+/g, '-'));
+  fs.mkdirSync(testDir, { recursive: true });
+  
   // First, copy the test file to a location that's included in the tsconfig
   let testDestination;
   let cleanupFunc;
   let testImportContent;
   
   if (configName === 'root tsconfig') {
-    testDestination = path.join(projectRoot, 'scripts', 'temp-path-alias-test.ts');
+    testDestination = path.join(testDir, 'temp-path-alias-test.ts');
     testImportContent = `// Test importing from shared using path alias
 import { LessonType } from '@shared/models/LessonType';
 
@@ -163,7 +174,7 @@ console.log('Available lesson types:', lessonTypes);
       }
     };
   } else if (configName === 'frontend tsconfig') {
-    testDestination = path.join(projectRoot, 'frontend', 'temp-path-alias-test.ts');
+    testDestination = path.join(testDir, 'temp-path-alias-test.ts');
     testImportContent = `// Test importing from shared using path alias
 import { LessonType } from '@shared/models/LessonType';
 
@@ -177,7 +188,7 @@ console.log('Available lesson types:', lessonTypes);
       }
     };
   } else if (configName === 'server tsconfig') {
-    testDestination = path.join(projectRoot, 'server', 'temp-path-alias-test.ts');
+    testDestination = path.join(testDir, 'temp-path-alias-test.ts');
     testImportContent = `// Test importing from shared using path alias
 import { LessonType } from '@shared/models/LessonType';
 
@@ -191,7 +202,7 @@ console.log('Available lesson types:', lessonTypes);
       }
     };
   } else if (configName === 'shared tsconfig') {
-    testDestination = path.join(projectRoot, 'shared', 'temp-path-alias-test.ts');
+    testDestination = path.join(testDir, 'temp-path-alias-test.ts');
     // For shared, the path alias should be to its own directory
     testImportContent = `// Test importing from the shared directory
 import { LessonType } from '@shared/models/LessonType';
@@ -274,10 +285,6 @@ console.log('Available lesson types:', lessonTypes);
 
 // Create a test file with path alias imports
 console.log(`\n${CYAN}Testing path alias imports...${RESET}`);
-const tempDir = path.join(projectRoot, 'temp');
-if (!fs.existsSync(tempDir)) {
-  fs.mkdirSync(tempDir);
-}
 
 // Test configs
 const results = {
@@ -286,15 +293,6 @@ const results = {
   server: testWithConfig('server tsconfig', path.join(projectRoot, 'server/tsconfig.server.json')),
   shared: testWithConfig('shared tsconfig', path.join(projectRoot, 'shared/tsconfig.shared.json'))
 };
-
-// Clean up
-if (fs.existsSync(tempDir)) {
-  try {
-    fs.rmdirSync(tempDir);
-  } catch (e) {
-    // Ignore errors
-  }
-}
 
 // Clean up all temporary files
 function cleanupTempFiles() {
@@ -309,6 +307,16 @@ function cleanupTempFiles() {
       console.error(`${RED}Error removing temporary file ${file}: ${error.message}${RESET}`);
     }
   });
+  
+  // Remove the temp directory if it's empty
+  try {
+    if (fs.existsSync(tempDir)) {
+      fs.rmdirSync(tempDir);
+      console.log(`${GREEN}✓ Removed temporary directory${RESET}`);
+    }
+  } catch (error) {
+    console.error(`${RED}Error removing temporary directory: ${error.message}${RESET}`);
+  }
 }
 
 // Summary and recommendations

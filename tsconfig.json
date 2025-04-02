@@ -1,43 +1,8 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "es2020",
-    "module": "esnext",
-    "moduleResolution": "node10",
-    "esModuleInterop": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noImplicitAny": true,
-    "baseUrl": "./",
-    "paths": {
-      "@shared/*": [
-        "./shared/*"
-      ],
-      "@server/*": [
-        "./server/*"
-      ],
-      "@frontend/*": [
-        "./frontend/*"
-      ],
-      "@/*": [
-        "./frontend/*"
-      ],
-      "@config/*": [
-        "./frontend/config/*"
-      ]
-    },
-    "allowSyntheticDefaultImports": true,
-    "preserveConstEnums": true,
-    "noImplicitThis": true,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true,
-    "strictBindCallApply": true,
-    "strictPropertyInitialization": true,
-    "strictBuiltinIteratorReturn": true,
-    "alwaysStrict": true,
-    "useUnknownInCatchVariables": true
+    "baseUrl": ".",
+    "outDir": "dist"
   },
   "references": [
     {
@@ -65,6 +30,7 @@
     "./*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "dist"
   ]
 }
