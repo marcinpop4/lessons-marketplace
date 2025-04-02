@@ -1,10 +1,6 @@
-// Enum for lesson types
-export enum LessonType {
-  VOICE = 'VOICE',
-  GUITAR = 'GUITAR',
-  BASS = 'BASS',
-  DRUMS = 'DRUMS'
-}
+import { LessonType } from '@shared/models/LessonType';
+
+export { LessonType };
 
 // Interface for address data
 export interface Address {

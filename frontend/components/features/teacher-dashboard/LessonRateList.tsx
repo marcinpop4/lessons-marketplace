@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatDisplayLabel } from '@shared/models/LessonType';
 import './LessonRateList.css';
 
 interface LessonRate {
@@ -27,13 +28,7 @@ const LessonRateList: React.FC<Props> = ({ rates, onToggleActive, onEdit }) => {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
   };
-  
-  // Format lesson type for display
-  const formatLessonType = (type: string): string => {
-    const typeName = type.charAt(0) + type.slice(1).toLowerCase();
-    return typeName;
-  };
-  
+
   if (rates.length === 0) {
     return (
       <div className="lesson-rate-list">
@@ -49,49 +44,43 @@ const LessonRateList: React.FC<Props> = ({ rates, onToggleActive, onEdit }) => {
   return (
     <div className="lesson-rate-list">
       <h3 className="text-lg font-medium mb-4">Your Lesson Rates</h3>
-      
-      <div className="overflow-x-auto">
-        <table className="rates-table w-full">
-          <thead>
-            <tr>
-              <th>Lesson Type</th>
-              <th>Rate</th>
-              <th>Status</th>
-              <th>Last Updated</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rates.map((rate) => (
-              <tr key={rate.id} className={!rate.isActive ? 'inactive-rate' : ''}>
-                <td>{formatLessonType(rate.type)}</td>
-                <td>{formatAmount(rate.rateInCents)}/hr</td>
-                <td>
-                  <span className={`status-badge ${rate.isActive ? 'active' : 'inactive'}`}>
-                    {rate.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-                <td>{formatDate(rate.updatedAt)}</td>
-                <td className="actions">
-                  <button
-                    onClick={() => onEdit(rate)}
-                    className="btn-edit"
-                    aria-label="Edit lesson rate"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => onToggleActive(rate)}
-                    className={`btn-toggle ${rate.isActive ? 'deactivate' : 'activate'}`}
-                    aria-label={rate.isActive ? 'Deactivate lesson rate' : 'Activate lesson rate'}
-                  >
-                    {rate.isActive ? 'Deactivate' : 'Activate'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="rates-grid">
+        {rates.map(rate => (
+          <div key={rate.id} className={`rate-card ${rate.isActive ? 'active' : 'inactive'}`}>
+            <div className="rate-header">
+              <h4>{formatDisplayLabel(rate.type)}</h4>
+              <div className="rate-actions">
+                <button
+                  onClick={() => onEdit(rate)}
+                  className="edit-button"
+                  title="Edit rate"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => onToggleActive(rate)}
+                  className={`toggle-button ${rate.isActive ? 'deactivate' : 'activate'}`}
+                  title={rate.isActive ? 'Deactivate rate' : 'Activate rate'}
+                >
+                  {rate.isActive ? 'Deactivate' : 'Activate'}
+                </button>
+              </div>
+            </div>
+            <div className="rate-details">
+              <p className="rate-amount">{formatAmount(rate.rateInCents)}/hour</p>
+              <p className="rate-status">
+                Status: <span className={rate.isActive ? 'active' : 'inactive'}>
+                  {rate.isActive ? 'Active' : 'Inactive'}
+                </span>
+              </p>
+              {rate.deactivatedAt && (
+                <p className="deactivation-date">
+                  Deactivated: {formatDate(rate.deactivatedAt)}
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

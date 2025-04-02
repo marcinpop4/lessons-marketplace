@@ -2,14 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import prisma from '../prisma.js';
 import { Prisma, PrismaClient } from '@prisma/client';
 import logger from '../utils/logger.js';
-
-// Define LessonType enum to match Prisma schema
-enum LessonType {
-  VOICE = 'VOICE',
-  GUITAR = 'GUITAR',
-  BASS = 'BASS',
-  DRUMS = 'DRUMS'
-}
+import { LessonType } from '@shared/models/LessonType.js';
 
 // Define interfaces to match Prisma models
 interface TeacherLessonHourlyRate {
@@ -45,7 +38,7 @@ export const teacherController = {
   getTeachers: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { lessonType, limit } = req.query;
-      
+
       // Validate lessonType is provided and valid
       if (!lessonType) {
         res.status(400).json({ message: 'Lesson type is required' });
@@ -54,18 +47,18 @@ export const teacherController = {
 
       // Check if the provided lessonType is valid
       if (!Object.values(LessonType).includes(lessonType as LessonType)) {
-        res.status(400).json({ 
-          message: `Invalid lesson type. Must be one of: ${Object.values(LessonType).join(', ')}` 
+        res.status(400).json({
+          message: `Invalid lesson type. Must be one of: ${Object.values(LessonType).join(', ')}`
         });
         return;
       }
-      
+
       // Parse and validate limit parameter
       if (!limit) {
         res.status(400).json({ message: 'Limit parameter is required' });
         return;
       }
-      
+
       if (!/^\d+$/.test(limit as string)) {
         res.status(400).json({ message: 'Limit must be a positive number' });
         return;
@@ -76,7 +69,7 @@ export const teacherController = {
         res.status(400).json({ message: 'Limit must be a positive number' });
         return;
       }
-      
+
       try {
         // Execute the query
         const teachers = await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => {
@@ -99,20 +92,20 @@ export const teacherController = {
             },
             take: limitValue
           };
-          
+
           return await tx.teacher.findMany(query);
         });
-        
+
         // Transform the data to match the expected frontend format
         const transformedTeachers = teachers.map((teacher: any) => {
           // Create a map of lesson types to rates
           const lessonHourlyRates: Record<string, number> = {};
-          
+
           // Populate the rates map
           teacher.teacherLessonHourlyRates.forEach((rate: any) => {
             lessonHourlyRates[rate.type] = rate.rateInCents;
           });
-          
+
           return {
             id: teacher.id,
             firstName: teacher.firstName,
@@ -123,7 +116,7 @@ export const teacherController = {
             lessonHourlyRates
           };
         });
-        
+
         res.status(200).json(transformedTeachers);
       } catch (dbError) {
         console.error('Database error:', dbError);
@@ -134,7 +127,7 @@ export const teacherController = {
       }
     } catch (error) {
       console.error('Error fetching teachers:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: 'An error occurred while fetching teachers',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
@@ -151,7 +144,7 @@ export const teacherController = {
     try {
       // Get the teacher ID from the authenticated user
       const teacherId = req.user?.id;
-      
+
       if (!teacherId) {
         res.status(401).json({ message: 'Unauthorized' });
         return;
@@ -215,7 +208,7 @@ export const teacherController = {
     try {
       // Get the teacher ID from the authenticated user
       const teacherId = req.user?.id;
-      
+
       if (!teacherId) {
         res.status(401).json({ message: 'Unauthorized' });
         return;
@@ -296,8 +289,8 @@ export const teacherController = {
 
       // If we're creating a new rate and the rate already exists
       if (existingRate) {
-        res.status(409).json({ 
-          message: `You already have a rate for ${lessonType} lessons. Please edit the existing rate instead.` 
+        res.status(409).json({
+          message: `You already have a rate for ${lessonType} lessons. Please edit the existing rate instead.`
         });
         return;
       }
@@ -339,7 +332,7 @@ export const teacherController = {
     try {
       // Get the teacher ID from the authenticated user
       const teacherId = req.user?.id;
-      
+
       if (!teacherId) {
         res.status(401).json({ message: 'Unauthorized' });
         return;
@@ -408,7 +401,7 @@ export const teacherController = {
     try {
       // Get the teacher ID from the authenticated user
       const teacherId = req.user?.id;
-      
+
       if (!teacherId) {
         res.status(401).json({ message: 'Unauthorized' });
         return;
@@ -477,7 +470,7 @@ export const teacherController = {
     try {
       // Get the teacher ID from the authenticated user
       const teacherId = req.user?.id;
-      
+
       if (!teacherId) {
         res.status(401).json({ message: 'Unauthorized' });
         return;
@@ -497,13 +490,13 @@ export const teacherController = {
             lessons: true
           }
         });
-        
+
         // Count active quotes (not expired and no lessons created)
         const activeQuotes = quotes.filter((quote: {
           id: string;
           expiresAt: Date;
           lessons: any[];
-        }) => 
+        }) =>
           new Date(quote.expiresAt) > new Date() && quote.lessons.length === 0
         ).length;
 
@@ -525,7 +518,7 @@ export const teacherController = {
 
         // Total number of lessons
         const totalLessons = allLessons.length;
-        
+
         // Count completed lessons (start time + duration is in the past)
         const completedLessons = allLessons.filter((lesson: {
           quote: {
@@ -540,7 +533,7 @@ export const teacherController = {
           lessonEndTime.setMinutes(lessonEndTime.getMinutes() + lessonRequest.durationMinutes);
           return lessonEndTime < new Date();
         }).length;
-        
+
         // Count upcoming lessons (start time is in the future)
         const upcomingLessons = allLessons.filter((lesson: {
           quote: {

@@ -1,7 +1,6 @@
 import prisma from '../../prisma.js';
 import { Prisma, PrismaClient } from '@prisma/client';
-
-export type LessonType = 'VOICE' | 'GUITAR' | 'BASS' | 'DRUMS';
+import { LessonType } from '@shared/models/LessonType.js';
 
 export interface AddressDTO {
   street: string;

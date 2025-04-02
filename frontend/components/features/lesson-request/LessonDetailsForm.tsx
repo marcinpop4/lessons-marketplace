@@ -1,5 +1,5 @@
 import React from 'react';
-import { LessonType } from '@frontend/types/lesson';
+import { LessonType, formatDisplayLabel } from '@shared/models/LessonType';
 
 // Helper function to format date for input field
 const formatDateForInput = (date: Date): string => {
@@ -50,12 +50,17 @@ const LessonDetailsForm: React.FC<LessonDetailsFormProps> = ({
 }) => {
   const timeOptions = generateTimeOptions();
 
+  // Helper to format display label
+  const formatDisplayLabel = (type: string): string => {
+    return type.charAt(0) + type.slice(1).toLowerCase();
+  };
+
   return (
     <div className="card card-primary lesson-request-card">
       <div className="card-header">
         <h3>Lesson Details</h3>
       </div>
-      
+
       <div className="card-body">
         <div className="form-row">
           <div className="form-group">
@@ -68,11 +73,11 @@ const LessonDetailsForm: React.FC<LessonDetailsFormProps> = ({
               required
             >
               {Object.values(LessonType).map(type => (
-                <option key={type} value={type}>{type}</option>
+                <option key={type} value={type}>{formatDisplayLabel(type)}</option>
               ))}
             </select>
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="durationMinutes">Duration (minutes)</label>
             <select
@@ -103,7 +108,7 @@ const LessonDetailsForm: React.FC<LessonDetailsFormProps> = ({
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="time">Time</label>
             <select

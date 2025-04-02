@@ -2,6 +2,7 @@ import React from 'react';
 import { LessonQuote, LessonRequest } from '@frontend/types/lesson';
 import { formatCurrency } from '@frontend/utils/currencyFormatter';
 import { FormattedDateTime, FormattedAddress } from '@frontend/components/shared';
+import { formatDisplayLabel } from '@shared/models/LessonType';
 import './LessonDetails.css';
 
 interface LessonDetailsProps {
@@ -39,12 +40,12 @@ const LessonDetails: React.FC<LessonDetailsProps> = ({
               <p className="lesson-detail-label">Teacher</p>
               <p className="lesson-detail-value">{teacher.firstName} {teacher.lastName}</p>
             </div>
-            
+
             <div className="lesson-detail-item">
               <p className="lesson-detail-label">Lesson Type</p>
-              <p className="lesson-detail-value">{lessonRequest.type}</p>
+              <p className="lesson-detail-value">{formatDisplayLabel(lessonRequest.type)}</p>
             </div>
-            
+
             <div className="lesson-detail-item">
               <p className="lesson-detail-label">Date & Time</p>
               <p className="lesson-detail-value">
@@ -52,13 +53,13 @@ const LessonDetails: React.FC<LessonDetailsProps> = ({
               </p>
             </div>
           </div>
-          
+
           <div className="lesson-detail-group">
             <div className="lesson-detail-item">
               <p className="lesson-detail-label">Duration</p>
               <p className="lesson-detail-value">{lessonRequest.durationMinutes} minutes</p>
             </div>
-            
+
             <div className="lesson-detail-item">
               <p className="lesson-detail-label">Location</p>
               <p className="lesson-detail-value">
@@ -66,7 +67,7 @@ const LessonDetails: React.FC<LessonDetailsProps> = ({
                 />
               </p>
             </div>
-            
+
             <div className="lesson-detail-item">
               <p className="lesson-detail-label">Price</p>
               <div className="price-details">

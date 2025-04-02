@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LessonType } from '@shared/models/LessonType';
+import { LessonType, formatDisplayLabel } from '@shared/models/LessonType';
 import './LessonRateForm.css';
 
 // Valid lesson types based on the API requirements
@@ -99,11 +99,6 @@ const LessonRateForm: React.FC<Props> = ({ rate, onSubmit, onCancel }) => {
     }
   };
 
-  // Helper to format lesson type name for display
-  const formatLessonTypeName = (key: string): string => {
-    return key.charAt(0) + key.slice(1).toLowerCase();
-  };
-
   return (
     <div className="lesson-rate-form">
       <h3 className="text-lg font-medium mb-4">
@@ -123,7 +118,7 @@ const LessonRateForm: React.FC<Props> = ({ rate, onSubmit, onCancel }) => {
               <option value="">Select a lesson type</option>
               {Object.keys(LessonType).map(key => (
                 <option key={key} value={key}>
-                  {formatLessonTypeName(key)}
+                  {formatDisplayLabel(key)}
                 </option>
               ))}
             </select>
