@@ -5,7 +5,8 @@ import { Teacher } from '@shared/models/Teacher';
 import { Address } from '@shared/models/Address';
 import { Student } from '@shared/models/Student';
 import apiClient from './apiClient';
-if (!process.env.VITE_API_BASE_URL) {
+// Check for API base URL using Vite's import.meta.env
+if (!import.meta.env.VITE_API_BASE_URL) {
     throw new Error('VITE_API_BASE_URL environment variable is not set');
 }
 /**

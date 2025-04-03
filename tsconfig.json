@@ -11,7 +11,8 @@
       "@shared/*": ["shared/*"],
       "@frontend/*": ["frontend/*"],
       "@server/*": ["server/*"]
-    }
+    },
+    "types": ["vite/client"]
   },
   "include": [
     "shared/**/*",
