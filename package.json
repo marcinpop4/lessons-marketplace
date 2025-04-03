@@ -3,8 +3,8 @@
   "private": true,
   "scripts": {
     "build:frontend": "tsc --project tsconfig.json --noEmit && dotenv -e env/.env.${ENV_TYPE} -- sh -c 'tsc --project tsconfig.json && VITE_TSCONFIG=tsconfig.json vite build --config frontend/config/vite.config.ts --emptyOutDir'",
-    "build:server": "tsc --project tsconfig.json --noEmit && dotenv -e env/.env.${ENV_TYPE} -- tsc -b tsconfig.json",
-    "build:shared": "tsc --project tsconfig.json --noEmit && dotenv -e env/.env.${ENV_TYPE} -- tsc -b tsconfig.json",
+    "build:server": "tsc --project tsconfig.json --noEmit && dotenv -e env/.env.${ENV_TYPE} -- tsc --project tsconfig.json --outDir dist",
+    "build:shared": "tsc --project tsconfig.json --noEmit && dotenv -e env/.env.${ENV_TYPE} -- tsc --project tsconfig.json --outDir dist",
     "clean": "rm -rf dist && rm -rf node_modules",
     "dev:frontend": "dotenv -e env/.env.${ENV_TYPE:-dev} -- cross-env VITE_TSCONFIG=tsconfig.json vite --config frontend/config/vite.config.ts --force",
     "dev:full": "cross-env ENV_TYPE=dev concurrently \"pnpm run dev:frontend\" \"pnpm run dev:server\"",

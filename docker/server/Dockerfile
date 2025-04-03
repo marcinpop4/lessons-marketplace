@@ -29,13 +29,15 @@ RUN pnpm install --frozen-lockfile
 # Copy application code
 COPY . .
 
-# Generate Prisma client before build
+# Generate Prisma client before any builds
 RUN pnpm prisma:generate
 
 # Build stage
 FROM dependencies AS builder
-# Build shared code first, then server
+# Build shared code first
 RUN pnpm build:shared
+
+# Build server
 RUN pnpm build:server
 
 # Production image
@@ -66,8 +68,10 @@ COPY --from=dependencies /app/node_modules/.pnpm ./node_modules/.pnpm
 # Copy Prisma schema
 COPY --from=dependencies /app/server/prisma ./server/prisma
 
+# Copy scripts from dependencies stage
+COPY --from=dependencies /app/scripts ./scripts
+
 # Copy other necessary files
-COPY scripts ./scripts
 COPY env ./env
 
 # Copy entrypoint script

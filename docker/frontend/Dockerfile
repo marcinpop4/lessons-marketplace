@@ -29,6 +29,9 @@ FROM dependencies AS builder
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 
+# Generate Prisma client first
+RUN pnpm prisma:generate
+
 # Build shared first since frontend may depend on it
 RUN pnpm build:shared
 
