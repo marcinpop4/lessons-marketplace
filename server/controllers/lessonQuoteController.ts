@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
-import logger from '../utils/logger.js';
 import prisma from '../prisma.js';
 import { teacherQuoteService } from '../services/teacherQuoteService.js';
 
@@ -31,7 +30,7 @@ export const lessonQuoteController = {
       const quotes = await teacherQuoteService.createQuotesForLessonRequest(lessonRequestId, lessonType);
       res.status(201).json(quotes);
     } catch (error) {
-      logger.error('Error creating lesson quotes:', error);
+      console.error('Error creating lesson quotes:', error);
       res.status(500).json({
         message: 'An error occurred while creating lesson quotes',
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -66,7 +65,7 @@ export const lessonQuoteController = {
 
       res.status(200).json(lessonQuote);
     } catch (error) {
-      logger.error('Error fetching lesson quote:', error);
+      console.error('Error fetching lesson quote:', error);
       res.status(500).json({
         message: 'An error occurred while fetching the lesson quote',
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -93,7 +92,7 @@ export const lessonQuoteController = {
       const quotes = await teacherQuoteService.getQuotesByLessonRequest(lessonRequestId);
       res.json(quotes);
     } catch (error) {
-      logger.error('Error fetching lesson quotes:', error);
+      console.error('Error fetching lesson quotes:', error);
       res.status(500).json({ error: 'Failed to fetch lesson quotes' });
     }
   },
@@ -181,7 +180,7 @@ export const lessonQuoteController = {
         lesson
       });
     } catch (error) {
-      logger.error('Error accepting lesson quote:', error);
+      console.error('Error accepting lesson quote:', error);
       res.status(500).json({ error: 'Failed to accept lesson quote' });
     }
   }

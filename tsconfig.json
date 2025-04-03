@@ -1,33 +1,23 @@
 {
-  "extends": "./tsconfig.base.json",
   "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
     "baseUrl": ".",
-    "outDir": "dist"
-  },
-  "references": [
-    {
-      "path": "./shared/tsconfig.shared.json"
-    },
-    {
-      "path": "./server/tsconfig.server.json"
-    },
-    {
-      "path": "./frontend/config/tsconfig.app.json"
+    "paths": {
+      "@shared/*": ["shared/*"],
+      "@frontend/*": ["frontend/*"],
+      "@server/*": ["server/*"]
     }
-  ],
-  "files": [
-    "./scripts/db-connection-test.ts",
-    "./scripts/docker-debug.ts",
-    "./scripts/docker-seed.ts",
-    "./scripts/docker-test-runner.ts",
-    "./scripts/install-jest-deps.ts",
-    "./scripts/test-alias.ts",
-    "./scripts/update-fly-deploy.ts",
-    "./playwright.config.ts"
-  ],
+  },
   "include": [
-    "./scripts/**/*.ts",
-    "./*.ts"
+    "shared/**/*",
+    "frontend/**/*",
+    "server/**/*",
+    "scripts/**/*"
   ],
   "exclude": [
     "node_modules",

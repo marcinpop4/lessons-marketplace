@@ -14,8 +14,8 @@ const getTsConfigPath = () => {
     return resolve(process.cwd(), envTsConfig)
   }
 
-  // Default to the config directory
-  return resolve(__dirname, './tsconfig.app.json')
+  // Default to the root tsconfig.json
+  return resolve(projectRoot, 'tsconfig.json')
 }
 
 // https://vite.dev/config/

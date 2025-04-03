@@ -11,7 +11,6 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
-import logger from '../utils/logger.js';
 
 /**
  * Load environment variables from a specific path
@@ -34,7 +33,7 @@ loadEnvFromPath();
  * @returns The masked URL
  */
 export const maskDatabaseUrl = (url: string): string => {
-  return url.includes('@') 
+  return url.includes('@')
     ? url.replace(/\/\/([^:]+):([^@]+)@/, '//$1:******@')
     : url;
 };
@@ -54,15 +53,15 @@ export const getDatabaseUrl = (options?: {
   useEnvUrl?: boolean;
 }): string => {
   const isDebugMode = process.env.DEBUG === 'true';
-  
+
   // Check if DATABASE_URL is directly provided and should be used
   if (process.env.DATABASE_URL) {
     if (isDebugMode) {
-      logger.debug('Using DATABASE_URL from environment variables');
+      console.debug('Using DATABASE_URL from environment variables');
       const maskedUrl = maskDatabaseUrl(process.env.DATABASE_URL);
-      logger.debug(`Database URL: ${maskedUrl}`);
+      console.debug(`Database URL: ${maskedUrl}`);
     }
-    
+
     return process.env.DATABASE_URL;
   } else {
     // Get database configuration from environment variables or options
@@ -77,15 +76,15 @@ export const getDatabaseUrl = (options?: {
     if (!DB_HOST) {
       throw new Error('Database host is required but not provided');
     }
-    
+
     if (!DB_PORT) {
       throw new Error('Database port is required but not provided');
     }
-    
+
     if (!DB_NAME) {
       throw new Error('Database name is required but not provided');
     }
-    
+
     if (!DB_USER) {
       throw new Error('Database user is required but not provided');
     }
@@ -94,16 +93,16 @@ export const getDatabaseUrl = (options?: {
     // Always include the sslmode parameter explicitly
     const sslParam = DB_SSL ? '?sslmode=require' : '?sslmode=disable';
     const passwordPart = DB_PASSWORD ? `:${DB_PASSWORD}` : '';
-    
+
     const url = `postgresql://${DB_USER}${passwordPart}@${DB_HOST}:${DB_PORT}/${DB_NAME}${sslParam}`;
-    
+
     // Log the database URL (with masked password for security) only in debug mode
     if (isDebugMode) {
       const maskedUrl = maskDatabaseUrl(url);
-      logger.debug(`Built database URL from environment variables: ${maskedUrl}`);
-      logger.debug(`SSL mode: ${DB_SSL ? 'enabled (require)' : 'disabled'}`);
+      console.debug(`Built database URL from environment variables: ${maskedUrl}`);
+      console.debug(`SSL mode: ${DB_SSL ? 'enabled (require)' : 'disabled'}`);
     }
-    
+
     return url;
   }
 };

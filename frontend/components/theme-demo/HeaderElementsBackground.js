@@ -1,0 +1,5 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+const HeaderElementsBackground = ({ className = '' }) => {
+    return (_jsxs("div", { className: `p-6 border border-gray-200 border-dashed rounded-lg ${className}`, children: [_jsx("div", { className: "mb-2 text-sm text-gray-500", children: "Headers against main content background:" }), _jsxs("div", { className: "space-y-4", children: [_jsx("h1", { children: "H1: Main Page Title" }), _jsx("h2", { children: "H2: Section Heading" }), _jsx("h3", { children: "H3: Subsection Heading" }), _jsx("h4", { children: "H4: Group Heading" }), _jsx("h5", { children: "H5: Minor Heading" }), _jsx("h6", { children: "H6: Detail Heading" }), _jsxs("div", { className: "space-y-2 pt-4 border-t border-gray-200", children: [_jsx("p", { className: "text-primary", children: "Primary text variation" }), _jsx("p", { className: "text-secondary", children: "Secondary text variation" }), _jsx("p", { className: "text-accent", children: "Accent text variation" })] })] })] }));
+};
+export default HeaderElementsBackground;

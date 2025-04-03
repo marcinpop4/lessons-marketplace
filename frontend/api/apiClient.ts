@@ -6,7 +6,6 @@ import axios, {
     AxiosError,
     AxiosRequestConfig
 } from 'axios';
-import logger from '@frontend/utils/logger';
 import { buildApiUrl } from './buildApiUrl';
 // Create a custom axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -25,7 +24,7 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     }
     if (config.url) {
         const fullUrl = buildApiUrl('', config.url);
-        logger.debug('Making API request to:', fullUrl);
+        console.debug('Making API request to:', fullUrl);
     }
     return config;
 }, (error: AxiosError) => {
@@ -37,10 +36,10 @@ apiClient.interceptors.response.use(
     async (error: AxiosError) => {
         // Log API errors
         if (error.response) {
-            logger.error(`API Error: ${error.response.status} - ${error.message}`, error.config?.url);
+            console.error(`API Error: ${error.response.status} - ${error.message}`, error.config?.url);
         }
         else {
-            logger.error(`API Error: ${error.message}`);
+            console.error(`API Error: ${error.message}`);
         }
 
         const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
@@ -68,7 +67,7 @@ apiClient.interceptors.response.use(
                 }
             }
             catch (refreshError) {
-                logger.error('Token refresh failed:', refreshError);
+                console.error('Token refresh failed:', refreshError);
 
                 // If refresh fails, redirect to login only if not already on login page
                 if (typeof window !== 'undefined' && !window.location.pathname.includes('/auth')) {

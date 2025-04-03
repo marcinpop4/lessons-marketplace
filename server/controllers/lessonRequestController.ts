@@ -4,7 +4,6 @@ import type { LessonRequest as PrismaLessonRequest } from '@prisma/client';
 import { LessonRequest } from '@shared/models/LessonRequest.js';
 import { Address } from '@shared/models/Address.js';
 import { teacherQuoteService } from '../services/teacherQuoteService.js';
-import logger from '../utils/logger.js';
 
 export class LessonRequestController {
   constructor() {
@@ -53,7 +52,7 @@ export class LessonRequestController {
       } = req.body;
 
       // Log the request body for debugging
-      logger.debug('Received lesson request data:', req.body);
+      console.debug('Received lesson request data:', req.body);
 
       // Validate required fields
       if (!type || !startTime || !durationMinutes || !addressObj || !studentId) {

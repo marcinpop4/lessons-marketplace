@@ -1,7 +1,6 @@
 import type { Request, Response } from 'express';
 import prisma from '../prisma.js';
 import type { PrismaClient } from '@prisma/client';
-import logger from '../utils/logger.js';
 import { Lesson } from '@shared/models/Lesson.js';
 import { LessonQuote } from '@shared/models/LessonQuote.js';
 import { LessonRequest } from '@shared/models/LessonRequest.js';
@@ -158,7 +157,7 @@ export const lessonController = {
       const modelLesson = lessonController.transformToModel(result);
       res.status(201).json(modelLesson);
     } catch (error) {
-      logger.error('Error creating lesson:', error);
+      console.error('Error creating lesson:', error);
       res.status(500).json({
         message: 'An error occurred while creating the lesson',
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -202,7 +201,7 @@ export const lessonController = {
       const modelLesson = lessonController.transformToModel(lesson);
       res.status(200).json(modelLesson);
     } catch (error) {
-      logger.error('Error fetching lesson:', error);
+      console.error('Error fetching lesson:', error);
       res.status(500).json({
         message: 'An error occurred while fetching the lesson',
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -239,7 +238,7 @@ export const lessonController = {
       const modelLessons = lessons.map(lesson => lessonController.transformToModel(lesson));
       res.status(200).json(modelLessons);
     } catch (error) {
-      logger.error('Error fetching lessons by quote:', error);
+      console.error('Error fetching lessons by quote:', error);
       res.status(500).json({
         message: 'An error occurred while fetching the lessons',
         error: error instanceof Error ? error.message : 'Unknown error'

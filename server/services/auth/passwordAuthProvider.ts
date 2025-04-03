@@ -1,7 +1,6 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma.js';
 import authService, { AuthProvider } from './authService.js';
-import logger from '../../utils/logger.js';
 
 interface PasswordCredentials {
   email: string;
@@ -62,7 +61,7 @@ class PasswordAuthProvider implements AuthProvider {
     });
 
     const refreshToken = await authService.generateRefreshToken(
-      user.id, 
+      user.id,
       userType === 'STUDENT' ? 'STUDENT' : 'TEACHER'
     );
 
@@ -80,14 +79,14 @@ class PasswordAuthProvider implements AuthProvider {
   }
 
   async register(userData: RegisterUserData) {
-    const { 
-      email, 
-      password, 
-      firstName, 
-      lastName, 
-      phoneNumber, 
-      dateOfBirth, 
-      userType 
+    const {
+      email,
+      password,
+      firstName,
+      lastName,
+      phoneNumber,
+      dateOfBirth,
+      userType
     } = userData;
 
     // Hash the password
@@ -142,7 +141,7 @@ class PasswordAuthProvider implements AuthProvider {
     });
 
     const refreshToken = await authService.generateRefreshToken(
-      user.id, 
+      user.id,
       userType === 'STUDENT' ? 'STUDENT' : 'TEACHER'
     );
 

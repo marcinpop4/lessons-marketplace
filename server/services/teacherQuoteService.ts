@@ -5,6 +5,7 @@ import { LessonQuote } from '@shared/models/LessonQuote.js';
 import { LessonRequest } from '@shared/models/LessonRequest.js';
 import { TeacherLessonHourlyRate } from '@shared/models/TeacherLessonHourlyRate.js';
 import { Student } from '@shared/models/Student.js';
+import { Address } from '@shared/models/Address.js';
 
 export class TeacherQuoteService {
     /**
@@ -101,15 +102,14 @@ export class TeacherQuoteService {
             dbLessonRequest.type as LessonType,
             new Date(dbLessonRequest.startTime),
             dbLessonRequest.durationMinutes,
-            dbLessonRequest.address.street,
-            student,
-            {
-                street: dbLessonRequest.address.street,
-                city: dbLessonRequest.address.city,
-                state: dbLessonRequest.address.state,
-                postalCode: dbLessonRequest.address.postalCode,
-                country: dbLessonRequest.address.country
-            }
+            new Address(
+                dbLessonRequest.address.street,
+                dbLessonRequest.address.city,
+                dbLessonRequest.address.state,
+                dbLessonRequest.address.postalCode,
+                dbLessonRequest.address.country
+            ),
+            student
         );
 
         // Get available teachers (limited to 5)
@@ -172,15 +172,14 @@ export class TeacherQuoteService {
                 dbQuote.lessonRequest.type as LessonType,
                 new Date(dbQuote.lessonRequest.startTime),
                 dbQuote.lessonRequest.durationMinutes,
-                dbQuote.lessonRequest.address.street,
-                student,
-                {
-                    street: dbQuote.lessonRequest.address.street,
-                    city: dbQuote.lessonRequest.address.city,
-                    state: dbQuote.lessonRequest.address.state,
-                    postalCode: dbQuote.lessonRequest.address.postalCode,
-                    country: dbQuote.lessonRequest.address.country
-                }
+                new Address(
+                    dbQuote.lessonRequest.address.street,
+                    dbQuote.lessonRequest.address.city,
+                    dbQuote.lessonRequest.address.state,
+                    dbQuote.lessonRequest.address.postalCode,
+                    dbQuote.lessonRequest.address.country
+                ),
+                student
             );
 
             const teacher = new Teacher(
@@ -248,15 +247,14 @@ export class TeacherQuoteService {
                 dbQuote.lessonRequest.type as LessonType,
                 new Date(dbQuote.lessonRequest.startTime),
                 dbQuote.lessonRequest.durationMinutes,
-                dbQuote.lessonRequest.address.street,
-                student,
-                {
-                    street: dbQuote.lessonRequest.address.street,
-                    city: dbQuote.lessonRequest.address.city,
-                    state: dbQuote.lessonRequest.address.state,
-                    postalCode: dbQuote.lessonRequest.address.postalCode,
-                    country: dbQuote.lessonRequest.address.country
-                }
+                new Address(
+                    dbQuote.lessonRequest.address.street,
+                    dbQuote.lessonRequest.address.city,
+                    dbQuote.lessonRequest.address.state,
+                    dbQuote.lessonRequest.address.postalCode,
+                    dbQuote.lessonRequest.address.country
+                ),
+                student
             );
 
             const teacher = new Teacher(

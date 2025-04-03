@@ -5,7 +5,6 @@ import compression from 'compression';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
-import logger from './utils/logger.js';
 import { execSync } from 'child_process';
 
 // Temporary debug code to diagnose startup issues
@@ -53,29 +52,29 @@ if (!frontendUrl) {
 
 // Ensure Prisma client is generated
 try {
-  logger.info('Generating Prisma client...');
+  console.log('Generating Prisma client...');
   execSync('npx prisma generate --schema=server/prisma/schema.prisma', { stdio: 'inherit' });
-  logger.info('Prisma client generated successfully');
+  console.log('Prisma client generated successfully');
 } catch (error) {
-  logger.error('Failed to generate Prisma client:', error);
+  console.error('Failed to generate Prisma client:', error);
   // Continue anyway - the client might already be generated
-  logger.warn('Continuing despite Prisma generation error');
+  console.warn('Continuing despite Prisma generation error');
 }
 
 // Verify database connection before starting server
 (async function testDatabaseConnection() {
   try {
-    logger.info('Testing database connection...');
+    console.log('Testing database connection...');
     await prisma.$queryRaw`SELECT 1`;
-    logger.info('Database connection successful');
+    console.log('Database connection successful');
   } catch (error) {
-    logger.error('Failed to connect to database:', error);
+    console.error('Failed to connect to database:', error);
     // In CI/production, exit on database connection failure
     if (process.env.NODE_ENV === 'production' || process.env.profile === 'ci') {
-      logger.error('Exiting due to database connection failure');
+      console.error('Exiting due to database connection failure');
       process.exit(1);
     } else {
-      logger.warn('Continuing despite database connection failure');
+      console.warn('Continuing despite database connection failure');
     }
   }
 })();
@@ -92,7 +91,7 @@ const isDebugMode = process.env.DEBUG === 'true' || logLevel >= 3;
 if (logLevel >= 2) { // Only log HTTP requests at INFO level or higher
   if (isDebugMode) {
     app.use(morgan('combined')); // Detailed logs for debugging
-    logger.info('Debug mode: Verbose logging enabled');
+    console.log('Debug mode: Verbose logging enabled');
   } else {
     // Use a minimal format for regular operation
     app.use(morgan('[:date[iso]] :method :url :status :response-time ms'));
@@ -104,7 +103,7 @@ const allowedOrigins = frontendUrl.split(',').map(url => url.trim()).filter(url 
 
 // Log the allowed origins for debugging
 if (isDebugMode) {
-  logger.debug('CORS allowed origins:', allowedOrigins);
+  console.debug('CORS allowed origins:', allowedOrigins);
 }
 
 app.use(cors({
@@ -115,7 +114,7 @@ app.use(cors({
     if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
       callback(null, true);
     } else {
-      logger.warn(`Origin ${origin} not allowed by CORS`);
+      console.warn(`Origin ${origin} not allowed by CORS`);
       callback(null, true); // Still allow for now, but log a warning
     }
   },
@@ -160,7 +159,7 @@ app.get('/api/health', async (req: express.Request, res: express.Response, next:
       return;
     } catch (error) {
       lastError = error;
-      logger.error(`Database connection error (attempt ${attempt}/${maxRetries}):`, error);
+      console.error(`Database connection error (attempt ${attempt}/${maxRetries}):`, error);
 
       // Wait before retry (exponential backoff)
       if (attempt < maxRetries) {
@@ -220,13 +219,13 @@ app.get('/', (req: express.Request, res: express.Response, next: express.NextFun
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  logger.error(err.stack || err.message || 'Unknown error');
+  console.error(err.stack || err.message || 'Unknown error');
   res.status(500).send({ error: 'Something went wrong!' });
 });
 
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
-  logger.info(`Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
 
 // Graceful shutdown

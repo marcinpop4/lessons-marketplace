@@ -2,11 +2,9 @@
 import { PrismaClient } from '@prisma/client';
 // Import the database configuration
 import './config/database.js';
-// Import the logger
-import logger, { LogLevel } from './utils/logger.js';
 
 // Determine if we're in debug mode based on log level
-const isDebugMode = logger.getLogLevel() === LogLevel.DEBUG;
+const isDebugMode = process.env.NODE_ENV === 'development';
 
 // Create a singleton instance of PrismaClient
 const prisma = new PrismaClient({

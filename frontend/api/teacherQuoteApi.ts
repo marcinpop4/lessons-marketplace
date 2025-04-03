@@ -47,8 +47,7 @@ export const createLessonQuotes = async (
       new Date(quote.lessonRequest.startTime),
       quote.lessonRequest.durationMinutes,
       quote.lessonRequest.address,
-      quote.lessonRequest.student,
-      quote.lessonRequest.addressObj
+      quote.lessonRequest.student
     );
 
     return new LessonQuote(
@@ -58,8 +57,7 @@ export const createLessonQuotes = async (
       quote.costInCents,
       new Date(quote.createdAt),
       new Date(quote.expiresAt),
-      quote.hourlyRateInCents,
-      quote.status
+      quote.hourlyRateInCents
     );
   });
 };
