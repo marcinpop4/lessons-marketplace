@@ -1,4 +1,7 @@
-import { Teacher, LessonQuote, LessonType } from '../types/lesson';
+import { Teacher } from '@shared/models/Teacher';
+import { LessonQuote } from '@shared/models/LessonQuote';
+import { LessonRequest } from '@shared/models/LessonRequest';
+import { LessonType } from '@shared/models/LessonType';
 import apiClient from './apiClient';
 
 // Interface for teacher with hourly rate information
@@ -17,48 +20,48 @@ export interface TeacherWithRates extends Teacher {
 export const getAvailableTeachers = async (
   lessonType: LessonType,
   limit: number = 5
-): Promise<TeacherWithRates[]> => {
-  try {
-    const response = await apiClient.get(`/api/v1/teachers`, {
-      params: { lessonType, limit }
-    });
-
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching available teachers:', error);
-    throw error;
-  }
+): Promise<Teacher[]> => {
+  const response = await apiClient.get(`/api/v1/teachers/available?lessonType=${lessonType}&limit=${limit}`);
+  return response.data;
 };
 
 /**
- * Create a lesson quote for a teacher and lesson request
+ * Create quotes for a lesson request
  * @param lessonRequestId - Lesson request ID
- * @param teacherId - Teacher ID
- * @param costInCents - Cost in cents
- * @returns Created lesson quote
+ * @param lessonType - Type of lesson
+ * @returns Array of created quotes
  */
-export const createLessonQuote = async (
+export const createLessonQuotes = async (
   lessonRequestId: string,
-  teacherId: string,
-  costInCents: number
-): Promise<LessonQuote> => {
-  try {
-    // Create an expiration date 24 hours from now
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
+  lessonType: LessonType
+): Promise<LessonQuote[]> => {
+  const response = await apiClient.post('/api/v1/lesson-quotes/create-quotes', {
+    lessonRequestId,
+    lessonType
+  });
 
-    const response = await apiClient.post(`/api/v1/lesson-quotes`, {
-      lessonRequestId,
-      teacherId,
-      costInCents,
-      expiresAt: expiresAt.toISOString(),
-    });
+  return response.data.map((quote: any) => {
+    const lessonRequest = new LessonRequest(
+      quote.lessonRequest.id,
+      quote.lessonRequest.type,
+      new Date(quote.lessonRequest.startTime),
+      quote.lessonRequest.durationMinutes,
+      quote.lessonRequest.address,
+      quote.lessonRequest.student,
+      quote.lessonRequest.addressObj
+    );
 
-    return response.data;
-  } catch (error) {
-    console.error('Error creating lesson quote:', error);
-    throw error;
-  }
+    return new LessonQuote(
+      quote.id,
+      lessonRequest,
+      quote.teacher,
+      quote.costInCents,
+      new Date(quote.createdAt),
+      new Date(quote.expiresAt),
+      quote.hourlyRateInCents,
+      quote.status
+    );
+  });
 };
 
 /**
@@ -69,7 +72,7 @@ export const createLessonQuote = async (
 export const bookLesson = async (quoteId: string): Promise<any> => {
   try {
     const confirmedAt = new Date().toISOString();
-    
+
     const response = await apiClient.post(`/api/v1/lessons`, {
       quoteId,
       confirmedAt,

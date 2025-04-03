@@ -1,7 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
-import * as fs from 'fs';
 import { fileURLToPath } from 'url';
 
 // Get directory path in ESM context
@@ -19,6 +18,11 @@ const isDocker = process.env.TEST_ENV === 'docker';
 const baseURL = isDocker ? process.env.DOCKER_FRONTEND_URL : process.env.FRONTEND_URL;
 const logLevel = process.env.LOG_LEVEL || '1';
 
+// Get timeout values from environment variables or use defaults
+const defaultTimeout = parseInt(process.env.PLAYWRIGHT_TIMEOUT || '30000', 10);
+const defaultActionTimeout = parseInt(process.env.PLAYWRIGHT_ACTION_TIMEOUT || '15000', 10);
+const defaultNavigationTimeout = parseInt(process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT || '20000', 10);
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
@@ -31,7 +35,7 @@ export default defineConfig({
   ],
 
   // Global timeout settings
-  timeout: 30000,
+  timeout: defaultTimeout,
 
   use: {
     baseURL,
@@ -41,8 +45,8 @@ export default defineConfig({
     },
     video: 'on-first-retry',
     headless: true,
-    actionTimeout: 15000,
-    navigationTimeout: 20000,
+    actionTimeout: defaultActionTimeout,
+    navigationTimeout: defaultNavigationTimeout,
     trace: 'retain-on-failure'
   },
   outputDir: './tests/results/screenshots',

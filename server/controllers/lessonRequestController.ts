@@ -1,6 +1,9 @@
-import { Request, Response, NextFunction } from 'express';
-import { lessonRequestService, CreateLessonRequestDTO } from '../services/database/lessonRequestService.js';
-import { LessonRequest } from '@prisma/client';
+import type { Request, Response } from 'express';
+import { lessonRequestService } from '../services/database/lessonRequestService.js';
+import type { LessonRequest as PrismaLessonRequest } from '@prisma/client';
+import { LessonRequest } from '@shared/models/LessonRequest.js';
+import { Address } from '@shared/models/Address.js';
+import { teacherQuoteService } from '../services/teacherQuoteService.js';
 import logger from '../utils/logger.js';
 
 export class LessonRequestController {
@@ -12,13 +15,34 @@ export class LessonRequestController {
   }
 
   /**
+   * Transform a Prisma LessonRequest into our shared model LessonRequest
+   */
+  private transformToModel(prismaRequest: any): LessonRequest {
+    const address = new Address(
+      prismaRequest.address.street,
+      prismaRequest.address.city,
+      prismaRequest.address.state,
+      prismaRequest.address.postalCode,
+      prismaRequest.address.country
+    );
+
+    return new LessonRequest(
+      prismaRequest.id,
+      prismaRequest.type,
+      new Date(prismaRequest.startTime),
+      prismaRequest.durationMinutes,
+      address,
+      prismaRequest.student
+    );
+  }
+
+  /**
    * Create a new lesson request
    * @route POST /api/lesson-requests
    * @param req - Express request
    * @param res - Express response
-   * @param next - Express next function
    */
-  async createLessonRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async createLessonRequest(req: Request, res: Response): Promise<void> {
     try {
       const {
         type,
@@ -59,58 +83,32 @@ export class LessonRequestController {
         studentId
       });
 
-      res.status(201).json(lessonRequest);
+      // Transform to shared model
+      const modelLessonRequest = this.transformToModel(lessonRequest);
+
+      // Automatically create quotes for the lesson request
+      const quotes = await teacherQuoteService.createQuotesForLessonRequest(
+        lessonRequest.id,
+        type
+      );
+
+      // Return both the lesson request and the created quotes
+      res.status(201).json({
+        lessonRequest: modelLessonRequest,
+        quotes
+      });
     } catch (error) {
       console.error('Error creating lesson request:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
+
       // Handle specific errors
       if (errorMessage.includes('not found')) {
         res.status(404).json({ error: errorMessage });
         return;
       }
-      
+
       res.status(500).json({ error: 'Internal server error', message: errorMessage });
     }
-  }
-
-  /**
-   * Format a lesson request for the frontend
-   * @param request - The lesson request from the database
-   * @returns Formatted lesson request
-   */
-  private formatLessonRequest(request: LessonRequest & {
-    address: {
-      street: string;
-      city: string;
-      state: string;
-      postalCode: string;
-      country: string;
-    };
-    lessonQuotes?: any[];
-  }) {
-    const startTime = new Date(request.startTime);
-    
-    // Format date as YYYY-MM-DD
-    const date = startTime.toISOString().split('T')[0];
-    
-    // Format time as HH:mm
-    const time = startTime.toLocaleTimeString('en-US', { 
-      hour12: false, 
-      hour: '2-digit', 
-      minute: '2-digit'
-    });
-
-    // Format date and time for display
-    const formattedDateTime = startTime.toLocaleDateString() + ' at ' + 
-      startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    return {
-      ...request,
-      date,
-      time,
-      formattedDateTime
-    };
   }
 
   /**
@@ -118,11 +116,15 @@ export class LessonRequestController {
    * @route GET /api/lesson-requests/:id
    * @param req - Express request
    * @param res - Express response
-   * @param next - Express next function
    */
-  async getLessonRequestById(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getLessonRequestById(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
+      if (!id) {
+        res.status(400).json({ error: 'Lesson request ID is required' });
+        return;
+      }
+
       const lessonRequest = await lessonRequestService.getLessonRequestById(id);
 
       if (!lessonRequest) {
@@ -133,8 +135,8 @@ export class LessonRequestController {
         return;
       }
 
-      const formattedRequest = this.formatLessonRequest(lessonRequest);
-      res.json(formattedRequest);
+      const modelLessonRequest = this.transformToModel(lessonRequest);
+      res.json(modelLessonRequest);
     } catch (error) {
       console.error('Error fetching lesson request:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -147,15 +149,18 @@ export class LessonRequestController {
    * @route GET /api/lesson-requests/student/:studentId
    * @param req - Express request
    * @param res - Express response
-   * @param next - Express next function
    */
-  async getLessonRequestsByStudent(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getLessonRequestsByStudent(req: Request, res: Response): Promise<void> {
     try {
       const { studentId } = req.params;
+      if (!studentId) {
+        res.status(400).json({ error: 'Student ID is required' });
+        return;
+      }
+
       const lessonRequests = await lessonRequestService.getLessonRequestsByStudent(studentId);
-      
-      const formattedRequests = lessonRequests.map(request => this.formatLessonRequest(request));
-      res.json(formattedRequests);
+      const modelLessonRequests = lessonRequests.map(request => this.transformToModel(request));
+      res.json(modelLessonRequests);
     } catch (error) {
       console.error('Error fetching student lesson requests:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

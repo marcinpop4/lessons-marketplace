@@ -3,7 +3,6 @@ import LessonRateList from './LessonRateList';
 import LessonRateForm from './LessonRateForm';
 import apiClient from '../../../api/apiClient';
 import axios from 'axios';
-import { LessonType } from '@shared/models/LessonType';
 import './TeacherLessonRatesManager.css';
 
 interface LessonRate {
@@ -136,28 +135,38 @@ const TeacherLessonRatesManager: React.FC<Props> = ({ lessonRates = [], onRatesU
   };
 
   return (
-    <div className="lesson-rates-manager card card-secondary">
-      <div className="card-header">
-        <h2 className="text-xl font-semibold">Lesson Rates Management</h2>
-      </div>
-      <div className="card-body">
-        {error && <div className="alert alert-error mb-4">{error}</div>}
+    <div className="lesson-rates-manager">
+      <h2 className="text-2xl font-semibold mb-6">Lesson Rates Management</h2>
+      {error && <div className="alert alert-error mb-4">{error}</div>}
 
-        <div className="rates-layout">
-          <div className="rates-form-container">
-            <LessonRateForm
-              rate={editingRate}
-              onSubmit={handleAddOrUpdate}
-              onCancel={handleCancel}
-            />
+      <div className="rates-layout">
+        <div className="rates-form-container">
+          <div className="card card-accent">
+            <div className="card-header">
+              <h3 className="text-xl font-semibold">Add New Rate</h3>
+            </div>
+            <div className="card-body">
+              <LessonRateForm
+                rate={editingRate}
+                onSubmit={handleAddOrUpdate}
+                onCancel={handleCancel}
+              />
+            </div>
           </div>
+        </div>
 
-          <div className="rates-list-container">
-            <LessonRateList
-              rates={lessonRates}
-              onToggleActive={handleToggleActive}
-              onEdit={handleEdit}
-            />
+        <div className="rates-list-container">
+          <div className="card card-accent">
+            <div className="card-header">
+              <h3 className="text-xl font-semibold">Your Lesson Rates</h3>
+            </div>
+            <div className="card-body">
+              <LessonRateList
+                rates={lessonRates}
+                onToggleActive={handleToggleActive}
+                onEdit={handleEdit}
+              />
+            </div>
           </div>
         </div>
       </div>

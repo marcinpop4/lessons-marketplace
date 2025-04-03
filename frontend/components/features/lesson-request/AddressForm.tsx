@@ -1,5 +1,6 @@
 import React from 'react';
-import { Address } from '@frontend/types/lesson';
+import { Address } from '@shared/models/Address';
+import './AddressForm.css';
 
 interface AddressFormProps {
   address: Address;
@@ -8,11 +9,11 @@ interface AddressFormProps {
 
 const AddressForm: React.FC<AddressFormProps> = ({ address, onChange }) => {
   return (
-    <div className="card card-primary lesson-request-card">
+    <div className="card card-accent lesson-request-card">
       <div className="card-header">
         <h3>Lesson Location</h3>
       </div>
-      
+
       <div className="card-body">
         <div className="form-row">
           <div className="form-group">
@@ -26,7 +27,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ address, onChange }) => {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="addressObj.city">City</label>
             <input
@@ -52,7 +53,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ address, onChange }) => {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="addressObj.postalCode">Postal Code</label>
             <input

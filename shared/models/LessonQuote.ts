@@ -11,16 +11,18 @@ export class LessonQuote {
   lessonRequest: LessonRequest;
   teacher: Teacher;
   costInCents: number;
+  hourlyRateInCents: number;
   createdAt: Date;
   expiresAt: Date; // Quotes can expire after a certain time period
-  
+
   constructor(
     id: string,
     lessonRequest: LessonRequest,
     teacher: Teacher,
     costInCents: number,
     createdAt: Date = new Date(),
-    expiresAt: Date
+    expiresAt: Date,
+    hourlyRateInCents: number
   ) {
     this.id = id;
     this.lessonRequest = lessonRequest;
@@ -28,6 +30,7 @@ export class LessonQuote {
     this.costInCents = costInCents;
     this.createdAt = createdAt;
     this.expiresAt = expiresAt;
+    this.hourlyRateInCents = hourlyRateInCents;
   }
 
   /**
@@ -46,16 +49,24 @@ export class LessonQuote {
     expiresAt: Date
   ): LessonQuote {
     const hourlyRate = teacher.getHourlyRate(lessonRequest.type);
-    
+
     if (!hourlyRate) {
       throw new Error(`Teacher does not offer lessons of type: ${lessonRequest.type}`);
     }
-    
+
     const costInCents = Math.round(
       (hourlyRate.rateInCents * lessonRequest.durationMinutes) / 60
     );
-    
-    return new LessonQuote(id, lessonRequest, teacher, costInCents, new Date(), expiresAt);
+
+    return new LessonQuote(
+      id,
+      lessonRequest,
+      teacher,
+      costInCents,
+      new Date(),
+      expiresAt,
+      hourlyRate.rateInCents
+    );
   }
 
   /**
@@ -78,12 +89,5 @@ export class LessonQuote {
    */
   isValid(): boolean {
     return new Date() < this.expiresAt;
-  }
-
-  /**
-   * Expire this quote immediately
-   */
-  expire(): void {
-    this.expiresAt = new Date();
   }
 } 

@@ -1,7 +1,15 @@
-.lesson-confirmation {
-  max-width: 800px;
+.lesson-confirmation-container {
+  max-width: 900px;
   margin: 2rem auto;
   padding: 0 1rem;
+  width: 100%;
+}
+
+.lesson-confirmation-container h1 {
+  margin-bottom: 2rem;
+  color: var(--text-primary);
+  font-size: 2rem;
+  font-weight: 600;
 }
 
 .lesson-details {
@@ -60,13 +68,18 @@
 }
 
 @media (max-width: 640px) {
+  .lesson-confirmation-container {
+    margin: 1rem auto;
+  }
+  
+  .lesson-confirmation-container h1 {
+    margin-bottom: 1.5rem;
+    font-size: 1.75rem;
+  }
+  
   .lesson-details-grid {
     grid-template-columns: 1fr;
     gap: 1.5rem;
-  }
-  
-  .lesson-confirmation {
-    margin: 1rem auto;
   }
   
   .confirmation-actions {

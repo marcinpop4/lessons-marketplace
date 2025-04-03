@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
-import { LessonQuote } from '@frontend/types/lesson';
-import { acceptLessonQuote } from '@frontend/api/lessonQuotesApi';
-import { formatCurrency } from '@frontend/utils/currencyFormatter';
-import { AxiosError } from 'axios';
+import { LessonQuote } from '@shared/models/LessonQuote';
+import { createLessonFromQuote } from '@frontend/api/lessonApi';
 import './TeacherQuoteCard.css';
 
 interface TeacherQuoteCardProps {
@@ -11,84 +9,56 @@ interface TeacherQuoteCardProps {
 }
 
 const TeacherQuoteCard: React.FC<TeacherQuoteCardProps> = ({ quote, onAccept }) => {
-  const [accepting, setAccepting] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleAcceptQuote = async () => {
-    setAccepting(true);
+  const handleAccept = async () => {
+    setLoading(true);
     setError(null);
 
     try {
-      const result = await acceptLessonQuote(quote.id);
-      
-      // Log the result for debugging
-      console.log('Quote acceptance result:', result);
-      
-      // Validate the response structure
-      if (!result || !result.lesson || !result.lesson.id) {
-        console.error('Invalid response from acceptLessonQuote:', result);
-        throw new Error('Invalid response format: missing lesson ID');
-      }
-      
-      // Navigate to lesson confirmation page
-      onAccept(result.lesson.id);
+      const lesson = await createLessonFromQuote(quote.id);
+      onAccept(lesson.id);
     } catch (err) {
-      console.error('Error accepting quote:', err);
-      
-      // Handle different error types
-      if (err instanceof AxiosError) {
-        const statusCode = err.response?.status;
-        const responseData = err.response?.data;
-        
-        // Log detailed error information
-        console.error('API Error Details:', { 
-          status: statusCode,
-          data: responseData,
-          config: err.config,
-          url: err.config?.url
-        });
-        
-        if (statusCode === 401) {
-          setError('Authentication error. Please log in again.');
-        } else if (statusCode === 404) {
-          setError('Quote not found. It may have been deleted.');
-        } else if (statusCode === 400) {
-          setError('Quote has expired or is invalid.');
-        } else {
-          setError(responseData?.message || 'Failed to accept quote. Please try again.');
-        }
-      } else if (err instanceof Error) {
-        setError(err.message || 'Failed to accept quote. Please try again.');
-      } else {
-        setError('Failed to accept quote. Please try again.');
-      }
-      
-      setAccepting(false);
+      setError(err instanceof Error ? err.message : 'Failed to accept quote');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="teacher-quote card card-accent">
+    <div className="card card-accent teacher-quote-card">
       <div className="card-header">
-        <h3>
-          {quote.teacher.firstName} {quote.teacher.lastName[0]}.
-          <span className="price-amount">{formatCurrency(quote.costInCents)}</span>
-        </h3>
+        <h3>{quote.teacher.firstName} {quote.teacher.lastName}</h3>
       </div>
       <div className="card-body">
-        <div className="hourly-rate">
-          Rate: {formatCurrency(quote.hourlyRateInCents)}/hour
-        </div>
+        <div className="quote-details">
+          <div className="quote-detail">
+            <span className="detail-label">Cost:</span>
+            <span className="detail-value">{quote.getFormattedCost()}</span>
+          </div>
 
-        {error && <p className="text-error">{error}</p>}
+          <div className="quote-detail">
+            <span className="detail-label">Hourly Rate:</span>
+            <span className="detail-value">
+              ${(quote.hourlyRateInCents / 100).toFixed(2)}/hour
+            </span>
+          </div>
+
+          {error && (
+            <div className="alert alert-error">
+              {error}
+            </div>
+          )}
+        </div>
 
         <div className="quote-actions">
           <button
-            className="btn btn-primary"
-            onClick={handleAcceptQuote}
-            disabled={accepting || quote.status === 'EXPIRED'}
+            onClick={handleAccept}
+            disabled={loading || !quote.isValid()}
+            className="btn btn-accent"
           >
-            {accepting ? 'Accepting...' : 'Accept Quote'}
+            {loading ? 'Accepting...' : 'Accept Quote'}
           </button>
         </div>
       </div>

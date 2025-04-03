@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 import logger from '../utils/logger.js';
 import prisma from '../prisma.js';
-import { Prisma, LessonQuote } from '@prisma/client';
+import { teacherQuoteService } from '../services/teacherQuoteService.js';
 
 const prismaClient = new PrismaClient();
 
@@ -11,85 +11,34 @@ const prismaClient = new PrismaClient();
  */
 export const lessonQuoteController = {
   /**
-   * Create a new lesson quote
-   * @param req Request with lessonRequestId, teacherId, costInCents, and expiresAt in the body
+   * Create quotes for a lesson request
+   * @param req Request with lessonRequestId and lessonType in the body
    * @param res Response
    * @param next NextFunction
    */
-  createLessonQuote: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  createLessonQuotes: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { lessonRequestId, teacherId, costInCents, expiresAt } = req.body;
-      
+      const { lessonRequestId, lessonType } = req.body;
+
       // Validate required fields
-      if (!lessonRequestId || !teacherId || !costInCents || !expiresAt) {
-        res.status(400).json({ 
-          message: 'Missing required fields. Please provide lessonRequestId, teacherId, costInCents, and expiresAt.' 
+      if (!lessonRequestId || !lessonType) {
+        res.status(400).json({
+          message: 'Missing required fields. Please provide lessonRequestId and lessonType.'
         });
         return;
       }
-      
-      // Validate that the lesson request exists
-      const lessonRequest = await prismaClient.lessonRequest.findUnique({
-        where: { id: lessonRequestId }
-      });
-      
-      if (!lessonRequest) {
-        res.status(404).json({ 
-          message: `Lesson request with ID ${lessonRequestId} not found.` 
-        });
-        return;
-      }
-      
-      // Validate that the teacher exists
-      const teacher = await prismaClient.teacher.findUnique({
-        where: { id: teacherId }
-      });
-      
-      if (!teacher) {
-        res.status(404).json({ 
-          message: `Teacher with ID ${teacherId} not found.` 
-        });
-        return;
-      }
-      
-      // Check for existing quotes for this teacher and lesson request
-      const existingQuote = await prismaClient.lessonQuote.findFirst({
-        where: {
-          lessonRequestId,
-          teacherId,
-        }
-      });
-      
-      // If a quote already exists, return it instead of creating a new one
-      if (existingQuote) {
-        res.status(200).json(existingQuote);
-        return;
-      }
-      
-      // Create the lesson quote
-      const lessonQuote = await prismaClient.lessonQuote.create({
-        data: {
-          costInCents,
-          expiresAt: new Date(expiresAt),
-          lessonRequest: {
-            connect: { id: lessonRequestId }
-          },
-          teacher: {
-            connect: { id: teacherId }
-          }
-        }
-      });
-      
-      res.status(201).json(lessonQuote);
+
+      const quotes = await teacherQuoteService.createQuotesForLessonRequest(lessonRequestId, lessonType);
+      res.status(201).json(quotes);
     } catch (error) {
-      logger.error('Error creating lesson quote:', error);
-      res.status(500).json({ 
-        message: 'An error occurred while creating the lesson quote',
+      logger.error('Error creating lesson quotes:', error);
+      res.status(500).json({
+        message: 'An error occurred while creating lesson quotes',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   },
-  
+
   /**
    * Get a lesson quote by ID
    * @param req Request with quoteId as a route parameter
@@ -99,7 +48,7 @@ export const lessonQuoteController = {
   getLessonQuoteById: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      
+
       const lessonQuote = await prismaClient.lessonQuote.findUnique({
         where: { id },
         include: {
@@ -107,53 +56,26 @@ export const lessonQuoteController = {
           teacher: true
         }
       });
-      
+
       if (!lessonQuote) {
-        res.status(404).json({ 
+        res.status(404).json({
           message: `Lesson quote with ID ${id} not found.`
         });
         return;
       }
-      
+
       res.status(200).json(lessonQuote);
     } catch (error) {
       logger.error('Error fetching lesson quote:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: 'An error occurred while fetching the lesson quote',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
-  },
-  
-  /**
-   * Get all lesson quotes for a lesson request
-   * @param req Request with lessonRequestId as a route parameter
-   * @param res Response
-   * @param next NextFunction
-   */
-  getLessonQuotesByLessonRequest: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const { lessonRequestId } = req.params;
-      
-      const lessonQuotes = await prismaClient.lessonQuote.findMany({
-        where: { lessonRequestId },
-        include: {
-          teacher: true
-        }
-      });
-      
-      res.status(200).json(lessonQuotes);
-    } catch (error) {
-      logger.error('Error fetching lesson quotes:', error);
-      res.status(500).json({ 
-        message: 'An error occurred while fetching lesson quotes',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   },
 
   /**
-   * Get quotes for a specific lesson request
+   * Get quotes for a lesson request
    * @param req Request with lessonRequestId as a route parameter
    * @param res Response
    * @param next NextFunction
@@ -168,34 +90,8 @@ export const lessonQuoteController = {
         return;
       }
 
-      // Get the lesson quotes with teacher and lesson request details
-      const quotes = await prismaClient.lessonQuote.findMany({
-        where: {
-          lessonRequestId,
-        },
-        include: {
-          teacher: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
-          },
-          lessonRequest: true,
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
-
-      // Transform quotes to include hourlyRateInCents
-      const quotesWithRates = quotes.map((quote: LessonQuote & { lessonRequest: { durationMinutes: number } }) => ({
-        ...quote,
-        hourlyRateInCents: Math.round((quote.costInCents * 60) / quote.lessonRequest.durationMinutes)
-      }));
-
-      res.json(quotesWithRates);
+      const quotes = await teacherQuoteService.getQuotesByLessonRequest(lessonRequestId);
+      res.json(quotes);
     } catch (error) {
       logger.error('Error fetching lesson quotes:', error);
       res.status(500).json({ error: 'Failed to fetch lesson quotes' });

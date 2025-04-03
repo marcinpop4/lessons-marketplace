@@ -1,5 +1,4 @@
 import { Person } from './Person.js';
-import { LessonType } from './LessonType.js';
 import { TeacherLessonHourlyRate } from './TeacherLessonHourlyRate.js';
 
 /**
@@ -9,7 +8,7 @@ import { TeacherLessonHourlyRate } from './TeacherLessonHourlyRate.js';
 export class Teacher extends Person {
   // Collection of hourly rates by lesson type
   hourlyRates: TeacherLessonHourlyRate[];
-  
+
   constructor(
     id: string,
     firstName: string,

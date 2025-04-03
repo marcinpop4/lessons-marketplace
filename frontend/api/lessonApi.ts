@@ -1,24 +1,14 @@
+import { Lesson } from '@shared/models/Lesson';
+import { LessonRequest } from '@shared/models/LessonRequest';
+import { LessonQuote } from '@shared/models/LessonQuote';
+import { Teacher } from '@shared/models/Teacher';
+import { Address } from '@shared/models/Address';
+import { Student } from '@shared/models/Student';
 import apiClient from './apiClient';
-import { Lesson, LessonRequest } from '../types/lesson';
 
-const validateLessonResponse = (data: any): data is Lesson => {
-  if (!data || typeof data !== 'object') {
-    console.error('Data is null or not an object');
-    return false;
-  }
-  
-  if (!data.quote || typeof data.quote !== 'object') {
-    console.error('Quote is missing or not an object');
-    return false;
-  }
-  
-  if (!data.quote.lessonRequest || typeof data.quote.lessonRequest !== 'object') {
-    console.error('LessonRequest is missing or not an object');
-    return false;
-  }
-  
-  return true;
-};
+if (!import.meta.env.VITE_API_BASE_URL) {
+  throw new Error('VITE_API_BASE_URL environment variable is not set');
+}
 
 /**
  * Create a new lesson from a quote
@@ -41,17 +31,57 @@ export const createLessonFromQuote = async (quoteId: string): Promise<Lesson> =>
  * @param lessonId - Lesson ID
  * @returns Lesson data
  */
-export const getLessonById = async (lessonId: string): Promise<Lesson> => {
+export const getLessonById = async (id: string): Promise<Lesson> => {
+  console.log('getLessonById called with id:', id);
   try {
-    const response = await apiClient.get(`/api/v1/lessons/${lessonId}`);
-    
-    if (!validateLessonResponse(response.data)) {
-      throw new Error('Invalid lesson data structure received from API');
-    }
-    
-    return response.data;
+    console.log('Making API request to:', `/api/v1/lessons/${id}`);
+    const response = await apiClient.get(`/api/v1/lessons/${id}`);
+    console.log('API response received:', response.data);
+    const data = response.data;
+
+    return new Lesson(
+      data.id,
+      new LessonQuote(
+        data.quote.id,
+        new LessonRequest(
+          data.quote.lessonRequest.id,
+          data.quote.lessonRequest.type,
+          new Date(data.quote.lessonRequest.startTime),
+          data.quote.lessonRequest.durationMinutes,
+          new Address(
+            data.quote.lessonRequest.address.street,
+            data.quote.lessonRequest.address.city,
+            data.quote.lessonRequest.address.state,
+            data.quote.lessonRequest.address.postalCode,
+            data.quote.lessonRequest.address.country
+          ),
+          new Student(
+            data.quote.lessonRequest.student.id,
+            data.quote.lessonRequest.student.firstName,
+            data.quote.lessonRequest.student.lastName,
+            data.quote.lessonRequest.student.email,
+            data.quote.lessonRequest.student.phoneNumber,
+            new Date(data.quote.lessonRequest.student.dateOfBirth)
+          )
+        ),
+        new Teacher(
+          data.quote.teacher.id,
+          data.quote.teacher.firstName,
+          data.quote.teacher.lastName,
+          data.quote.teacher.email,
+          data.quote.teacher.phoneNumber,
+          new Date(data.quote.teacher.dateOfBirth),
+          data.quote.teacher.hourlyRates
+        ),
+        data.quote.costInCents,
+        new Date(data.quote.createdAt),
+        new Date(data.quote.expiresAt),
+        data.quote.status
+      ),
+      new Date(data.confirmedAt)
+    );
   } catch (error) {
-    console.error('Error fetching lesson:', error);
+    console.error('Error in getLessonById:', error);
     throw error;
   }
 };
@@ -69,4 +99,8 @@ export const getLessonsByQuoteId = async (quoteId: string): Promise<Lesson[]> =>
     console.error('Error fetching lessons by quote:', error);
     throw error;
   }
+};
+
+export const updateLessonStatus = async (id: string, status: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED'): Promise<void> => {
+  await apiClient.patch(`/api/v1/lessons/${id}/status`, { status });
 }; 

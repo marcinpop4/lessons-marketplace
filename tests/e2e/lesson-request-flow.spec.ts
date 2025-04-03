@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 
-
 /**
  * End-to-end test for the complete lesson request flow.
  * Covers the entire user journey from login to confirmation.
@@ -27,7 +26,7 @@ test.describe.serial('Lesson request flow', () => {
     ]);
 
     // Wait for navigation to lesson request page
-    await expect(page).toHaveURL(/.*\/lesson-request.*/);
+    await expect(page).toHaveURL(/.*\/lesson-request.*/, { timeout: 5000 });
 
     // 2. Fill out the lesson request form
     await expect(page.locator('form')).toBeVisible();
@@ -35,33 +34,16 @@ test.describe.serial('Lesson request flow', () => {
     // Fill in the minimum required fields
     await page.getByLabel('Lesson Type').selectOption('GUITAR');
     await page.getByLabel('Duration').selectOption('30');
-    await page.getByLabel('Date').fill(new Date().toISOString().split('T')[0]);
+    const today = new Date().toISOString().split('T')[0];
+    if (!today) throw new Error('Failed to get today\'s date');
+    await page.getByLabel('Date').fill(today);
     await page.getByLabel('Time').selectOption('10:00');
     await page.getByLabel('Street').fill('123 Test Street');
     await page.getByLabel('City').fill('Test City');
     await page.getByLabel('State').fill('TS');
     await page.getByLabel('Postal Code').fill('12345');
 
-    // Create a promise that resolves when we see the complete sequence of quote creation
-    const waitForQuotesCreation = new Promise<void>((resolve) => {
-      let postCount = 0;
-      let sawFinalGet = false;
-
-      page.on('response', response => {
-        const url = response.url();
-        if (url.includes('/api/v1/lesson-quotes')) {
-          if (response.request().method() === 'POST' && response.status() === 201) {
-            postCount++;
-          } else if (response.request().method() === 'GET' && postCount > 0) {
-            sawFinalGet = true;
-            // Only resolve after we've seen some successful POSTs and a subsequent GET
-            resolve();
-          }
-        }
-      });
-    });
-
-    // Submit the form and wait for initial navigation
+    // Submit the form and wait for the lesson request creation response
     await Promise.all([
       page.waitForResponse(
         response => response.url().includes('/api/v1/lesson-requests') && response.request().method() === 'POST'
@@ -69,11 +51,12 @@ test.describe.serial('Lesson request flow', () => {
       page.locator('form button[type="submit"]').click()
     ]);
 
-    // Wait for navigation and initial data load
+    // Wait for navigation to teacher quotes page
     await expect(page).toHaveURL(/.*\/teacher-quotes\/.*/);
 
     // Extract request ID from URL to use in response waiting
-    const requestId = page.url().split('/').pop();
+    const urlParts = page.url().split('/');
+    const requestId = urlParts[urlParts.length - 1];
 
     // Wait for lesson request details to load
     await page.waitForResponse(
@@ -83,21 +66,32 @@ test.describe.serial('Lesson request flow', () => {
     // Verify lesson request card is rendered
     await expect(page.locator('.lesson-request-details')).toBeVisible();
 
-    // Wait for quotes to be created and then fetched
-    await waitForQuotesCreation;
-
     // Now wait for the quotes container and verify quotes are present
     await expect(page.locator('.teacher-quotes-container')).toBeVisible();
 
     // Wait for the first quote to be visible
-    await expect(page.locator('.teacher-quote').first()).toBeVisible();
+    await expect(page.locator('.card.card-accent.teacher-quote-card').first()).toBeVisible();
 
     // Get the quote count after we know they're visible
-    const quoteCount = await page.locator('.teacher-quote').count();
+    const quoteCount = await page.locator('.card.card-accent.teacher-quote-card').count();
     expect(quoteCount).toBeGreaterThan(0);
 
-    // Verify hourly rates are present (should be equal to quote count)
-    const ratesCount = await page.locator('.hourly-rate').count();
-    expect(ratesCount).toBe(quoteCount);
+    // Click accept on the first quote
+    const acceptButton = page.locator('.card.card-accent.teacher-quote-card').first().locator('.btn.btn-accent');
+    await acceptButton.click();
+
+    // Wait for navigation to lesson confirmation page
+    await expect(page).toHaveURL(/.*\/lesson-confirmation\/.*/);
+
+    // Wait for lesson details to be visible
+    await expect(page.locator('.lesson-details')).toBeVisible();
+
+    // Verify lesson details are displayed
+    await expect(page.locator('.lesson-details-grid .lesson-detail-teacher')).toBeVisible();
+    await expect(page.locator('.lesson-details-grid .lesson-detail-cost')).toBeVisible();
+    await expect(page.locator('.lesson-details-grid .lesson-detail-datetime')).toBeVisible();
+    await expect(page.locator('.lesson-details-grid .lesson-detail-duration')).toBeVisible();
+    await expect(page.locator('.lesson-details-grid .lesson-detail-location')).toBeVisible();
+    await expect(page.locator('.lesson-details-grid .lesson-detail-expiry')).toBeVisible();
   });
 }); 

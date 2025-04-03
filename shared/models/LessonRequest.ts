@@ -11,18 +11,16 @@ export class LessonRequest {
   type: LessonType;
   startTime: Date;
   durationMinutes: number;
-  address: string;
-  addressObj?: Address;
+  address: Address;
   student: Student;
-  
+
   constructor(
     id: string,
     type: LessonType,
     startTime: Date,
     durationMinutes: number,
-    address: string,
-    student: Student,
-    addressObj?: Address
+    address: Address,
+    student: Student
   ) {
     this.id = id;
     this.type = type;
@@ -30,7 +28,6 @@ export class LessonRequest {
     this.durationMinutes = durationMinutes;
     this.address = address;
     this.student = student;
-    this.addressObj = addressObj;
   }
 
   /**
@@ -44,12 +41,15 @@ export class LessonRequest {
 
   /**
    * Get the formatted address string
-   * If addressObj is available, use it, otherwise use the address string
    */
   get formattedAddress(): string {
-    if (this.addressObj) {
-      return this.addressObj.toString();
-    }
-    return this.address;
+    return this.address.toString();
+  }
+
+  /**
+   * Check if the lesson would end after 9pm
+   */
+  isLessonEndingAfter9pm(): boolean {
+    return this.endTime.getHours() >= 21; // 9pm
   }
 } 

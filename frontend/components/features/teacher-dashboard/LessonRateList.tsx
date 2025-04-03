@@ -32,7 +32,6 @@ const LessonRateList: React.FC<Props> = ({ rates = [], onToggleActive, onEdit })
   if (!rates || rates.length === 0) {
     return (
       <div className="lesson-rate-list">
-        <h3 className="text-lg font-medium mb-4">Your Lesson Rates</h3>
         <div className="empty-state">
           <p>No lesson rates have been set up yet.</p>
           <p>Add your first lesson rate to get started.</p>
@@ -43,7 +42,6 @@ const LessonRateList: React.FC<Props> = ({ rates = [], onToggleActive, onEdit })
 
   return (
     <div className="lesson-rate-list">
-      <h3 className="text-lg font-medium mb-4">Your Lesson Rates</h3>
       <div className="rates-grid">
         {rates.map(rate => (
           <div key={rate.id} className={`rate-card ${rate.isActive ? 'active' : 'inactive'}`}>
@@ -52,14 +50,14 @@ const LessonRateList: React.FC<Props> = ({ rates = [], onToggleActive, onEdit })
               <div className="rate-actions">
                 <button
                   onClick={() => onEdit(rate)}
-                  className="edit-button"
+                  className="btn btn-primary btn-sm"
                   title="Edit rate"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => onToggleActive(rate)}
-                  className={`toggle-button ${rate.isActive ? 'deactivate' : 'activate'}`}
+                  className={`btn btn-secondary btn-sm`}
                   title={rate.isActive ? 'Deactivate rate' : 'Activate rate'}
                 >
                   {rate.isActive ? 'Deactivate' : 'Activate'}

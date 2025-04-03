@@ -2,9 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { LessonType, formatDisplayLabel } from '@shared/models/LessonType';
 import './LessonRateForm.css';
 
-// Valid lesson types based on the API requirements
-const VALID_LESSON_TYPES = ['VOICE', 'GUITAR', 'BASS', 'DRUMS'] as const;
-
 interface LessonRate {
   id: string;
   type: string;
@@ -101,10 +98,6 @@ const LessonRateForm: React.FC<Props> = ({ rate, onSubmit, onCancel }) => {
 
   return (
     <div className="lesson-rate-form">
-      <h3 className="text-lg font-medium mb-4">
-        {rate ? 'Edit Lesson Rate' : 'Add New Rate'}
-      </h3>
-
       <form onSubmit={handleSubmit}>
         <div className="form-row">
           <div className="form-group">

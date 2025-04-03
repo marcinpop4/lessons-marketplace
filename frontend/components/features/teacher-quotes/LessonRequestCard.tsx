@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { LessonRequest } from '@frontend/types/lesson';
+import { LessonRequest } from '@shared/models/LessonRequest';
 import { getLessonRequestById } from '@frontend/api/lessonRequestApi';
-import { FormattedAddress, FormattedDateTime } from '@frontend/components/shared';
+import { FormattedDateTime, FormattedAddress } from '@frontend/components/shared';
 import { formatDisplayLabel } from '@shared/models/LessonType';
 import './LessonRequestCard.css';
 
 interface LessonRequestCardProps {
-  lessonRequestId: string; // Make required since we need it
+  lessonRequestId: string;
 }
 
 const LessonRequestCard: React.FC<LessonRequestCardProps> = ({ lessonRequestId }) => {
@@ -16,24 +16,11 @@ const LessonRequestCard: React.FC<LessonRequestCardProps> = ({ lessonRequestId }
 
   useEffect(() => {
     const fetchLessonRequest = async () => {
-      if (!lessonRequestId) {
-        setError('Lesson request ID is required');
-        setLoading(false);
-        return;
-      }
-
       try {
-        const data = await getLessonRequestById(lessonRequestId);
-        if (!data) {
-          throw new Error('Lesson request not found');
-        }
-        if (!data.address) {
-          throw new Error('Lesson request address is missing');
-        }
-        setLessonRequest(data);
+        const request = await getLessonRequestById(lessonRequestId);
+        setLessonRequest(request);
       } catch (err) {
-        console.error('Error fetching lesson request:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load lesson request details');
+        setError(err instanceof Error ? err.message : 'Failed to fetch lesson request');
       } finally {
         setLoading(false);
       }
@@ -43,23 +30,15 @@ const LessonRequestCard: React.FC<LessonRequestCardProps> = ({ lessonRequestId }
   }, [lessonRequestId]);
 
   if (loading) {
-    return (
-      <div className="card card-primary lesson-request-card">
-        <div className="card-body">
-          <p className="text-center">Loading lesson request details...</p>
-        </div>
-      </div>
-    );
+    return <div>Loading...</div>;
   }
 
-  if (error || !lessonRequest) {
-    return (
-      <div className="card card-primary lesson-request-card">
-        <div className="card-body">
-          <p className="text-center text-error">{error || 'Failed to load lesson request'}</p>
-        </div>
-      </div>
-    );
+  if (error) {
+    return <div className="error">{error}</div>;
+  }
+
+  if (!lessonRequest) {
+    return <div>Lesson request not found</div>;
   }
 
   return (
@@ -82,14 +61,14 @@ const LessonRequestCard: React.FC<LessonRequestCardProps> = ({ lessonRequestId }
           <div className="lesson-request-detail">
             <span className="detail-label">Date & Time:</span>
             <span className="detail-value">
-              <FormattedDateTime timestamp={lessonRequest.startTime} />
+              <FormattedDateTime date={lessonRequest.startTime} />
             </span>
           </div>
 
           <div className="lesson-request-detail">
             <span className="detail-label">Location:</span>
             <span className="detail-value">
-              <FormattedAddress addressObject={lessonRequest.address} />
+              <FormattedAddress address={lessonRequest.address} />
             </span>
           </div>
         </div>

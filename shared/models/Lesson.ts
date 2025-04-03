@@ -8,7 +8,7 @@ export class Lesson {
   id: string;
   quote: LessonQuote;
   confirmedAt: Date;
-  
+
   constructor(
     id: string,
     quote: LessonQuote,

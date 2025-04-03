@@ -19,7 +19,7 @@
 .rates-layout {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 2rem;
 }
 
 /* On larger screens, make the layout side-by-side */
@@ -30,17 +30,113 @@
   }
   
   .rates-form-container {
-    flex: 0 0 35%;
-    max-width: 35%;
+    flex: 0 0 40%;
+    max-width: 40%;
   }
   
   .rates-list-container {
-    flex: 0 0 65%;
-    max-width: 65%;
+    flex: 0 0 60%;
+    max-width: 60%;
   }
 }
 
-/* Make the form take full height to match the list */
-.rates-form-container .lesson-rate-form {
+/* Form container styles */
+.rates-form-container,
+.rates-list-container {
   height: 100%;
+}
+
+.rates-form-container .card,
+.rates-list-container .card {
+  height: 100%;
+}
+
+/* List container styles */
+.rates-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Rate item styles */
+.rate-card {
+  padding: 1.5rem;
+  border: 1px solid var(--color-primary-100);
+  border-radius: var(--radius-md);
+  background-color: var(--color-white);
+}
+
+.rate-card:hover {
+  border-color: var(--color-primary-300);
+}
+
+.rate-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.rate-header h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-primary-700);
+  margin: 0;
+}
+
+.rate-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.rate-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rate-amount {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-primary-700);
+}
+
+.rate-status {
+  font-size: 0.875rem;
+  color: var(--color-gray-600);
+}
+
+.rate-status .active {
+  color: var(--color-success-600);
+}
+
+.rate-status .inactive {
+  color: var(--color-error-600);
+}
+
+/* Dark theme adjustments */
+body[data-theme="dark"] .rate-card {
+  background-color: var(--color-gray-800);
+  border-color: var(--color-primary-800);
+}
+
+body[data-theme="dark"] .rate-card:hover {
+  border-color: var(--color-primary-600);
+}
+
+/* Warm theme adjustments */
+body[data-theme="warm"] .rate-card {
+  border-color: var(--border-color);
+}
+
+body[data-theme="warm"] .rate-card:hover {
+  border-color: var(--color-primary-400);
+}
+
+/* Responsive adjustments */
+@media (max-width: 991px) {
+  .rates-form-container,
+  .rates-list-container {
+    width: 100%;
+  }
 } 

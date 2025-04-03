@@ -57,4 +57,13 @@ export class TeacherLessonHourlyRate {
   isActive(): boolean {
     return this.deactivatedAt === null || this.deactivatedAt === undefined;
   }
+
+  /**
+   * Calculate the cost for a lesson of a given duration
+   * @param durationMinutes Duration of the lesson in minutes
+   * @returns Cost in cents
+   */
+  calculateCostForDuration(durationMinutes: number): number {
+    return Math.round((this.rateInCents * durationMinutes) / 60);
+  }
 } 

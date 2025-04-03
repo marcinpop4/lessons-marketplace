@@ -1,48 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LessonType, LessonRequest, Address } from '@frontend/types/lesson';
+import { LessonType } from '@shared/models/LessonType';
+import { Address } from '@shared/models/Address';
+import { LessonRequest } from '@shared/models/LessonRequest';
 import { createLessonRequest } from '@frontend/api/lessonRequestApi';
 import { useAuth } from '@frontend/contexts/AuthContext';
-import { formatDisplayLabel } from '@shared/models/LessonType';
 import LessonDetailsForm from './LessonDetailsForm';
 import AddressForm from './AddressForm';
 import './LessonRequestForm.css';
-
-// Helper function to check if a lesson would end after 9pm
-const isLessonEndingAfter9pm = (startTime: string, durationMinutes: number): boolean => {
-  const [hours, minutes] = startTime.split(':').map(Number);
-  const startMinutesSinceMidnight = (hours * 60) + minutes;
-  const endMinutesSinceMidnight = startMinutesSinceMidnight + durationMinutes;
-  return endMinutesSinceMidnight > 1260; // 9pm = 21 hours * 60 minutes
-};
 
 interface LessonRequestFormProps {
   onSubmitSuccess?: (lessonRequestId: string) => void;
 }
 
 const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }) => {
-  const { user, justRegistered, clearJustRegistered } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
-  const [formData, setFormData] = useState<Omit<LessonRequest, 'address'> & {
+  const [formData, setFormData] = useState<{
+    type: LessonType;
+    startTime: Date;
+    durationMinutes: number;
     addressObj: Address;
+    studentId: string;
   }>({
-    id: '',
     type: LessonType.GUITAR,
-    startTime: '',
+    startTime: new Date(),
     durationMinutes: 30,
-    addressId: '',
-    addressObj: {
-      street: '',
-      city: '',
-      state: '',
-      postalCode: '',
-      country: 'USA'
-    },
-    studentId: '',
-    createdAt: '',
-    updatedAt: ''
+    addressObj: new Address('', '', '', '', 'USA'),
+    studentId: ''
   });
 
   const [loading, setLoading] = useState(false);
@@ -75,33 +62,15 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
 
   useEffect(() => {
     if (selectedDate && selectedTime) {
-      const dateTimeString = `${selectedDate}T${selectedTime}:00`;
+      const [hours, minutes] = selectedTime.split(':').map(Number);
+      const date = new Date(selectedDate);
+      date.setHours(hours || 0, minutes || 0);
       setFormData(prevData => ({
         ...prevData,
-        startTime: dateTimeString
+        startTime: date
       }));
     }
   }, [selectedDate, selectedTime]);
-
-  useEffect(() => {
-    const registrationSuccess = sessionStorage.getItem('registrationSuccess');
-    if (registrationSuccess === 'true') {
-      setShowSuccessMessage(true);
-      sessionStorage.removeItem('registrationSuccess');
-    }
-  }, []);
-
-  useEffect(() => {
-    if (showSuccessMessage || justRegistered) {
-      const timer = setTimeout(() => {
-        setShowSuccessMessage(false);
-        if (justRegistered) {
-          clearJustRegistered();
-        }
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [showSuccessMessage, justRegistered, clearJustRegistered]);
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedDate(e.target.value);
@@ -111,45 +80,74 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
     const newTime = e.target.value;
     setSelectedTime(newTime);
 
-    if (newTime && isLessonEndingAfter9pm(newTime, formData.durationMinutes)) {
-      setError('Lesson cannot end after 9:00 PM. Please choose an earlier time or shorter duration.');
-    } else if (error && error.includes('Lesson cannot end after 9:00 PM')) {
-      setError(null);
+    if (newTime && selectedDate) {
+      const [hours, minutes] = newTime.split(':').map(Number);
+      const date = new Date(selectedDate);
+      date.setHours(hours || 0, minutes || 0);
+
+      const tempRequest = new LessonRequest(
+        '',
+        formData.type,
+        date,
+        formData.durationMinutes,
+        formData.addressObj,
+        {} as any
+      );
+
+      if (tempRequest.isLessonEndingAfter9pm()) {
+        setError('Lesson cannot end after 9:00 PM. Please choose an earlier time or shorter duration.');
+      } else if (error && error.includes('Lesson cannot end after 9:00 PM')) {
+        setError(null);
+      }
     }
   };
 
   const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    // Convert string value to LessonType enum - ensure it's a valid enum value
+    const { value } = e.target;
     const lessonType = Object.values(LessonType).includes(value as LessonType)
       ? value as LessonType
       : LessonType.GUITAR;
 
     setFormData(prevData => ({
       ...prevData,
-      [name]: lessonType
+      type: lessonType
     }));
   };
 
   const handleDurationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const { name, value } = e.target;
+    const { value } = e.target;
     const durationValue = parseInt(value, 10);
 
-    if (selectedTime && isLessonEndingAfter9pm(selectedTime, durationValue)) {
-      setError('Lesson cannot end after 9:00 PM. Please choose an earlier time or shorter duration.');
-    } else if (error && error.includes('Lesson cannot end after 9:00 PM')) {
-      setError(null);
+    if (selectedTime && selectedDate) {
+      const [hours, minutes] = selectedTime.split(':').map(Number);
+      const date = new Date(selectedDate);
+      date.setHours(hours || 0, minutes || 0);
+
+      const tempRequest = new LessonRequest(
+        '',
+        formData.type,
+        date,
+        durationValue,
+        formData.addressObj,
+        {} as any
+      );
+
+      if (tempRequest.isLessonEndingAfter9pm()) {
+        setError('Lesson cannot end after 9:00 PM. Please choose an earlier time or shorter duration.');
+      } else if (error && error.includes('Lesson cannot end after 9:00 PM')) {
+        setError(null);
+      }
     }
 
     setFormData(prevData => ({
       ...prevData,
-      [name]: durationValue
+      durationMinutes: durationValue
     }));
   };
 
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    const addressField = name.split('.')[1];
+    const addressField = name.split('.')[1] as keyof Address;
     setFormData(prevData => ({
       ...prevData,
       addressObj: {
@@ -167,7 +165,21 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
       return;
     }
 
-    if (isLessonEndingAfter9pm(selectedTime, formData.durationMinutes)) {
+    // Create a new Date object with the selected date and time
+    const [hours, minutes] = selectedTime.split(':').map(Number);
+    const date = new Date(selectedDate);
+    date.setHours(hours || 0, minutes || 0);
+
+    const tempRequest = new LessonRequest(
+      '',
+      formData.type,
+      date,
+      formData.durationMinutes,
+      formData.addressObj,
+      {} as any
+    );
+
+    if (tempRequest.isLessonEndingAfter9pm()) {
       setError('Lesson cannot end after 9:00 PM. Please choose an earlier time or shorter duration.');
       return;
     }
@@ -182,39 +194,30 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
     setError(null);
 
     try {
+      // Convert to API payload format
       const payload = {
         type: formData.type,
-        startTime: formData.startTime,
+        startTime: date,
         durationMinutes: formData.durationMinutes,
         addressObj: formData.addressObj,
         studentId: formData.studentId
       };
 
-      const result = await createLessonRequest(payload);
+      const { lessonRequest } = await createLessonRequest(payload);
       setShowSuccessMessage(true);
 
-      if (onSubmitSuccess && result.id) {
-        onSubmitSuccess(result.id);
+      if (onSubmitSuccess && lessonRequest.id) {
+        onSubmitSuccess(lessonRequest.id);
       }
 
+      // Reset form
       setFormData({
-        id: '',
         type: LessonType.GUITAR,
-        startTime: '',
+        startTime: new Date(),
         durationMinutes: 30,
-        addressId: '',
-        addressObj: {
-          street: '',
-          city: '',
-          state: '',
-          postalCode: '',
-          country: 'USA'
-        },
-        studentId: user?.id || '',
-        createdAt: '',
-        updatedAt: ''
+        addressObj: new Address('', '', '', '', 'USA'),
+        studentId: user?.id || ''
       });
-
       setSelectedTime('');
       setSelectedDate(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`);
 
@@ -226,43 +229,37 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
   };
 
   return (
-    <div className="lesson-request-form-container">
-      {(showSuccessMessage || justRegistered) && (
-        <div className="alert-success">
-          {justRegistered ? 'Registration successful! ' : ''}
-          Please fill out this form to request a lesson.
+    <div className="lesson-request-form">
+      {showSuccessMessage && (
+        <div className="alert alert-success">
+          Lesson request submitted successfully!
         </div>
       )}
-
-      {error && <div className="alert-error">{error}</div>}
-
-      <form onSubmit={handleSubmit} className="lesson-request-form">
-        <LessonDetailsForm
-          type={formData.type}
-          durationMinutes={formData.durationMinutes}
-          selectedDate={selectedDate}
-          selectedTime={selectedTime}
-          onTypeChange={handleTypeChange}
-          onDurationChange={handleDurationChange}
-          onDateChange={handleDateChange}
-          onTimeChange={handleTimeChange}
-          formatDisplayLabel={formatDisplayLabel}
-        />
-
-        <AddressForm
-          address={formData.addressObj}
-          onChange={handleAddressChange}
-        />
-
-        <div className="form-actions">
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={loading}
-          >
-            {loading ? 'Submitting...' : 'Submit Request'}
-          </button>
+      {error && (
+        <div className="alert alert-error">
+          {error}
         </div>
+      )}
+      <form onSubmit={handleSubmit}>
+        <div className="lesson-request-cards">
+          <LessonDetailsForm
+            type={formData.type}
+            durationMinutes={formData.durationMinutes}
+            selectedDate={selectedDate}
+            selectedTime={selectedTime}
+            onTypeChange={handleTypeChange}
+            onDurationChange={handleDurationChange}
+            onDateChange={handleDateChange}
+            onTimeChange={handleTimeChange}
+          />
+          <AddressForm
+            address={formData.addressObj}
+            onChange={handleAddressChange}
+          />
+        </div>
+        <button type="submit" disabled={loading}>
+          {loading ? 'Submitting...' : 'Submit Request'}
+        </button>
       </form>
     </div>
   );

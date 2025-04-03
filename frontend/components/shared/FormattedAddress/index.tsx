@@ -1,28 +1,19 @@
 import React from 'react';
-import { Address } from '@frontend/types/lesson';
+import { Address } from '@shared/models/Address';
 import './FormattedAddress.css';
 
 interface FormattedAddressProps {
-  addressObject: Address;
-  className?: string;
+  address: Address;
 }
 
-const FormattedAddress: React.FC<FormattedAddressProps> = ({
-  addressObject,
-  className
-}) => {
-  const formatAddress = () => {
-    const { street, city, state, postalCode } = addressObject;
-
-    return [
-      street,
-      [city, state, postalCode].filter(Boolean).join(', ')
-    ].filter(Boolean).join('\n');
-  };
+const FormattedAddress: React.FC<FormattedAddressProps> = ({ address }) => {
+  if (!(address instanceof Address)) {
+    throw new Error('FormattedAddress: Invalid address provided');
+  }
 
   return (
-    <span className={className ? `formatted-address ${className}` : 'formatted-address'}>
-      {formatAddress()}
+    <span className="formatted-address">
+      {address.toString()}
     </span>
   );
 };

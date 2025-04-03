@@ -10,6 +10,7 @@
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 2rem;
+  padding: 1.5rem;
 }
 
 .lesson-detail-group {
@@ -26,13 +27,13 @@
 
 .lesson-detail-label {
   font-weight: 600;
-  color: var(--color-secondary-600);
+  color: var(--text-secondary);
   font-size: 0.875rem;
 }
 
 .lesson-detail-value {
   font-size: 1rem;
-  color: var(--color-secondary-900);
+  color: var(--text-primary);
 }
 
 .price-details {
@@ -41,9 +42,11 @@
   gap: 0.25rem;
 }
 
+/* Responsive layout */
 @media (max-width: 640px) {
   .lesson-details-grid {
     grid-template-columns: 1fr;
     gap: 1.5rem;
+    padding: 1rem;
   }
 } 

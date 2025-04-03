@@ -2,16 +2,15 @@ import React from 'react';
 import './FormattedDateTime.css';
 
 interface FormattedDateTimeProps {
-  timestamp: string;
-  className?: string;
+  date: Date;
 }
 
-const FormattedDateTime: React.FC<FormattedDateTimeProps> = ({ 
-  timestamp,
-  className
-}) => {
+const FormattedDateTime: React.FC<FormattedDateTimeProps> = ({ date }) => {
+  if (!(date instanceof Date) || isNaN(date.getTime())) {
+    throw new Error('FormattedDateTime: Invalid date provided');
+  }
+
   const formatDateTime = () => {
-    const dateObj = new Date(timestamp);
     return new Intl.DateTimeFormat('en-US', {
       weekday: 'long',
       year: 'numeric',
@@ -19,11 +18,11 @@ const FormattedDateTime: React.FC<FormattedDateTimeProps> = ({
       day: 'numeric',
       hour: 'numeric',
       minute: 'numeric',
-    }).format(dateObj);
+    }).format(date);
   };
 
   return (
-    <span className={`formatted-datetime ${className || ''}`}>
+    <span className="formatted-datetime">
       {formatDateTime()}
     </span>
   );

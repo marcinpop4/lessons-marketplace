@@ -8,7 +8,7 @@ export class Address {
   state: string;
   postalCode: string;
   country: string;
-  
+
   constructor(
     street: string,
     city: string,
@@ -32,29 +32,35 @@ export class Address {
 
   /**
    * Creates an Address object from a string representation
-   * @param addressString String representation of an address
+   * @param addressString String representation of an address in format: "street, city, state postalCode, country"
    * @returns Address object
+   * @throws Error if the address string is not in the correct format
    */
   static fromString(addressString: string): Address {
-    // This is a simple implementation and might need to be adjusted
-    // based on the expected format of address strings in the system
     const parts = addressString.split(',').map(part => part.trim());
-    
-    if (parts.length < 3) {
-      throw new Error('Invalid address string format');
+
+    if (parts.length !== 4) {
+      throw new Error('Address string must contain street, city, state/postal code, and country separated by commas');
     }
-    
-    const street = parts[0];
-    const city = parts[1];
-    
-    // Handle the state and postal code which might be in the format "State PostalCode"
-    const statePostalParts = parts[2].split(' ').filter(p => p.length > 0);
-    const postalCode = statePostalParts.pop() || '';
+
+    const [street, city, statePostal, country] = parts;
+
+    if (!street || !city || !statePostal || !country) {
+      throw new Error('All address components (street, city, state/postal code, country) are required');
+    }
+
+    const statePostalParts = statePostal.split(' ').filter(p => p.length > 0);
+    if (statePostalParts.length < 2) {
+      throw new Error('State and postal code must be provided in the format "state postalCode"');
+    }
+
+    const postalCode = statePostalParts.pop();
     const state = statePostalParts.join(' ');
-    
-    // Default to US if country is not specified
-    const country = parts[3] || 'USA';
-    
+
+    if (!postalCode || !state) {
+      throw new Error('Both state and postal code are required');
+    }
+
     return new Address(street, city, state, postalCode, country);
   }
 } 
