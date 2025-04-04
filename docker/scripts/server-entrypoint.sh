@@ -98,25 +98,14 @@ if [ $EXIT_CODE -ne 0 ]; then
   log "Environment variables (excluding sensitive data):"
   env | grep -v -E "PASSWORD|SECRET|KEY" | sort
   
-  # Check if npm-debug.log exists
-  if [ -f "/app/npm-debug.log" ]; then
-    log "=== NPM DEBUG LOG ==="
-    cat /app/npm-debug.log
-  fi
-  
-  # Check if pnpm-debug.log exists
-  if [ -f "/app/.pnpm-debug.log" ]; then
-    log "=== PNPM DEBUG LOG ==="
-    cat /app/.pnpm-debug.log
-  fi
-  
-  # Check Node.js version
-  log "Node.js version: $(node --version)"
-  
-  # Try running node with --trace-warnings to get more detailed error information
+  # Try to run with trace warnings for more detailed error information
   log "=== ATTEMPTING TO RUN SERVER WITH TRACE WARNINGS ==="
-  ENV_TYPE=$ENV_TYPE NODE_OPTIONS="--trace-warnings" node dist/server/index.js 2>&1 || log "Failed to run with trace warnings"
+  ENV_TYPE=$ENV_TYPE NODE_OPTIONS="--trace-warnings" "$@" 2>&1
+  TRACE_EXIT_CODE=$?
+  
+  if [ $TRACE_EXIT_CODE -ne 0 ]; then
+    log "SERVER FAILED with trace warnings with exit code: $TRACE_EXIT_CODE"
+  fi
 fi
 
-# Exit with the original exit code
 exit $EXIT_CODE 

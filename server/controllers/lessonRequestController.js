@@ -1,6 +1,6 @@
 import { lessonRequestService } from '../services/database/lessonRequestService.js';
-import { LessonRequest } from '@shared/models/LessonRequest.js';
-import { Address } from '@shared/models/Address.js';
+import { LessonRequest } from '../../shared/models/LessonRequest.js';
+import { Address } from '../../shared/models/Address.js';
 import { teacherQuoteService } from '../services/teacherQuoteService.js';
 export class LessonRequestController {
     constructor() {

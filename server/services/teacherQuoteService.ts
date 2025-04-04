@@ -1,11 +1,11 @@
 import prisma from '../prisma.js';
-import { LessonType } from '@shared/models/LessonType.js';
-import { Teacher } from '@shared/models/Teacher.js';
-import { LessonQuote } from '@shared/models/LessonQuote.js';
-import { LessonRequest } from '@shared/models/LessonRequest.js';
-import { TeacherLessonHourlyRate } from '@shared/models/TeacherLessonHourlyRate.js';
-import { Student } from '@shared/models/Student.js';
-import { Address } from '@shared/models/Address.js';
+import { LessonType } from '../../shared/models/LessonType.js';
+import { Teacher } from '../../shared/models/Teacher.js';
+import { LessonQuote } from '../../shared/models/LessonQuote.js';
+import { LessonRequest } from '../../shared/models/LessonRequest.js';
+import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourlyRate.js';
+import { Student } from '../../shared/models/Student.js';
+import { Address } from '../../shared/models/Address.js';
 
 export class TeacherQuoteService {
     /**

@@ -1,8 +1,8 @@
 import prisma from '../prisma.js';
-import { Lesson } from '@shared/models/Lesson.js';
-import { LessonQuote } from '@shared/models/LessonQuote.js';
-import { LessonRequest } from '@shared/models/LessonRequest.js';
-import { Teacher } from '@shared/models/Teacher.js';
+import { Lesson } from '../../shared/models/Lesson.js';
+import { LessonQuote } from '../../shared/models/LessonQuote.js';
+import { LessonRequest } from '../../shared/models/LessonRequest.js';
+import { Teacher } from '../../shared/models/Teacher.js';
 /**
  * Controller for lesson-related operations
  */

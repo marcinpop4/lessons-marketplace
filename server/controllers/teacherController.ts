@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../prisma.js';
 import { Prisma, PrismaClient } from '@prisma/client';
-import { LessonType } from '@shared/models/LessonType.js';
+import { LessonType } from '../../shared/models/LessonType.js';
 
 // Define interfaces to match Prisma models
 interface TeacherLessonHourlyRate {

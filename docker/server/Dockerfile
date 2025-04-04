@@ -59,6 +59,9 @@ RUN npm install -g pnpm
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
 
+# Install production dependencies including ts-node and tsconfig-paths
+RUN pnpm install --prod --frozen-lockfile
+
 # Copy node_modules from dependencies stage
 COPY --from=dependencies /app/node_modules ./node_modules
 
@@ -68,8 +71,8 @@ COPY --from=dependencies /app/node_modules/.pnpm ./node_modules/.pnpm
 # Copy Prisma schema
 COPY --from=dependencies /app/server/prisma ./server/prisma
 
-# Copy scripts from dependencies stage
-COPY --from=dependencies /app/scripts ./scripts
+# Copy tsconfig.json for path resolution
+COPY tsconfig.json ./
 
 # Copy other necessary files
 COPY env ./env
@@ -80,9 +83,6 @@ RUN chmod +x /usr/local/bin/server-entrypoint.sh
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
-
-# Set up module resolution for scripts
-RUN echo '{"type":"module"}' > ./scripts/package.json 
 
 # Set environment variables
 ENV NODE_ENV=production

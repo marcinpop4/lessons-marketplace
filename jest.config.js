@@ -69,7 +69,7 @@ export default {
   setupFilesAfterEnv: ['<rootDir>/tests/unit/jest.setup.ts'],
   
   // Extension for ESM support since we're using Vite
-  extensionsToTreatAsEsm: ['.ts', '.tsx', '.mts', '.jsx'],
+  extensionsToTreatAsEsm: ['.ts', '.tsx', '.mts'],
   
   // Exclude e2e tests that use Playwright
   testPathIgnorePatterns: [
@@ -86,5 +86,10 @@ export default {
   moduleDirectories: [
     'node_modules',
     '<rootDir>'
+  ],
+
+  // Enable ES modules support
+  transformIgnorePatterns: [
+    'node_modules/(?!(tsconfig-paths|dotenv)/)'
   ]
 }; 

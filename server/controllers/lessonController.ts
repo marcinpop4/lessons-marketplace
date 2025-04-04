@@ -1,10 +1,10 @@
 import type { Request, Response } from 'express';
 import prisma from '../prisma.js';
 import type { PrismaClient } from '@prisma/client';
-import { Lesson } from '@shared/models/Lesson.js';
-import { LessonQuote } from '@shared/models/LessonQuote.js';
-import { LessonRequest } from '@shared/models/LessonRequest.js';
-import { Teacher } from '@shared/models/Teacher.js';
+import { Lesson } from '../../shared/models/Lesson.js';
+import { LessonQuote } from '../../shared/models/LessonQuote.js';
+import { LessonRequest } from '../../shared/models/LessonRequest.js';
+import { Teacher } from '../../shared/models/Teacher.js';
 
 /**
  * Controller for lesson-related operations

@@ -12,22 +12,22 @@
     "dev:server:debug": "cross-env DEBUG=true ENV_TYPE=dev dotenv -e env/.env.dev -- tsx watch server/index.ts",
     "docker:clean": "docker compose -f docker/docker-compose.yml down --volumes --remove-orphans && docker ps -aq | xargs -r docker rm -f && docker volume prune -f && docker network prune -f",
     "docker:db": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml rm -fs database && docker compose -f docker/docker-compose.yml up -d database",
-    "docker:db:rebuild": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml rm -fs database && docker compose -f docker/docker-compose.yml up -d --build database",
+    "docker:db:rebuild": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml rm -fs database && docker rmi docker-database:latest || true && docker compose -f docker/docker-compose.yml up -d --build database",
     "docker:debug": "node scripts/docker-debug.js",
     "docker:debug:sh": "./scripts/debug-docker.sh",
     "docker:deep-clean": "chmod +x scripts/docker-cleanup.sh && ./scripts/docker-cleanup.sh",
     "docker:deploy": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml down && docker compose -f docker/docker-compose.yml up -d",
-    "docker:deploy:rebuild": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml down && docker compose -f docker/docker-compose.yml up -d --build",
+    "docker:deploy:rebuild": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml down && docker compose -f docker/docker-compose.yml build --no-cache && docker compose -f docker/docker-compose.yml up -d",
     "docker:deploy:fly": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml --profile deploy build --no-cache deploy && docker compose -f docker/docker-compose.yml --profile deploy up deploy --exit-code-from deploy",
     "docker:down": "pnpm docker:stop && docker compose -f docker/docker-compose.yml down --remove-orphans",
     "docker:frontend": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml rm -fs frontend && docker compose -f docker/docker-compose.yml up -d frontend",
-    "docker:frontend:rebuild": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml rm -fs frontend && docker compose -f docker/docker-compose.yml up -d --build frontend",
+    "docker:frontend:rebuild": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml rm -fs frontend && docker rmi docker-frontend:latest || true && docker compose -f docker/docker-compose.yml up -d --build frontend",
     "docker:logs": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml logs",
     "docker:logs:frontend": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml logs frontend",
     "docker:logs:server": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml logs server",
     "docker:ps": "docker ps -a",
     "docker:server": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml rm -fs server && docker compose -f docker/docker-compose.yml up -d server",
-    "docker:server:rebuild": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml rm -fs server && docker compose -f docker/docker-compose.yml up -d --build server",
+    "docker:server:rebuild": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml rm -fs server && docker rmi docker-server:latest || true && docker compose -f docker/docker-compose.yml up -d --build server",
     "docker:stop": "docker compose -f docker/docker-compose.yml stop",
     "docker:test": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml --profile test run --rm --no-deps --use-aliases test pnpm test",
     "docker:test:rebuild": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml --profile test build test && docker compose -f docker/docker-compose.yml --profile test run --rm --use-aliases test pnpm test",
@@ -59,7 +59,8 @@
     "fix:tsconfig": "node scripts/fix-tsconfig-json.js",
     "fix:typescript": "pnpm fix:tsconfig && pnpm typecheck",
     "check:deployment": "node scripts/check-build-errors.js",
-    "lint-staged": "lint-staged"
+    "lint-staged": "lint-staged",
+    "start": "dotenv -e env/.env.${ENV_TYPE:-ci} -- node -r ts-node/register/transpile-only -r tsconfig-paths/register dist/server/index.js"
   },
   "dependencies": {
     "@tailwindcss/forms": "0.5.10",
@@ -84,7 +85,8 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-router-dom": "7.4.1",
-    "zod": "3.24.2"
+    "zod": "3.24.2",
+    "ts-node": "^10.9.2"
   },
   "devDependencies": {
     "@eslint/js": "9.23.0",
@@ -125,12 +127,13 @@
     "prisma": "6.5.0",
     "tailwindcss": "4.0.17",
     "ts-jest": "29.3.1",
+    "ts-node-dev": "^2.0.0",
     "tsc-files": "1.1.4",
+    "tsconfig-paths": "^4.2.0",
     "tsx": "4.19.3",
     "typescript": "5.8.2",
     "typescript-eslint": "8.29.0",
-    "vite": "6.2.4",
-    "ts-node-dev": "^2.0.0"
+    "vite": "6.2.4"
   },
   "type": "module",
   "version": "0.0.0",

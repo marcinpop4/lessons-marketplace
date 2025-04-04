@@ -1,5 +1,5 @@
 import prisma from '../prisma.js';
-import { LessonType } from '@shared/models/LessonType.js';
+import { LessonType } from '../../shared/models/LessonType.js';
 /**
  * Controller for teacher-related operations
  */

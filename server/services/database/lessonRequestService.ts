@@ -1,6 +1,6 @@
 import prisma from '../../prisma.js';
 import { Prisma, PrismaClient } from '@prisma/client';
-import { LessonType } from '@shared/models/LessonType.js';
+import { LessonType } from '../../../shared/models/LessonType.js';
 
 export interface AddressDTO {
   street: string;

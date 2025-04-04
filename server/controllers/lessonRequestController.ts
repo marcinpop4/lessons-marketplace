@@ -1,8 +1,8 @@
 import type { Request, Response } from 'express';
 import { lessonRequestService } from '../services/database/lessonRequestService.js';
 import type { LessonRequest as PrismaLessonRequest } from '@prisma/client';
-import { LessonRequest } from '@shared/models/LessonRequest.js';
-import { Address } from '@shared/models/Address.js';
+import { LessonRequest } from '../../shared/models/LessonRequest.js';
+import { Address } from '../../shared/models/Address.js';
 import { teacherQuoteService } from '../services/teacherQuoteService.js';
 
 export class LessonRequestController {
