@@ -13,7 +13,7 @@ if (!target || !['frontend', 'server'].includes(target)) {
 }
 
 // Read the .env.prod file
-const envFile = fs.readFileSync('env/.env.prod', 'utf8');
+const envFile = fs.readFileSync('env/.env.production', 'utf8');
 const flyFile = fs.readFileSync(`docker/${target}/fly.toml`, 'utf8');
 
 // Parse .env.prod file
