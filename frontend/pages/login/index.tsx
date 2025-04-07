@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import LoginForm from '@frontend/components/features/login/LoginForm';
 import { useAuth } from '@frontend/contexts/AuthContext';
+import { Card } from '@frontend/components/shared/Card';
 import './login.css';
 
 const LoginPage: React.FC = () => {
@@ -11,7 +12,7 @@ const LoginPage: React.FC = () => {
 
   const handleSuccess = () => {
     const { from } = location.state || {};
-    
+
     if (user?.userType === 'STUDENT') {
       navigate('/lesson-request', { replace: true });
     } else if (user?.userType === 'TEACHER') {
@@ -25,19 +26,17 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="login-form-container">
-      <div className="card card-primary login-card">
-        <div className="card-header">
-          <h3 className="text-xl font-semibold">Welcome Back</h3>
-          <p>Sign in to your account</p>
+      <Card
+        title="Welcome Back"
+        subtitle="Sign in to your account"
+        variant="primary"
+        className="login-card"
+      >
+        <LoginForm onSuccess={handleSuccess} />
+        <div className="mt-4 text-center">
+          <p>Don't have an account? <a href="/register" className="text-primary-600 hover:text-primary-700">Create one</a></p>
         </div>
-        
-        <div className="card-body">
-          <LoginForm onSuccess={handleSuccess} />
-          <div className="mt-4 text-center">
-            <p>Don't have an account? <a href="/register" className="text-primary-600 hover:text-primary-700">Create one</a></p>
-          </div>
-        </div>
-      </div>
+      </Card>
     </div>
   );
 };

@@ -530,47 +530,40 @@ body[data-theme="dark"] .alert-error {
 }
 
 /* ===== TYPOGRAPHY ===== */
-/* Headers */
-h1, .text-3xl {
-  font-size: 1.875rem;
-  line-height: 2.25rem;
-  font-weight: bold;
+/* Base heading styles */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading-color);
+  font-weight: 600;
+  line-height: 1.2;
+  margin-bottom: 0.5em;
 }
 
-body[data-theme="dark"] h1, 
-body[data-theme="dark"] .text-3xl {
-  color: var(--color-primary-100);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+h1 { font-size: var(--heading-h1-size); }
+h2 { font-size: var(--heading-h2-size); }
+h3 { font-size: var(--heading-h3-size); }
+h4 { font-size: var(--heading-h4-size); }
+h5 { font-size: var(--heading-h5-size); }
+h6 { font-size: var(--heading-h6-size); }
+
+/* Muted heading variants */
+h4.muted, h5.muted, h6.muted {
+  color: var(--heading-color-muted);
 }
 
-h2, .text-2xl {
-  font-size: 1.5rem;
-  line-height: 2rem;
-  font-weight: bold;
+/* Dark mode heading overrides */
+body[data-theme="dark"] h1,
+body[data-theme="dark"] h2,
+body[data-theme="dark"] h3,
+body[data-theme="dark"] h4,
+body[data-theme="dark"] h5,
+body[data-theme="dark"] h6 {
+  color: var(--heading-color);
 }
 
-h3, .text-xl {
-  font-size: 1.25rem;
-  line-height: 1.75rem;
-  font-weight: semibold;
-}
-
-h4, .text-lg {
-  font-size: 1.125rem;
-  line-height: 1.75rem;
-  font-weight: medium;
-}
-
-h5, .text-base {
-  font-size: 1rem;
-  line-height: 1.5rem;
-  font-weight: medium;
-}
-
-h6, .text-sm {
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-  font-weight: medium;
+body[data-theme="dark"] h4.muted,
+body[data-theme="dark"] h5.muted,
+body[data-theme="dark"] h6.muted {
+  color: var(--heading-color-muted);
 }
 
 /* Text variations */
