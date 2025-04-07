@@ -47,6 +47,7 @@
     "prisma:studio": "dotenv -e env/.env.${ENV_TYPE} -- prisma studio --schema=server/prisma/schema.prisma",
     "swagger:server": "tsx api-docs/serve-swagger.ts",
     "test": "dotenv -e env/.env.${ENV_TYPE} -- jest tests/unit && NODE_OPTIONS=--no-warnings dotenv -e env/.env.${ENV_TYPE} -- playwright test",
+    "test:clean": "pnpm clean && pnpm install && pnpm prisma:generate && pnpm prisma:seed && pnpm test",
     "test:unit": "dotenv -e env/.env.${ENV_TYPE} -- jest tests/unit",
     "test:e2e": "NODE_OPTIONS=--no-warnings dotenv -e env/.env.${ENV_TYPE} -- playwright test",
     "typecheck": "ENV_TYPE=prod tsc --project tsconfig.json --noEmit",
@@ -60,8 +61,7 @@
     "fix:typescript": "pnpm fix:tsconfig && pnpm typecheck",
     "check:deployment": "node scripts/check-build-errors.js",
     "lint-staged": "lint-staged",
-    "start": "dotenv -e env/.env.${ENV_TYPE:-ci} -- node -r ts-node/register/transpile-only -r tsconfig-paths/register dist/server/index.js",
-    "validate:rebuild": "pnpm clean && pnpm install && pnpm prisma:generate && pnpm prisma:seed && pnpm test:e2e"
+    "start": "dotenv -e env/.env.${ENV_TYPE:-ci} -- node -r ts-node/register/transpile-only -r tsconfig-paths/register dist/server/index.js"
   },
   "dependencies": {
     "@tailwindcss/forms": "0.5.10",
