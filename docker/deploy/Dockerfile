@@ -27,7 +27,7 @@ RUN curl -L https://fly.io/install.sh | sh
 ENV PATH="/root/.fly/bin:${PATH}"
 
 # Set environment variables
-ENV ENV_TYPE=prod
+ENV NODE_ENV=production
 
 CMD flyctl version && \
     node scripts/sync-fly-env.js server && \

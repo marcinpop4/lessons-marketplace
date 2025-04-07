@@ -9,7 +9,6 @@ primary_region = "ewr"
 [env]
 # START: Environment variables from .env.prod
 # Only include environment variables that are not in .env.prod
-  ENV_TYPE = "prod"
   NODE_ENV = "production"
   PORT = "3000"
   FRONTEND_PORT = "80"

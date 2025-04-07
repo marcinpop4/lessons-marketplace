@@ -47,4 +47,4 @@ Alwasy put scripts in the ./scripts folder. Add subfolders to keep the folder or
 Never create symlinks and always reference files where they are located
 
 //Environments
-Run ad-hoc comands with ENV_TYPE=dev|ci|prod 
+Run ad-hoc commands with NODE_ENV=development|test|production 

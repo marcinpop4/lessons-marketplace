@@ -7,9 +7,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables - this assumes ENV_TYPE is set when the tests are run
-const envType = process.env.ENV_TYPE;
-const envFile = path.resolve(__dirname, `env/.env.${envType}`);
+// Load environment variables - this assumes NODE_ENV is set when the tests are run
+const nodeEnv = process.env.NODE_ENV;
+const envFile = path.resolve(__dirname, `env/.env.${nodeEnv}`);
 dotenv.config({ path: envFile });
 
 // Check if running in Docker
@@ -58,7 +58,7 @@ export default defineConfig({
   ],
   // Only start web server in local development
   webServer: isDocker ? undefined : {
-    command: `NODE_NO_WARNINGS=1 LOG_LEVEL=${logLevel} VITE_LOG_LEVEL=${logLevel} ENV_TYPE=${envType} pnpm run dev:full`,
+    command: `NODE_NO_WARNINGS=1 LOG_LEVEL=${logLevel} VITE_LOG_LEVEL=${logLevel} NODE_ENV=${nodeEnv} pnpm run dev:full`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     stdout: parseInt(logLevel, 10) >= 2 ? 'pipe' : 'ignore', // Only pipe stdout if log level is INFO or higher

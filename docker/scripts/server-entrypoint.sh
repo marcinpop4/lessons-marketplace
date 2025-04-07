@@ -9,14 +9,13 @@ log() {
 
 # Source environment variables if the temporary file exists
 if [ -f "/tmp/env_vars.sh" ]; then
-  log "Sourcing environment variables from .env.${ENV_TYPE}"
+  log "Sourcing environment variables from .env.${NODE_ENV}"
   source /tmp/env_vars.sh
 fi
 
 # Log environment information
 log "=== ENVIRONMENT SETUP ==="
 log "Current directory: $(pwd)"
-log "ENV_TYPE: $ENV_TYPE"
 log "NODE_ENV: $NODE_ENV"
 log "PORT: $PORT"
 log "FRONTEND_URL: $FRONTEND_URL"
@@ -31,20 +30,20 @@ if [ -z "$FRONTEND_URL" ]; then
   log "ERROR: FRONTEND_URL environment variable is missing!"
 fi
 
-if [ -z "$ENV_TYPE" ]; then
-  log "WARNING: ENV_TYPE is not set. This may affect .env file loading."
-  # Set a default ENV_TYPE if not provided
-  ENV_TYPE="ci"
-  log "Setting default ENV_TYPE=$ENV_TYPE"
+if [ -z "$NODE_ENV" ]; then
+  log "WARNING: NODE_ENV is not set. This may affect .env file loading."
+  # Set a default NODE_ENV if not provided
+  NODE_ENV="test"
+  log "Setting default NODE_ENV=$NODE_ENV"
 fi
 
 # Check if environment file exists
-if [ -n "$ENV_TYPE" ] && [ -f "env/.env.$ENV_TYPE" ]; then
-  log "Found env file: env/.env.$ENV_TYPE"
-  log "Contents of env/.env.$ENV_TYPE (excluding sensitive data):"
-  grep -v -E "PASSWORD|SECRET|KEY" "env/.env.$ENV_TYPE" || log "Failed to read env file"
+if [ -n "$NODE_ENV" ] && [ -f "env/.env.$NODE_ENV" ]; then
+  log "Found env file: env/.env.$NODE_ENV"
+  log "Contents of env/.env.$NODE_ENV (excluding sensitive data):"
+  grep -v -E "PASSWORD|SECRET|KEY" "env/.env.$NODE_ENV" || log "Failed to read env file"
 else
-  log "WARNING: env/.env.$ENV_TYPE file not found!"
+  log "WARNING: env/.env.$NODE_ENV file not found!"
   ls -la env/ || log "Failed to list env directory"
 fi
 
@@ -58,7 +57,7 @@ fi
 
 # Generate Prisma client
 log "=== GENERATING PRISMA CLIENT ==="
-ENV_TYPE=$ENV_TYPE pnpm prisma:generate
+NODE_ENV=$NODE_ENV pnpm prisma:generate
 GENERATE_EXIT_CODE=$?
 if [ $GENERATE_EXIT_CODE -ne 0 ]; then
   log "ERROR: Prisma client generation failed with exit code $GENERATE_EXIT_CODE"
@@ -68,7 +67,7 @@ fi
 
 # Run database migrations
 log "=== RUNNING DATABASE MIGRATIONS ==="
-ENV_TYPE=$ENV_TYPE pnpm prisma:migrate
+NODE_ENV=$NODE_ENV pnpm prisma:migrate
 MIGRATE_EXIT_CODE=$?
 if [ $MIGRATE_EXIT_CODE -ne 0 ]; then
   log "ERROR: Database migrations failed with exit code $MIGRATE_EXIT_CODE"
@@ -77,7 +76,7 @@ else
 fi
 
 log "=== RUNNING DATABASE SEED ==="
-ENV_TYPE=$ENV_TYPE pnpm prisma:seed
+NODE_ENV=$NODE_ENV pnpm prisma:seed
 SEED_EXIT_CODE=$?
 if [ $SEED_EXIT_CODE -ne 0 ]; then
   log "ERROR: Database seed failed with exit code $SEED_EXIT_CODE"
@@ -89,8 +88,8 @@ fi
 log "=== STARTING SERVER ==="
 log "Command to run: $*"
 
-# Run the server with ENV_TYPE explicitly set
-ENV_TYPE=$ENV_TYPE "$@" 2>&1
+# Run the server with NODE_ENV explicitly set
+NODE_ENV=$NODE_ENV "$@" 2>&1
 EXIT_CODE=$?
 
 if [ $EXIT_CODE -ne 0 ]; then
@@ -100,7 +99,7 @@ if [ $EXIT_CODE -ne 0 ]; then
   
   # Try to run with trace warnings for more detailed error information
   log "=== ATTEMPTING TO RUN SERVER WITH TRACE WARNINGS ==="
-  ENV_TYPE=$ENV_TYPE NODE_OPTIONS="--trace-warnings" "$@" 2>&1
+  NODE_ENV=$NODE_ENV NODE_OPTIONS="--trace-warnings" "$@" 2>&1
   TRACE_EXIT_CODE=$?
   
   if [ $TRACE_EXIT_CODE -ne 0 ]; then

@@ -3,9 +3,9 @@ FROM node:20-slim AS base
 # Set working directory
 WORKDIR /app
 
-# Set default ENV_TYPE if not provided at build time
-ARG ENV_TYPE=ci
-ENV ENV_TYPE=${ENV_TYPE}
+# Set default NODE_ENV if not provided at build time
+ARG NODE_ENV=test
+ENV NODE_ENV=${NODE_ENV}
 
 # Install dependencies
 FROM base AS dependencies
@@ -86,7 +86,7 @@ COPY --from=builder /app/dist ./dist
 
 # Set environment variables
 ENV NODE_ENV=production
-# ENV_TYPE already set from base image
+# NODE_ENV already set from base image
 
 # Expose the port the app runs on
 EXPOSE ${PORT:-3000}

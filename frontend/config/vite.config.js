@@ -23,11 +23,11 @@ export default defineConfig(({ mode }) => {
     // Get log level from environment
     const logLevel = parseInt(process.env.VITE_LOG_LEVEL || '1', 10);
     // Check if we're in development mode
-    const isDev = process.env.ENV_TYPE === 'dev';
+    const isDev = process.env.NODE_ENV === 'development';
     // Only log in higher verbosity modes
     if (logLevel >= 2) {
         console.log(`Building for ${mode} with API URL: ${process.env.VITE_API_BASE_URL}`);
-        console.log(`Environment type: ${process.env.ENV_TYPE}`);
+        console.log(`Environment type: ${process.env.NODE_ENV}`);
     }
     return {
         plugins: [

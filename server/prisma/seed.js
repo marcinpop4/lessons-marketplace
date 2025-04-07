@@ -14,7 +14,16 @@ import { execSync } from 'child_process';
 // Load environment variables from .env file in the project root
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+const envFile = path.resolve(__dirname, `../../env/.env.${process.env.NODE_ENV}`);
+
+if (!process.env.NODE_ENV) {
+  throw new Error('NODE_ENV environment variable is required');
+}
+
+const result = dotenv.config({ path: envFile });
+if (result.error) {
+  throw new Error(`Failed to load environment file at ${envFile}: ${result.error.message}`);
+}
 
 const { PrismaClient } = pkg;
 
@@ -29,6 +38,10 @@ async function ensurePrismaClientIsInitialized() {
     console.log('✅ Prisma client is initialized and connected to the database');
     return true;
   } catch (error) {
+    if (error.code === 'ECONNREFUSED') {
+      throw new Error(`Database connection failed. Make sure the database container is running and accessible at ${process.env.DATABASE_URL}`);
+    }
+    
     console.error('❌ Prisma client is not initialized properly');
     console.error('Attempting to generate Prisma client...');
     
@@ -41,8 +54,10 @@ async function ensurePrismaClientIsInitialized() {
       console.log('✅ Prisma client is now properly initialized');
       return true;
     } catch (generateError) {
-      console.error('Failed to generate Prisma client:', generateError);
-      return false;
+      if (generateError.code === 'ECONNREFUSED') {
+        throw new Error(`Database connection failed. Make sure the database container is running and accessible at ${process.env.DATABASE_URL}`);
+      }
+      throw new Error(`Failed to initialize Prisma client: ${generateError.message}`);
     }
   }
 }

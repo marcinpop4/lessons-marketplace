@@ -11,7 +11,7 @@ import fs from 'fs';
 import path from 'path';
 
 // Set environment variable to match Docker build
-process.env.ENV_TYPE = 'prod';
+process.env.NODE_ENV = 'production';
 
 // Colors for output formatting
 const colors = {
