@@ -1,29 +1,63 @@
 .lesson-request-page {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
   width: 100%;
-  max-width: 1200px;
+  max-width: var(--container-6xl);
   margin: 0 auto;
-  padding: 1rem;
+  padding: 2rem;
 }
 
-.lesson-request-page-header {
-  width: 100%;
-  text-align: center;
-  margin-bottom: 1rem;
+.page-header {
+  margin-bottom: 2rem;
 }
 
-.lesson-request-page-header h1 {
-  font-size: 2rem;
-  font-weight: 600;
+.page-header h1 {
+  font-size: var(--heading-h1-size);
   color: var(--color-text-primary);
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.5rem;
 }
 
-.lesson-request-page-header p {
+.page-header p {
   color: var(--color-text-secondary);
-  font-size: 1rem;
-  margin-bottom: 0.5rem;
+  font-size: var(--text-lg);
+}
+
+.lesson-request-content {
+  width: 100%;
+}
+
+.lesson-request-form {
+  width: 100%;
+}
+
+.lesson-request-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Card specific styles */
+.lesson-request-card {
+  height: 100%;
+}
+
+/* Form submit button styles */
+.lesson-request-form button[type="submit"] {
+  width: 100%;
+  padding: 1rem;
+  background-color: var(--color-primary-600);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: var(--transition-colors);
+}
+
+.lesson-request-form button[type="submit"]:hover {
+  background-color: var(--color-primary-700);
+}
+
+.lesson-request-form button[type="submit"]:disabled {
+  background-color: var(--color-secondary-400);
+  cursor: not-allowed;
 } 

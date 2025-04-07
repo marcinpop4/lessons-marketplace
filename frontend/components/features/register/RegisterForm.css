@@ -25,12 +25,17 @@
   margin-bottom: 1rem;
 }
 
-.register-form .form-row.full-width {
-  grid-column: 1 / -1;
+.register-form .form-row:has(.form-group.full-width) {
+  grid-template-columns: 1fr;
 }
 
 .register-form .form-group {
   margin-bottom: 0;
+}
+
+.form-group.full-width {
+  flex: 0 0 100%;
+  max-width: 100%;
 }
 
 /* User type styles */

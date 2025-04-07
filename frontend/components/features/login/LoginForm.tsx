@@ -121,9 +121,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
               required
             />
           </div>
-        </div>
 
-        <div className="form-row">
           <div className="form-group">
             <label htmlFor="password">Password</label>
             <input

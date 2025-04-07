@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { LessonQuote } from '@shared/models/LessonQuote';
 import { createLessonFromQuote } from '@frontend/api/lessonApi';
+import { Card } from '@frontend/components/shared/Card';
 import './TeacherQuoteCard.css';
 
 interface TeacherQuoteCardProps {
@@ -27,42 +28,37 @@ const TeacherQuoteCard: React.FC<TeacherQuoteCardProps> = ({ quote, onAccept }) 
   };
 
   return (
-    <div className="card card-accent teacher-quote-card">
-      <div className="card-header">
-        <h3>{quote.teacher.firstName} {quote.teacher.lastName}</h3>
-      </div>
-      <div className="card-body">
-        <div className="quote-details">
-          <div className="quote-detail">
-            <span className="detail-label">Cost:</span>
-            <span className="detail-value">{quote.getFormattedCost()}</span>
-          </div>
+    <Card
+      title={`${quote.teacher.firstName} ${quote.teacher.lastName} - ${quote.getFormattedCost()}`}
+      variant="accent"
+      className="teacher-quote-card"
+    >
+      <div className="quote-details">
 
-          <div className="quote-detail">
-            <span className="detail-label">Hourly Rate:</span>
-            <span className="detail-value">
-              ${(quote.hourlyRateInCents / 100).toFixed(2)}/hour
-            </span>
-          </div>
-
-          {error && (
-            <div className="alert alert-error">
-              {error}
-            </div>
-          )}
+        <div className="quote-detail">
+          <span className="detail-label">Hourly Rate:</span>
+          <span className="detail-value">
+            ${(quote.hourlyRateInCents / 100).toFixed(2)}/hour
+          </span>
         </div>
 
-        <div className="quote-actions">
-          <button
-            onClick={handleAccept}
-            disabled={loading || !quote.isValid()}
-            className="btn btn-accent"
-          >
-            {loading ? 'Accepting...' : 'Accept Quote'}
-          </button>
-        </div>
+        {error && (
+          <div className="alert alert-error">
+            {error}
+          </div>
+        )}
       </div>
-    </div>
+
+      <div className="quote-actions">
+        <button
+          onClick={handleAccept}
+          disabled={loading || !quote.isValid()}
+          className="btn btn-accent"
+        >
+          {loading ? 'Accepting...' : 'Accept Quote'}
+        </button>
+      </div>
+    </Card>
   );
 };
 

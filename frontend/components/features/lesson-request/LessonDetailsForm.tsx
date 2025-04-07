@@ -1,5 +1,6 @@
 import React from 'react';
 import { LessonType, formatDisplayLabel } from '@shared/models/LessonType';
+import { Card } from '@frontend/components/shared/Card';
 
 // Helper function to format date for input field
 const formatDateForInput = (date: Date): string => {
@@ -9,20 +10,13 @@ const formatDateForInput = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-// Helper function to generate time options (9am to 8pm)
-const generateTimeOptions = () => {
-  const options = [];
-  for (let hour = 9; hour <= 20; hour++) {
-    const hourFormatted = hour % 12 === 0 ? 12 : hour % 12;
-    const amPm = hour < 12 ? 'AM' : 'PM';
-    options.push({
-      value: `${hour.toString().padStart(2, '0')}:00`,
-      label: `${hourFormatted}:00 ${amPm}`
-    });
-    options.push({
-      value: `${hour.toString().padStart(2, '0')}:30`,
-      label: `${hourFormatted}:30 ${amPm}`
-    });
+// Helper function to generate time options
+const generateTimeOptions = (): string[] => {
+  const options: string[] = [];
+  for (let hour = 9; hour < 21; hour++) {
+    const formattedHour = hour.toString().padStart(2, '0');
+    options.push(`${formattedHour}:00`);
+    options.push(`${formattedHour}:30`);
   }
   return options;
 };
@@ -51,79 +45,73 @@ const LessonDetailsForm: React.FC<LessonDetailsFormProps> = ({
   const timeOptions = generateTimeOptions();
 
   return (
-    <div className="card card-primary lesson-request-card">
-      <div className="card-header">
-        <h3>Lesson Details</h3>
-      </div>
-
-      <div className="card-body">
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="type">Lesson Type</label>
-            <select
-              id="type"
-              name="type"
-              value={type}
-              onChange={onTypeChange}
-              required
-            >
-              {Object.values(LessonType).map(type => (
-                <option key={type} value={type}>{formatDisplayLabel(type)}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="durationMinutes">Duration (minutes)</label>
-            <select
-              id="durationMinutes"
-              name="durationMinutes"
-              value={durationMinutes}
-              onChange={onDurationChange}
-              required
-            >
-              <option value={30}>30</option>
-              <option value={45}>45</option>
-              <option value={60}>60</option>
-              <option value={90}>90</option>
-            </select>
-          </div>
+    <Card
+      title="Lesson Details"
+      variant="primary"
+      className="lesson-request-card"
+    >
+      <div className="form-row">
+        <div className="form-group">
+          <label htmlFor="type">Lesson Type</label>
+          <select
+            id="type"
+            name="type"
+            value={type}
+            onChange={onTypeChange}
+            required
+          >
+            {Object.values(LessonType).map(type => (
+              <option key={type} value={type}>{formatDisplayLabel(type)}</option>
+            ))}
+          </select>
         </div>
 
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="date">Date</label>
-            <input
-              type="date"
-              id="date"
-              name="date"
-              value={selectedDate}
-              onChange={onDateChange}
-              min={formatDateForInput(new Date())}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="time">Time</label>
-            <select
-              id="time"
-              name="time"
-              value={selectedTime}
-              onChange={onTimeChange}
-              required
-            >
-              <option value="">Select a time</option>
-              {timeOptions.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="form-group">
+          <label htmlFor="durationMinutes">Duration (minutes)</label>
+          <select
+            id="durationMinutes"
+            name="durationMinutes"
+            value={durationMinutes}
+            onChange={onDurationChange}
+            required
+          >
+            <option value={30}>30</option>
+            <option value={45}>45</option>
+            <option value={60}>60</option>
+            <option value={90}>90</option>
+          </select>
         </div>
       </div>
-    </div>
+
+      <div className="form-row">
+        <div className="form-group">
+          <label htmlFor="date">Date</label>
+          <input
+            id="date"
+            type="date"
+            value={selectedDate}
+            onChange={onDateChange}
+            min={formatDateForInput(new Date())}
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="time">Time</label>
+          <select
+            id="time"
+            value={selectedTime}
+            onChange={onTimeChange}
+            required
+          >
+            <option value="">Select a time</option>
+            {timeOptions.map(time => (
+              <option key={time} value={time}>{time}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </Card>
   );
 };
 

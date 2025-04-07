@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import LessonRequestForm from '@frontend/components/features/lesson-request/LessonRequestForm';
+import { Card } from '@frontend/components/shared/Card';
 import './lesson-request.css';
 
 const LessonRequestPage: React.FC = () => {
@@ -12,11 +13,13 @@ const LessonRequestPage: React.FC = () => {
 
   return (
     <div className="lesson-request-page">
-      <div className="lesson-request-page-header">
+      <div className="page-header">
         <h1>Request a Lesson</h1>
         <p>Fill out the form below to request a lesson with one of our qualified teachers.</p>
       </div>
-      <LessonRequestForm onSubmitSuccess={handleSubmitSuccess} />
+      <div className="lesson-request-content">
+        <LessonRequestForm onSubmitSuccess={handleSubmitSuccess} />
+      </div>
     </div>
   );
 };

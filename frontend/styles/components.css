@@ -104,26 +104,58 @@ button:disabled,
 }
 
 /* ===== FORM ELEMENTS ===== */
+/* Form row for multi-column layouts */
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.form-row:last-child {
+  margin-bottom: 0;
+}
+
+/* Form group styles */
 .form-group {
-  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.form-row .form-group {
+  margin-bottom: 0;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 0.5rem;
   font-weight: 500;
+  color: var(--color-secondary-700);
+  font-size: 0.875rem;
+}
+
+body[data-theme="dark"] .form-group label {
+  color: var(--color-secondary-300);
 }
 
 input, 
 select,
 textarea {
   width: 100%;
-  padding: 0.625rem 0.75rem;
+  padding: 0.5rem 0.75rem;
   border: 1px solid var(--color-secondary-200);
   border-radius: var(--radius-md);
   background-color: var(--color-secondary-50);
   color: var(--color-secondary-900);
   transition: var(--transition-colors), var(--transition-shadow);
+  font-size: 0.875rem;
+  line-height: 1.25;
+  min-height: 2.25rem;
 }
 
 /* Checkbox and Radio styles */
@@ -131,6 +163,7 @@ input[type="checkbox"],
 input[type="radio"] {
   width: 1rem;
   height: 1rem;
+  min-height: 1rem;
   margin: 0;
   cursor: pointer;
   appearance: none;
@@ -141,6 +174,8 @@ input[type="radio"] {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: all 0.2s ease;
+  background-color: white;
 }
 
 input[type="checkbox"] {
@@ -157,6 +192,18 @@ input[type="radio"]:checked {
   border-color: var(--color-primary-500);
 }
 
+input[type="radio"]:checked::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  background-color: white;
+  transform: translate(-50%, -50%);
+}
+
 input[type="checkbox"]:checked::before {
   content: '';
   position: absolute;
@@ -169,21 +216,10 @@ input[type="checkbox"]:checked::before {
   transform: translate(-50%, -60%) rotate(45deg);
 }
 
-input[type="radio"]:checked::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: white;
-  transform: translate(-50%, -50%);
-}
-
 input[type="checkbox"]:focus,
 input[type="radio"]:focus {
   outline: none;
+  border-color: var(--color-primary-500);
   box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.2);
 }
 
@@ -244,18 +280,44 @@ input[type="date"] {
   padding-right: 0.75rem;
 }
 
-/* Form row for multi-column layouts */
-.form-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1rem;
+/* Special handling for radio groups */
+.form-group.user-type {
+  margin-bottom: 1.5rem;
 }
 
-.form-row .form-group {
-  flex: 1 1 0;
-  min-width: 200px;
-  margin-bottom: 0;
+/* Radio group styles */
+.radio-group {
+  display: flex;
+  gap: 1.5rem;
+}
+
+/* Vertical radio group */
+.radio-group.vertical {
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Radio option wrapper */
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.radio-option input[type="radio"] {
+  margin: 0;
+}
+
+.radio-option label {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-secondary-700);
+  cursor: pointer;
+}
+
+body[data-theme="dark"] .radio-option label {
+  color: var(--color-secondary-300);
 }
 
 /* ===== CARDS ===== */

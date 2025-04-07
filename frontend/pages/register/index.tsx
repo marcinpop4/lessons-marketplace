@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import RegisterForm from '@frontend/components/features/register/RegisterForm';
 import { useAuth } from '@frontend/contexts/AuthContext';
+import { Card } from '@frontend/components/shared/Card';
 import './register.css';
 
 const RegisterPage: React.FC = () => {
@@ -20,19 +21,17 @@ const RegisterPage: React.FC = () => {
 
   return (
     <div className="register-form-container">
-      <div className="card card-primary register-card">
-        <div className="card-header">
-          <h3 className="text-xl font-semibold">Create an Account</h3>
-          <p>Join Lessons Marketplace today</p>
+      <Card
+        title="Create an Account"
+        subtitle="Join Lessons Marketplace today"
+        variant="primary"
+        className="register-card"
+      >
+        <RegisterForm onSuccess={handleSuccess} />
+        <div className="mt-4 text-center">
+          <p>Already have an account? <a href="/login" className="text-primary-600 hover:text-primary-700">Sign in</a></p>
         </div>
-        
-        <div className="card-body">
-          <RegisterForm onSuccess={handleSuccess} />
-          <div className="mt-4 text-center">
-            <p>Already have an account? <a href="/login" className="text-primary-600 hover:text-primary-700">Sign in</a></p>
-          </div>
-        </div>
-      </div>
+      </Card>
     </div>
   );
 };
