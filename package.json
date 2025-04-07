@@ -13,7 +13,7 @@
     "docker:clean": "docker compose -f docker/docker-compose.yml down --volumes --remove-orphans && docker ps -aq | xargs -r docker rm -f && docker volume prune -f && docker network prune -f",
     "docker:db": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml rm -fs database && docker compose -f docker/docker-compose.yml up -d database",
     "docker:db:rebuild": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml rm -fs database && docker rmi docker-database:latest || true && docker compose -f docker/docker-compose.yml up -d --build database",
-    "docker:debug": "node scripts/docker-debug.js",
+    "docker:debug": "tsx scripts/docker-debug.ts",
     "docker:debug:sh": "./scripts/debug-docker.sh",
     "docker:deep-clean": "chmod +x scripts/docker-cleanup.sh && ./scripts/docker-cleanup.sh",
     "docker:deploy": "dotenv -e env/.env.${ENV_TYPE} -- docker compose -f docker/docker-compose.yml down && docker compose -f docker/docker-compose.yml up -d",

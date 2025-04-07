@@ -67,16 +67,15 @@ jobs:
           mkdir -p logs
           chmod -R 777 logs
           
-          # Ensure script is executable and run it
-          chmod +x scripts/debug-docker.sh
-          ./scripts/debug-docker.sh
+          # Run TypeScript debug script
+          pnpm tsx scripts/docker-debug.ts
           
           # Ensure logs are accessible
           chmod -R 777 logs
           
           # List debug files if they exist
           echo "=== DEBUG FILES GENERATED ==="
-          find logs -type f | sort
+          find logs -type f -name "*-debug-*.log" | sort
 
       - name: Upload debug logs
         uses: actions/upload-artifact@v4
@@ -84,9 +83,7 @@ jobs:
         with:
           name: docker-debug-logs
           path: |
-            logs/**/*.log
-            logs/**/*.txt
-            logs/**/*
+            logs/*-debug-*.log
           retention-days: 7
           if-no-files-found: warn # Don't fail the build if no logs are found
 

@@ -9,27 +9,30 @@ const profileName = process.env.profile || 'ci';
 async function debugDockerContainers() {
   try {
     console.log(`=== DEBUG INFO FOR PROFILE: ${profileName} ===`);
-    
+
     // Check all running containers
     const { stdout: containers } = await execAsync('docker ps -a');
     console.log('=== ALL CONTAINERS ===');
     console.log(containers);
-    
+
     // Get server container logs
     const { stdout: containerId } = await execAsync(
       `docker ps -aq --filter name=lessons-marketplace-server`
     );
-    
+
     if (containerId.trim()) {
       console.log('=== SERVER CONTAINER LOGS ===');
       try {
         const { stdout: logs } = await execAsync(`docker logs ${containerId.trim()}`);
         console.log(logs);
-        
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const serverLogPath = `logs/server-container-debug-${timestamp}.log`;
+
         // Save logs to file
-        await fs.writeFile('server-container-debug.log', logs);
-        console.log('Logs saved to server-container-debug.log');
-        
+        await fs.writeFile(serverLogPath, logs);
+        console.log(`Logs saved to ${serverLogPath}`);
+
         // Get container environment variables
         console.log('=== SERVER CONTAINER ENV VARS ===');
         try {
@@ -48,7 +51,7 @@ async function debugDockerContainers() {
           console.log(dbTest);
         } catch (dbError) {
           console.error('Could not test database connection:', dbError);
-          
+
           // Try alternative connection test using nc if available
           try {
             console.log('Attempting alternative database connection test...');
@@ -58,7 +61,7 @@ async function debugDockerContainers() {
             console.log(altDbTest);
           } catch (altDbError) {
             console.error('Alternative database connection test failed:', altDbError);
-            
+
             // Try ping as last resort
             try {
               const { stdout: pingTest } = await execAsync(
@@ -70,7 +73,7 @@ async function debugDockerContainers() {
             }
           }
         }
-        
+
         // Create and copy a simple debug script
         console.log('=== CREATING SIMPLE DEBUG SCRIPT ===');
         const simpleDebugScript = `
@@ -143,26 +146,26 @@ setTimeout(() => {
 
         await fs.writeFile('simple-debug.js', simpleDebugScript);
         await execAsync(`docker cp simple-debug.js ${containerId.trim()}:/app/`);
-        
+
         // Run Prisma Debug Script
         console.log('=== RUNNING PRISMA DEBUG SCRIPT ===');
         try {
           await execAsync(`docker cp server/prisma.debug.ts ${containerId.trim()}:/app/server/`);
-          
+
           // Check if tsx is available
           try {
             const { stdout: tsxVersion } = await execAsync(
               `docker exec ${containerId.trim()} which tsx`
             );
             console.log(`tsx found at: ${tsxVersion}`);
-            
+
             const { stdout: prismaDebug } = await execAsync(
               `docker exec ${containerId.trim()} tsx server/prisma.debug.ts`
             );
             console.log(prismaDebug);
           } catch (tsxError) {
             console.log('tsx not found, trying alternative methods');
-            
+
             // Try with ts-node
             try {
               const { stdout: tsNodeOutput } = await execAsync(
@@ -171,7 +174,7 @@ setTimeout(() => {
               console.log(tsNodeOutput);
             } catch (tsNodeError) {
               console.error('ts-node execution failed:', tsNodeError);
-              
+
               // Run the simple debug script instead
               try {
                 console.log('Running simple Node.js debug script:');
@@ -187,12 +190,12 @@ setTimeout(() => {
         } catch (prismaError) {
           console.error('Could not run Prisma debug script:', prismaError);
         }
-        
+
         // Run Database Connection Test Script
         console.log('=== RUNNING DATABASE CONNECTION TEST SCRIPT ===');
         try {
           await execAsync(`docker cp scripts/db-connection-test.ts ${containerId.trim()}:/app/scripts/`);
-          
+
           // Try with tsx first
           try {
             const { stdout: dbConnectionTest } = await execAsync(
@@ -201,7 +204,7 @@ setTimeout(() => {
             console.log(dbConnectionTest);
           } catch (tsxDbError) {
             console.log('tsx not found for DB test, trying alternatives');
-            
+
             // Try with ts-node
             try {
               const { stdout: tsNodeDbOutput } = await execAsync(
@@ -210,7 +213,7 @@ setTimeout(() => {
               console.log(tsNodeDbOutput);
             } catch (tsNodeDbError) {
               console.error('ts-node DB test failed:', tsNodeDbError);
-              
+
               // Simple connection test as fallback
               try {
                 console.log('Running direct DB connection test:');
@@ -237,22 +240,25 @@ setTimeout(() => {
     } else {
       console.log('Server container not found');
     }
-    
+
     // Check database logs
     const { stdout: dbContainerId } = await execAsync(
       `docker ps -aq --filter name=lessons-marketplace-db`
     );
-    
+
     if (dbContainerId.trim()) {
       console.log('=== DATABASE CONTAINER LOGS ===');
       try {
         const { stdout: dbLogs } = await execAsync(`docker logs ${dbContainerId.trim()}`);
         console.log(dbLogs);
-        
-        // Save DB logs to file
-        await fs.writeFile('db-container-debug.log', dbLogs);
-        console.log('DB logs saved to db-container-debug.log');
-        
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const dbLogPath = `logs/db-container-debug-${timestamp}.log`;
+
+        // Save logs to file
+        await fs.writeFile(dbLogPath, dbLogs);
+        console.log(`DB logs saved to ${dbLogPath}`);
+
         // Check database container status
         console.log('=== DATABASE CONTAINER STATUS ===');
         try {
@@ -267,19 +273,19 @@ setTimeout(() => {
         console.error('Could not get database logs:', dbLogsError);
       }
     }
-    
+
     // Check Docker network
     console.log('=== DOCKER NETWORK INFO ===');
     const { stdout: networkInfo } = await execAsync('docker network ls');
     console.log(networkInfo);
-    
+
     try {
       const { stdout: inspectNetwork } = await execAsync('docker network inspect docker_default');
       console.log(inspectNetwork);
     } catch (networkError) {
       console.error('Could not inspect network:', networkError);
     }
-    
+
     // Summarize findings
     console.log('\n=== SUMMARY ===');
     if (!containerId.trim()) {
@@ -290,14 +296,14 @@ setTimeout(() => {
       console.log('Both server and database containers are present.');
       console.log('Check the logs for specific errors on why the server is failing.');
     }
-    
+
     // Clean up temporary files
     try {
       await fs.unlink('simple-debug.js');
     } catch (cleanupError) {
       console.error('Error cleaning up temporary files:', cleanupError);
     }
-    
+
   } catch (error) {
     console.error('Debug error:', error);
   }

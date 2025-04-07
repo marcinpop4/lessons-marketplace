@@ -30,6 +30,8 @@ Always keep business logic and calculations in the appropriate layer:
 - For multi-model operations: Use dedicated service classes
 - Never implement business logic or calculations directly in UI components or controllers
 - Models are declared in shared/models. Use those throughout the app and don't create interfaces to compsensate for something missing in the shared model. We'll update teh shared model first. Prisma database types need to model themselves after the shared models.
+- When generating log files, append a timestamp and avoid overriding files.
+- Avoid updates and deletes in the database. Invalidate records for a delete (soft-delete). Invalidate records and create new ones for updates.
 
 // API Design
 Never implement retry logic in API endpoints. If an operation fails, return the appropriate error immediately. Retry logic should only be implemented at the worker or client level if explicitly requested.
@@ -43,3 +45,6 @@ Never create placeholder or sample pages for deployment. Always implement the ac
 //File structure
 Alwasy put scripts in the ./scripts folder. Add subfolders to keep the folder organized.
 Never create symlinks and always reference files where they are located
+
+//Environments
+Run ad-hoc comands with ENV_TYPE=dev|ci|prod 
