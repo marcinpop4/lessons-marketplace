@@ -136,8 +136,11 @@ export default defineConfig(({ mode }) => {
       }
     },
     resolve: {
+      extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json'],
       alias: {
-        '@frontend': resolve(__dirname, '..'),
+        '@shared': resolve(projectRoot, 'shared'),
+        '@frontend': resolve(projectRoot, 'frontend'),
+        '@config': resolve(__dirname, '.'),
         '@frontend/api': resolve(__dirname, '../api'),
         '@frontend/components': resolve(__dirname, '../components'),
         '@frontend/contexts': resolve(__dirname, '../contexts'),
@@ -147,8 +150,6 @@ export default defineConfig(({ mode }) => {
         '@frontend/theme': resolve(__dirname, '../theme'),
         '@frontend/types': resolve(__dirname, '../types'),
         '@frontend/utils': resolve(__dirname, '../utils'),
-        '@shared': resolve(__dirname, '../../shared'),
-        '@config': resolve(__dirname, '.') // Add an alias for the config directory
       }
     }
   }
