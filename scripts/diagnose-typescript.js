@@ -84,7 +84,7 @@ const requiredOptions = {
     '@frontend/*': ['frontend/*'],
     '@server/*': ['server/*']
   },
-  types: ['vite/client']
+  types: ['vite/client', 'jest']
 };
 
 let hasErrors = false;
