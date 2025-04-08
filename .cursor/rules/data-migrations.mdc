@@ -1,0 +1,20 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+
+Use Prisma's built-in migration tools: Always use prisma:create-migration to generate migrations properly through Prisma, rather than writing migrations manually.
+Proper rollback handling: If migrations fail, use prisma:resolve-rolled-back to properly mark migrations as rolled back in the prisma_migrations table.
+Data backfilling through SQL: When data needs to be transformed during schema changes, include SQL statements in the migration for backfilling rather than relying on separate scripts.
+Never manipulate prisma_migrations directly in code: While manual intervention in the prisma_migrations table might occasionally be necessary (as we experienced), this should never be codified in migrations or scripts.
+Schema changes come first: Change the Prisma schema, then generate migrations using the proper tooling rather than working backward.
+The proper migration workflow should be:
+Update the Prisma schema
+Run pnpm prisma:create-migration to generate the migration file
+Add any necessary data-transformation SQL to the migration file
+Apply the migration with pnpm prisma:migrate
+If issues occur, use pnpm prisma:resolve-rolled-back to properly handle rollbacks
+This approach ensures proper tracking of migrations and maintains database integrity while following Prisma's recommended practices.
