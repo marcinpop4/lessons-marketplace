@@ -43,7 +43,7 @@
     "prisma:deploy": "prisma migrate deploy --schema=server/prisma/schema.prisma",
     "prisma:generate": "prisma generate --schema=server/prisma/schema.prisma",
     "prisma:migrate": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate deploy --schema=server/prisma/schema.prisma",
-    "prisma:seed": "dotenv -e env/.env.${NODE_ENV} -- node server/prisma/seed.js",
+    "prisma:seed": "dotenv -e env/.env.${NODE_ENV} -- tsx server/prisma/seed.ts",
     "prisma:studio": "dotenv -e env/.env.${NODE_ENV} -- prisma studio --schema=server/prisma/schema.prisma",
     "swagger:server": "tsx api-docs/serve-swagger.ts",
     "test": "dotenv -e env/.env.${NODE_ENV} -- jest tests/unit && NODE_OPTIONS=--no-warnings dotenv -e env/.env.${NODE_ENV} -- playwright test",
@@ -61,7 +61,13 @@
     "fix:typescript": "pnpm fix:tsconfig && pnpm typecheck",
     "check:deployment": "node scripts/check-build-errors.js",
     "lint-staged": "lint-staged",
-    "start": "dotenv -e env/.env.${NODE_ENV:-test} -- node -r ts-node/register/transpile-only -r tsconfig-paths/register dist/server/index.js"
+    "start": "dotenv -e env/.env.${NODE_ENV:-test} -- node -r ts-node/register/transpile-only -r tsconfig-paths/register dist/server/index.js",
+    "prisma:reset": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate reset --force --schema=server/prisma/schema.prisma",
+    "prisma:resolve-applied": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate resolve --applied",
+    "prisma:resolve-rolled-back": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate resolve --schema=server/prisma/schema.prisma --rolled-back",
+    "prisma:fresh-start": "dotenv -e env/.env.${NODE_ENV} -- sh -c 'psql \"$(echo $DATABASE_URL | sed \"s/?schema=public//\")\" -c \"DROP TABLE IF EXISTS _prisma_migrations;\" && prisma migrate dev --name initial_migration --create-only --schema=server/prisma/schema.prisma'",
+    "prisma:create-migration": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate dev --schema=server/prisma/schema.prisma",
+    "backfill:lesson-statuses": "dotenv -e env/.env.${NODE_ENV} -- node scripts/backfill-lesson-statuses.js"
   },
   "dependencies": {
     "@tailwindcss/forms": "0.5.10",
@@ -86,8 +92,9 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-router-dom": "7.4.1",
-    "zod": "3.24.2",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "uuid": "^11.1.0",
+    "zod": "3.24.2"
   },
   "devDependencies": {
     "@eslint/js": "9.23.0",
@@ -108,6 +115,7 @@
     "@types/pg": "8.11.11",
     "@types/react": "19.0.12",
     "@types/react-dom": "19.0.4",
+    "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "4.3.4",
     "autoprefixer": "10.4.21",
     "concurrently": "9.1.2",

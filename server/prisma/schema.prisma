@@ -147,15 +147,15 @@ model LessonQuote {
 
 // Lesson model representing a confirmed music lesson
 model Lesson {
-  id          String   @id @default(uuid())
-  confirmedAt DateTime @default(now())
-
-  // Reference to the accepted quote
-  quote   LessonQuote @relation(fields: [quoteId], references: [id])
-  quoteId String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String         @id @default(cuid())
+  quoteId         String         @unique
+  quote           LessonQuote    @relation(fields: [quoteId], references: [id])
+  currentStatusId String?        @unique
+  currentStatus   LessonStatus?  @relation("CurrentStatus", fields: [currentStatusId], references: [id])
+  lessonStatuses  LessonStatus[] @relation("LessonStatuses")
+  confirmedAt     DateTime       @default(now())
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 }
 
 // Model for storing refresh tokens
@@ -167,4 +167,19 @@ model RefreshToken {
   expiresAt DateTime
   createdAt DateTime @default(now())
   revokedAt DateTime?
+}
+
+// Model for storing lesson status changes
+model LessonStatus {
+  id        String   @id @default(uuid())
+  lessonId  String
+  status    String
+  context   Json?
+  createdAt DateTime @default(now())
+
+  // Reference to the lesson - both for current status and history
+  lesson        Lesson? @relation("LessonStatuses", fields: [lessonId], references: [id])
+  currentLesson Lesson? @relation("CurrentStatus")
+
+  @@index([lessonId])
 }

@@ -48,3 +48,10 @@ Never create symlinks and always reference files where they are located
 
 //Environments
 Run ad-hoc commands with NODE_ENV=development|test|production 
+In development, a local postgres database running through brew is available. Do not default to the docker database in development.
+
+//Running scripts
+Run scripts from package.json rather than suggest ad hoc commands. There are exceptions, like generic script like prisma:create-migration that will be used for several migrations
+
+//Focus
+Focus on the task at hand, I am talking to you Claude-3.7-Sonnet. For example when generating a migration, I don't know why you installed a crypto library. At least ask.

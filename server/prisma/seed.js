@@ -10,6 +10,9 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import bcryptjs from 'bcryptjs';
 import { execSync } from 'child_process';
+import { v4 as uuidv4 } from 'uuid';
+import { LessonType } from '../../shared/models/LessonType.js';
+import { LessonStatusValue } from '../../shared/models/LessonStatus.js';
 
 // Load environment variables from .env file in the project root
 const __filename = fileURLToPath(import.meta.url);
@@ -61,14 +64,6 @@ async function ensurePrismaClientIsInitialized() {
     }
   }
 }
-
-// Define LessonType to match schema.prisma
-const LessonType = {
-  VOICE: 'VOICE',
-  GUITAR: 'GUITAR',
-  BASS: 'BASS',
-  DRUMS: 'DRUMS'
-};
 
 // Function to get base rate by lesson type (in cents)
 function getBaseRateInCents(lessonType) {
@@ -155,6 +150,7 @@ async function main() {
     // Clear existing data
     console.log('Clearing existing data...');
     await prisma.$transaction([
+      prisma.lessonStatus.deleteMany(),
       prisma.lesson.deleteMany(),
       prisma.lessonQuote.deleteMany(),
       prisma.lessonRequest.deleteMany(),
@@ -346,6 +342,24 @@ async function main() {
           quoteId: quote.id,
           // confirmedAt is automatically set to current timestamp
         },
+      });
+      
+      // Create initial REQUESTED status for the lesson
+      const statusId = uuidv4();
+      const lessonStatus = await prisma.lessonStatus.create({
+        data: {
+          id: statusId,
+          lessonId: lesson.id,
+          status: LessonStatusValue.REQUESTED,
+          context: {},
+          createdAt: lesson.confirmedAt
+        }
+      });
+      
+      // Update the lesson with the status ID
+      await prisma.lesson.update({
+        where: { id: lesson.id },
+        data: { currentStatusId: statusId }
       });
       
       lessons.push(lesson);

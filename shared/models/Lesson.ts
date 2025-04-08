@@ -1,4 +1,6 @@
 import { LessonQuote } from './LessonQuote.js';
+import { LessonStatus, LessonStatusValue } from './LessonStatus.js';
+import { PrismaClient } from '@prisma/client';
 
 /**
  * Lesson model representing a confirmed music lesson
@@ -7,16 +9,23 @@ import { LessonQuote } from './LessonQuote.js';
 export class Lesson {
   id: string;
   quote: LessonQuote;
+  /**
+   * @deprecated Use lesson status tracking instead. This field will be removed in a future version.
+   * The confirmation status should be tracked through LessonStatus records.
+   */
   confirmedAt: Date;
+  currentStatusId: string | null;
 
   constructor(
     id: string,
     quote: LessonQuote,
-    confirmedAt: Date = new Date()
+    confirmedAt: Date = new Date(),
+    currentStatusId: string | null = null
   ) {
     this.id = id;
     this.quote = quote;
     this.confirmedAt = confirmedAt;
+    this.currentStatusId = currentStatusId;
   }
 
   /**
@@ -99,5 +108,42 @@ export class Lesson {
    */
   getFormattedCost(locale = 'en-US', currency = 'USD'): string {
     return this.quote.getFormattedCost(locale, currency);
+  }
+
+  /**
+   * Update the lesson's status by creating a new status record
+   * @param prisma Prisma client instance
+   * @param statusId Unique identifier for the new status record
+   * @param status The new status value
+   * @param context Additional context about the status change
+   * @returns The updated Lesson instance
+   */
+  async updateStatus(
+    prisma: PrismaClient,
+    statusId: string,
+    status: LessonStatusValue,
+    context: Record<string, unknown> = {}
+  ): Promise<Lesson> {
+    return await prisma.$transaction(async (tx) => {
+      // Create both records in a single transaction
+      const [newStatus, updatedLesson] = await Promise.all([
+        tx.lessonStatus.create({
+          data: {
+            id: statusId,
+            lessonId: this.id,
+            status: status,
+            context: context,
+            createdAt: new Date()
+          }
+        }),
+        tx.lesson.update({
+          where: { id: this.id },
+          data: { currentStatusId: statusId }
+        })
+      ]);
+
+      this.currentStatusId = statusId;
+      return this;
+    });
   }
 } 
