@@ -2,6 +2,13 @@
  * Prisma Seed Script
  * 
  * This script seeds the database with initial data for development and testing.
+ * 
+ * IMPORTANT NOTES:
+ * - This file is intentionally JavaScript rather than TypeScript for better compatibility
+ *   with Prisma's migration and seeding systems, especially in Docker environments.
+ * - Enums are defined directly in this file rather than imported from TypeScript models
+ *   to avoid module resolution issues across different environments.
+ * - If you modify the enums in the TypeScript models, be sure to update them here as well.
  */
 
 import pkg from '@prisma/client';
@@ -11,8 +18,44 @@ import dotenv from 'dotenv';
 import bcryptjs from 'bcryptjs';
 import { execSync } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
-import { LessonType } from '../../shared/models/LessonType.js';
-import { LessonStatusValue } from '../../shared/models/LessonStatus.js';
+/* 
+ * IMPORTANT: ES Module imports require .js extension even for TypeScript files
+ * This is particularly important for Docker environments where module resolution is strict.
+ * Local development with tsx may work without extensions, but Docker will fail.
+ */
+
+/* 
+ * DUPLICATED ENUMS FOR DOCKER COMPATIBILITY
+ * 
+ * These enums duplicate the TypeScript enums from:
+ * - shared/models/LessonType.ts
+ * - shared/models/LessonStatus.ts
+ * 
+ * This duplication is necessary because:
+ * 1. Docker's ES Module environment strictly enforces import paths
+ * 2. TypeScript files are not directly available in compiled environments
+ * 3. Path resolution works differently across environments
+ *
+ * If you modify the original TypeScript enums, make sure to keep
+ * these duplicates in sync.
+ */
+// Duplicated from shared/models/LessonType.ts
+const LessonType = {
+  VOICE: "VOICE",
+  GUITAR: "GUITAR",
+  BASS: "BASS",
+  DRUMS: "DRUMS"
+};
+
+// Duplicated from shared/models/LessonStatus.ts 
+const LessonStatusValue = {
+  REQUESTED: 'REQUESTED',
+  ACCEPTED: 'ACCEPTED',
+  REJECTED: 'REJECTED',
+  STARTED: 'STARTED',
+  COMPLETED: 'COMPLETED',
+  INCOMPLETE: 'INCOMPLETE'
+};
 
 // Load environment variables from .env file in the project root
 const __filename = fileURLToPath(import.meta.url);
