@@ -1,1 +1,10 @@
- 
+---
+description: TypeScript coding standards and file type requirements
+globs: ["**/*.ts", "**/*.tsx"]
+alwaysApply: true
+---
+
+# TypeScript Standards
+
+- Always create TypeScript files (.ts, .tsx) and never JavaScript files (.js, .jsx) for application code.
+- TypeScript code should be properly typed with explicit types rather than using 'any' where possible.

@@ -1,1 +1,16 @@
- 
+---
+description: Standards for testing practices
+globs: ["**/*.test.ts", "**/*.spec.ts", "**/*.test.tsx", "**/*.spec.tsx"]
+alwaysApply: true
+---
+
+# Testing
+
+- Never increase test timeouts without explicit permission. If tests are timing out, investigate and fix the underlying performance issue rather than extending the timeout.
+- Never ever copy code into a test, to test it in isolation. We either make a function more testable or find a way to test it.
+- Run tests in docker with --retries=0
+- Write tests that are deterministic and don't depend on external state.
+- Organize tests with clear arrange-act-assert structure.
+- Test for both success and failure conditions.
+- Use appropriate mocks for external dependencies.
+- Keep test coverage high, especially for critical business logic. 

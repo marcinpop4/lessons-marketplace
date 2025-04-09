@@ -1,1 +1,17 @@
- 
+---
+description: Guidelines for frontend development
+globs: ["**/frontend/**/*.ts", "**/frontend/**/*.tsx"]
+alwaysApply: true
+---
+
+# Frontend Development
+
+- Never create placeholder or sample pages for deployment.
+- Always implement the actual functionality to catch real issues early.
+- The application should fail fast rather than displaying dummy content that masks underlying problems.
+- Follow accessibility best practices (WCAG guidelines).
+- Implement responsive design that works well on different screen sizes.
+- Optimize performance for initial load and runtime interactions.
+- Handle loading, error, and empty states appropriately.
+- Implement proper form validation with clear error messages.
+- Use consistent UI patterns throughout the application. 

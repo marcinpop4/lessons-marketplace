@@ -1,1 +1,15 @@
- 
+---
+description: Guidelines for maintaining clean and consistent code
+globs: ["**/*.ts", "**/*.tsx"]
+alwaysApply: true
+---
+
+# Code Maintainability
+
+- Never hardcode values directly in components or functions.
+- Extract all magic numbers, URLs, timeouts, and configuration values into named constants or environment variables with clear, descriptive names.
+- Use meaningful variable and function names that describe their purpose.
+- Keep functions focused on a single responsibility.
+- Limit function and file length to improve readability.
+- Add comments for complex logic, but prefer self-documenting code.
+- Maintain consistent formatting and code style throughout the project. 

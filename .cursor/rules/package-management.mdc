@@ -1,1 +1,15 @@
- 
+---
+description: Standards for package management
+globs: ["package.json"]
+alwaysApply: true
+---
+
+# Package Management
+
+- Always maintain package.json in alphabetical order when adding new dependencies.
+- This applies to both dependencies and devDependencies sections.
+- Pin dependency versions to specific values to ensure reproducible builds.
+- Regularly update dependencies to address security vulnerabilities.
+- Document why specific package versions are required if pinning to older versions.
+- Minimize the number of dependencies to reduce security and maintenance risks.
+- Use devDependencies for packages only needed during development or building. 

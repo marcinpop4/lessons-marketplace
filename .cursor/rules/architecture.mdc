@@ -1,1 +1,20 @@
- 
+---
+description: Guidelines for application architecture
+globs: ["**/*.ts", "**/*.tsx"]
+alwaysApply: true
+---
+
+# Architecture
+
+- Always keep business logic and calculations in the appropriate layer:
+  - For single-model operations: Place logic in the model itself
+  - For multi-model operations: Use dedicated service classes
+  - Never implement business logic or calculations directly in UI components or controllers
+- Models are declared in shared/models. Use those throughout the app and don't create interfaces to compensate for something missing in the shared model. We'll update the shared model first.
+- Prisma database types need to model themselves after the shared models.
+- When generating log files, append a timestamp and avoid overriding files.
+- Avoid updates and deletes in the database. Invalidate records for a delete (soft-delete). Invalidate records and create new ones for updates.
+
+## File Organization
+- Always put scripts in the ./scripts folder. Add subfolders to keep the folder organized.
+- Never create symlinks and always reference files where they are located. 

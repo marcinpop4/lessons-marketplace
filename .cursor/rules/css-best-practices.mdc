@@ -1,1 +1,19 @@
- 
+---
+description: Best practices for CSS styling
+globs: ["**/*.css", "**/*.scss", "**/*.tsx", "**/*.jsx"]
+alwaysApply: true
+---
+
+# CSS Best Practices
+
+- Never use '!important' in CSS rules.
+- Structure CSS selectors with appropriate specificity to avoid specificity conflicts.
+- Design CSS as a cohesive system where rules work together without overrides.
+- Follow a consistent naming convention for CSS classes.
+- Group related CSS properties together and order them logically.
+- Use variables for colors, spacing, and other repeated values.
+
+## HTML/CSS/JS Structure
+- Never use inline CSS (style attributes) or inline JavaScript (onclick attributes).
+- Always use separate files for styles and scripts, and use proper event binding in TypeScript files.
+- Prefer component-based styling approaches. 

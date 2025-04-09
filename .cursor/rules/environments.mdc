@@ -1,1 +1,20 @@
- 
+---
+description: Standards for environment setup
+globs: ["**/*.ts", "**/*.tsx"]
+alwaysApply: true
+---
+
+# Environments
+
+- Run ad-hoc commands with NODE_ENV=development|test|production
+- In development, a local postgres database running through brew is available. Do not default to the docker database in development.
+
+## Running Scripts
+- Run scripts from package.json rather than suggest ad hoc commands.
+- There are exceptions, like generic scripts like prisma:create-migration that will be used for several migrations.
+- Use consistent naming patterns for scripts in package.json.
+- Document complex scripts with comments in the package.json or in a separate document.
+
+## Focus
+- Focus on the task at hand.
+- For example, when generating a migration, don't install unrelated libraries without asking. 

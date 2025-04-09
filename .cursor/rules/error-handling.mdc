@@ -1,1 +1,11 @@
- 
+---
+description: Standards for error handling and configuration
+globs: ["**/*.ts", "**/*.tsx"]
+alwaysApply: true
+---
+
+# Error Handling & Configuration
+
+- Never implement fallbacks for missing environment variables, configuration values, or error conditions.
+- Explicitly check that required values exist and throw errors immediately if they don't.
+- The application should fail fast rather than continue running with default values that might mask problems.

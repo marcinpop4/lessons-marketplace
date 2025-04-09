@@ -1,1 +1,17 @@
- 
+---
+description: Guidelines for API design
+globs: ["**/api/**/*.ts", "**/server/**/*.ts"]
+alwaysApply: true
+---
+
+# API Design
+
+- Never implement retry logic in API endpoints.
+- If an operation fails, return the appropriate error immediately.
+- Retry logic should only be implemented at the worker or client level if explicitly requested.
+- Use consistent error response formats.
+- Document APIs using standardized approaches.
+- Implement proper validation for all API inputs.
+- Follow RESTful design principles for API endpoints.
+- Use appropriate HTTP status codes for different response types.
+- Include sufficient information in error responses for debugging without exposing sensitive details. 

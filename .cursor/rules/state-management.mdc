@@ -1,1 +1,17 @@
- 
+---
+description: Standards for state management
+globs: ["**/*.ts", "**/*.tsx"]
+alwaysApply: true
+---
+
+# State Management
+
+- Never infer state or status values.
+- All status changes must be explicit results of specific events or actions.
+- Status transitions should be clearly defined and traceable to specific triggers.
+- Use appropriate state management patterns for the complexity of the application.
+- Keep state as local as possible, lifting it up only when necessary.
+- Document complex state machines with diagrams or clear comments.
+- Ensure state changes are predictable and easy to debug.
+- Consider using finite state machines for complex state transitions.
+- Avoid direct mutation of state; prefer immutable state updates. 
