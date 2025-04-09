@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { JsonValue } from '@prisma/client/runtime/library';
 
 /**
  * Possible status values for a lesson
@@ -20,14 +20,14 @@ export class LessonStatus {
     id: string;
     lessonId: string;
     status: LessonStatusValue;
-    context: Prisma.JsonValue | null;
+    context: JsonValue | null;
     createdAt: Date;
 
     constructor(
         id: string,
         lessonId: string,
         status: LessonStatusValue,
-        context: Prisma.JsonValue | null = null,
+        context: JsonValue | null = null,
         createdAt: Date = new Date()
     ) {
         this.id = id;
@@ -49,7 +49,7 @@ export class LessonStatus {
         id: string,
         lessonId: string,
         status: LessonStatusValue,
-        context: Prisma.JsonValue | null = null
+        context: JsonValue | null = null
     ): LessonStatus {
         return new LessonStatus(id, lessonId, status, context);
     }
