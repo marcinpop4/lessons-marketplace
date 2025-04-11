@@ -1,1 +1,10 @@
- 
+---
+description: Standards for file structure
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# File Structure
+
+- Always put scripts in the ./scripts folder. Add subfolders to keep the folder organized.
+- Never create symlinks and always reference files where they are located. 

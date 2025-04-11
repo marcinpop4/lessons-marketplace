@@ -1,1 +1,10 @@
- 
+---
+description: Guidelines for running scripts
+globs: ["**/*.ts", "**/*.tsx", "**/*.sh"]
+alwaysApply: true
+---
+
+# Running Scripts
+
+- Run scripts from package.json rather than suggest ad hoc commands.
+- There are exceptions, like generic script like prisma:create-migration that will be used for several migrations. 

@@ -1,1 +1,10 @@
- 
+---
+description: Guidelines for maintaining focus
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# Focus
+
+- Focus on the task at hand.
+- For example when generating a migration, don't install unrelated libraries without asking. 

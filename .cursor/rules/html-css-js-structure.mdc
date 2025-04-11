@@ -1,1 +1,10 @@
- 
+---
+description: Standards for HTML, CSS, and JavaScript structure
+globs: ["**/*.html", "**/*.tsx", "**/*.jsx", "**/*.css"]
+alwaysApply: true
+---
+
+# HTML/CSS/JS Structure
+
+- Never use inline CSS (style attributes) or inline JavaScript (onclick attributes).
+- Always use separate files for styles and scripts, and use proper event binding in TypeScript files. 
