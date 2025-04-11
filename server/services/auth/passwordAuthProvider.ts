@@ -56,7 +56,6 @@ class PasswordAuthProvider implements AuthProvider {
     // Generate tokens
     const accessToken = authService.generateToken({
       id: user.id,
-      email: user.email,
       userType: userType === 'STUDENT' ? 'STUDENT' : 'TEACHER',
     });
 
@@ -136,7 +135,6 @@ class PasswordAuthProvider implements AuthProvider {
     // Generate tokens
     const accessToken = authService.generateToken({
       id: user.id,
-      email: user.email,
       userType: userType === 'STUDENT' ? 'STUDENT' : 'TEACHER',
     });
 

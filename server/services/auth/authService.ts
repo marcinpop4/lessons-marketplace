@@ -29,7 +29,6 @@ const refreshExpiresIn: string = REFRESH_TOKEN_EXPIRES_IN;
 
 interface TokenPayload {
   id: string;
-  email: string;
   userType: 'STUDENT' | 'TEACHER';
 }
 
@@ -56,7 +55,7 @@ class AuthService {
     if (!provider) {
       throw new Error(`Authentication method ${method} not supported`);
     }
-    
+
     return provider.authenticate(credentials);
   }
 
@@ -65,7 +64,7 @@ class AuthService {
     if (!provider) {
       throw new Error(`Authentication method ${method} not supported`);
     }
-    
+
     return provider.register(userData);
   }
 
@@ -134,7 +133,6 @@ class AuthService {
 
     return {
       id: refreshToken.userId,
-      email: '', // We don't store email in refresh token
       userType: refreshToken.userType as 'STUDENT' | 'TEACHER', // Type assertion to match the TokenPayload type
     };
   }
@@ -150,9 +148,9 @@ class AuthService {
   // Revoke all refresh tokens for a user
   async revokeAllUserRefreshTokens(userId: string): Promise<void> {
     await prisma.refreshToken.updateMany({
-      where: { 
+      where: {
         userId,
-        revokedAt: null 
+        revokedAt: null
       },
       data: { revokedAt: new Date() },
     });

@@ -2,104 +2,47 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET;
+
 if (!JWT_SECRET) {
-  throw new Error("JWT_SECRET environment variable is required");
+    console.error('FATAL ERROR: JWT_SECRET is not defined in environment variables.');
+    process.exit(1); // Exit if the secret is missing
 }
 
-// Assertion to satisfy TypeScript
-const secretKey: string = JWT_SECRET;
+const authMiddleware = (req: Request, res: Response, next: NextFunction): void => {
+    const authHeader = req.headers.authorization;
 
-// Interface for JWT payload
-interface JwtPayload {
-  id: string;
-  email: string;
-  userType: 'STUDENT' | 'TEACHER';
-}
-
-// Extend Express Request interface to include user
-declare global {
-  namespace Express {
-    interface Request {
-      user?: JwtPayload;
-    }
-  }
-}
-
-// Middleware to validate token
-export function authenticate(req: Request, res: Response, next: NextFunction): void {
-  // Get token from header
-  const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
-  if (!token) {
-    res.status(401).json({ error: 'Access denied. No token provided.' });
-    return;
-  }
-
-  try {
-    // Verify token
-    const decoded = jwt.verify(token, secretKey) as JwtPayload;
-    req.user = decoded;
-    next();
-  } catch (error) {
-    res.status(401).json({ error: 'Invalid token.' });
-    return;
-  }
-}
-
-// Middleware to check if user is a student
-export function isStudent(req: Request, res: Response, next: NextFunction): void {
-  if (!req.user) {
-    res.status(401).json({ error: 'Not authenticated' });
-    return;
-  }
-
-  if (req.user.userType !== 'STUDENT') {
-    res.status(403).json({ error: 'Access denied. Student role required.' });
-    return;
-  }
-
-  next();
-}
-
-// Middleware to check if user is a teacher
-export function isTeacher(req: Request, res: Response, next: NextFunction): void {
-  if (!req.user) {
-    res.status(401).json({ error: 'Not authenticated' });
-    return;
-  }
-
-  if (req.user.userType !== 'TEACHER') {
-    res.status(403).json({ error: 'Access denied. Teacher role required.' });
-    return;
-  }
-
-  next();
-}
-
-// Middleware to check if the user is the specific student for the request
-export function isSpecificStudent(studentIdParam: string) {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    if (!req.user) {
-      res.status(401).json({ error: 'Not authenticated' });
-      return;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        res.status(401).json({ error: 'Unauthorized: No token provided.' });
+        return;
     }
 
-    const studentId = req.params[studentIdParam];
+    const token = authHeader.split(' ')[1];
 
-    // Allow if user is the student in question
-    if (req.user.userType === 'STUDENT' && req.user.id === studentId) {
-      next();
-      return;
+    try {
+        // Verify the token using the secret
+        const decoded = jwt.verify(token, JWT_SECRET);
+
+        // Attach the decoded payload (user info) to the request object
+        // Using `any` for simplicity, consider defining a custom Request type with `user` property
+        (req as any).user = decoded;
+
+        // Proceed to the next middleware or route handler
+        next();
+    } catch (error) {
+        // Handle specific JWT errors
+        if (error instanceof jwt.TokenExpiredError) {
+            res.status(401).json({ error: 'Unauthorized: Token expired.' });
+            return;
+        }
+        if (error instanceof jwt.JsonWebTokenError) {
+            res.status(401).json({ error: 'Unauthorized: Invalid token.' });
+            return;
+        }
+        // Handle other potential errors during verification
+        console.error('Auth Middleware Error:', error);
+        res.status(401).json({ error: 'Unauthorized.' });
+        return;
     }
+};
 
-    // Also allow if user is a teacher (for certain operations they might need)
-    if (req.user.userType === 'TEACHER') {
-      next();
-      return;
-    }
-
-    res.status(403).json({ error: 'Access denied. Not authorized for this student data.' });
-    return;
-  };
-} 
+export { authMiddleware }; 

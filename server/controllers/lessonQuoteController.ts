@@ -183,5 +183,40 @@ export const lessonQuoteController = {
       console.error('Error accepting lesson quote:', error);
       res.status(500).json({ error: 'Failed to accept lesson quote' });
     }
-  }
+  },
+
+  /**
+   * Accept a lesson quote and create a corresponding lesson.
+   */
+  acceptQuote: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { quoteId } = req.params;
+    const studentId = (req as any).user?.id; // Assuming student ID is from authenticated user
+
+    if (!quoteId) {
+      res.status(400).json({ error: 'Missing quoteId parameter' });
+      return;
+    }
+    if (!studentId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    try {
+      // TODO: Fetch the quote
+      // TODO: Verify the quote belongs to the authenticated student (or is for their request)
+      // TODO: Verify the quote is still valid (not expired)
+      // TODO: Call a service/function to create the lesson from the quote (e.g., createLessonFromQuote)
+      // This might involve instantiating Lesson/LessonQuote models
+
+      // --- Placeholder --- 
+      console.log(`Student ${studentId} attempting to accept quote ${quoteId}`);
+      const mockLessonId = `lesson_for_${quoteId}`;
+      // --- End Placeholder ---
+
+      res.status(200).json({ message: 'Quote accepted successfully', lessonId: mockLessonId });
+    } catch (error) {
+      console.error('Error accepting quote:', error);
+      next(error); // Pass error to centralized error handler
+    }
+  },
 }; 

@@ -1,5 +1,7 @@
 import express, { Router } from 'express';
 import { lessonController } from '../controllers/lessonController.js';
+import { authMiddleware } from '../middleware/auth/authMiddleware.js';
+import { checkRole } from '../middleware/auth/roleMiddleware.js';
 
 const router: Router = express.Router();
 
@@ -8,9 +10,12 @@ router.post('/', lessonController.createLesson);
 
 // Get lessons by quote ID
 // This route must come before the general /:id route to avoid being treated as an ID
-router.get('/quote/:quoteId', lessonController.getLessonsByQuoteId);
+router.get('/quote/:quoteId', authMiddleware, lessonController.getLessonsByQuoteId);
 
 // Get a lesson by ID
-router.get('/:id', lessonController.getLessonById);
+router.get('/:id', authMiddleware, lessonController.getLessonById);
+
+// Update lesson status (Teacher only)
+router.patch('/:lessonId', authMiddleware, checkRole(['TEACHER']), lessonController.updateLessonStatus);
 
 export default router; 

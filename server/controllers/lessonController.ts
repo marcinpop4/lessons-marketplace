@@ -244,5 +244,43 @@ export const lessonController = {
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
+  },
+
+  /**
+   * Update the status of a lesson
+   */
+  updateLessonStatus: async (req: Request, res: Response): Promise<Response> => {
+    const { lessonId } = req.params;
+    const { status } = req.body; // Expecting { status: LessonStatusValue }
+    const teacherId = (req as any).user?.id; // Get teacher ID from authenticated user
+
+    if (!teacherId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!lessonId || !status) {
+      return res.status(400).json({ error: 'Missing lessonId or status in request' });
+    }
+
+    // TODO: Validate status value is a valid LessonStatusValue
+    // TODO: Fetch the lesson and verify the teacher owns it
+    // TODO: Instantiate the Lesson model
+    // TODO: Validate the status transition is allowed
+    // TODO: Call lesson.updateStatus() with prisma instance, new status ID, status value, context
+    // TODO: Handle potential errors from updateStatus
+
+    try {
+      // --- Placeholder logic --- 
+      console.log(`Attempting to update lesson ${lessonId} to status ${status} by teacher ${teacherId}`);
+      // --- End Placeholder --- 
+
+      // Assuming success for now
+      return res.status(200).json({ message: 'Lesson status updated successfully' }); // Or return updated lesson
+
+    } catch (error: any) {
+      console.error('Error updating lesson status:', error);
+      // TODO: Add more specific error handling (e.g., lesson not found, unauthorized, invalid status)
+      return res.status(500).json({ error: 'Failed to update lesson status' });
+    }
   }
 }; 
