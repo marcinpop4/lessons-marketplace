@@ -14,6 +14,11 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    LessonStatusValue:
+      type: string
+      enum: [REQUESTED, ACCEPTED, REJECTED, COMPLETED, VOIDED]
+      description: Possible statuses for a lesson
+    
     LessonType:
       type: string
       enum: [VOICE, GUITAR, BASS, DRUMS]
@@ -291,6 +296,8 @@ paths:
   /auth/register:
     post:
       summary: Register a new user
+      tags:
+        - Auth
       security: []
       requestBody:
         required: true
@@ -321,6 +328,8 @@ paths:
   /auth/login:
     post:
       summary: Login as an existing user
+      tags:
+        - Auth
       security: []
       requestBody:
         required: true
@@ -345,6 +354,8 @@ paths:
   /auth/refresh-token:
     post:
       summary: Refresh an expired access token
+      tags:
+        - Auth
       security: []
       responses:
         '200':
@@ -366,6 +377,8 @@ paths:
   /auth/logout:
     post:
       summary: Logout the current user
+      tags:
+        - Auth
       responses:
         '200':
           description: Logout successful
@@ -373,6 +386,8 @@ paths:
   /auth/me:
     get:
       summary: Get the current authenticated user
+      tags:
+        - Auth
       responses:
         '200':
           description: Current user details
@@ -402,6 +417,8 @@ paths:
   /lesson-requests:
     post:
       summary: Create a new lesson request
+      tags:
+        - Lesson Requests
       requestBody:
         required: true
         content:
@@ -444,6 +461,8 @@ paths:
   /lesson-requests/{id}:
     get:
       summary: Get a lesson request by ID
+      tags:
+        - Lesson Requests
       parameters:
         - name: id
           in: path
@@ -467,6 +486,8 @@ paths:
   /lesson-requests/student/{studentId}:
     get:
       summary: Get all lesson requests for a student
+      tags:
+        - Lesson Requests
       parameters:
         - name: studentId
           in: path
@@ -489,9 +510,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
   
-  /lesson-quotes:
+  /lesson-quotes/create-quotes:
     post:
-      summary: Create a new lesson quote
+      summary: Create initial quotes for a lesson request
+      tags:
+        - Lesson Quotes
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -501,28 +526,40 @@ paths:
               properties:
                 lessonRequestId:
                   type: string
-                teacherId:
-                  type: string
-                costInCents:
-                  type: integer
-                  minimum: 0
-                expiresAt:
-                  type: string
-                  format: date-time
+                lessonType:
+                  $ref: '#/components/schemas/LessonType'
               required:
                 - lessonRequestId
-                - teacherId
-                - costInCents
-                - expiresAt
+                - lessonType
       responses:
         '201':
-          description: Lesson quote created successfully
+          description: Quotes created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LessonQuote'
+                type: array
+                items:
+                  $ref: '#/components/schemas/LessonQuote'
         '400':
           description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden (User is not a student)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -531,6 +568,8 @@ paths:
   /lesson-quotes/request/{lessonRequestId}:
     get:
       summary: Get all quotes for a lesson request
+      tags:
+        - Lesson Quotes
       parameters:
         - name: lessonRequestId
           in: path
@@ -556,6 +595,8 @@ paths:
   /lesson-quotes/{quoteId}/accept:
     post:
       summary: Accept a lesson quote
+      tags:
+        - Lesson Quotes
       parameters:
         - name: quoteId
           in: path
@@ -593,6 +634,8 @@ paths:
   /lessons:
     post:
       summary: Create a new lesson from a quote
+      tags:
+        - Lessons
       requestBody:
         required: true
         content:
@@ -624,6 +667,8 @@ paths:
   /lessons/{lessonId}:
     get:
       summary: Get a lesson by ID
+      tags:
+        - Lessons
       parameters:
         - name: lessonId
           in: path
@@ -643,10 +688,80 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+    patch:
+      summary: Update the status of a lesson
+      tags:
+        - Lessons
+      description: Allows an authenticated teacher to update the status of a lesson they are assigned to.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lessonId
+          in: path
+          required: true
+          description: The ID of the lesson to update.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  $ref: '#/components/schemas/LessonStatusValue'
+              required:
+                - status
+      responses:
+        '200':
+          description: Lesson status updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  # Optionally return the updated lesson object:
+                  # lesson:
+                  #   $ref: '#/components/schemas/Lesson' 
+        '400':
+          description: Bad Request (e.g., invalid status value, invalid status transition)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized (e.g., missing or invalid token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden (e.g., user is not a teacher, teacher does not own the lesson)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Lesson not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   
   /lessons/quote/{quoteId}:
     get:
       summary: Get a lesson by quote ID
+      tags:
+        - Lessons
       parameters:
         - name: quoteId
           in: path
@@ -670,6 +785,8 @@ paths:
   /teachers:
     get:
       summary: Get available teachers
+      tags:
+        - Teachers
       parameters:
         - name: lessonType
           in: query
@@ -696,6 +813,8 @@ paths:
   /teachers/profile:
     get:
       summary: Get the current teacher's profile
+      tags:
+        - Teachers
       responses:
         '200':
           description: Teacher profile details
@@ -719,6 +838,8 @@ paths:
   /teachers/stats:
     get:
       summary: Get the current teacher's statistics
+      tags:
+        - Teachers
       responses:
         '200':
           description: Teacher statistics
@@ -742,6 +863,8 @@ paths:
   /teachers/lesson-rates:
     post:
       summary: Add or update a lesson rate for a teacher
+      tags:
+        - Teachers
       requestBody:
         required: true
         content:
@@ -789,6 +912,8 @@ paths:
   /teachers/lesson-rates/deactivate:
     post:
       summary: Deactivate a lesson rate for a teacher
+      tags:
+        - Teachers
       requestBody:
         required: true
         content:
@@ -826,6 +951,8 @@ paths:
   /teachers/lesson-rates/reactivate:
     post:
       summary: Reactivate a lesson rate for a teacher
+      tags:
+        - Teachers
       requestBody:
         required: true
         content:
@@ -858,4 +985,38 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error' 
+                $ref: '#/components/schemas/Error'
+  
+  /health:
+    get:
+      summary: Health check endpoint
+      tags:
+        - Health
+      security: []
+      responses:
+        '200':
+          description: Server is healthy and database is connected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  database:
+                    type: string
+                    example: connected
+        '500':
+          description: Server is unhealthy or database is disconnected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  database:
+                    type: string
+                    example: disconnected 
