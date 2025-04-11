@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { getLessonById } from '../../api/lessonApi';
+import { getLessonById } from '@frontend/api/lessonApi';
 import { Lesson } from '@shared/models/Lesson';
-import LessonDetails from '../../components/features/lesson-confirmation/LessonDetails';
+import LessonDetails from '@frontend/components/features/lesson-confirmation/LessonDetails';
 import './lesson-confirmation.css';
 
 export default function LessonConfirmation() {

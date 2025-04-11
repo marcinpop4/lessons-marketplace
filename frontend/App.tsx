@@ -2,13 +2,21 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, Link } from 'react-router-dom';
 import { useAuth, AuthProvider } from '@frontend/contexts/AuthContext';
-import LoginPage from '@frontend/pages/login';
-import RegisterPage from '@frontend/pages/register';
-import LessonRequestPage from '@frontend/pages/lesson-request';
-import TeacherQuotesPage from './pages/teacher-quotes';
-import LessonConfirmation from '@frontend/pages/lesson-confirmation';
-import TeacherDashboard from '@frontend/pages/TeacherDashboard';
-import ThemeDemoPage from '@frontend/pages/theme-demo';
+
+// Common Pages
+import LoginPage from '@frontend/pages/common/login';
+import RegisterPage from '@frontend/pages/common/register';
+import ThemeDemoPage from '@frontend/pages/common/theme-demo';
+
+// Student Pages
+import LessonRequestPage from '@frontend/pages/student/lesson-request';
+import TeacherQuotesPage from '@frontend/pages/student/teacher-quotes';
+import LessonConfirmation from '@frontend/pages/student/lesson-confirmation';
+
+// Teacher Pages
+import TeacherProfilePage from '@frontend/pages/teacher/profile'; // Renamed from TeacherDashboard
+import TeacherLessonsPage from '@frontend/pages/teacher/lessons'; // New lessons page
+
 import ProtectedRoute from '@frontend/components/common/ProtectedRoute';
 import { ThemeSwitcher } from '@frontend/components/shared';
 import ThemeProvider from '@frontend/contexts/ThemeContext';
@@ -22,19 +30,20 @@ import '@frontend/styles/components.css';
 // Root redirect component to handle user type specific redirects
 const RootRedirect = () => {
   const { user } = useAuth();
-  
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  
+
   if (user.userType === 'TEACHER') {
-    return <Navigate to="/teacher-dashboard" replace />;
+    // Redirect teacher to their profile page (formerly dashboard)
+    return <Navigate to="/teacher/profile" replace />;
   }
-  
+
   if (user.userType === 'STUDENT') {
-    return <Navigate to="/lesson-request" replace />;
+    return <Navigate to="/student/lesson-request" replace />;
   }
-  
+
   return <Navigate to="/login" replace />;
 };
 
@@ -43,18 +52,19 @@ const AppRoutes: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Update navigation path if needed
   const handleBackFromQuotes = () => {
-    navigate('/lesson-request');
+    navigate('/student/lesson-request');
   };
 
   return (
     <div className="app-container">
       <header className="header">
         <div className="logo-container">
-          <img 
-            src="/assets/images/lessons-marketplace.png" 
-            alt="Lessons Marketplace Logo" 
-            className="logo" 
+          <img
+            src="/assets/images/lessons-marketplace.png"
+            alt="Lessons Marketplace Logo"
+            className="logo"
           />
           <Link to="/" className="hover:text-primary-600 transition-colors">
             <h1>Take lessons and Git Gud!</h1>
@@ -64,52 +74,50 @@ const AppRoutes: React.FC = () => {
           <ThemeSwitcher className="flex items-center" />
         </div>
       </header>
-      
+
       <main className="main-content animate-slide-up">
         <Routes>
-          {/* Public routes */}
+          {/* Public/Common routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/theme-demo" element={<ThemeDemoPage />} />
-          
+
           {/* Protected routes - Student only */}
-          <Route element={<ProtectedRoute userTypes={['STUDENT']} />}>
-            <Route 
-              path="/lesson-request" 
-              element={<LessonRequestPage />} 
+          <Route path="/student" element={<ProtectedRoute userTypes={['STUDENT']} />}>
+            <Route
+              path="lesson-request"
+              element={<LessonRequestPage />}
+            />
+            <Route
+              path="teacher-quotes/:lessonRequestId"
+              element={<TeacherQuotesPage />} // Keep this under student?
+            />
+            <Route
+              path="lesson-confirmation/:lessonId"
+              element={<LessonConfirmation />} // Keep this under student?
             />
           </Route>
-          
+
           {/* Protected routes - Teacher only */}
-          <Route element={<ProtectedRoute userTypes={['TEACHER']} />}>
-            <Route 
-              path="/teacher-dashboard" 
-              element={<TeacherDashboard />} 
+          <Route path="/teacher" element={<ProtectedRoute userTypes={['TEACHER']} />}>
+            <Route
+              path="profile"
+              element={<TeacherProfilePage />} // Updated path and component name
+            />
+            <Route
+              path="lessons" // Add route for the new lessons page
+              element={<TeacherLessonsPage />}
             />
           </Route>
-          
-          {/* Protected routes - Student and Teacher */}
-          <Route element={<ProtectedRoute />}>
-            <Route 
-              path="/teacher-quotes/:lessonRequestId" 
-              element={<TeacherQuotesPage />} 
-            />
-            
-            {/* Lesson confirmation route */}
-            <Route 
-              path="/lesson-confirmation/:lessonId" 
-              element={<LessonConfirmation />} 
-            />
-          </Route>
-          
+
           {/* Root route - redirects based on user type */}
           <Route path="/" element={<RootRedirect />} />
-          
-          {/* Catch all route */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
+
+          {/* Catch all route - redirect to appropriate default or login */}
+          <Route path="*" element={<RootRedirect />} />
         </Routes>
       </main>
-      
+
       <div className="footer">
         <p>Welcome to the Lessons Marketplace project</p>
         <div className="flex items-center gap-4">

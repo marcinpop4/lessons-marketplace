@@ -7,9 +7,8 @@ export enum LessonStatusValue {
     REQUESTED = 'REQUESTED',
     ACCEPTED = 'ACCEPTED',
     REJECTED = 'REJECTED',
-    STARTED = 'STARTED',
     COMPLETED = 'COMPLETED',
-    INCOMPLETE = 'INCOMPLETE'
+    VOIDED = 'VOIDED'
 }
 
 /**

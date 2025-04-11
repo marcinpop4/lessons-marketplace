@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import TeacherProfile from '../../components/features/teacher-dashboard/TeacherProfile';
-import TeacherStats from '../../components/features/teacher-dashboard/TeacherStats';
-import TeacherLessonRatesManager from '../../components/features/teacher-dashboard/TeacherLessonRatesManager';
-import apiClient from '../../api/apiClient';
+import { useAuth } from '../../../contexts/AuthContext';
+import TeacherProfileComponent from '../../../components/features/teacher-dashboard/TeacherProfile';
+import TeacherStats from '../../../components/features/teacher-dashboard/TeacherStats';
+import TeacherLessonRatesManager from '../../../components/features/teacher-dashboard/TeacherLessonRatesManager';
+import apiClient from '../../../api/apiClient';
 import axios from 'axios';
-import './TeacherDashboard.css';
+import './profile.css';
 
 interface TeacherProfile {
   id: string;
@@ -150,7 +150,7 @@ const TeacherDashboardPage: React.FC = () => {
 
       {profile && (
         <div className="dashboard-content space-y-6">
-          <TeacherProfile profile={profile} />
+          <TeacherProfileComponent profile={profile} />
 
           <TeacherLessonRatesManager
             lessonRates={profile.lessonRates}

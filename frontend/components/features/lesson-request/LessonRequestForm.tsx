@@ -203,11 +203,13 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
         studentId: formData.studentId
       };
 
-      const { lessonRequest } = await createLessonRequest(payload);
-      setShowSuccessMessage(true);
+      const response = await createLessonRequest(payload);
+      console.log('Lesson request created:', response);
 
-      if (onSubmitSuccess && lessonRequest.id) {
-        onSubmitSuccess(lessonRequest.id);
+      setShowSuccessMessage(true);
+      // Call the success handler passed via props, using the correct response structure
+      if (onSubmitSuccess && response && response.lessonRequest && response.lessonRequest.id) {
+        onSubmitSuccess(response.lessonRequest.id);
       }
 
       // Reset form

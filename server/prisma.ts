@@ -8,7 +8,7 @@ const isDebugMode = process.env.NODE_ENV === 'development';
 
 // Create a singleton instance of PrismaClient
 const prisma = new PrismaClient({
-  log: isDebugMode ? ['query', 'error', 'warn'] : ['error'],
+  log: isDebugMode ? ['warn', 'error'] : ['error'], // when wanting the query logs to come back, use ['query', 'warn', 'error']
 });
 
 export default prisma; 

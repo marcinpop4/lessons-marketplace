@@ -115,6 +115,6 @@ test('Teacher registration with new credentials succeeds', async ({ page }) => {
   // Registration should succeed
   expect(result.success).toBe(true);
 
-  // Should be redirected to teacher dashboard
-  await expect(page).toHaveURL(/.*\/teacher-dashboard.*/);
+  // Should be redirected to teacher profile page
+  await expect(page).toHaveURL(/.*\/teacher\/profile.*/);
 }); 

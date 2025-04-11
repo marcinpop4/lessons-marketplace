@@ -8,7 +8,7 @@ import {
   CardsShowcase,
   AlertsShowcase,
   BadgesShowcase
-} from '../../components/theme-demo';
+} from '@frontend/components/theme-demo';
 
 const ThemeDemoPage: React.FC = () => {
   return (

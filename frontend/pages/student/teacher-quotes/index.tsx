@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import TeacherQuotesList from '../../components/features/teacher-quotes/TeacherQuotesList';
-import LessonRequestCard from '../../components/features/teacher-quotes/LessonRequestCard';
+import TeacherQuotesList from '@frontend/components/features/teacher-quotes/TeacherQuotesList';
+import LessonRequestCard from '@frontend/components/features/teacher-quotes/LessonRequestCard';
 import { getLessonRequestById } from '@frontend/api/lessonRequestApi';
 import { LessonRequest } from '@shared/models/LessonRequest';
+import { LessonQuote } from '@shared/models/LessonQuote';
 import './teacher-quotes.css';
 
 const TeacherQuotesPage: React.FC = () => {
@@ -43,7 +44,7 @@ const TeacherQuotesPage: React.FC = () => {
   };
 
   const handleQuoteAccepted = (lessonId: string) => {
-    navigate(`/lesson-confirmation/${lessonId}`);
+    navigate(`/student/lesson-confirmation/${lessonId}`);
   };
 
   const handleError = (errorMessage: string) => {
