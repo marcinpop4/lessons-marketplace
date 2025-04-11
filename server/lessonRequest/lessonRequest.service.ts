@@ -1,5 +1,6 @@
-import prisma from '../../prisma.js';
-import { Prisma, PrismaClient } from '@prisma/client';
+import prisma from '../prisma.js';
+import type { Prisma, PrismaClient } from '@prisma/client';
+import { Address } from '../../shared/models/Address.js';
 import { LessonType } from '../../../shared/models/LessonType.js';
 
 export interface AddressDTO {

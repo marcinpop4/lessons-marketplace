@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import { addressController } from '../controllers/addressController.js';
+import { addressController } from './address.controller.js';
 
 const router: Router = express.Router();
 

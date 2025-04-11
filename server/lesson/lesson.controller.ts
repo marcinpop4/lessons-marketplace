@@ -1,10 +1,14 @@
-import type { Request, Response } from 'express';
+import { Request, Response } from 'express';
 import prisma from '../prisma.js';
 import type { PrismaClient } from '@prisma/client';
 import { Lesson } from '../../shared/models/Lesson.js';
 import { LessonQuote } from '../../shared/models/LessonQuote.js';
 import { LessonRequest } from '../../shared/models/LessonRequest.js';
+import { Address } from '../../shared/models/Address.js';
 import { Teacher } from '../../shared/models/Teacher.js';
+import { Student } from '../../shared/models/Student.js';
+import { LessonStatusValue } from '../../shared/models/LessonStatus.js';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Controller for lesson-related operations

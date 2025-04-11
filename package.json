@@ -7,7 +7,7 @@
     "build:shared": "tsc --project tsconfig.json --noEmit && dotenv -e env/.env.${NODE_ENV} -- tsc --project tsconfig.json --outDir dist",
     "clean": "rm -rf dist && rm -rf node_modules",
     "dev:frontend": "dotenv -e env/.env.${NODE_ENV:-development} -- cross-env VITE_TSCONFIG=tsconfig.json vite --config frontend/config/vite.config.ts --force",
-    "dev:full": "cross-env NODE_ENV=development concurrently \"pnpm run dev:frontend\" \"pnpm run dev:server\"",
+    "dev:full": "cross-env NODE_ENV=development concurrently --raw \"pnpm run dev:frontend\" \"pnpm run dev:server\"",
     "dev:server": "dotenv -e env/.env.${NODE_ENV:-development} -- tsx watch server/index.ts",
     "dev:server:debug": "cross-env DEBUG=true NODE_ENV=development dotenv -e env/.env.development -- tsx watch server/index.ts",
     "docker:clean": "docker compose -f docker/docker-compose.yml down --volumes --remove-orphans && docker ps -aq | xargs -r docker rm -f && docker volume prune -f && docker network prune -f",

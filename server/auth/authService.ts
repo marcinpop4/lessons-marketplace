@@ -1,6 +1,6 @@
 import bcryptjs from 'bcryptjs';
 import jwt, { Secret, SignOptions } from 'jsonwebtoken';
-import prisma from '../../prisma.js';
+import prisma from '../prisma.js';
 import type { PrismaClient } from '@prisma/client';
 
 // Use string literals that match Prisma's enums
@@ -157,4 +157,10 @@ class AuthService {
   }
 }
 
-export default new AuthService(); 
+const authServiceInstance = new AuthService();
+
+// Export the instance and helper methods if needed directly
+export const hashPassword = authServiceInstance.hashPassword.bind(authServiceInstance);
+export const comparePassword = authServiceInstance.comparePassword.bind(authServiceInstance);
+
+export default authServiceInstance; 

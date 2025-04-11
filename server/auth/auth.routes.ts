@@ -1,10 +1,12 @@
 import express, { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import prisma from '../../prisma.js';
+import prisma from '../prisma.js';
 import bcryptjs from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import cookieParser from 'cookie-parser';
 import { Secret, SignOptions } from 'jsonwebtoken';
+import authService, { hashPassword, comparePassword } from './authService.js';
+import crypto from 'crypto';
 
 const router: Router = express.Router();
 
@@ -27,17 +29,6 @@ if (!JWT_EXPIRES_IN) {
   throw new Error("JWT_EXPIRES_IN environment variable is required");
 }
 const REFRESH_TOKEN_EXPIRES_IN = 7; // days
-
-// Hash password
-export const hashPassword = async (password: string): Promise<string> => {
-  const saltRounds = 10;
-  return bcryptjs.hash(password, saltRounds);
-};
-
-// Compare password with hash
-export const comparePasswords = async (password: string, hash: string): Promise<boolean> => {
-  return bcryptjs.compare(password, hash);
-};
 
 // Register endpoint
 router.post('/register', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -103,36 +94,31 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
       throw error;
     }
 
-    // Generate JWT token
-    const accessToken = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        userType
-      },
-      JWT_SECRET as Secret,
-      { expiresIn: JWT_EXPIRES_IN } as SignOptions
-    );
+    // Generate Access JWT token (payload only needs essential info for verification)
+    const accessToken = authService.generateToken({
+      id: user.id,
+      userType
+    });
 
     // Calculate refresh token expiration
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_EXPIRES_IN);
 
-    // Generate refresh token
-    const refreshToken = jwt.sign({ id: user.id, type: userType }, JWT_SECRET as Secret);
+    // Generate a secure random string for the database refresh token
+    const uniqueRefreshToken = crypto.randomBytes(32).toString('hex');
 
-    // Store refresh token in database
+    // Store unique refresh token in database
     await prisma.refreshToken.create({
       data: {
-        token: refreshToken,
+        token: uniqueRefreshToken,
         userId: user.id,
         userType: userType === 'STUDENT' ? 'STUDENT' : 'TEACHER',
         expiresAt,
       },
     });
 
-    // Set refresh token cookie
-    res.cookie('refreshToken', refreshToken, cookieOptions);
+    // Set refresh token cookie with the unique random string
+    res.cookie('refreshToken', uniqueRefreshToken, cookieOptions);
 
     // Return user and access token
     res.status(201).json({
@@ -195,42 +181,37 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction): P
     }
 
     // Verify password
-    const isValidPassword = await comparePasswords(password, user.password);
+    const isValidPassword = await comparePassword(password, user.password);
     if (!isValidPassword) {
       res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
 
-    // Generate JWT token
-    const accessToken = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        userType
-      },
-      JWT_SECRET as Secret,
-      { expiresIn: JWT_EXPIRES_IN } as SignOptions
-    );
+    // Generate Access JWT token
+    const accessToken = authService.generateToken({
+      id: user.id,
+      userType
+    });
 
     // Calculate refresh token expiration
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_EXPIRES_IN);
 
-    // Generate refresh token
-    const refreshToken = jwt.sign({ id: user.id, type: userType }, JWT_SECRET as Secret);
+    // Generate a secure random string for the database refresh token
+    const uniqueRefreshToken = crypto.randomBytes(32).toString('hex');
 
-    // Store refresh token in database
+    // Store unique refresh token in database
     await prisma.refreshToken.create({
       data: {
-        token: refreshToken,
+        token: uniqueRefreshToken,
         userId: user.id,
         userType: userType === 'STUDENT' ? 'STUDENT' : 'TEACHER',
         expiresAt,
       },
     });
 
-    // Set refresh token cookie
-    res.cookie('refreshToken', refreshToken, cookieOptions);
+    // Set refresh token cookie with the unique random string
+    res.cookie('refreshToken', uniqueRefreshToken, cookieOptions);
 
     // Return user and access token
     res.status(200).json({

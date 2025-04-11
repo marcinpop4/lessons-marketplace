@@ -1,4 +1,5 @@
 import prisma from '../prisma.js';
+import type { PrismaClient } from '@prisma/client';
 import { LessonType } from '../../shared/models/LessonType.js';
 import { Teacher } from '../../shared/models/Teacher.js';
 import { LessonQuote } from '../../shared/models/LessonQuote.js';

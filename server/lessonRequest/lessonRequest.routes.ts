@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
-import { lessonRequestController } from '../controllers/lessonRequestController.js';
-import { authMiddleware } from '../middleware/auth/authMiddleware.js';
-import { checkRole } from '../middleware/auth/roleMiddleware.js';
+import { lessonRequestController } from './lessonRequest.controller.js';
+import { authMiddleware } from '../auth/authMiddleware.js';
+import { checkRole } from '../auth/roleMiddleware.js';
 
 const router: Router = express.Router();
 

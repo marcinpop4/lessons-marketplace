@@ -1,8 +1,7 @@
-import express, { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import express, { Router, Request, Response, NextFunction } from 'express';
+import prisma from '../prisma.js'; // Corrected path
 
 const router: Router = express.Router();
-const prisma = new PrismaClient();
 
 /**
  * Health check endpoint
@@ -14,7 +13,7 @@ router.get('/', async (_req, res) => {
   try {
     // Check database connection
     await prisma.$queryRaw`SELECT 1`;
-    
+
     res.status(200).json({
       status: 'ok',
       timestamp: new Date().toISOString(),
