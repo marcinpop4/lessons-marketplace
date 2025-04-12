@@ -7,9 +7,9 @@ import { LessonRequest } from '../../shared/models/LessonRequest.js';
 import { Address } from '../../shared/models/Address.js';
 import { Teacher } from '../../shared/models/Teacher.js';
 import { Student } from '../../shared/models/Student.js';
-import { LessonStatusValue, LessonStatus } from '@shared/models/LessonStatus';
+import { LessonStatusValue, LessonStatus } from '../../shared/models/LessonStatus.js';
 import { v4 as uuidv4 } from 'uuid';
-import { lessonService } from './lesson.service';
+import { lessonService } from './lesson.service.js';
 
 /**
  * Controller for lesson-related operations
@@ -21,41 +21,64 @@ export const lessonController = {
    * @returns Shared model instance
    */
   transformToModel(prismaLesson: any): Lesson {
-    if (!prismaLesson?.quote?.lessonRequest?.address) {
-      throw new Error('Invalid lesson data structure');
+    if (!prismaLesson?.quote?.lessonRequest?.address ||
+      !prismaLesson?.quote?.teacher ||
+      !prismaLesson?.quote?.lessonRequest?.student ||
+      !prismaLesson.currentStatusId // Ensure status ID is present
+    ) {
+      console.error('Invalid lesson data structure received for transformToModel:', JSON.stringify(prismaLesson, null, 2));
+      throw new Error('Invalid lesson data structure for transformation');
     }
 
-    // Ensure currentStatusId exists before constructing the model
-    if (!prismaLesson.currentStatusId) {
-      throw new Error(`Lesson data for ${prismaLesson.id} is missing currentStatusId.`);
-    }
+    const student = new Student(
+      prismaLesson.quote.lessonRequest.student.id,
+      prismaLesson.quote.lessonRequest.student.firstName,
+      prismaLesson.quote.lessonRequest.student.lastName,
+      prismaLesson.quote.lessonRequest.student.email,
+      prismaLesson.quote.lessonRequest.student.phoneNumber,
+      prismaLesson.quote.lessonRequest.student.dateOfBirth
+    );
+
+    const address = new Address({
+      street: prismaLesson.quote.lessonRequest.address.street,
+      city: prismaLesson.quote.lessonRequest.address.city,
+      state: prismaLesson.quote.lessonRequest.address.state,
+      postalCode: prismaLesson.quote.lessonRequest.address.postalCode,
+      country: prismaLesson.quote.lessonRequest.address.country
+    });
+
+    const lessonRequest = new LessonRequest(
+      prismaLesson.quote.lessonRequest.id,
+      prismaLesson.quote.lessonRequest.type,
+      new Date(prismaLesson.quote.lessonRequest.startTime),
+      prismaLesson.quote.lessonRequest.durationMinutes,
+      address,
+      student
+    );
+
+    const teacher = new Teacher(
+      prismaLesson.quote.teacher.id,
+      prismaLesson.quote.teacher.firstName,
+      prismaLesson.quote.teacher.lastName,
+      prismaLesson.quote.teacher.email,
+      prismaLesson.quote.teacher.phoneNumber,
+      new Date(prismaLesson.quote.teacher.dateOfBirth),
+      prismaLesson.quote.teacher.hourlyRates // Assuming hourlyRates are included in the query
+    );
+
+    const lessonQuote = new LessonQuote(
+      prismaLesson.quote.id,
+      lessonRequest,
+      teacher,
+      prismaLesson.quote.costInCents,
+      prismaLesson.quote.hourlyRateInCents,
+      new Date(prismaLesson.quote.createdAt),
+      new Date(prismaLesson.quote.expiresAt)
+    );
 
     return new Lesson(
       prismaLesson.id,
-      new LessonQuote(
-        prismaLesson.quote.id,
-        new LessonRequest(
-          prismaLesson.quote.lessonRequest.id,
-          prismaLesson.quote.lessonRequest.type,
-          new Date(prismaLesson.quote.lessonRequest.startTime),
-          prismaLesson.quote.lessonRequest.durationMinutes,
-          prismaLesson.quote.lessonRequest.address,
-          prismaLesson.quote.lessonRequest.student
-        ),
-        new Teacher(
-          prismaLesson.quote.teacher.id,
-          prismaLesson.quote.teacher.firstName,
-          prismaLesson.quote.teacher.lastName,
-          prismaLesson.quote.teacher.email,
-          prismaLesson.quote.teacher.phoneNumber,
-          new Date(prismaLesson.quote.teacher.dateOfBirth),
-          prismaLesson.quote.teacher.hourlyRates
-        ),
-        prismaLesson.quote.costInCents,
-        prismaLesson.quote.hourlyRateInCents,
-        new Date(prismaLesson.quote.createdAt),
-        new Date(prismaLesson.quote.expiresAt)
-      ),
+      lessonQuote,
       prismaLesson.currentStatusId,
       new Date(prismaLesson.confirmedAt)
     );

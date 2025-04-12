@@ -61,7 +61,7 @@
     "fix:typescript": "pnpm fix:tsconfig && pnpm typecheck",
     "check:deployment": "node scripts/check-build-errors.js",
     "lint-staged": "lint-staged",
-    "start": "dotenv -e env/.env.${NODE_ENV:-test} -- node -r ts-node/register/transpile-only -r tsconfig-paths/register dist/server/index.js",
+    "start": "dotenv -e env/.env.${NODE_ENV:-test} -- node -r tsconfig-paths/register dist/server/index.js",
     "prisma:reset": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate reset --force --schema=server/prisma/schema.prisma",
     "prisma:resolve-applied": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate resolve --applied",
     "prisma:resolve-rolled-back": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate resolve --schema=server/prisma/schema.prisma --rolled-back",
