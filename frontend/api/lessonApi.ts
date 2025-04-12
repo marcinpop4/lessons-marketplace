@@ -49,13 +49,13 @@ export const getLessonById = async (id: string): Promise<Lesson> => {
           data.quote.lessonRequest.type,
           new Date(data.quote.lessonRequest.startTime),
           data.quote.lessonRequest.durationMinutes,
-          new Address(
-            data.quote.lessonRequest.address.street,
-            data.quote.lessonRequest.address.city,
-            data.quote.lessonRequest.address.state,
-            data.quote.lessonRequest.address.postalCode,
-            data.quote.lessonRequest.address.country
-          ),
+          new Address({
+            street: data.quote.lessonRequest.address.street,
+            city: data.quote.lessonRequest.address.city,
+            state: data.quote.lessonRequest.address.state,
+            postalCode: data.quote.lessonRequest.address.postalCode,
+            country: data.quote.lessonRequest.address.country
+          }),
           new Student(
             data.quote.lessonRequest.student.id,
             data.quote.lessonRequest.student.firstName,

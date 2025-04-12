@@ -17,13 +17,16 @@ export class LessonRequestController {
    * Transform a Prisma LessonRequest into our shared model LessonRequest
    */
   private transformToModel(prismaRequest: any): LessonRequest {
-    const address = new Address(
-      prismaRequest.address.street,
-      prismaRequest.address.city,
-      prismaRequest.address.state,
-      prismaRequest.address.postalCode,
-      prismaRequest.address.country
-    );
+    const address = new Address({
+      street: prismaRequest.address.street,
+      city: prismaRequest.address.city,
+      state: prismaRequest.address.state,
+      postalCode: prismaRequest.address.postalCode,
+      country: prismaRequest.address.country
+    });
+
+    // TODO: Transform student data properly if it's not already the correct model
+    const student = prismaRequest.student;
 
     return new LessonRequest(
       prismaRequest.id,
@@ -31,7 +34,7 @@ export class LessonRequestController {
       new Date(prismaRequest.startTime),
       prismaRequest.durationMinutes,
       address,
-      prismaRequest.student
+      student
     );
   }
 
@@ -43,22 +46,24 @@ export class LessonRequestController {
    */
   async createLessonRequest(req: Request, res: Response): Promise<void> {
     try {
-      const {
-        type,
-        startTime,
-        durationMinutes,
-        addressObj,
-        studentId
-      } = req.body;
+      const { type, startTime, durationMinutes, addressObj, studentId } = req.body;
 
       // Log the request body for debugging
       console.debug('Received lesson request data:', req.body);
 
-      // Validate required fields
-      if (!type || !startTime || !durationMinutes || !addressObj || !studentId) {
+      // --- Default country if missing --- 
+      if (!addressObj.country) {
+        console.log('Country missing in request, defaulting to USA.');
+        addressObj.country = "USA";
+      }
+      // --- End Default country --- 
+
+      // Validate required fields (checking addressObj itself, not just country)
+      if (!type || !startTime || !durationMinutes || !addressObj || !studentId ||
+        !addressObj.street || !addressObj.city || !addressObj.state || !addressObj.postalCode || !addressObj.country) { // Ensure all parts of address are present
         res.status(400).json({
           error: 'Missing required fields',
-          message: 'Please provide type, startTime, durationMinutes, addressObj, and studentId'
+          message: 'Please provide type, startTime, durationMinutes, studentId, and a complete address (street, city, state, postalCode, country)'
         });
         return;
       }
@@ -73,13 +78,30 @@ export class LessonRequestController {
         return;
       }
 
+      // Use the addressObj directly from the body
+      const addressModel = new Address({
+        street: addressObj.street,
+        city: addressObj.city,
+        state: addressObj.state,
+        postalCode: addressObj.postalCode,
+        country: addressObj.country // Will be defaulted if was missing
+      });
+
+      // --- Removing Debug Logging --- 
+      // console.log('Controller: addressModel created:', JSON.stringify(addressModel, null, 2));
+      // console.log('Controller: Calling service with type:', type);
+      // console.log('Controller: Calling service with startTime:', new Date(startTime));
+      // console.log('Controller: Calling service with duration:', parseInt(durationMinutes, 10));
+      // console.log('Controller: Calling service with studentId:', studentId);
+      // --- End Removing Debug Logging --- 
+
       // Create lesson request
       const lessonRequest = await lessonRequestService.createLessonRequest({
-        type,
-        startTime: parsedStartTime,
+        type: type,
+        startTime: new Date(startTime),
         durationMinutes: parseInt(durationMinutes, 10),
-        addressObj,
-        studentId
+        addressObj: addressModel, // Pass the model instance
+        studentId: studentId
       });
 
       // Transform to shared model

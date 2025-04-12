@@ -298,7 +298,8 @@ router.post('/refresh-token', async (req: Request, res: Response, next: NextFunc
     });
   } catch (error) {
     console.error('Token refresh error:', error);
-    res.status(401).json({ error: 'Invalid refresh token' });
+    // Send 500 for unexpected errors during refresh
+    res.status(500).json({ error: 'Failed to refresh token', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 

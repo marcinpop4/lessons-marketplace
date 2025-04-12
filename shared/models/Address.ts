@@ -2,6 +2,16 @@
  * Address model representing a physical location
  * Used for lesson locations and potentially other address needs
  */
+
+// Interface for constructor properties
+interface AddressProps {
+  street: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+}
+
 export class Address {
   street: string;
   city: string;
@@ -9,13 +19,8 @@ export class Address {
   postalCode: string;
   country: string;
 
-  constructor(
-    street: string,
-    city: string,
-    state: string,
-    postalCode: string,
-    country: string
-  ) {
+  // Updated constructor using object destructuring
+  constructor({ street, city, state, postalCode, country }: AddressProps) {
     this.street = street;
     this.city = city;
     this.state = state;
@@ -61,6 +66,7 @@ export class Address {
       throw new Error('Both state and postal code are required');
     }
 
-    return new Address(street, city, state, postalCode, country);
+    // Use the new constructor pattern
+    return new Address({ street, city, state, postalCode, country });
   }
 } 

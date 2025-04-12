@@ -70,13 +70,13 @@ export const createLessonRequest = async (data: CreateLessonRequestPayload): Pro
       responseData.type,
       new Date(responseData.startTime),
       responseData.durationMinutes,
-      new Address(
-        responseData.address.street,
-        responseData.address.city,
-        responseData.address.state,
-        responseData.address.postalCode,
-        responseData.address.country
-      ),
+      new Address({
+        street: responseData.address.street,
+        city: responseData.address.city,
+        state: responseData.address.state,
+        postalCode: responseData.address.postalCode,
+        country: responseData.address.country
+      }),
       responseData.student
     );
 
@@ -117,13 +117,13 @@ export const getLessonRequestById = async (id: string): Promise<LessonRequest> =
       responseData.type,
       new Date(responseData.startTime),
       responseData.durationMinutes,
-      new Address(
-        responseData.address.street,
-        responseData.address.city,
-        responseData.address.state,
-        responseData.address.postalCode,
-        responseData.address.country
-      ),
+      new Address({
+        street: responseData.address.street,
+        city: responseData.address.city,
+        state: responseData.address.state,
+        postalCode: responseData.address.postalCode,
+        country: responseData.address.country
+      }),
       responseData.student
     );
   } catch (error) {
@@ -147,13 +147,13 @@ export const getLessonRequestsByStudent = async (studentId: string): Promise<Les
       data.type,
       new Date(data.startTime),
       data.durationMinutes,
-      new Address(
-        data.address.street,
-        data.address.city,
-        data.address.state,
-        data.address.postalCode,
-        data.address.country
-      ),
+      new Address({
+        street: data.address.street,
+        city: data.address.city,
+        state: data.address.state,
+        postalCode: data.address.postalCode,
+        country: data.address.country
+      }),
       data.student
     ));
   } catch (error) {

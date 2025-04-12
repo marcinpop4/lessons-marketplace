@@ -103,13 +103,13 @@ export class TeacherQuoteService {
             dbLessonRequest.type as LessonType,
             new Date(dbLessonRequest.startTime),
             dbLessonRequest.durationMinutes,
-            new Address(
-                dbLessonRequest.address.street,
-                dbLessonRequest.address.city,
-                dbLessonRequest.address.state,
-                dbLessonRequest.address.postalCode,
-                dbLessonRequest.address.country
-            ),
+            new Address({
+                street: dbLessonRequest.address.street,
+                city: dbLessonRequest.address.city,
+                state: dbLessonRequest.address.state,
+                postalCode: dbLessonRequest.address.postalCode,
+                country: dbLessonRequest.address.country
+            }),
             student
         );
 
@@ -174,13 +174,13 @@ export class TeacherQuoteService {
                 dbQuote.lessonRequest.type as LessonType,
                 new Date(dbQuote.lessonRequest.startTime),
                 dbQuote.lessonRequest.durationMinutes,
-                new Address(
-                    dbQuote.lessonRequest.address.street,
-                    dbQuote.lessonRequest.address.city,
-                    dbQuote.lessonRequest.address.state,
-                    dbQuote.lessonRequest.address.postalCode,
-                    dbQuote.lessonRequest.address.country
-                ),
+                new Address({
+                    street: dbQuote.lessonRequest.address.street,
+                    city: dbQuote.lessonRequest.address.city,
+                    state: dbQuote.lessonRequest.address.state,
+                    postalCode: dbQuote.lessonRequest.address.postalCode,
+                    country: dbQuote.lessonRequest.address.country
+                }),
                 student
             );
 
@@ -249,13 +249,13 @@ export class TeacherQuoteService {
                 dbQuote.lessonRequest.type as LessonType,
                 new Date(dbQuote.lessonRequest.startTime),
                 dbQuote.lessonRequest.durationMinutes,
-                new Address(
-                    dbQuote.lessonRequest.address.street,
-                    dbQuote.lessonRequest.address.city,
-                    dbQuote.lessonRequest.address.state,
-                    dbQuote.lessonRequest.address.postalCode,
-                    dbQuote.lessonRequest.address.country
-                ),
+                new Address({
+                    street: dbQuote.lessonRequest.address.street,
+                    city: dbQuote.lessonRequest.address.city,
+                    state: dbQuote.lessonRequest.address.state,
+                    postalCode: dbQuote.lessonRequest.address.postalCode,
+                    country: dbQuote.lessonRequest.address.country
+                }),
                 student
             );
 

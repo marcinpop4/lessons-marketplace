@@ -127,15 +127,45 @@ export const lessonController = {
 
       // Start a transaction to ensure all operations succeed or fail together
       const result = await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => {
-        // Create the lesson
+
+        // *** CORRECTED APPROACH: Create Lesson first (DB allows null), then Status, then Update Lesson ***
+
+        // 1. Create the Lesson, connecting the quote (currentStatusId is initially null)
         const lesson = await tx.lesson.create({
           data: {
             confirmedAt: confirmedAt ? new Date(confirmedAt) : new Date(),
             quote: {
               connect: { id: quoteId }
             }
+            // currentStatusId is null here initially
           },
           include: {
+            // Include relations needed for later steps or response
+            quote: {
+              include: {
+                lessonRequest: true // Need lessonRequestId for expiring other quotes
+              }
+            }
+          }
+        });
+
+        // 2. Create the initial LessonStatus, now that we have the lessonId
+        const acceptedStatusId = uuidv4();
+        await tx.lessonStatus.create({
+          data: {
+            id: acceptedStatusId,
+            lessonId: lesson.id,
+            status: LessonStatusValue.REQUESTED,
+            context: { requestedVia: 'quoteConfirmation' },
+            createdAt: new Date()
+          }
+        });
+
+        // 3. Update the Lesson to set the currentStatusId
+        const updatedLesson = await tx.lesson.update({
+          where: { id: lesson.id },
+          data: { currentStatusId: acceptedStatusId },
+          include: { // Include relations needed for the final response
             quote: {
               include: {
                 teacher: true,
@@ -146,14 +176,19 @@ export const lessonController = {
                   }
                 }
               }
-            }
+            },
+            currentStatus: true // Include the status we just set
           }
         });
 
-        // Expire all other quotes for the same lesson request
+        // 4. Expire all other quotes for the same lesson request
+        // Ensure we have lessonRequestId from the included relation
+        if (!lesson.quote?.lessonRequestId) {
+          throw new Error('Could not retrieve lessonRequestId to expire other quotes.');
+        }
         await tx.lessonQuote.updateMany({
           where: {
-            lessonRequestId: quote.lessonRequestId,
+            lessonRequestId: lesson.quote.lessonRequestId,
             id: { not: quoteId },
             expiresAt: { gt: new Date() } // Only update unexpired quotes
           },
@@ -162,9 +197,11 @@ export const lessonController = {
           }
         });
 
-        return lesson;
+        // Return the *updated* lesson with the status ID set
+        return updatedLesson;
       });
 
+      // Transform the result (which now includes currentStatusId)
       const modelLesson = lessonController.transformToModel(result);
       res.status(201).json(modelLesson);
     } catch (error) {

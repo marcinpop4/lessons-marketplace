@@ -7,7 +7,7 @@ import { Person } from './Person.js';
 export class Student extends Person {
   // You could add student-specific properties here in the future
   // For example: preferences, payment information, lesson history
-  
+
   constructor(
     id: string,
     firstName: string,

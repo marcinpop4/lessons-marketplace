@@ -9,6 +9,14 @@ import LessonDetailsForm from './LessonDetailsForm';
 import AddressForm from './AddressForm';
 import './LessonRequestForm.css';
 
+interface LessonRequestFormData {
+  type: LessonType;
+  startTime: Date;
+  durationMinutes: number;
+  address: Address;
+  studentId: string;
+}
+
 interface LessonRequestFormProps {
   onSubmitSuccess?: (lessonRequestId: string) => void;
 }
@@ -18,18 +26,12 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
   const navigate = useNavigate();
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
-  const [formData, setFormData] = useState<{
-    type: LessonType;
-    startTime: Date;
-    durationMinutes: number;
-    addressObj: Address;
-    studentId: string;
-  }>({
+  const [formData, setFormData] = useState<LessonRequestFormData>({
     type: LessonType.GUITAR,
     startTime: new Date(),
     durationMinutes: 30,
-    addressObj: new Address('', '', '', '', 'USA'),
-    studentId: ''
+    address: new Address({ street: '', city: '', state: '', postalCode: '', country: 'USA' }),
+    studentId: user?.id || ''
   });
 
   const [loading, setLoading] = useState(false);
@@ -90,7 +92,7 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
         formData.type,
         date,
         formData.durationMinutes,
-        formData.addressObj,
+        formData.address,
         {} as any
       );
 
@@ -128,7 +130,7 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
         formData.type,
         date,
         durationValue,
-        formData.addressObj,
+        formData.address,
         {} as any
       );
 
@@ -150,8 +152,8 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
     const addressField = name.split('.')[1] as keyof Address;
     setFormData(prevData => ({
       ...prevData,
-      addressObj: {
-        ...prevData.addressObj,
+      address: {
+        ...prevData.address,
         [addressField]: value
       }
     }));
@@ -165,7 +167,6 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
       return;
     }
 
-    // Create a new Date object with the selected date and time
     const [hours, minutes] = selectedTime.split(':').map(Number);
     const date = new Date(selectedDate);
     date.setHours(hours || 0, minutes || 0);
@@ -175,7 +176,7 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
       formData.type,
       date,
       formData.durationMinutes,
-      formData.addressObj,
+      formData.address,
       {} as any
     );
 
@@ -184,9 +185,9 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
       return;
     }
 
-    const { street, city, state, postalCode } = formData.addressObj;
-    if (!street || !city || !state || !postalCode) {
-      setError('Please fill in all address fields.');
+    const { street, city, state, postalCode, country } = formData.address;
+    if (!street || !city || !state || !postalCode || !country) {
+      setError('Please fill in all address fields (including country).');
       return;
     }
 
@@ -194,36 +195,35 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
     setError(null);
 
     try {
-      // Convert to API payload format
       const payload = {
         type: formData.type,
         startTime: date,
         durationMinutes: formData.durationMinutes,
-        addressObj: formData.addressObj,
+        addressObj: formData.address,
         studentId: formData.studentId
       };
 
+      console.log('Submitting payload:', payload);
       const response = await createLessonRequest(payload);
       console.log('Lesson request created:', response);
 
       setShowSuccessMessage(true);
-      // Call the success handler passed via props, using the correct response structure
       if (onSubmitSuccess && response && response.lessonRequest && response.lessonRequest.id) {
         onSubmitSuccess(response.lessonRequest.id);
       }
 
-      // Reset form
       setFormData({
         type: LessonType.GUITAR,
         startTime: new Date(),
         durationMinutes: 30,
-        addressObj: new Address('', '', '', '', 'USA'),
+        address: new Address({ street: '', city: '', state: '', postalCode: '', country: 'USA' }),
         studentId: user?.id || ''
       });
       setSelectedTime('');
       setSelectedDate(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`);
 
     } catch (err) {
+      console.error('Form submission error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred while submitting the form.');
     } finally {
       setLoading(false);
@@ -255,7 +255,7 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
             onTimeChange={handleTimeChange}
           />
           <AddressForm
-            address={formData.addressObj}
+            address={formData.address}
             onChange={handleAddressChange}
           />
         </div>
