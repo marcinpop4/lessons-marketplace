@@ -253,17 +253,19 @@ export const lessonController = {
   /**
    * Update the status of a lesson
    */
-  updateLessonStatus: async (req: Request, res: Response): Promise<Response> => {
+  updateLessonStatus: async (req: Request, res: Response): Promise<void> => {
     const { lessonId } = req.params;
     const { status } = req.body; // Expecting { status: LessonStatusValue }
-    const teacherId = (req as any).user?.id; // Get teacher ID from authenticated user
+    const teacherId = req.user?.id; // Use augmented type
 
     if (!teacherId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: 'Unauthorized' });
+      return; // Added return void
     }
 
     if (!lessonId || !status) {
-      return res.status(400).json({ error: 'Missing lessonId or status in request' });
+      res.status(400).json({ error: 'Missing lessonId or status in request' });
+      return; // Added return void
     }
 
     // TODO: Validate status value is a valid LessonStatusValue
@@ -279,12 +281,12 @@ export const lessonController = {
       // --- End Placeholder --- 
 
       // Assuming success for now
-      return res.status(200).json({ message: 'Lesson status updated successfully' }); // Or return updated lesson
+      res.status(200).json({ message: 'Lesson status updated successfully' }); // Removed return
 
     } catch (error: any) {
       console.error('Error updating lesson status:', error);
       // TODO: Add more specific error handling (e.g., lesson not found, unauthorized, invalid status)
-      return res.status(500).json({ error: 'Failed to update lesson status' });
+      res.status(500).json({ error: 'Failed to update lesson status' }); // Removed return
     }
   }
 }; 

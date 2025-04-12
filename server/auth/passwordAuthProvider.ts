@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import prisma from '../../prisma.js';
+import prisma from '../prisma';
 import authService, { AuthProvider } from './authService.js';
 
 interface PasswordCredentials {

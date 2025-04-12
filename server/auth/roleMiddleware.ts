@@ -10,13 +10,14 @@ import { UserType } from '@prisma/client'; // Assuming UserType enum is generate
 export const checkRole = (allowedRoles: UserType[]) => {
     return (req: Request, res: Response, next: NextFunction) => {
         // Assume authMiddleware has run and attached user info to req.user
-        const user = (req as any).user;
+        const user = req.user;
 
         if (!user || !user.userType) {
             // If user is not attached or doesn't have a userType, forbid access
             // This might also indicate an issue with authMiddleware
             console.warn('checkRole: User or userType not found on request object.');
-            return res.status(403).json({ error: 'Forbidden: Access denied.' });
+            res.status(403).json({ error: 'Forbidden: Access denied.' });
+            return;
         }
 
         const userRole: UserType = user.userType;
@@ -27,7 +28,8 @@ export const checkRole = (allowedRoles: UserType[]) => {
         } else {
             // User role is not in the allowed list, forbid access
             console.warn(`checkRole: User with role '${userRole}' attempted to access restricted route. Allowed: ${allowedRoles.join(', ')}`);
-            return res.status(403).json({ error: 'Forbidden: Insufficient permissions.' });
+            res.status(403).json({ error: 'Forbidden: Insufficient permissions.' });
+            return;
         }
     };
 }; 

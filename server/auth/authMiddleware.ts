@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
+// Test comment
 const JWT_SECRET = process.env.JWT_SECRET;
 
 if (!JWT_SECRET) {
@@ -23,8 +24,8 @@ const authMiddleware = (req: Request, res: Response, next: NextFunction): void =
         const decoded = jwt.verify(token, JWT_SECRET);
 
         // Attach the decoded payload (user info) to the request object
-        // Using `any` for simplicity, consider defining a custom Request type with `user` property
-        (req as any).user = decoded;
+        // Type assertion removed, relying on augmented Request type
+        req.user = decoded as Express.Request['user']; // Use augmented type
 
         // Proceed to the next middleware or route handler
         next();
