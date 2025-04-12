@@ -75,10 +75,11 @@ export const getLessonById = async (id: string): Promise<Lesson> => {
           data.quote.teacher.hourlyRates
         ),
         data.quote.costInCents,
+        data.quote.hourlyRateInCents,
         new Date(data.quote.createdAt),
-        new Date(data.quote.expiresAt),
-        data.quote.status
+        new Date(data.quote.expiresAt)
       ),
+      data.currentStatusId,
       new Date(data.confirmedAt)
     );
   } catch (error) {

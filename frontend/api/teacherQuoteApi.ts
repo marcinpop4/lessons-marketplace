@@ -55,9 +55,9 @@ export const createLessonQuotes = async (
       lessonRequest,
       quote.teacher,
       quote.costInCents,
+      quote.hourlyRateInCents,
       new Date(quote.createdAt),
-      new Date(quote.expiresAt),
-      quote.hourlyRateInCents
+      new Date(quote.expiresAt)
     );
   });
 };

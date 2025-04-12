@@ -381,22 +381,25 @@ async function main() {
     const confirmedQuotes = lessonQuotes.filter((_, idx) => idx % 2 === 0);
     
     for (const quote of confirmedQuotes) {
+      // Create the Lesson first, connecting the quote
       const lesson = await prisma.lesson.create({
         data: {
-          quoteId: quote.id,
-          // confirmedAt is automatically set to current timestamp
+          quote: {
+            connect: { id: quote.id }
+          }
+          // currentStatusId is initially null
         },
       });
       
       // Create initial REQUESTED status for the lesson
       const statusId = uuidv4();
-      const lessonStatus = await prisma.lessonStatus.create({
+      await prisma.lessonStatus.create({ // Renamed variable to avoid conflict
         data: {
           id: statusId,
-          lessonId: lesson.id,
+          lessonId: lesson.id, // Use the ID of the newly created lesson
           status: LessonStatusValue.REQUESTED,
           context: {},
-          createdAt: lesson.confirmedAt
+          // createdAt: lesson.confirmedAt // Use default createdAt
         }
       });
       

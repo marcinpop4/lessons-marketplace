@@ -14,31 +14,18 @@ export class Lesson {
    * The confirmation status should be tracked through LessonStatus records.
    */
   confirmedAt: Date;
-  currentStatusId: string | null;
+  currentStatusId: string;
 
   constructor(
     id: string,
     quote: LessonQuote,
-    confirmedAt: Date = new Date(),
-    currentStatusId: string | null = null
+    currentStatusId: string,
+    confirmedAt: Date = new Date()
   ) {
     this.id = id;
     this.quote = quote;
     this.confirmedAt = confirmedAt;
     this.currentStatusId = currentStatusId;
-  }
-
-  /**
-   * Create a Lesson from a LessonQuote
-   * @param id Unique identifier for the lesson
-   * @param quote The accepted lesson quote
-   * @returns A new Lesson instance
-   */
-  static createFromQuote(id: string, quote: LessonQuote): Lesson {
-    if (!quote.isValid()) {
-      throw new Error('Cannot create a lesson from an expired quote');
-    }
-    return new Lesson(id, quote);
   }
 
   /**
@@ -110,47 +97,5 @@ export class Lesson {
     return this.quote.getFormattedCost(locale, currency);
   }
 
-  /**
-   * Update the lesson's status by creating a new status record
-   * @param prisma Prisma client instance
-   * @param statusId Unique identifier for the new status record
-   * @param status The new status value
-   * @param context Additional context about the status change
-   * @returns The updated Lesson instance
-   */
-  async updateStatus(
-    prisma: PrismaClient,
-    statusId: string,
-    status: LessonStatusValue,
-    context: Record<string, unknown> = {}
-  ): Promise<Lesson> {
-    // Use any casting to bypass TypeScript errors
-    // This is a temporary solution until the TypeScript/Prisma compatibility issue is resolved
-    const client = prisma as any;
-
-    // Use transaction to ensure both operations succeed or fail together
-    await client.$transaction([
-      // Create the new status record
-      client.lessonStatus.create({
-        data: {
-          id: statusId,
-          lessonId: this.id,
-          status: status,
-          context: context,
-          createdAt: new Date()
-        }
-      }),
-
-      // Update the lesson to reference the new status
-      client.lesson.update({
-        where: { id: this.id },
-        data: {
-          currentStatusId: statusId
-        }
-      })
-    ]);
-
-    this.currentStatusId = statusId;
-    return this;
-  }
+  // updateStatus method removed - logic moved to LessonService
 } 

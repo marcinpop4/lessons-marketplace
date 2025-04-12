@@ -7,8 +7,9 @@ import { LessonRequest } from '../../shared/models/LessonRequest.js';
 import { Address } from '../../shared/models/Address.js';
 import { Teacher } from '../../shared/models/Teacher.js';
 import { Student } from '../../shared/models/Student.js';
-import { LessonStatusValue } from '../../shared/models/LessonStatus.js';
+import { LessonStatusValue, LessonStatus } from '@shared/models/LessonStatus';
 import { v4 as uuidv4 } from 'uuid';
+import { lessonService } from './lesson.service';
 
 /**
  * Controller for lesson-related operations
@@ -22,6 +23,11 @@ export const lessonController = {
   transformToModel(prismaLesson: any): Lesson {
     if (!prismaLesson?.quote?.lessonRequest?.address) {
       throw new Error('Invalid lesson data structure');
+    }
+
+    // Ensure currentStatusId exists before constructing the model
+    if (!prismaLesson.currentStatusId) {
+      throw new Error(`Lesson data for ${prismaLesson.id} is missing currentStatusId.`);
     }
 
     return new Lesson(
@@ -46,10 +52,11 @@ export const lessonController = {
           prismaLesson.quote.teacher.hourlyRates
         ),
         prismaLesson.quote.costInCents,
+        prismaLesson.quote.hourlyRateInCents,
         new Date(prismaLesson.quote.createdAt),
-        new Date(prismaLesson.quote.expiresAt),
-        prismaLesson.quote.status
+        new Date(prismaLesson.quote.expiresAt)
       ),
+      prismaLesson.currentStatusId,
       new Date(prismaLesson.confirmedAt)
     );
   },
@@ -255,7 +262,7 @@ export const lessonController = {
    */
   updateLessonStatus: async (req: Request, res: Response): Promise<void> => {
     const { lessonId } = req.params;
-    const { status } = req.body; // Expecting { status: LessonStatusValue }
+    const { status: newStatusValue } = req.body; // Expecting { status: LessonStatusValue }
     const teacherId = req.user?.id; // Use augmented type
 
     if (!teacherId) {
@@ -263,30 +270,67 @@ export const lessonController = {
       return; // Added return void
     }
 
-    if (!lessonId || !status) {
+    if (!lessonId || !newStatusValue) {
       res.status(400).json({ error: 'Missing lessonId or status in request' });
       return; // Added return void
     }
 
-    // TODO: Validate status value is a valid LessonStatusValue
-    // TODO: Fetch the lesson and verify the teacher owns it
-    // TODO: Instantiate the Lesson model
-    // TODO: Validate the status transition is allowed
-    // TODO: Call lesson.updateStatus() with prisma instance, new status ID, status value, context
-    // TODO: Handle potential errors from updateStatus
+    // Validate the incoming status value
+    if (!Object.values(LessonStatusValue).includes(newStatusValue)) {
+      res.status(400).json({ error: `Invalid status value: ${newStatusValue}` });
+      return;
+    }
 
     try {
-      // --- Placeholder logic --- 
-      console.log(`Attempting to update lesson ${lessonId} to status ${status} by teacher ${teacherId}`);
-      // --- End Placeholder --- 
+      // Fetch the current lesson with its current status to validate ownership and transition
+      const lesson = await prisma.lesson.findUnique({
+        where: { id: lessonId },
+        include: {
+          quote: { include: { teacher: true } },
+          currentStatus: true
+        }
+      });
 
-      // Assuming success for now
-      res.status(200).json({ message: 'Lesson status updated successfully' }); // Removed return
+      if (!lesson) {
+        res.status(404).json({ error: `Lesson with ID ${lessonId} not found.` });
+        return;
+      }
+
+      // Verify the teacher owns the lesson (via the quote)
+      if (lesson.quote.teacherId !== teacherId) {
+        res.status(403).json({ error: 'Forbidden: You do not own this lesson.' });
+        return;
+      }
+
+      // Get the current status value
+      const currentStatusValue = lesson.currentStatus?.status as LessonStatusValue | undefined;
+      if (!currentStatusValue) {
+        // Should not happen with proper seeding/creation, but handle defensively
+        console.error(`Lesson ${lessonId} is missing a current status.`);
+        res.status(500).json({ error: 'Internal server error: Lesson status is inconsistent.' });
+        return;
+      }
+
+      // Validate the status transition using the static method on LessonStatus model
+      if (!LessonStatus.isValidTransition(currentStatusValue, newStatusValue)) {
+        res.status(400).json({ error: `Invalid status transition from ${currentStatusValue} to ${newStatusValue}` });
+        return;
+      }
+
+      // If transition is valid, call the service to perform the update
+      // Context can be added here if needed, e.g., { updatedBy: teacherId }
+      const newStatusId = await lessonService.updateStatus(prisma, lessonId, newStatusValue, { updatedBy: teacherId });
+
+      res.status(200).json({ message: 'Lesson status updated successfully', newStatusId });
 
     } catch (error: any) {
       console.error('Error updating lesson status:', error);
-      // TODO: Add more specific error handling (e.g., lesson not found, unauthorized, invalid status)
-      res.status(500).json({ error: 'Failed to update lesson status' }); // Removed return
+      // Handle specific errors thrown by the service or Prisma
+      if (error.message.includes('not found')) {
+        res.status(404).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: `Failed to update lesson status: ${error.message}` });
+      }
     }
   }
 }; 

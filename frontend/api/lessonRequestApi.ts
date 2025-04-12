@@ -86,9 +86,9 @@ export const createLessonRequest = async (data: CreateLessonRequestPayload): Pro
       lessonRequest,
       quote.teacher,
       quote.costInCents,
+      quote.hourlyRateInCents,
       new Date(quote.createdAt),
-      new Date(quote.expiresAt),
-      quote.hourlyRateInCents
+      new Date(quote.expiresAt)
     ));
 
     return {

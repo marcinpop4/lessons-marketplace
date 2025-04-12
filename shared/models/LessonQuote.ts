@@ -20,9 +20,9 @@ export class LessonQuote {
     lessonRequest: LessonRequest,
     teacher: Teacher,
     costInCents: number,
+    hourlyRateInCents: number,
     createdAt: Date = new Date(),
-    expiresAt: Date,
-    hourlyRateInCents: number
+    expiresAt: Date
   ) {
     this.id = id;
     this.lessonRequest = lessonRequest;
@@ -63,9 +63,9 @@ export class LessonQuote {
       lessonRequest,
       teacher,
       costInCents,
+      hourlyRate.rateInCents,
       new Date(),
-      expiresAt,
-      hourlyRate.rateInCents
+      expiresAt
     );
   }
 

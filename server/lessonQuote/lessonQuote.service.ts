@@ -206,9 +206,9 @@ export class TeacherQuoteService {
                 lessonRequest,
                 teacher,
                 dbQuote.costInCents,
+                dbQuote.hourlyRateInCents,
                 new Date(dbQuote.createdAt),
-                new Date(dbQuote.expiresAt),
-                hourlyRate.calculateCostForDuration(60) // Calculate cost for 60 minutes to get hourly rate
+                new Date(dbQuote.expiresAt)
             );
         });
     }
@@ -281,9 +281,9 @@ export class TeacherQuoteService {
                 lessonRequest,
                 teacher,
                 dbQuote.costInCents,
+                dbQuote.hourlyRateInCents,
                 new Date(dbQuote.createdAt),
-                new Date(dbQuote.expiresAt),
-                hourlyRate.calculateCostForDuration(60) // Calculate cost for 60 minutes to get hourly rate
+                new Date(dbQuote.expiresAt)
             );
         });
     }
