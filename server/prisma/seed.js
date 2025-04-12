@@ -365,6 +365,7 @@ async function main() {
               expiresAt,
               lessonRequestId: request.id,
               teacherId: teacher.id,
+              hourlyRateInCents: hourlyRate.rateInCents,
             },
           });
           

@@ -110,7 +110,7 @@ export class LessonRequestService {
         lessonQuotes: {
           include: {
             teacher: true,
-            lessons: true
+            Lesson: true
           }
         }
       },

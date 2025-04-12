@@ -128,21 +128,21 @@ model LessonRequest {
 
 // New model for quotes provided by teachers
 model LessonQuote {
-  id          String   @id @default(uuid())
-  costInCents Int
-  createdAt   DateTime @default(now())
-  expiresAt   DateTime
+  id                String        @id @default(uuid())
+  costInCents       Int
+  hourlyRateInCents Int
+  expiresAt         DateTime
+  lessonRequestId   String
+  teacherId         String
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
-  // Relationships
-  lessonRequest   LessonRequest @relation(fields: [lessonRequestId], references: [id])
-  lessonRequestId String
-  teacher         Teacher       @relation(fields: [teacherId], references: [id])
-  teacherId       String
+  lessonRequest     LessonRequest @relation(fields: [lessonRequestId], references: [id])
+  teacher           Teacher       @relation(fields: [teacherId], references: [id])
+  Lesson            Lesson?       // Relation to the Lesson if quote is accepted
 
-  // Lessons created from this quote
-  lessons Lesson[]
-
-  updatedAt DateTime @updatedAt
+  @@index([lessonRequestId])
+  @@index([teacherId])
 }
 
 // Lesson model representing a confirmed music lesson

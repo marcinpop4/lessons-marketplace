@@ -241,68 +241,49 @@ router.post('/refresh-token', async (req: Request, res: Response, next: NextFunc
       return;
     }
 
-    // Verify refresh token
-    const decoded = jwt.verify(refreshToken, JWT_SECRET as Secret) as { id: string; type: 'STUDENT' | 'TEACHER' };
-
-    // Find refresh token in database
+    // Find refresh token (the opaque string) in database
     const storedToken = await prisma.refreshToken.findFirst({
       where: {
-        token: refreshToken,
-        userId: decoded.id,
-        userType: decoded.type,
+        token: refreshToken, // Look up using the token string directly
+        revokedAt: null,   // Ensure not revoked
         expiresAt: {
-          gt: new Date()
+          gt: new Date()     // Ensure not expired
         }
       }
     });
 
     if (!storedToken) {
-      res.status(401).json({ error: 'Invalid refresh token' });
+      // Clear potentially invalid cookie
+      res.clearCookie('refreshToken', cookieOptions);
+      res.status(401).json({ error: 'Invalid or expired refresh token' });
       return;
     }
 
-    // Find user based on token type
+    // Token found in DB and is valid, proceed to get user info
+    const userType = storedToken.userType;
+    const userId = storedToken.userId;
+
+    // Find user based on token type and ID
     let user;
-    if (decoded.type === 'STUDENT') {
-      user = await prisma.student.findUnique({ where: { id: decoded.id } });
+    if (userType === 'STUDENT') {
+      user = await prisma.student.findUnique({ where: { id: userId } });
     } else {
-      user = await prisma.teacher.findUnique({ where: { id: decoded.id } });
+      user = await prisma.teacher.findUnique({ where: { id: userId } });
     }
 
     if (!user) {
-      res.status(401).json({ error: 'User not found' });
+      // User associated with token not found (data inconsistency?)
+      // Clear potentially invalid cookie
+      res.clearCookie('refreshToken', cookieOptions);
+      res.status(401).json({ error: 'User for refresh token not found' });
       return;
     }
 
-    // Generate new access token
-    const accessToken = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        userType: decoded.type
-      },
-      JWT_SECRET as Secret,
-      { expiresIn: JWT_EXPIRES_IN } as SignOptions
-    );
-
-    // Calculate new refresh token expiration
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_EXPIRES_IN);
-
-    // Generate new refresh token
-    const newRefreshToken = jwt.sign({ id: user.id, type: decoded.type }, JWT_SECRET as Secret);
-
-    // Update refresh token in database
-    await prisma.refreshToken.update({
-      where: { id: storedToken.id },
-      data: {
-        token: newRefreshToken,
-        expiresAt,
-      },
+    // Generate NEW access token
+    const accessToken = authService.generateToken({
+      id: user.id,
+      userType
     });
-
-    // Set new refresh token cookie
-    res.cookie('refreshToken', newRefreshToken, cookieOptions);
 
     // Return user and new access token
     res.status(200).json({
@@ -311,7 +292,7 @@ router.post('/refresh-token', async (req: Request, res: Response, next: NextFunc
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        userType: decoded.type,
+        userType,
       },
       accessToken,
     });

@@ -483,73 +483,42 @@ export const teacherController = {
       const stats = await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => {
         // Get all quotes for this teacher
         const quotes = await tx.lessonQuote.findMany({
-          where: { teacherId },
-          include: {
-            lessonRequest: true,
-            lessons: true
-          }
-        });
-
-        // Count active quotes (not expired and no lessons created)
-        const activeQuotes = quotes.filter((quote: {
-          id: string;
-          expiresAt: Date;
-          lessons: any[];
-        }) =>
-          new Date(quote.expiresAt) > new Date() && quote.lessons.length === 0
-        ).length;
-
-        // Get all lessons for this teacher through quotes
-        const allLessons = await tx.lesson.findMany({
           where: {
-            quote: {
-              teacherId
-            }
+            teacherId
           },
           include: {
-            quote: {
+            lessonRequest: true,
+            Lesson: {
               include: {
-                lessonRequest: true
+                currentStatus: true
               }
-            }
+            },
           }
         });
 
-        // Total number of lessons
-        const totalLessons = allLessons.length;
+        // Calculate statistics based on the quotes
+        const activeQuotes = quotes.filter(quote => quote.expiresAt > new Date()).length;
 
-        // Count completed lessons (start time + duration is in the past)
-        const completedLessons = allLessons.filter((lesson: {
-          quote: {
-            lessonRequest: {
-              startTime: Date;
-              durationMinutes: number;
-            }
-          }
-        }) => {
-          const lessonRequest = lesson.quote.lessonRequest;
-          const lessonEndTime = new Date(lessonRequest.startTime);
-          lessonEndTime.setMinutes(lessonEndTime.getMinutes() + lessonRequest.durationMinutes);
-          return lessonEndTime < new Date();
-        }).length;
+        // Correctly filter and reduce based on Lesson and its currentStatus
+        const completedLessons = quotes.filter(quote => quote.Lesson?.currentStatus?.status === 'COMPLETED').length;
+        const totalEarnings = quotes
+          .filter(quote => quote.Lesson?.currentStatus?.status === 'COMPLETED')
+          .reduce((sum, quote) => sum + quote.costInCents, 0);
 
         // Count upcoming lessons (start time is in the future)
-        const upcomingLessons = allLessons.filter((lesson: {
-          quote: {
-            lessonRequest: {
-              startTime: Date;
-            }
-          }
-        }) => {
-          const lessonRequest = lesson.quote.lessonRequest;
+        const upcomingLessons = quotes.filter(quote => {
+          const lesson = quote.Lesson;
+          if (!lesson) return false; // Skip quotes without a lesson
+          const lessonRequest = quote.lessonRequest;
           return new Date(lessonRequest.startTime) > new Date();
         }).length;
 
         return {
-          totalLessons,
+          totalQuotes: quotes.length,
+          activeQuotes,
           completedLessons,
           upcomingLessons,
-          activeQuotes
+          totalEarnings
         };
       });
 

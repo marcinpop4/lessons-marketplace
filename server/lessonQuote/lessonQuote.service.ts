@@ -140,7 +140,8 @@ export class TeacherQuoteService {
                         lessonRequest: { connect: { id: lessonRequestId } },
                         teacher: { connect: { id: teacher.id } },
                         costInCents,
-                        expiresAt
+                        expiresAt,
+                        hourlyRateInCents: hourlyRate.rateInCents,
                     },
                     include: {
                         teacher: true,

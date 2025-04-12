@@ -52,4 +52,33 @@ export class LessonStatus {
     ): LessonStatus {
         return new LessonStatus(id, lessonId, status, context);
     }
+
+    /**
+     * Validates if a transition from a current status to a new status is allowed.
+     * @param currentStatus The current status of the lesson.
+     * @param newStatus The desired new status.
+     * @returns True if the transition is valid, false otherwise.
+     */
+    static isValidTransition(currentStatus: LessonStatusValue, newStatus: LessonStatusValue): boolean {
+        if (currentStatus === newStatus) {
+            // Handled as no-op by controller, considered valid here for completeness
+            return true;
+        }
+
+        switch (currentStatus) {
+            case LessonStatusValue.REQUESTED:
+                return [LessonStatusValue.ACCEPTED, LessonStatusValue.REJECTED].includes(newStatus);
+            case LessonStatusValue.ACCEPTED:
+                // Allowing REJECTED from ACCEPTED as discussed
+                return [LessonStatusValue.COMPLETED, LessonStatusValue.VOIDED, LessonStatusValue.REJECTED].includes(newStatus);
+            case LessonStatusValue.REJECTED:
+            case LessonStatusValue.COMPLETED:
+            case LessonStatusValue.VOIDED:
+                return false; // Terminal states
+            default:
+                // Should not happen with valid enum values, treat as invalid
+                console.error(`Unexpected currentStatus: ${currentStatus}`);
+                return false;
+        }
+    }
 }
