@@ -12,6 +12,17 @@ export enum LessonStatusValue {
 }
 
 /**
+ * Properties required to create a LessonStatus instance.
+ */
+interface LessonStatusProps {
+    id: string;
+    lessonId: string;
+    status: LessonStatusValue;
+    context?: JsonValue | null; // Optional, defaults to null
+    createdAt?: Date; // Optional, defaults to new Date()
+}
+
+/**
  * Represents a status change for a lesson
  * Each status change is immutable and creates a new record
  */
@@ -22,13 +33,14 @@ export class LessonStatus {
     context: JsonValue | null;
     createdAt: Date;
 
-    constructor(
-        id: string,
-        lessonId: string,
-        status: LessonStatusValue,
-        context: JsonValue | null = null,
-        createdAt: Date = new Date()
-    ) {
+    // Updated constructor using object destructuring
+    constructor({
+        id,
+        lessonId,
+        status,
+        context = null, // Default value for optional prop
+        createdAt = new Date() // Default value for optional prop
+    }: LessonStatusProps) {
         this.id = id;
         this.lessonId = lessonId;
         this.status = status;
@@ -50,7 +62,8 @@ export class LessonStatus {
         status: LessonStatusValue,
         context: JsonValue | null = null
     ): LessonStatus {
-        return new LessonStatus(id, lessonId, status, context);
+        // Use the new constructor pattern
+        return new LessonStatus({ id, lessonId, status, context });
     }
 
     /**

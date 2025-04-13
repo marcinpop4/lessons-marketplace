@@ -10,23 +10,24 @@ import apiClient from './apiClient';
 export const getLessonQuotesByRequestId = async (lessonRequestId: string): Promise<LessonQuote[]> => {
   const response = await apiClient.get(`/api/v1/lesson-quotes/request/${lessonRequestId}`);
   return response.data.map((quote: any) => {
-    const lessonRequest = new LessonRequest(
-      quote.lessonRequest.id,
-      quote.lessonRequest.type,
-      new Date(quote.lessonRequest.startTime),
-      quote.lessonRequest.durationMinutes,
-      quote.lessonRequest.address,
-      quote.lessonRequest.student
-    );
-    return new LessonQuote(
-      quote.id,
+    const lessonRequest = new LessonRequest({
+      id: quote.lessonRequest.id,
+      type: quote.lessonRequest.type,
+      startTime: new Date(quote.lessonRequest.startTime),
+      durationMinutes: quote.lessonRequest.durationMinutes,
+      address: quote.lessonRequest.address,
+      student: quote.lessonRequest.student
+    });
+    const teacher = quote.teacher;
+    return new LessonQuote({
+      id: quote.id,
       lessonRequest,
-      quote.teacher,
-      quote.costInCents,
-      quote.hourlyRateInCents,
-      new Date(quote.createdAt),
-      new Date(quote.expiresAt)
-    );
+      teacher,
+      costInCents: quote.costInCents,
+      hourlyRateInCents: quote.hourlyRateInCents,
+      createdAt: new Date(quote.createdAt),
+      expiresAt: new Date(quote.expiresAt)
+    });
   });
 };
 

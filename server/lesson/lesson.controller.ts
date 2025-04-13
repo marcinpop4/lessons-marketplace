@@ -30,14 +30,14 @@ export const lessonController = {
       throw new Error('Invalid lesson data structure for transformation');
     }
 
-    const student = new Student(
-      prismaLesson.quote.lessonRequest.student.id,
-      prismaLesson.quote.lessonRequest.student.firstName,
-      prismaLesson.quote.lessonRequest.student.lastName,
-      prismaLesson.quote.lessonRequest.student.email,
-      prismaLesson.quote.lessonRequest.student.phoneNumber,
-      prismaLesson.quote.lessonRequest.student.dateOfBirth
-    );
+    const student = new Student({
+      id: prismaLesson.quote.lessonRequest.student.id,
+      firstName: prismaLesson.quote.lessonRequest.student.firstName,
+      lastName: prismaLesson.quote.lessonRequest.student.lastName,
+      email: prismaLesson.quote.lessonRequest.student.email,
+      phoneNumber: prismaLesson.quote.lessonRequest.student.phoneNumber,
+      dateOfBirth: new Date(prismaLesson.quote.lessonRequest.student.dateOfBirth)
+    });
 
     const address = new Address({
       street: prismaLesson.quote.lessonRequest.address.street,
@@ -47,41 +47,41 @@ export const lessonController = {
       country: prismaLesson.quote.lessonRequest.address.country
     });
 
-    const lessonRequest = new LessonRequest(
-      prismaLesson.quote.lessonRequest.id,
-      prismaLesson.quote.lessonRequest.type,
-      new Date(prismaLesson.quote.lessonRequest.startTime),
-      prismaLesson.quote.lessonRequest.durationMinutes,
+    const lessonRequest = new LessonRequest({
+      id: prismaLesson.quote.lessonRequest.id,
+      type: prismaLesson.quote.lessonRequest.type,
+      startTime: new Date(prismaLesson.quote.lessonRequest.startTime),
+      durationMinutes: prismaLesson.quote.lessonRequest.durationMinutes,
       address,
       student
-    );
+    });
 
-    const teacher = new Teacher(
-      prismaLesson.quote.teacher.id,
-      prismaLesson.quote.teacher.firstName,
-      prismaLesson.quote.teacher.lastName,
-      prismaLesson.quote.teacher.email,
-      prismaLesson.quote.teacher.phoneNumber,
-      new Date(prismaLesson.quote.teacher.dateOfBirth),
-      prismaLesson.quote.teacher.hourlyRates // Assuming hourlyRates are included in the query
-    );
+    const teacher = new Teacher({
+      id: prismaLesson.quote.teacher.id,
+      firstName: prismaLesson.quote.teacher.firstName,
+      lastName: prismaLesson.quote.teacher.lastName,
+      email: prismaLesson.quote.teacher.email,
+      phoneNumber: prismaLesson.quote.teacher.phoneNumber,
+      dateOfBirth: new Date(prismaLesson.quote.teacher.dateOfBirth),
+      hourlyRates: prismaLesson.quote.teacher.hourlyRates // Assuming hourlyRates are included in the query
+    });
 
-    const lessonQuote = new LessonQuote(
-      prismaLesson.quote.id,
+    const lessonQuote = new LessonQuote({
+      id: prismaLesson.quote.id,
       lessonRequest,
       teacher,
-      prismaLesson.quote.costInCents,
-      prismaLesson.quote.hourlyRateInCents,
-      new Date(prismaLesson.quote.createdAt),
-      new Date(prismaLesson.quote.expiresAt)
-    );
+      costInCents: prismaLesson.quote.costInCents,
+      hourlyRateInCents: prismaLesson.quote.hourlyRateInCents,
+      createdAt: new Date(prismaLesson.quote.createdAt),
+      expiresAt: new Date(prismaLesson.quote.expiresAt)
+    });
 
-    return new Lesson(
-      prismaLesson.id,
-      lessonQuote,
-      prismaLesson.currentStatusId,
-      new Date(prismaLesson.confirmedAt)
-    );
+    return new Lesson({
+      id: prismaLesson.id,
+      quote: lessonQuote,
+      currentStatusId: prismaLesson.currentStatusId,
+      confirmedAt: new Date(prismaLesson.confirmedAt)
+    });
   },
 
   /**

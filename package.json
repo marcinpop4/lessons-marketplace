@@ -47,7 +47,7 @@
     "prisma:studio": "dotenv -e env/.env.${NODE_ENV} -- prisma studio --schema=server/prisma/schema.prisma",
     "swagger:server": "tsx api-docs/serve-swagger.ts",
     "test": "dotenv -e env/.env.${NODE_ENV} -- jest tests/unit && NODE_OPTIONS=--no-warnings dotenv -e env/.env.${NODE_ENV} -- playwright test",
-    "test:clean": "pnpm clean && pnpm install && pnpm prisma:generate && pnpm prisma:migrate && pnpm prisma:seed && pnpm test",
+    "test:clean": "pnpm clean && pnpm install && pnpm prisma:generate && pnpm prisma:migrate && pnpm prisma:seed && pnpm diagnose:ts && pnpm test",
     "test:unit": "dotenv -e env/.env.${NODE_ENV} -- jest tests/unit",
     "test:e2e": "NODE_OPTIONS=--no-warnings dotenv -e env/.env.${NODE_ENV} -- playwright test",
     "typecheck": "NODE_ENV=production tsc --project tsconfig.json --noEmit",

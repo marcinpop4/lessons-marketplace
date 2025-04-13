@@ -65,31 +65,31 @@ export const createLessonRequest = async (data: CreateLessonRequestPayload): Pro
     const { lessonRequest: responseData, quotes } = response.data as { lessonRequest: ApiResponseData; quotes: ApiQuoteData[] };
 
     // Ensure proper date instantiation
-    const lessonRequest = new LessonRequest(
-      responseData.id,
-      responseData.type,
-      new Date(responseData.startTime),
-      responseData.durationMinutes,
-      new Address({
+    const lessonRequest = new LessonRequest({
+      id: responseData.id,
+      type: responseData.type,
+      startTime: new Date(responseData.startTime),
+      durationMinutes: responseData.durationMinutes,
+      address: new Address({
         street: responseData.address.street,
         city: responseData.address.city,
         state: responseData.address.state,
         postalCode: responseData.address.postalCode,
         country: responseData.address.country
       }),
-      responseData.student
-    );
+      student: responseData.student
+    });
 
     // Transform quotes
-    const transformedQuotes = quotes.map(quote => new LessonQuote(
-      quote.id,
+    const transformedQuotes = quotes.map(quote => new LessonQuote({
+      id: quote.id,
       lessonRequest,
-      quote.teacher,
-      quote.costInCents,
-      quote.hourlyRateInCents,
-      new Date(quote.createdAt),
-      new Date(quote.expiresAt)
-    ));
+      teacher: quote.teacher,
+      costInCents: quote.costInCents,
+      hourlyRateInCents: quote.hourlyRateInCents,
+      createdAt: new Date(quote.createdAt),
+      expiresAt: new Date(quote.expiresAt)
+    }));
 
     return {
       lessonRequest,
@@ -112,20 +112,20 @@ export const getLessonRequestById = async (id: string): Promise<LessonRequest> =
     const responseData = response.data as ApiResponseData;
 
     // Ensure proper date instantiation
-    return new LessonRequest(
-      responseData.id,
-      responseData.type,
-      new Date(responseData.startTime),
-      responseData.durationMinutes,
-      new Address({
+    return new LessonRequest({
+      id: responseData.id,
+      type: responseData.type,
+      startTime: new Date(responseData.startTime),
+      durationMinutes: responseData.durationMinutes,
+      address: new Address({
         street: responseData.address.street,
         city: responseData.address.city,
         state: responseData.address.state,
         postalCode: responseData.address.postalCode,
         country: responseData.address.country
       }),
-      responseData.student
-    );
+      student: responseData.student
+    });
   } catch (error) {
     console.error('Error fetching lesson request:', error);
     throw error;
@@ -142,20 +142,20 @@ export const getLessonRequestsByStudent = async (studentId: string): Promise<Les
     const response = await apiClient.get(`/api/v1/lesson-requests/student/${studentId}`);
     const responseData = response.data as ApiResponseData[];
 
-    return responseData.map(data => new LessonRequest(
-      data.id,
-      data.type,
-      new Date(data.startTime),
-      data.durationMinutes,
-      new Address({
+    return responseData.map(data => new LessonRequest({
+      id: data.id,
+      type: data.type,
+      startTime: new Date(data.startTime),
+      durationMinutes: data.durationMinutes,
+      address: new Address({
         street: data.address.street,
         city: data.address.city,
         state: data.address.state,
         postalCode: data.address.postalCode,
         country: data.address.country
       }),
-      data.student
-    ));
+      student: data.student
+    }));
   } catch (error) {
     console.error('Error fetching student lesson requests:', error);
     throw error;

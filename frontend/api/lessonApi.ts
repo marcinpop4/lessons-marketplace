@@ -40,48 +40,50 @@ export const getLessonById = async (id: string): Promise<Lesson> => {
     console.log('API response received:', response.data);
     const data = response.data;
 
-    return new Lesson(
-      data.id,
-      new LessonQuote(
-        data.quote.id,
-        new LessonRequest(
-          data.quote.lessonRequest.id,
-          data.quote.lessonRequest.type,
-          new Date(data.quote.lessonRequest.startTime),
-          data.quote.lessonRequest.durationMinutes,
-          new Address({
-            street: data.quote.lessonRequest.address.street,
-            city: data.quote.lessonRequest.address.city,
-            state: data.quote.lessonRequest.address.state,
-            postalCode: data.quote.lessonRequest.address.postalCode,
-            country: data.quote.lessonRequest.address.country
-          }),
-          new Student(
-            data.quote.lessonRequest.student.id,
-            data.quote.lessonRequest.student.firstName,
-            data.quote.lessonRequest.student.lastName,
-            data.quote.lessonRequest.student.email,
-            data.quote.lessonRequest.student.phoneNumber,
-            new Date(data.quote.lessonRequest.student.dateOfBirth)
-          )
-        ),
-        new Teacher(
-          data.quote.teacher.id,
-          data.quote.teacher.firstName,
-          data.quote.teacher.lastName,
-          data.quote.teacher.email,
-          data.quote.teacher.phoneNumber,
-          new Date(data.quote.teacher.dateOfBirth),
-          data.quote.teacher.hourlyRates
-        ),
-        data.quote.costInCents,
-        data.quote.hourlyRateInCents,
-        new Date(data.quote.createdAt),
-        new Date(data.quote.expiresAt)
-      ),
-      data.currentStatusId,
-      new Date(data.confirmedAt)
-    );
+    const lessonQuote = new LessonQuote({
+      id: data.quote.id,
+      lessonRequest: new LessonRequest({
+        id: data.quote.lessonRequest.id,
+        type: data.quote.lessonRequest.type,
+        startTime: new Date(data.quote.lessonRequest.startTime),
+        durationMinutes: data.quote.lessonRequest.durationMinutes,
+        address: new Address({
+          street: data.quote.lessonRequest.address.street,
+          city: data.quote.lessonRequest.address.city,
+          state: data.quote.lessonRequest.address.state,
+          postalCode: data.quote.lessonRequest.address.postalCode,
+          country: data.quote.lessonRequest.address.country
+        }),
+        student: new Student({
+          id: data.quote.lessonRequest.student.id,
+          firstName: data.quote.lessonRequest.student.firstName,
+          lastName: data.quote.lessonRequest.student.lastName,
+          email: data.quote.lessonRequest.student.email,
+          phoneNumber: data.quote.lessonRequest.student.phoneNumber,
+          dateOfBirth: new Date(data.quote.lessonRequest.student.dateOfBirth)
+        })
+      }),
+      teacher: new Teacher({
+        id: data.quote.teacher.id,
+        firstName: data.quote.teacher.firstName,
+        lastName: data.quote.teacher.lastName,
+        email: data.quote.teacher.email,
+        phoneNumber: data.quote.teacher.phoneNumber,
+        dateOfBirth: new Date(data.quote.teacher.dateOfBirth),
+        hourlyRates: data.quote.teacher.hourlyRates
+      }),
+      costInCents: data.quote.costInCents,
+      hourlyRateInCents: data.quote.hourlyRateInCents,
+      createdAt: new Date(data.quote.createdAt),
+      expiresAt: new Date(data.quote.expiresAt)
+    });
+
+    return new Lesson({
+      id: data.id,
+      quote: lessonQuote,
+      currentStatusId: data.currentStatusId,
+      confirmedAt: new Date(data.confirmedAt)
+    });
   } catch (error) {
     console.error('Error in getLessonById:', error);
     throw error;

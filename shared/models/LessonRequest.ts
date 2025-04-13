@@ -3,6 +3,18 @@ import { Student } from './Student.js';
 import { Address } from './Address.js';
 
 /**
+ * Properties required to create a LessonRequest instance.
+ */
+interface LessonRequestProps {
+  id: string;
+  type: LessonType;
+  startTime: Date;
+  durationMinutes: number;
+  address: Address;
+  student: Student;
+}
+
+/**
  * LessonRequest model representing a student's requirements for a lesson
  * This is created before quotes and actual lessons
  */
@@ -14,14 +26,14 @@ export class LessonRequest {
   address: Address;
   student: Student;
 
-  constructor(
-    id: string,
-    type: LessonType,
-    startTime: Date,
-    durationMinutes: number,
-    address: Address,
-    student: Student
-  ) {
+  constructor({
+    id,
+    type,
+    startTime,
+    durationMinutes,
+    address,
+    student
+  }: LessonRequestProps) {
     this.id = id;
     this.type = type;
     this.startTime = startTime;

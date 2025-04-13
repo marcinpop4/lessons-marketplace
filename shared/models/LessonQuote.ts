@@ -2,6 +2,17 @@ import { LessonRequest } from './LessonRequest.js';
 import { Teacher } from './Teacher.js';
 import { centsToDisplayDollars } from '../types/CurrencyTypes.js';
 
+// Interface for constructor properties
+interface LessonQuoteProps {
+  id: string;
+  lessonRequest: LessonRequest;
+  teacher: Teacher;
+  costInCents: number;
+  hourlyRateInCents: number;
+  createdAt?: Date; // Optional, defaults to new Date()
+  expiresAt: Date;
+}
+
 /**
  * LessonQuote model representing a teacher's quote for a specific lesson request
  * This is created after a student submits a lesson request and before a lesson is booked
@@ -15,22 +26,23 @@ export class LessonQuote {
   createdAt: Date;
   expiresAt: Date; // Quotes can expire after a certain time period
 
-  constructor(
-    id: string,
-    lessonRequest: LessonRequest,
-    teacher: Teacher,
-    costInCents: number,
-    hourlyRateInCents: number,
-    createdAt: Date = new Date(),
-    expiresAt: Date
-  ) {
+  // Updated constructor using object destructuring
+  constructor({
+    id,
+    lessonRequest,
+    teacher,
+    costInCents,
+    hourlyRateInCents,
+    createdAt = new Date(), // Default value for optional prop
+    expiresAt
+  }: LessonQuoteProps) {
     this.id = id;
     this.lessonRequest = lessonRequest;
     this.teacher = teacher;
     this.costInCents = costInCents;
+    this.hourlyRateInCents = hourlyRateInCents;
     this.createdAt = createdAt;
     this.expiresAt = expiresAt;
-    this.hourlyRateInCents = hourlyRateInCents;
   }
 
   /**
@@ -58,15 +70,16 @@ export class LessonQuote {
       (hourlyRate.rateInCents * lessonRequest.durationMinutes) / 60
     );
 
-    return new LessonQuote(
+    // Use the new constructor pattern
+    return new LessonQuote({
       id,
       lessonRequest,
       teacher,
       costInCents,
-      hourlyRate.rateInCents,
-      new Date(),
+      hourlyRateInCents: hourlyRate.rateInCents,
+      // createdAt uses default
       expiresAt
-    );
+    });
   }
 
   /**

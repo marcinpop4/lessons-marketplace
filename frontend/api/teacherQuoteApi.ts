@@ -3,6 +3,8 @@ import { LessonQuote } from '@shared/models/LessonQuote';
 import { LessonRequest } from '@shared/models/LessonRequest';
 import { LessonType } from '@shared/models/LessonType';
 import apiClient from './apiClient';
+import { Student } from '@shared/models/Student';
+import { Address } from '@shared/models/Address';
 
 // Interface for teacher with hourly rate information
 export interface TeacherWithRates extends Teacher {
@@ -41,24 +43,53 @@ export const createLessonQuotes = async (
   });
 
   return response.data.map((quote: any) => {
-    const lessonRequest = new LessonRequest(
-      quote.lessonRequest.id,
-      quote.lessonRequest.type,
-      new Date(quote.lessonRequest.startTime),
-      quote.lessonRequest.durationMinutes,
-      quote.lessonRequest.address,
-      quote.lessonRequest.student
-    );
+    // Create dependent models first
+    const student = new Student({
+      id: quote.lessonRequest.student.id,
+      firstName: quote.lessonRequest.student.firstName,
+      lastName: quote.lessonRequest.student.lastName,
+      email: quote.lessonRequest.student.email,
+      phoneNumber: quote.lessonRequest.student.phoneNumber,
+      dateOfBirth: new Date(quote.lessonRequest.student.dateOfBirth)
+    });
 
-    return new LessonQuote(
-      quote.id,
+    const address = new Address({
+      street: quote.lessonRequest.address.street,
+      city: quote.lessonRequest.address.city,
+      state: quote.lessonRequest.address.state,
+      postalCode: quote.lessonRequest.address.postalCode,
+      country: quote.lessonRequest.address.country
+    });
+
+    const lessonRequest = new LessonRequest({
+      id: quote.lessonRequest.id,
+      type: quote.lessonRequest.type,
+      startTime: new Date(quote.lessonRequest.startTime),
+      durationMinutes: quote.lessonRequest.durationMinutes,
+      address,
+      student
+    });
+
+    const teacher = new Teacher({
+      id: quote.teacher.id,
+      firstName: quote.teacher.firstName,
+      lastName: quote.teacher.lastName,
+      email: quote.teacher.email,
+      phoneNumber: quote.teacher.phoneNumber,
+      dateOfBirth: new Date(quote.teacher.dateOfBirth)
+      // Missing hourlyRates? Assuming they are not needed here or fetched separately
+    });
+
+    // Create the LessonQuote using object pattern
+    return new LessonQuote({
+      id: quote.id,
       lessonRequest,
-      quote.teacher,
-      quote.costInCents,
-      quote.hourlyRateInCents,
-      new Date(quote.createdAt),
-      new Date(quote.expiresAt)
-    );
+      teacher,
+      costInCents: quote.costInCents,
+      hourlyRateInCents: quote.hourlyRateInCents,
+      createdAt: new Date(quote.createdAt),
+      expiresAt: new Date(quote.expiresAt)
+    });
   });
 };
 
@@ -79,6 +110,82 @@ export const bookLesson = async (quoteId: string): Promise<any> => {
     return response.data;
   } catch (error) {
     console.error('Error booking lesson:', error);
+    throw error;
+  }
+};
+
+// Interface for the raw quote data from the API
+interface ApiQuoteData {
+  id: string;
+  costInCents: number;
+  hourlyRateInCents: number;
+  createdAt: string;
+  expiresAt: string;
+  lessonRequest: any; // Define more strictly if possible
+  teacher: any;       // Define more strictly if possible
+}
+
+// Function to transform raw API data into domain models
+const transformQuotes = (quotesData: ApiQuoteData[]): LessonQuote[] => {
+  return quotesData.map((quote: ApiQuoteData) => {
+    // Transform nested data first
+    const address = new Address({
+      street: quote.lessonRequest.address.street,
+      city: quote.lessonRequest.address.city,
+      state: quote.lessonRequest.address.state,
+      postalCode: quote.lessonRequest.address.postalCode,
+      country: quote.lessonRequest.address.country
+    });
+
+    const student = new Student({
+      id: quote.lessonRequest.student.id,
+      firstName: quote.lessonRequest.student.firstName,
+      lastName: quote.lessonRequest.student.lastName,
+      email: quote.lessonRequest.student.email,
+      phoneNumber: quote.lessonRequest.student.phoneNumber,
+      dateOfBirth: new Date(quote.lessonRequest.student.dateOfBirth)
+    });
+
+    const lessonRequest = new LessonRequest({
+      id: quote.lessonRequest.id,
+      type: quote.lessonRequest.type,
+      startTime: new Date(quote.lessonRequest.startTime),
+      durationMinutes: quote.lessonRequest.durationMinutes,
+      address,
+      student
+    });
+
+    const teacher = new Teacher({
+      id: quote.teacher.id,
+      firstName: quote.teacher.firstName,
+      lastName: quote.teacher.lastName,
+      email: quote.teacher.email,
+      phoneNumber: quote.teacher.phoneNumber,
+      dateOfBirth: new Date(quote.teacher.dateOfBirth)
+      // hourlyRates likely not needed here
+    });
+
+    // Use object pattern for LessonQuote
+    return new LessonQuote({
+      id: quote.id,
+      lessonRequest,
+      teacher,
+      costInCents: quote.costInCents,
+      hourlyRateInCents: quote.hourlyRateInCents,
+      createdAt: new Date(quote.createdAt),
+      expiresAt: new Date(quote.expiresAt)
+    });
+  });
+};
+
+// Function to fetch quotes for a specific teacher
+export const fetchQuotesForTeacher = async (teacherId: string): Promise<LessonQuote[]> => {
+  try {
+    const response = await apiClient.get(`/api/v1/teachers/${teacherId}/quotes`);
+    // Use the transformer function
+    return transformQuotes(response.data);
+  } catch (error) {
+    console.error('Error fetching quotes for teacher:', error);
     throw error;
   }
 }; 

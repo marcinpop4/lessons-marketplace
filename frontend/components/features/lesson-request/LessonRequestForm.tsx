@@ -87,14 +87,14 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
       const date = new Date(selectedDate);
       date.setHours(hours || 0, minutes || 0);
 
-      const tempRequest = new LessonRequest(
-        '',
-        formData.type,
-        date,
-        formData.durationMinutes,
-        formData.address,
-        {} as any
-      );
+      const tempRequest = new LessonRequest({
+        id: '',
+        type: formData.type,
+        startTime: date,
+        durationMinutes: formData.durationMinutes,
+        address: formData.address,
+        student: {} as any
+      });
 
       if (tempRequest.isLessonEndingAfter9pm()) {
         setError('Lesson cannot end after 9:00 PM. Please choose an earlier time or shorter duration.');
@@ -125,14 +125,14 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
       const date = new Date(selectedDate);
       date.setHours(hours || 0, minutes || 0);
 
-      const tempRequest = new LessonRequest(
-        '',
-        formData.type,
-        date,
-        durationValue,
-        formData.address,
-        {} as any
-      );
+      const tempRequest = new LessonRequest({
+        id: '',
+        type: formData.type,
+        startTime: date,
+        durationMinutes: durationValue,
+        address: formData.address,
+        student: {} as any
+      });
 
       if (tempRequest.isLessonEndingAfter9pm()) {
         setError('Lesson cannot end after 9:00 PM. Please choose an earlier time or shorter duration.');
@@ -171,14 +171,14 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
     const date = new Date(selectedDate);
     date.setHours(hours || 0, minutes || 0);
 
-    const tempRequest = new LessonRequest(
-      '',
-      formData.type,
-      date,
-      formData.durationMinutes,
-      formData.address,
-      {} as any
-    );
+    const tempRequest = new LessonRequest({
+      id: '',
+      type: formData.type,
+      startTime: date,
+      durationMinutes: formData.durationMinutes,
+      address: formData.address,
+      student: {} as any
+    });
 
     if (tempRequest.isLessonEndingAfter9pm()) {
       setError('Lesson cannot end after 9:00 PM. Please choose an earlier time or shorter duration.');

@@ -37,27 +37,26 @@ export class TeacherQuoteService {
 
         // Map database teachers to domain model
         return dbTeachers.map(dbTeacher => {
-            const teacher = new Teacher(
-                dbTeacher.id,
-                dbTeacher.firstName,
-                dbTeacher.lastName,
-                dbTeacher.email,
-                dbTeacher.phoneNumber,
-                dbTeacher.dateOfBirth
-            );
+            const teacher = new Teacher({
+                id: dbTeacher.id,
+                firstName: dbTeacher.firstName,
+                lastName: dbTeacher.lastName,
+                email: dbTeacher.email,
+                phoneNumber: dbTeacher.phoneNumber,
+                dateOfBirth: dbTeacher.dateOfBirth
+            });
 
             // Add hourly rates to teacher
             dbTeacher.teacherLessonHourlyRates.forEach(rate => {
                 teacher.addHourlyRate(
-                    new TeacherLessonHourlyRate(
-                        rate.id,
-                        rate.teacherId,
-                        rate.type,
-                        rate.rateInCents,
-                        rate.createdAt,
-                        rate.updatedAt,
-                        rate.deactivatedAt || undefined
-                    )
+                    new TeacherLessonHourlyRate({
+                        id: rate.id,
+                        teacherId: rate.teacherId,
+                        type: rate.type,
+                        rateInCents: rate.rateInCents,
+                        deactivatedAt: rate.deactivatedAt ? new Date(rate.deactivatedAt) : undefined,
+                        createdAt: new Date(rate.createdAt)
+                    })
                 );
             });
 
@@ -88,30 +87,34 @@ export class TeacherQuoteService {
             throw new Error(`Lesson request with ID ${lessonRequestId} not found`);
         }
 
-        // Convert to domain model
-        const student = new Student(
-            dbLessonRequest.student.id,
-            dbLessonRequest.student.firstName,
-            dbLessonRequest.student.lastName,
-            dbLessonRequest.student.email,
-            dbLessonRequest.student.phoneNumber,
-            dbLessonRequest.student.dateOfBirth
-        );
+        // Transform student data
+        const student = new Student({
+            id: dbLessonRequest.student.id,
+            firstName: dbLessonRequest.student.firstName,
+            lastName: dbLessonRequest.student.lastName,
+            email: dbLessonRequest.student.email,
+            phoneNumber: dbLessonRequest.student.phoneNumber,
+            dateOfBirth: new Date(dbLessonRequest.student.dateOfBirth)
+        });
 
-        const lessonRequest = new LessonRequest(
-            dbLessonRequest.id,
-            dbLessonRequest.type as LessonType,
-            new Date(dbLessonRequest.startTime),
-            dbLessonRequest.durationMinutes,
-            new Address({
-                street: dbLessonRequest.address.street,
-                city: dbLessonRequest.address.city,
-                state: dbLessonRequest.address.state,
-                postalCode: dbLessonRequest.address.postalCode,
-                country: dbLessonRequest.address.country
-            }),
-            student
-        );
+        // Transform address data
+        const address = new Address({
+            street: dbLessonRequest.address.street,
+            city: dbLessonRequest.address.city,
+            state: dbLessonRequest.address.state,
+            postalCode: dbLessonRequest.address.postalCode,
+            country: dbLessonRequest.address.country
+        });
+
+        // Create LessonRequest model
+        const lessonRequest = new LessonRequest({
+            id: dbLessonRequest.id,
+            type: dbLessonRequest.type as LessonType,
+            startTime: new Date(dbLessonRequest.startTime),
+            durationMinutes: dbLessonRequest.durationMinutes,
+            address: address,
+            student: student
+        });
 
         // Get available teachers (limited to 5)
         const availableTeachers = await this.getAvailableTeachers(lessonType);
@@ -122,10 +125,28 @@ export class TeacherQuoteService {
 
         // Create quotes for each available teacher
         const dbQuotes = await Promise.all(
-            availableTeachers.map(async (teacher) => {
-                const hourlyRate = teacher.getHourlyRate(lessonType);
+            availableTeachers.map(async (dbTeacher) => {
+                const teacherModel = new Teacher({
+                    id: dbTeacher.id,
+                    firstName: dbTeacher.firstName,
+                    lastName: dbTeacher.lastName,
+                    email: dbTeacher.email,
+                    phoneNumber: dbTeacher.phoneNumber,
+                    dateOfBirth: new Date(dbTeacher.dateOfBirth),
+                    hourlyRates: dbTeacher.hourlyRates.map(rate => new TeacherLessonHourlyRate({
+                        id: rate.id,
+                        teacherId: rate.teacherId,
+                        type: rate.type,
+                        rateInCents: rate.rateInCents,
+                        deactivatedAt: rate.deactivatedAt ? new Date(rate.deactivatedAt) : undefined,
+                        createdAt: new Date(rate.createdAt)
+                    }))
+                });
+
+                const hourlyRate = teacherModel.getHourlyRate(lessonRequest.type);
                 if (!hourlyRate) {
-                    throw new Error(`No hourly rate found for teacher ${teacher.id} for lesson type ${lessonType}`);
+                    console.error(`No hourly rate found for teacher ${teacherModel.id} for lesson type ${lessonRequest.type}`);
+                    return null;
                 }
 
                 // Calculate quote expiration (24 hours from now)
@@ -138,13 +159,17 @@ export class TeacherQuoteService {
                 const quote = await prisma.lessonQuote.create({
                     data: {
                         lessonRequest: { connect: { id: lessonRequestId } },
-                        teacher: { connect: { id: teacher.id } },
+                        teacher: { connect: { id: teacherModel.id } },
                         costInCents,
                         expiresAt,
                         hourlyRateInCents: hourlyRate.rateInCents,
                     },
                     include: {
-                        teacher: true,
+                        teacher: {
+                            include: {
+                                teacherLessonHourlyRates: true
+                            }
+                        },
                         lessonRequest: {
                             include: {
                                 student: true,
@@ -158,58 +183,71 @@ export class TeacherQuoteService {
             })
         );
 
+        // Filter out any null results (teachers without rates)
+        const createdQuotes = (await dbQuotes).filter(quote => quote !== null);
+
+        if (!createdQuotes || createdQuotes.length === 0) {
+            return [];
+        }
+
         // Convert database quotes to domain model
-        return dbQuotes.map(dbQuote => {
-            const student = new Student(
-                dbQuote.lessonRequest.student.id,
-                dbQuote.lessonRequest.student.firstName,
-                dbQuote.lessonRequest.student.lastName,
-                dbQuote.lessonRequest.student.email,
-                dbQuote.lessonRequest.student.phoneNumber,
-                dbQuote.lessonRequest.student.dateOfBirth
-            );
+        return createdQuotes.map(dbQuote => {
+            // Transform student data
+            const studentModel = new Student({
+                id: dbQuote.lessonRequest.student.id,
+                firstName: dbQuote.lessonRequest.student.firstName,
+                lastName: dbQuote.lessonRequest.student.lastName,
+                email: dbQuote.lessonRequest.student.email,
+                phoneNumber: dbQuote.lessonRequest.student.phoneNumber,
+                dateOfBirth: dbQuote.lessonRequest.student.dateOfBirth
+            });
 
-            const lessonRequest = new LessonRequest(
-                dbQuote.lessonRequest.id,
-                dbQuote.lessonRequest.type as LessonType,
-                new Date(dbQuote.lessonRequest.startTime),
-                dbQuote.lessonRequest.durationMinutes,
-                new Address({
-                    street: dbQuote.lessonRequest.address.street,
-                    city: dbQuote.lessonRequest.address.city,
-                    state: dbQuote.lessonRequest.address.state,
-                    postalCode: dbQuote.lessonRequest.address.postalCode,
-                    country: dbQuote.lessonRequest.address.country
-                }),
-                student
-            );
+            // Transform address data
+            const addressModel = new Address({
+                street: dbQuote.lessonRequest.address.street,
+                city: dbQuote.lessonRequest.address.city,
+                state: dbQuote.lessonRequest.address.state,
+                postalCode: dbQuote.lessonRequest.address.postalCode,
+                country: dbQuote.lessonRequest.address.country
+            });
 
-            const teacher = new Teacher(
-                dbQuote.teacher.id,
-                dbQuote.teacher.firstName,
-                dbQuote.teacher.lastName,
-                dbQuote.teacher.email,
-                dbQuote.teacher.phoneNumber,
-                dbQuote.teacher.dateOfBirth
-            );
+            // Create LessonRequest model
+            const lessonRequestModel = new LessonRequest({
+                id: dbQuote.lessonRequest.id,
+                type: dbQuote.lessonRequest.type as LessonType,
+                startTime: new Date(dbQuote.lessonRequest.startTime),
+                durationMinutes: dbQuote.lessonRequest.durationMinutes,
+                address: addressModel,
+                student: studentModel
+            });
 
-            // Create a temporary hourly rate to calculate the hourly rate in cents
-            const hourlyRate = new TeacherLessonHourlyRate(
-                '', // We don't need the ID for this calculation
-                teacher.id,
-                lessonRequest.type,
-                dbQuote.costInCents
-            );
+            // Transform teacher data
+            const teacherModel = new Teacher({
+                id: dbQuote.teacher.id,
+                firstName: dbQuote.teacher.firstName,
+                lastName: dbQuote.teacher.lastName,
+                email: dbQuote.teacher.email,
+                phoneNumber: dbQuote.teacher.phoneNumber,
+                dateOfBirth: new Date(dbQuote.teacher.dateOfBirth),
+                hourlyRates: dbQuote.teacher.teacherLessonHourlyRates.map(rate => new TeacherLessonHourlyRate({
+                    id: rate.id,
+                    teacherId: rate.teacherId,
+                    type: rate.type,
+                    rateInCents: rate.rateInCents,
+                    deactivatedAt: rate.deactivatedAt ? new Date(rate.deactivatedAt) : undefined,
+                    createdAt: new Date(rate.createdAt)
+                }))
+            });
 
-            return new LessonQuote(
-                dbQuote.id,
-                lessonRequest,
-                teacher,
-                dbQuote.costInCents,
-                dbQuote.hourlyRateInCents,
-                new Date(dbQuote.createdAt),
-                new Date(dbQuote.expiresAt)
-            );
+            return new LessonQuote({
+                id: dbQuote.id,
+                lessonRequest: lessonRequestModel,
+                teacher: teacherModel,
+                costInCents: dbQuote.costInCents,
+                hourlyRateInCents: dbQuote.hourlyRateInCents!,
+                createdAt: new Date(dbQuote.createdAt),
+                expiresAt: new Date(dbQuote.expiresAt)
+            });
         });
     }
 
@@ -222,7 +260,11 @@ export class TeacherQuoteService {
         const dbQuotes = await prisma.lessonQuote.findMany({
             where: { lessonRequestId },
             include: {
-                teacher: true,
+                teacher: {
+                    include: {
+                        teacherLessonHourlyRates: true
+                    }
+                },
                 lessonRequest: {
                     include: {
                         student: true,
@@ -235,56 +277,62 @@ export class TeacherQuoteService {
 
         // Convert database quotes to domain model
         return dbQuotes.map(dbQuote => {
-            const student = new Student(
-                dbQuote.lessonRequest.student.id,
-                dbQuote.lessonRequest.student.firstName,
-                dbQuote.lessonRequest.student.lastName,
-                dbQuote.lessonRequest.student.email,
-                dbQuote.lessonRequest.student.phoneNumber,
-                dbQuote.lessonRequest.student.dateOfBirth
-            );
+            // Transform student data
+            const studentModel = new Student({
+                id: dbQuote.lessonRequest.student.id,
+                firstName: dbQuote.lessonRequest.student.firstName,
+                lastName: dbQuote.lessonRequest.student.lastName,
+                email: dbQuote.lessonRequest.student.email,
+                phoneNumber: dbQuote.lessonRequest.student.phoneNumber,
+                dateOfBirth: new Date(dbQuote.lessonRequest.student.dateOfBirth)
+            });
 
-            const lessonRequest = new LessonRequest(
-                dbQuote.lessonRequest.id,
-                dbQuote.lessonRequest.type as LessonType,
-                new Date(dbQuote.lessonRequest.startTime),
-                dbQuote.lessonRequest.durationMinutes,
-                new Address({
-                    street: dbQuote.lessonRequest.address.street,
-                    city: dbQuote.lessonRequest.address.city,
-                    state: dbQuote.lessonRequest.address.state,
-                    postalCode: dbQuote.lessonRequest.address.postalCode,
-                    country: dbQuote.lessonRequest.address.country
-                }),
-                student
-            );
+            // Transform address data
+            const addressModel = new Address({
+                street: dbQuote.lessonRequest.address.street,
+                city: dbQuote.lessonRequest.address.city,
+                state: dbQuote.lessonRequest.address.state,
+                postalCode: dbQuote.lessonRequest.address.postalCode,
+                country: dbQuote.lessonRequest.address.country
+            });
 
-            const teacher = new Teacher(
-                dbQuote.teacher.id,
-                dbQuote.teacher.firstName,
-                dbQuote.teacher.lastName,
-                dbQuote.teacher.email,
-                dbQuote.teacher.phoneNumber,
-                dbQuote.teacher.dateOfBirth
-            );
+            // Create LessonRequest model
+            const lessonRequestModel = new LessonRequest({
+                id: dbQuote.lessonRequest.id,
+                type: dbQuote.lessonRequest.type as LessonType,
+                startTime: new Date(dbQuote.lessonRequest.startTime),
+                durationMinutes: dbQuote.lessonRequest.durationMinutes,
+                address: addressModel,
+                student: studentModel
+            });
 
-            // Create a temporary hourly rate to calculate the hourly rate in cents
-            const hourlyRate = new TeacherLessonHourlyRate(
-                '', // We don't need the ID for this calculation
-                teacher.id,
-                lessonRequest.type,
-                dbQuote.costInCents
-            );
+            // Transform teacher data
+            const teacherModel = new Teacher({
+                id: dbQuote.teacher.id,
+                firstName: dbQuote.teacher.firstName,
+                lastName: dbQuote.teacher.lastName,
+                email: dbQuote.teacher.email,
+                phoneNumber: dbQuote.teacher.phoneNumber,
+                dateOfBirth: new Date(dbQuote.teacher.dateOfBirth),
+                hourlyRates: dbQuote.teacher.teacherLessonHourlyRates.map(rate => new TeacherLessonHourlyRate({
+                    id: rate.id,
+                    teacherId: rate.teacherId,
+                    type: rate.type,
+                    rateInCents: rate.rateInCents,
+                    deactivatedAt: rate.deactivatedAt ? new Date(rate.deactivatedAt) : undefined,
+                    createdAt: new Date(rate.createdAt)
+                }))
+            });
 
-            return new LessonQuote(
-                dbQuote.id,
-                lessonRequest,
-                teacher,
-                dbQuote.costInCents,
-                dbQuote.hourlyRateInCents,
-                new Date(dbQuote.createdAt),
-                new Date(dbQuote.expiresAt)
-            );
+            return new LessonQuote({
+                id: dbQuote.id,
+                lessonRequest: lessonRequestModel,
+                teacher: teacherModel,
+                costInCents: dbQuote.costInCents,
+                hourlyRateInCents: dbQuote.hourlyRateInCents!,
+                createdAt: new Date(dbQuote.createdAt),
+                expiresAt: new Date(dbQuote.expiresAt)
+            });
         });
     }
 }

@@ -25,17 +25,14 @@ export class LessonRequestController {
       country: prismaRequest.address.country
     });
 
-    // TODO: Transform student data properly if it's not already the correct model
-    const student = prismaRequest.student;
-
-    return new LessonRequest(
-      prismaRequest.id,
-      prismaRequest.type,
-      new Date(prismaRequest.startTime),
-      prismaRequest.durationMinutes,
+    return new LessonRequest({
+      id: prismaRequest.id,
+      type: prismaRequest.type,
+      startTime: new Date(prismaRequest.startTime),
+      durationMinutes: prismaRequest.durationMinutes,
       address,
-      student
-    );
+      student: prismaRequest.student // Assuming student is raw data here
+    });
   }
 
   /**

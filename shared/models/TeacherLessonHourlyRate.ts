@@ -2,30 +2,46 @@
  * Model representing the hourly rate a teacher charges for a specific lesson type
  * Maps to the "TeacherLessonHourlyRate" table in the database
  */
+
+/**
+ * Properties required to create a TeacherLessonHourlyRate instance.
+ */
+interface TeacherLessonHourlyRateProps {
+  id: string;
+  teacherId: string;
+  type: string; // TODO: Should use LessonType enum if possible
+  rateInCents: number;
+  deactivatedAt?: Date | undefined; // Optional
+  createdAt?: Date; // Optional, defaults to new Date()
+}
+
+/**
+ * Represents an hourly rate set by a teacher for a specific lesson type.
+ * Tracks activation/deactivation history implicitly via deactivatedAt.
+ */
 export class TeacherLessonHourlyRate {
   id: string;
   teacherId: string;
   type: string; // Maps to "type" column, using string to avoid import issues, will be one of LessonType enum values
   rateInCents: number; // Rate stored in cents (e.g., $45.50 = 4550 cents)
-  createdAt?: Date;
+  createdAt: Date;
   updatedAt?: Date;
-  deactivatedAt?: Date; // When null, the rate is active; when set, the rate is deactivated
+  deactivatedAt?: Date | undefined; // Optional field
 
-  constructor(
-    id: string,
-    teacherId: string,
-    type: string,
-    rateInCents: number,
-    createdAt?: Date,
-    updatedAt?: Date,
-    deactivatedAt?: Date
-  ) {
+  // Updated constructor using object destructuring
+  constructor({
+    id,
+    teacherId,
+    type,
+    rateInCents,
+    deactivatedAt = undefined, // Default value for optional prop
+    createdAt = new Date() // Default value for optional prop
+  }: TeacherLessonHourlyRateProps) {
     this.id = id;
     this.teacherId = teacherId;
     this.type = type;
     this.rateInCents = rateInCents;
     this.createdAt = createdAt;
-    this.updatedAt = updatedAt;
     this.deactivatedAt = deactivatedAt;
   }
 
@@ -55,7 +71,7 @@ export class TeacherLessonHourlyRate {
    * @returns Boolean indicating if the rate is active
    */
   isActive(): boolean {
-    return this.deactivatedAt === null || this.deactivatedAt === undefined;
+    return this.deactivatedAt === undefined || this.deactivatedAt === null;
   }
 
   /**
@@ -64,6 +80,10 @@ export class TeacherLessonHourlyRate {
    * @returns Cost in cents
    */
   calculateCostForDuration(durationMinutes: number): number {
-    return Math.round((this.rateInCents * durationMinutes) / 60);
+    if (durationMinutes <= 0) {
+      return 0;
+    }
+    // Ensure calculation uses floating point before rounding at the end
+    return Math.round((this.rateInCents * durationMinutes) / 60.0);
   }
 } 

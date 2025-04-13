@@ -3,6 +3,16 @@ import { LessonStatus, LessonStatusValue } from './LessonStatus.js';
 import type { PrismaClient } from '@prisma/client';
 
 /**
+ * Properties required to create a Lesson instance.
+ */
+interface LessonProps {
+  id: string;
+  quote: LessonQuote;
+  currentStatusId: string;
+  confirmedAt?: Date; // Optional, defaults to new Date()
+}
+
+/**
  * Lesson model representing a confirmed music lesson
  * This is created after a student accepts a quote from a teacher
  */
@@ -16,12 +26,13 @@ export class Lesson {
   confirmedAt: Date;
   currentStatusId: string;
 
-  constructor(
-    id: string,
-    quote: LessonQuote,
-    currentStatusId: string,
-    confirmedAt: Date = new Date()
-  ) {
+  // Updated constructor using object destructuring
+  constructor({
+    id,
+    quote,
+    currentStatusId,
+    confirmedAt = new Date() // Default value for optional prop
+  }: LessonProps) {
     this.id = id;
     this.quote = quote;
     this.confirmedAt = confirmedAt;

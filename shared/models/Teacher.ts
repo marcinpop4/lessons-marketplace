@@ -1,6 +1,17 @@
 import { Person } from './Person.js';
 import { TeacherLessonHourlyRate } from './TeacherLessonHourlyRate.js';
 
+// Interface for Teacher constructor properties, extending PersonProps
+interface TeacherProps {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  dateOfBirth: Date;
+  hourlyRates?: TeacherLessonHourlyRate[]; // Optional, defaults to []
+}
+
 /**
  * Teacher model representing instructors who offer music lessons
  * Extends the base Person model and adds teaching-specific properties
@@ -9,16 +20,18 @@ export class Teacher extends Person {
   // Collection of hourly rates by lesson type
   hourlyRates: TeacherLessonHourlyRate[];
 
-  constructor(
-    id: string,
-    firstName: string,
-    lastName: string,
-    email: string,
-    phoneNumber: string,
-    dateOfBirth: Date,
-    hourlyRates: TeacherLessonHourlyRate[] = []
-  ) {
-    super(id, firstName, lastName, email, phoneNumber, dateOfBirth);
+  // Updated constructor using object destructuring
+  constructor({
+    id,
+    firstName,
+    lastName,
+    email,
+    phoneNumber,
+    dateOfBirth,
+    hourlyRates = [] // Default value for optional prop
+  }: TeacherProps) {
+    // Call super with the relevant part of the object
+    super({ id, firstName, lastName, email, phoneNumber, dateOfBirth });
     this.hourlyRates = hourlyRates;
   }
 
