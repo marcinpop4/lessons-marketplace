@@ -1019,4 +1019,161 @@ paths:
                     example: error
                   database:
                     type: string
-                    example: disconnected 
+                    example: disconnected
+  
+  /teachers/{teacherId}/lessons:
+    get:
+      summary: Get all lessons for a specific teacher
+      tags:
+        - Teachers
+      description: Retrieves a list of lessons associated with the specified teacher ID. Requires authentication, and the authenticated user must match the teacherId.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: teacherId
+          in: path
+          required: true
+          description: The ID of the teacher whose lessons are to be retrieved.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A list of lessons for the teacher.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  # Define a schema for the detailed lesson object returned
+                  # This should align with the FullLessonDetails type in the service
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    confirmedAt:
+                      type: string
+                      format: date-time
+                    createdAt:
+                       type: string
+                       format: date-time
+                    updatedAt:
+                      type: string
+                      format: date-time
+                    currentStatus:
+                      type: object # Represents the LessonStatus relation
+                      properties:
+                        id:
+                          type: string
+                        status:
+                          $ref: '#/components/schemas/LessonStatusValue'
+                        context:
+                          type: string
+                          nullable: true
+                        createdAt:
+                          type: string
+                          format: date-time
+                      required:
+                        - id
+                        - status
+                        - createdAt
+                    quote:
+                      type: object # Represents the LessonQuote relation
+                      properties:
+                        id:
+                          type: string
+                        costInCents:
+                          type: integer
+                        expiresAt:
+                          type: string
+                          format: date-time
+                        lessonRequestId:
+                          type: string
+                        teacherId:
+                          type: string
+                        createdAt:
+                          type: string
+                          format: date-time
+                        updatedAt:
+                          type: string
+                          format: date-time
+                        teacher:
+                          $ref: '#/components/schemas/Teacher'
+                        lessonRequest:
+                          type: object # Represents the LessonRequest relation
+                          properties:
+                            id:
+                              type: string
+                            type:
+                              $ref: '#/components/schemas/LessonType'
+                            startTime:
+                              type: string
+                              format: date-time
+                            durationMinutes:
+                              type: integer
+                            studentId:
+                              type: string
+                            addressId:
+                              type: string # Assuming Address relation is fetched via ID
+                            createdAt:
+                              type: string
+                              format: date-time
+                            updatedAt:
+                              type: string
+                              format: date-time
+                            student:
+                              $ref: '#/components/schemas/Student'
+                            address:
+                              $ref: '#/components/schemas/Address'
+                          required:
+                            - id
+                            - type
+                            - startTime
+                            - durationMinutes
+                            - studentId
+                            - addressId
+                            - createdAt
+                            - updatedAt
+                            - student
+                            - address
+                      required:
+                        - id
+                        - costInCents
+                        - expiresAt
+                        - lessonRequestId
+                        - teacherId
+                        - createdAt
+                        - updatedAt
+                        - teacher
+                        - lessonRequest
+                  required:
+                    - id
+                    - confirmedAt
+                    - createdAt
+                    - updatedAt
+                    - currentStatus
+                    - quote
+
+        '401':
+          description: Unauthorized (Missing or invalid token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden (Authenticated user does not match teacherId)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Teacher not found (or no lessons for the teacher, depending on implementation)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error' 

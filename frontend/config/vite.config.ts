@@ -102,32 +102,31 @@ export default defineConfig(({ mode }) => {
         'Expires': '0'
       } : undefined,
       proxy: {
-        // Versioned API routes
-        '/api/v1/auth': {
-          target: 'http://localhost:3000',
+
+        // Add a proxy rule specifically for /api/v1
+        '/api/v1': {
+          target: 'http://localhost:3000', // Your backend server address
           changeOrigin: true,
-          secure: false
+          secure: false,
+          // Optional: Rewrite path if backend doesn't expect /api/v1 prefix
+          // rewrite: (path) => path.replace(/^\/api\/v1/, ''), 
+          configure: (proxy, options) => {
+            proxy.on('proxyReq', (proxyReq, req, res) => {
+              console.log(`[VITE PROXY /api/v1] Sending request to target: ${options.target}${proxyReq.path}`);
+            });
+            proxy.on('proxyRes', (proxyRes, req, res) => {
+              console.log(`[VITE PROXY /api/v1] Received response from target: ${proxyRes.statusCode} ${req.url}`);
+            });
+            proxy.on('error', (err, req, res) => {
+              console.error('[VITE PROXY /api/v1] Proxy error:', err);
+              if (!res.headersSent) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+              }
+              res.end(JSON.stringify({ message: 'Proxy Error', error: err.message }));
+            });
+          }
         },
-        '/api/v1/teachers': {
-          target: 'http://localhost:3000',
-          changeOrigin: true,
-          secure: false
-        },
-        '/api/v1/lesson-requests': {
-          target: 'http://localhost:3000',
-          changeOrigin: true,
-          secure: false
-        },
-        '/api/v1/lesson-quotes': {
-          target: 'http://localhost:3000',
-          changeOrigin: true,
-          secure: false
-        },
-        '/api/v1/lessons': {
-          target: 'http://localhost:3000',
-          changeOrigin: true,
-          secure: false
-        },
+        // You might still need a separate rule for /api/health if it's not under /v1
         '/api/health': {
           target: 'http://localhost:3000',
           changeOrigin: true,

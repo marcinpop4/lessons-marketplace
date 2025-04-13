@@ -21,7 +21,8 @@ Object.keys(process.env)
 dotenv.config();
 
 // Load database configuration (must be before importing prisma)
-import './config/database.js';
+// Use .ts extension now that allowImportingTsExtensions is enabled
+import './config/database.ts';
 
 // Import prisma client
 import prisma from './prisma.js';
@@ -220,9 +221,35 @@ app.get('/', (req: express.Request, res: express.Response, next: express.NextFun
 });
 
 // Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack || err.message || 'Unknown error');
-  res.status(500).send({ error: 'Something went wrong!' });
+app.use((err: Error | any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // Log detailed error information
+  console.error('[GLOBAL ERROR HANDLER] Caught error:');
+  console.error('Timestamp:', new Date().toISOString());
+  console.error('Request URL:', req.originalUrl);
+  console.error('Request Method:', req.method);
+
+  // Log different properties depending on the error type
+  if (err instanceof Error) {
+    console.error('Error Name:', err.name);
+    console.error('Error Message:', err.message);
+    console.error('Error Stack:', err.stack);
+  } else {
+    // Log non-Error objects as best as possible
+    console.error('Caught non-Error object:', err);
+  }
+
+  // Ensure response status is set, even if error occurred before setting status
+  if (!res.headersSent) {
+    res.status(err.status || 500).json({
+      error: err.message || 'Something went wrong!',
+      // Optionally include stack in development
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+  } else {
+    // If headers were already sent, we can only close the connection
+    console.error('[GLOBAL ERROR HANDLER] Headers already sent, cannot send JSON error response.');
+    next(err); // Delegate to default Express error handler if possible
+  }
 });
 
 // Start server

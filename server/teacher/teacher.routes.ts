@@ -25,4 +25,8 @@ router.post('/lesson-rates/reactivate', authMiddleware, checkRole(['TEACHER']), 
 // GET /api/teachers/stats - Get teacher statistics
 router.get('/stats', authMiddleware, checkRole(['TEACHER']), teacherController.getTeacherStats);
 
+// GET /api/teachers/:teacherId/lessons - Get all lessons for a specific teacher
+// Requires authentication, authorization handled in controller/service
+router.get('/:teacherId/lessons', authMiddleware, teacherController.getTeacherLessons);
+
 export default router; 

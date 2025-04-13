@@ -29,4 +29,4 @@ COPY server/ ./server/
 COPY shared/ ./shared/
 
 # Set the default command to run tests
-CMD ["pnpm", "test"]
+CMD ["pnpm", "test:docker"]

@@ -13,13 +13,21 @@
       "@server/*": ["server/*"]
     },
     "types": ["vite/client", "jest"],
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "rootDir": ".",
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true
   },
   "include": [
     "shared/**/*",
     "frontend/**/*",
     "server/**/*",
-    "scripts/**/*"
+    "scripts/**/*",
+    "tests/**/*",
+    "vite.config.ts"
   ],
   "exclude": [
     "node_modules",

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import prisma from '../prisma.js';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { LessonType } from '../../shared/models/LessonType.js';
+import { TeacherService } from './teacher.service.js';
 
 // Define interfaces to match Prisma models
 interface TeacherLessonHourlyRate {
@@ -23,6 +24,9 @@ interface Teacher {
   dateOfBirth: Date;
   teacherLessonHourlyRates: TeacherLessonHourlyRate[];
 }
+
+// Placeholder service implementation
+const teacherService = new TeacherService();
 
 /**
  * Controller for teacher-related operations
@@ -460,6 +464,46 @@ export const teacherController = {
   },
 
   /**
+   * Get all lessons for a specific teacher.
+   * Requires authentication.
+   * Ensures the authenticated user is the teacher whose lessons are requested.
+   */
+  getTeacherLessons: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    console.log(`[CONTROLLER] Entering getTeacherLessons for teacherId: ${req.params.teacherId}`);
+    try {
+      const requestedTeacherId = req.params.teacherId;
+      const authenticatedUserId = (req as any).user?.id;
+      const authenticatedUserType = (req as any).user?.userType;
+
+      if (!authenticatedUserId || authenticatedUserType !== 'TEACHER' || authenticatedUserId !== requestedTeacherId) {
+        console.warn(`[CONTROLLER] Forbidden access attempt for teacher lessons. Requested: ${requestedTeacherId}, Auth User: ${authenticatedUserId}, Type: ${authenticatedUserType}`);
+        res.status(403).json({ error: 'Forbidden: You can only access your own lessons.' });
+        return;
+      }
+
+      console.log(`[CONTROLLER] Calling service findLessonsByTeacherId for: ${requestedTeacherId}`);
+      const lessons = await teacherService.findLessonsByTeacherId(requestedTeacherId);
+      console.log(`[CONTROLLER] Service returned ${lessons.length} lessons.`);
+
+      res.status(200).json(lessons);
+      console.log(`[CONTROLLER] Successfully sent lessons response for teacherId: ${requestedTeacherId}`);
+
+    } catch (error) {
+      // Log the specific error caught within this controller method
+      console.error(`[CONTROLLER] Error in getTeacherLessons for teacherId ${req.params.teacherId}:`, error);
+
+      // Decide if we handle specific errors here or pass all to global handler
+      if (error instanceof Error && error.message.includes('not found')) {
+        console.log('[CONTROLLER] Handling 404 error locally.');
+        res.status(404).json({ error: error.message });
+      } else {
+        console.log('[CONTROLLER] Passing error to global handler.');
+        next(error); // Pass other errors to the global error handler
+      }
+    }
+  },
+
+  /**
    * Get statistics for a teacher
    * @param req Request - must include teacherId from authenticated user
    * @param res Response
@@ -467,68 +511,17 @@ export const teacherController = {
    */
   getTeacherStats: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      // Get the teacher ID from the authenticated user
-      const teacherId = req.user?.id;
+      const teacherId = (req as any).user?.id; // Get ID from authenticated user
 
       if (!teacherId) {
-        res.status(401).json({ message: 'Unauthorized' });
+        res.status(401).json({ error: 'Unauthorized: Teacher ID not found in token.' });
         return;
       }
 
-      // Get today's date at midnight for comparing with lesson dates
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      // Get statistics using Prisma transactions
-      const stats = await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => {
-        // Get all quotes for this teacher
-        const quotes = await tx.lessonQuote.findMany({
-          where: {
-            teacherId
-          },
-          include: {
-            lessonRequest: true,
-            Lesson: {
-              include: {
-                currentStatus: true
-              }
-            },
-          }
-        });
-
-        // Calculate statistics based on the quotes
-        const activeQuotes = quotes.filter(quote => quote.expiresAt > new Date()).length;
-
-        // Correctly filter and reduce based on Lesson and its currentStatus
-        const completedLessons = quotes.filter(quote => quote.Lesson?.currentStatus?.status === 'COMPLETED').length;
-        const totalEarnings = quotes
-          .filter(quote => quote.Lesson?.currentStatus?.status === 'COMPLETED')
-          .reduce((sum, quote) => sum + quote.costInCents, 0);
-
-        // Count upcoming lessons (start time is in the future)
-        const upcomingLessons = quotes.filter(quote => {
-          const lesson = quote.Lesson;
-          if (!lesson) return false; // Skip quotes without a lesson
-          const lessonRequest = quote.lessonRequest;
-          return new Date(lessonRequest.startTime) > new Date();
-        }).length;
-
-        return {
-          totalQuotes: quotes.length,
-          activeQuotes,
-          completedLessons,
-          upcomingLessons,
-          totalEarnings
-        };
-      });
-
+      const stats = await teacherService.getTeacherStatistics(teacherId);
       res.status(200).json(stats);
     } catch (error) {
-      console.error('Error fetching teacher statistics:', error);
-      res.status(500).json({
-        message: 'An error occurred while fetching teacher statistics',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+      next(error);
     }
   }
 }; 
