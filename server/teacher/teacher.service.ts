@@ -1,6 +1,6 @@
 import prisma from '../prisma.js';
 import { Lesson, LessonQuote, LessonRequest, Teacher, Student, Address, LessonStatus } from '@prisma/client';
-import { LessonStatusValue } from '@shared/models/LessonStatus.js';
+import { LessonStatusValue } from '../../shared/models/LessonStatus.js';
 
 // Type representing a full Lesson object with related data for display
 // We need the student name, lesson time/duration/address/cost, and current status.

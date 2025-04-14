@@ -8,8 +8,8 @@ export default {
     './jest.setup.ts' // Path relative to this config file
   ],
   clearMocks: true,
-  // Output coverage relative to project root
-  coverageDirectory: "<rootDir>/../../coverage/unit",
+  // Output coverage relative to project root, inside tests/coverage/
+  coverageDirectory: "<rootDir>/../coverage/unit",
   coverageProvider: "v8",
   // Look for tests only within this directory (tests/unit) and its subdirectories
   testMatch: [

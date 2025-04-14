@@ -116,7 +116,7 @@ test('Teacher login form submission', async ({ page }) => {
 
   // If login successful, wait for redirect
   if (status === 200) {
-    await expect(page).toHaveURL(/.*\/teacher\/profile.*/, { timeout: 2000 });
+    await expect(page).toHaveURL(/.*\/teacher\/lessons.*/, { timeout: 2000 });
   } else {
     // If login failed, verify error message
     const errorMessage = page.locator('.alert-error');

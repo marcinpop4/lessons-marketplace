@@ -23,9 +23,10 @@ pnpm-debug.log
 .DS_Store
 
 # Testing
-/test-results
-/playwright-report
-/playwright/.cache
+/tests/results
+/tests/playwright-report
+/tests/playwright/.cache
+/tests/coverage/
 
 # Documentation
 /docs

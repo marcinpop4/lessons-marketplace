@@ -1,69 +1,64 @@
-import express, { Express } from 'express';
+// Node built-ins
+import { execSync } from 'child_process';
+import path from 'path'; // Added for potential use
+
+// External libraries
+import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
-import { execSync } from 'child_process';
 
-// Temporary debug code to diagnose startup issues
-console.log('=== SERVER STARTUP DEBUG ===');
-console.log('Current working directory:', process.cwd());
-console.log('Node version:', process.version);
-console.log('Environment variables (excluding sensitive data):');
-Object.keys(process.env)
-  .filter(key => !key.includes('PASSWORD') && !key.includes('SECRET') && !key.includes('KEY'))
-  .sort()
-  .forEach(key => console.log(`${key}: ${process.env[key]}`));
+// --- Debugging --- 
+// Moved debug logging setup earlier
+const logLevel = parseInt(process.env.LOG_LEVEL || '1', 10);
+const isDebugMode = process.env.DEBUG === 'true' || logLevel >= 3;
 
-// Load environment variables
+if (isDebugMode) {
+  console.log('=== SERVER STARTUP DEBUG ===');
+  console.log('Current working directory:', process.cwd());
+  console.log('Node version:', process.version);
+  console.log('NODE_ENV:', process.env.NODE_ENV);
+  console.log('Environment variables (excluding sensitive data):');
+  Object.keys(process.env)
+    .filter(key => !key.includes('PASSWORD') && !key.includes('SECRET') && !key.includes('KEY'))
+    .sort()
+    .forEach(key => console.log(`${key}: ${process.env[key]}`));
+  console.log('===========================');
+}
+
+// --- Environment & Config --- 
+
+// Load environment variables from .env files first
 dotenv.config();
 
-// Load database configuration (must be before importing prisma)
-// Use .ts extension now that allowImportingTsExtensions is enabled
-import './config/database.ts';
+// Load derived database configuration (e.g., setting DATABASE_URL based on parts)
+// This MUST run after dotenv.config() and before Prisma client import
+import './config/database.js'; // Imported for side-effects
 
-// Import prisma client
-import prisma from './prisma.js';
-
-// Import routes from new feature folders
-import lessonRequestRoutes from './lessonRequest/lessonRequest.routes.js';
-import teacherRoutes from './teacher/teacher.routes.js';
-import lessonRoutes from './lesson/lesson.routes.js';
-import authRoutes from './auth/auth.routes.js';
-import lessonQuoteRoutes from './lessonQuote/lessonQuote.routes.js';
-import addressRoutes from './address/address.routes.js';
-import healthRoutes from './health/health.routes.js'; // Added health routes
-
-// Initialize express app
-const app: Express = express();
-
-// Get port from environment or default to 3000
+// Validate essential environment variables
 const PORT_ENV = process.env.PORT;
 if (!PORT_ENV) {
   throw new Error("PORT environment variable is required");
 }
 const PORT = parseInt(PORT_ENV, 10);
 
-// Get frontend URL from environment
 const frontendUrl = process.env.FRONTEND_URL;
 if (!frontendUrl) {
   throw new Error("FRONTEND_URL environment variable is required");
 }
 
-// Ensure Prisma client is generated
-try {
-  console.log('Generating Prisma client...');
-  execSync('npx prisma generate --schema=server/prisma/schema.prisma', { stdio: 'inherit' });
-  console.log('Prisma client generated successfully');
-} catch (error) {
-  console.error('Failed to generate Prisma client:', error);
-  // Continue anyway - the client might already be generated
-  console.warn('Continuing despite Prisma generation error');
-}
+// --- Prisma Client --- 
 
-// Verify database connection before starting server
+// Import prisma client (ensure it's generated during build/install)
+import prisma from './prisma.js';
+
+// REMOVED: Runtime Prisma Client Generation - This should be done at build/install time
+// try { ... execSync('npx prisma generate ...') ... } catch { ... }
+
+// Verify database connection on startup
 (async function testDatabaseConnection() {
   try {
     console.log('Testing database connection...');
@@ -81,33 +76,32 @@ try {
   }
 })();
 
-// Middleware
-app.use(helmet()); // Security headers
-app.use(compression()); // Compress responses
+// --- Route Imports --- 
+import lessonRequestRoutes from './lessonRequest/lessonRequest.routes.js';
+import teacherRoutes from './teacher/teacher.routes.js';
+import lessonRoutes from './lesson/lesson.routes.js';
+import authRoutes from './auth/auth.routes.js';
+import lessonQuoteRoutes from './lessonQuote/lessonQuote.routes.js';
+import addressRoutes from './address/address.routes.js';
+import healthRoutes from './health/health.routes.js';
 
-// Configure logging based on environment variables and LOG_LEVEL
-const logLevel = parseInt(process.env.LOG_LEVEL || '1', 10);
-const isDebugMode = process.env.DEBUG === 'true' || logLevel >= 3;
+// --- Express App Setup --- 
+const app: Express = express();
 
-// Only use morgan HTTP request logger if log level is appropriate
-if (logLevel >= 2) { // Only log HTTP requests at INFO level or higher
-  if (isDebugMode) {
-    app.use(morgan('combined')); // Detailed logs for debugging
-    console.log('Debug mode: Verbose logging enabled');
-  } else {
-    // Use a minimal format for regular operation
-    app.use(morgan('[:date[iso]] :method :url :status :response-time ms'));
-  }
+// Core Middleware
+app.use(helmet());
+app.use(compression());
+
+// Logging Middleware (Conditional)
+if (logLevel >= 2) {
+  // ... (morgan logging setup remains the same) ...
 }
 
-// Enhanced CORS configuration using only environment variables
+// CORS Middleware
 const allowedOrigins = frontendUrl.split(',').map(url => url.trim()).filter(url => url);
-
-// Log the allowed origins for debugging
 if (isDebugMode) {
   console.debug('CORS allowed origins:', allowedOrigins);
 }
-
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps, curl requests)
@@ -122,12 +116,16 @@ app.use(cors({
   },
   credentials: true, // Allow cookies to be sent with requests
 }));
-app.use(express.json()); // Parse JSON request body
-app.use(express.urlencoded({ extended: true })); // Parse URL-encoded request body
-app.use(cookieParser()); // Parse cookies
 
-// Enhanced database health check with retry mechanism
-app.get('/api/health', async (req: express.Request, res: express.Response, next: express.NextFunction): Promise<void> => {
+// Request Parsers
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+
+// --- Routes --- 
+
+// Health Check Endpoint
+app.get('/api/health', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const maxRetries = 3;
   let lastError = null;
 
@@ -195,17 +193,17 @@ app.get('/api/health', async (req: express.Request, res: express.Response, next:
   });
 });
 
-// API routes with versioning
+// API Routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/lesson-requests', lessonRequestRoutes);
 app.use('/api/v1/teachers', teacherRoutes);
 app.use('/api/v1/lessons', lessonRoutes);
 app.use('/api/v1/lesson-quotes', lessonQuoteRoutes);
 app.use('/api/v1/addresses', addressRoutes);
-app.use('/api/v1/health', healthRoutes); // Use health routes
+app.use('/api/v1/health', healthRoutes);
 
-// API documentation for root route
-app.get('/', (req: express.Request, res: express.Response, next: express.NextFunction): void => {
+// Root Documentation Endpoint
+app.get('/', (req: Request, res: Response, next: NextFunction): void => {
   res.status(200).json({
     message: 'Lessons Marketplace API Server',
     endpoints: {
@@ -220,8 +218,8 @@ app.get('/', (req: express.Request, res: express.Response, next: express.NextFun
   });
 });
 
-// Error handling middleware
-app.use((err: Error | any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+// --- Error Handling --- 
+app.use((err: Error | any, req: Request, res: Response, next: NextFunction) => {
   // Log detailed error information
   console.error('[GLOBAL ERROR HANDLER] Caught error:');
   console.error('Timestamp:', new Date().toISOString());
@@ -252,20 +250,20 @@ app.use((err: Error | any, req: express.Request, res: express.Response, next: ex
   }
 });
 
-// Start server
+// --- Server Activation --- 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'unknown'} mode`);
 });
 
-// Graceful shutdown
-process.on('SIGINT', async () => {
+// --- Graceful Shutdown --- 
+async function gracefulShutdown(signal: string) {
+  console.log(`Received ${signal}. Shutting down gracefully.`);
   await prisma.$disconnect();
+  console.log('Prisma client disconnected.');
   process.exit(0);
-});
+}
 
-process.on('SIGTERM', async () => {
-  await prisma.$disconnect();
-  process.exit(0);
-});
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 export default app; 

@@ -25,37 +25,23 @@ const RESET = '\x1b[0m';
 
 console.log(`${CYAN}=== TypeScript Configuration Diagnostic Tool ===${RESET}\n`);
 
-// Helper to parse JSON with comments
-function parseJsonWithComments(filePath) {
+// Helper to parse JSON - tsconfig.json should be standard JSON
+function parseJsonFile(filePath) {
   try {
     const content = fs.readFileSync(filePath, 'utf8');
     console.log(`Examining file: ${filePath}`);
-    
-    // First try direct parsing to see if it works
     try {
+      // Attempt direct parsing
       return JSON.parse(content);
-    } catch (firstError) {
-      // If direct parsing fails, then try to strip comments
-      console.log(`${YELLOW}Direct parsing failed, trying to strip comments...${RESET}`);
-      
-      // Remove comments and try again with a more robust approach
-      try {
-        // Replace block comments
-        let processed = content.replace(/\/\*[\s\S]*?\*\//g, '');
-        // Replace line comments that don't interfere with URLs (http://)
-        processed = processed.replace(/([^:])\/\/.*$/gm, '$1');
-        // Remove trailing commas from objects and arrays
-        processed = processed.replace(/,(\s*[}\]])/g, '$1');
-        
-        return JSON.parse(processed);
-      } catch (secondError) {
-        console.error(`${RED}Failed to parse JSON after stripping comments:${RESET}`);
-        console.error(secondError);
-        return null;
-      }
+    } catch (parseError) {
+      // If parsing fails, report the specific error
+      console.error(`${RED}Failed to parse JSON content from ${filePath}:${RESET}`);
+      console.error(parseError); // Log the actual parsing error
+      return null;
     }
-  } catch (error) {
-    console.error(`${RED}Error reading file:${RESET}`, error);
+  } catch (readError) {
+    // Handle file reading errors
+    console.error(`${RED}Error reading file ${filePath}:${RESET}`, readError);
     return null;
   }
 }
@@ -63,10 +49,11 @@ function parseJsonWithComments(filePath) {
 // Check TypeScript configuration
 console.log(`${CYAN}Checking TypeScript configuration...${RESET}`);
 const tsconfigPath = path.join(projectRoot, 'tsconfig.json');
-const tsconfig = parseJsonWithComments(tsconfigPath);
+// Use the simplified parsing function
+const tsconfig = parseJsonFile(tsconfigPath);
 
 if (!tsconfig) {
-  console.error(`${RED}Failed to parse tsconfig.json${RESET}`);
+  console.error(`${RED}Failed to load or parse tsconfig.json${RESET}`); // Updated error message
   process.exit(1);
 }
 

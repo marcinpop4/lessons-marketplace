@@ -9,8 +9,8 @@ export default {
     '<rootDir>/jest.setup.ts' 
   ],
   clearMocks: true,
-  // Output coverage relative to project root
-  coverageDirectory: "<rootDir>/../../coverage/api", // Adjusted path
+  // Output coverage relative to project root, inside tests/coverage/
+  coverageDirectory: "<rootDir>/../coverage/api",
   coverageProvider: "v8",
   // Test files within this directory (relative to config file location)
   testMatch: [

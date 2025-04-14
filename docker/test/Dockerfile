@@ -10,19 +10,19 @@ RUN npm config set registry https://registry.npmjs.org/ && \
     pnpm install --frozen-lockfile
 
 # Copy only the necessary files for testing
-# Config files
-COPY playwright.config.ts jest.config.js tsconfig.json ./
+# Base config (needed because tests/tsconfig.test.json extends it)
+COPY tsconfig.json ./
 
 # Environment configuration
 COPY env/.env.* ./env/
 
-# Test directories
+# Test directories (includes tests/tsconfig.json and tests/tsconfig.test.json)
 COPY tests/ ./tests/
 
-# Frontend code (needed for unit tests)
+# Frontend code (needed for some tests)
 COPY frontend/ ./frontend/
 
-# Server code (needed for unit tests)
+# Server code (needed for some tests)
 COPY server/ ./server/
 
 # Shared code (needed for tests)

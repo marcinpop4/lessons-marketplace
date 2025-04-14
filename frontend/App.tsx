@@ -1,6 +1,6 @@
 // CACHE-BUSTER: 20250320101632
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth, AuthProvider } from '@frontend/contexts/AuthContext';
 
 // Common Pages
@@ -18,7 +18,7 @@ import TeacherProfilePage from '@frontend/pages/teacher/profile'; // Renamed fro
 import TeacherLessonsPage from '@frontend/pages/teacher/lessons'; // New lessons page
 
 import ProtectedRoute from '@frontend/components/common/ProtectedRoute';
-import { ThemeSwitcher } from '@frontend/components/shared';
+import { ThemeSwitcher, Button } from '@frontend/components/shared';
 import ThemeProvider from '@frontend/contexts/ThemeContext';
 import './App.css';
 
@@ -36,8 +36,8 @@ const RootRedirect = () => {
   }
 
   if (user.userType === 'TEACHER') {
-    // Redirect teacher to their profile page (formerly dashboard)
-    return <Navigate to="/teacher/profile" replace />;
+    // Redirect teacher to their lessons page
+    return <Navigate to="/teacher/lessons" replace />;
   }
 
   if (user.userType === 'STUDENT') {
@@ -49,8 +49,10 @@ const RootRedirect = () => {
 
 // Inner component to use hooks
 const AppRoutes: React.FC = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const currentPath = location.pathname;
 
   // Update navigation path if needed
   const handleBackFromQuotes = () => {
@@ -70,9 +72,36 @@ const AppRoutes: React.FC = () => {
             <h1>Take lessons and Git Gud!</h1>
           </Link>
         </div>
-        <div className="flex items-center">
+        <nav className="flex items-center gap-4">
+          {/* Conditional Teacher Navigation */}
+          {user && user.userType === 'TEACHER' && (
+            <>
+              <Button
+                variant={currentPath === '/teacher/lessons' ? 'primary' : 'secondary'}
+                size="sm"
+                onClick={() => navigate('/teacher/lessons')}
+              >
+                My Lessons
+              </Button>
+              <Button
+                variant={currentPath === '/teacher/profile' ? 'primary' : 'secondary'}
+                size="sm"
+                onClick={() => navigate('/teacher/profile')}
+              >
+                My Profile
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={logout}
+              >
+                Logout
+              </Button>
+            </>
+          )}
+          {/* Add Student Navigation or common links here */}
           <ThemeSwitcher className="flex items-center" />
-        </div>
+        </nav>
       </header>
 
       <main className="main-content animate-slide-up">

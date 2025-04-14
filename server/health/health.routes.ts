@@ -1,5 +1,5 @@
 import express, { Router, Request, Response, NextFunction } from 'express';
-import prisma from '../prisma.js'; // Corrected path
+import prisma from '../prisma.js'; // Already has .js
 
 const router: Router = express.Router();
 

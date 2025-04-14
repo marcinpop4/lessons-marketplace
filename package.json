@@ -2,9 +2,9 @@
   "name": "lessons-marketplace",
   "private": true,
   "scripts": {
-    "build:frontend": "tsc --project tsconfig.json --noEmit && dotenv -e env/.env.${NODE_ENV} -- sh -c 'tsc --project tsconfig.json && VITE_TSCONFIG=tsconfig.json vite build --config frontend/config/vite.config.ts --emptyOutDir'",
-    "build:server": "tsc --project tsconfig.json --noEmit && dotenv -e env/.env.${NODE_ENV} -- tsc --project tsconfig.json --outDir dist",
-    "build:shared": "tsc --project tsconfig.json --noEmit && dotenv -e env/.env.${NODE_ENV} -- tsc --project tsconfig.json --outDir dist",
+    "build:frontend": "tsc --project tsconfig.json --noEmit && dotenv -e env/.env.${NODE_ENV} -- sh -c 'VITE_TSCONFIG=tsconfig.json vite build --config frontend/config/vite.config.ts --emptyOutDir'",
+    "build:server": "dotenv -e env/.env.${NODE_ENV} -- tsc --project tsconfig.json --noEmit false --outDir dist",
+    "build:shared": "dotenv -e env/.env.${NODE_ENV} -- tsc --project tsconfig.json --noEmit false --outDir dist",
     "clean": "rm -rf dist && rm -rf node_modules",
     "dev:frontend": "dotenv -e env/.env.${NODE_ENV:-development} -- cross-env VITE_TSCONFIG=tsconfig.json vite --config frontend/config/vite.config.ts --force",
     "dev:full": "cross-env NODE_ENV=development concurrently --raw \"pnpm run dev:frontend\" \"pnpm run dev:server\"",

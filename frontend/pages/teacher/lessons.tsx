@@ -3,6 +3,7 @@ import TeacherLessonCard from '../../components/TeacherLessonCard';
 import { Lesson } from '@shared/models/Lesson';
 import { LessonStatusValue } from '@shared/models/LessonStatus';
 import { getTeacherLessons, TeacherLessonApiResponseItem } from '@frontend/api/teacherApi'; // Import API function and response type
+import { updateLessonStatus } from '@frontend/api/lessonApi'; // Import the update status function
 import { LessonQuote } from '@shared/models/LessonQuote';
 import { LessonRequest } from '@shared/models/LessonRequest';
 import { Student } from '@shared/models/Student';
@@ -88,54 +89,74 @@ const TeacherLessonsPage: React.FC = () => {
     const [lessons, setLessons] = useState<Lesson[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [updatingLessonId, setUpdatingLessonId] = useState<string | null>(null);
     const { user } = useAuth();
 
-    useEffect(() => {
-        const fetchLessons = async () => {
-            if (!user || user.userType !== 'TEACHER') {
-                setError('User not authenticated or not a teacher.');
-                setLoading(false);
-                return;
-            }
-            const teacherId = user.id;
+    const fetchLessonsData = async () => {
+        if (!user || user.userType !== 'TEACHER') {
+            setError('User not authenticated or not a teacher.');
+            setLoading(false);
+            return;
+        }
+        const teacherId = user.id;
 
-            try {
-                setLoading(true);
-                setError(null);
-                const rawLessonsData = await getTeacherLessons(teacherId);
+        try {
+            setLoading(true);
+            setError(null);
+            const rawLessonsData = await getTeacherLessons(teacherId);
 
-                // Log the raw data to inspect its structure
-                console.log('Raw Lessons Data from API:', rawLessonsData);
+            // Log the raw data to inspect its structure
+            console.log('Raw Lessons Data from API:', rawLessonsData);
 
-                // Check if it's an array before mapping
-                if (!Array.isArray(rawLessonsData)) {
-                    // If it's not an array, try to find the array if nested (common pattern)
-                    // Example: Check if data is like { lessons: [...] }
-                    const lessonsArray = (rawLessonsData as any)?.lessons || (rawLessonsData as any)?.data;
+            // Check if it's an array before mapping
+            if (!Array.isArray(rawLessonsData)) {
+                // If it's not an array, try to find the array if nested (common pattern)
+                // Example: Check if data is like { lessons: [...] }
+                const lessonsArray = (rawLessonsData as any)?.lessons || (rawLessonsData as any)?.data;
 
-                    if (!Array.isArray(lessonsArray)) {
-                        console.error('API did not return an array of lessons.', rawLessonsData);
-                        throw new Error('Invalid data format received from API. Expected an array of lessons.');
-                    }
-                    // If found nested array, use it instead
-                    const instantiatedLessons = lessonsArray.map(instantiateLessonFromData);
-                    setLessons(instantiatedLessons);
-                } else {
-                    // If it is an array, proceed as before
-                    const instantiatedLessons = rawLessonsData.map(instantiateLessonFromData);
-                    setLessons(instantiatedLessons);
+                if (!Array.isArray(lessonsArray)) {
+                    console.error('API did not return an array of lessons.', rawLessonsData);
+                    throw new Error('Invalid data format received from API. Expected an array of lessons.');
                 }
-
-            } catch (err) {
-                console.error('Failed to fetch teacher lessons:', err);
-                setError(err instanceof Error ? err.message : 'An unknown error occurred');
-            } finally {
-                setLoading(false);
+                // If found nested array, use it instead
+                const instantiatedLessons = lessonsArray.map(instantiateLessonFromData);
+                setLessons(instantiatedLessons);
+            } else {
+                // If it is an array, proceed as before
+                const instantiatedLessons = rawLessonsData.map(instantiateLessonFromData);
+                setLessons(instantiatedLessons);
             }
-        };
 
-        fetchLessons();
+        } catch (err) {
+            console.error('Failed to fetch teacher lessons:', err);
+            setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchLessonsData();
     }, [user]);
+
+    // Handle lesson status updates
+    const handleUpdateStatus = async (lessonId: string, newStatus: LessonStatusValue) => {
+        try {
+            setUpdatingLessonId(lessonId);
+            await updateLessonStatus(lessonId, newStatus);
+
+            // Refresh the lessons after successful update
+            await fetchLessonsData();
+
+            // Optionally show a success message
+            // setSuccessMessage(`Lesson status updated to ${newStatus}`);
+        } catch (err) {
+            console.error('Failed to update lesson status:', err);
+            setError(err instanceof Error ? err.message : 'Failed to update lesson status');
+        } finally {
+            setUpdatingLessonId(null);
+        }
+    };
 
     const groupLessonsByStatus = (lessonsToGroup: Lesson[]): Record<LessonStatusValue, Lesson[]> => {
         const grouped: Record<string, Lesson[]> = {
@@ -168,6 +189,7 @@ const TeacherLessonsPage: React.FC = () => {
     return (
         <div className="p-4 md:p-6 max-w-7xl mx-auto">
             <h1 className="text-2xl font-semibold mb-6">Lessons Dashboard</h1>
+
             {lessonStatuses.map(status => (
                 groupedLessons[status] && groupedLessons[status].length > 0 && (
                     <div key={status} className="mb-8">
@@ -179,12 +201,15 @@ const TeacherLessonsPage: React.FC = () => {
                                     lesson={lesson}
                                     // Pass the correct status value attached during instantiation
                                     currentStatus={(lesson as any)._currentStatusValue}
+                                    onUpdateStatus={handleUpdateStatus}
+                                    isUpdating={updatingLessonId === lesson.id}
                                 />
                             ))}
                         </div>
                     </div>
                 )
             ))}
+
             {lessons.length === 0 && !loading && (
                 <div className="text-center py-10 text-gray-500">
                     No lessons found for this teacher.
