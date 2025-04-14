@@ -1,61 +1,33 @@
 /**
- * Prisma Seed Script
+ * Prisma Seed Script (Refactored)
  * 
- * This script seeds the database with initial data for development and testing.
- * 
- * IMPORTANT NOTES:
- * - This file is intentionally JavaScript rather than TypeScript for better compatibility
- *   with Prisma's migration and seeding systems, especially in Docker environments.
- * - Enums are defined directly in this file rather than imported from TypeScript models
- *   to avoid module resolution issues across different environments.
- * - If you modify the enums in the TypeScript models, be sure to update them here as well.
+ * This script seeds the database using service classes to adhere to architectural guidelines.
+ * It relies on shared models and service logic for data creation and validation.
  */
 
-import pkg from '@prisma/client';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import bcryptjs from 'bcryptjs';
-import { execSync } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
-/* 
- * IMPORTANT: ES Module imports require .js extension even for TypeScript files
- * This is particularly important for Docker environments where module resolution is strict.
- * Local development with tsx may work without extensions, but Docker will fail.
- */
+// import bcryptjs from 'bcryptjs'; // No longer needed here
 
-/* 
- * DUPLICATED ENUMS FOR DOCKER COMPATIBILITY
- * 
- * These enums duplicate the TypeScript enums from:
- * - shared/models/LessonType.ts
- * - shared/models/LessonStatus.ts
- * 
- * This duplication is necessary because:
- * 1. Docker's ES Module environment strictly enforces import paths
- * 2. TypeScript files are not directly available in compiled environments
- * 3. Path resolution works differently across environments
- *
- * If you modify the original TypeScript enums, make sure to keep
- * these duplicates in sync.
- */
-// Duplicated from shared/models/LessonType.ts
-const LessonType = {
-  VOICE: "VOICE",
-  GUITAR: "GUITAR",
-  BASS: "BASS",
-  DRUMS: "DRUMS"
-};
+// Import shared models and enums
+import { LessonType } from '@shared/models/LessonType';
+import { LessonStatusValue } from '@shared/models/LessonStatus';
 
-// Duplicated from shared/models/LessonStatus.ts 
-const LessonStatusValue = {
-  REQUESTED: 'REQUESTED',
-  ACCEPTED: 'ACCEPTED',
-  REJECTED: 'REJECTED',
-  STARTED: 'STARTED',
-  COMPLETED: 'COMPLETED',
-  INCOMPLETE: 'INCOMPLETE'
-};
+// Import ALL services 
+import { teacherService } from '../teacher/teacher.service.js'; 
+import { studentService } from '../student/student.service.js'; 
+import { addressService } from '../address/address.service.js'; 
+import { lessonRequestService } from '../lessonRequest/lessonRequest.service.js'; 
+// Import the lesson quote service
+import { lessonQuoteService } from '../lessonQuote/lessonQuote.service.js'; 
+import { lessonService } from '../lesson/lesson.service.js'; 
+import { teacherLessonHourlyRateService } from '../teacher/teacherLessonHourlyRate.service.js'; 
+
+// Initialize Prisma client (passed to services)
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 
 // Load environment variables from .env file in the project root
 const __filename = fileURLToPath(import.meta.url);
@@ -71,56 +43,14 @@ if (result.error) {
   throw new Error(`Failed to load environment file at ${envFile}: ${result.error.message}`);
 }
 
-const { PrismaClient } = pkg;
-
-// Initialize Prisma client
-const prisma = new PrismaClient();
-
-// Ensure Prisma client is initialized before running the seed
-async function ensurePrismaClientIsInitialized() {
-  try {
-    // Test a simple database query
-    await prisma.$queryRaw`SELECT 1`;
-    console.log('✅ Prisma client is initialized and connected to the database');
-    return true;
-  } catch (error) {
-    if (error.code === 'ECONNREFUSED') {
-      throw new Error(`Database connection failed. Make sure the database container is running and accessible at ${process.env.DATABASE_URL}`);
-    }
-    
-    console.error('❌ Prisma client is not initialized properly');
-    console.error('Attempting to generate Prisma client...');
-    
-    try {
-      execSync('npx prisma generate --schema=server/prisma/schema.prisma', { stdio: 'inherit' });
-      console.log('Prisma client generation completed');
-      
-      // Test connection again
-      await prisma.$queryRaw`SELECT 1`;
-      console.log('✅ Prisma client is now properly initialized');
-      return true;
-    } catch (generateError) {
-      if (generateError.code === 'ECONNREFUSED') {
-        throw new Error(`Database connection failed. Make sure the database container is running and accessible at ${process.env.DATABASE_URL}`);
-      }
-      throw new Error(`Failed to initialize Prisma client: ${generateError.message}`);
-    }
-  }
-}
-
-// Function to get base rate by lesson type (in cents)
+// Function to get base rate
 function getBaseRateInCents(lessonType) {
   switch (lessonType) {
-    case LessonType.VOICE:
-      return 5000; // $50.00
-    case LessonType.GUITAR:
-      return 4500; // $45.00
-    case LessonType.BASS:
-      return 4000; // $40.00
-    case LessonType.DRUMS:
-      return 3500; // $35.00
-    default:
-      throw new Error(`Unsupported lesson type: ${lessonType}`);
+    case LessonType.VOICE: return 5000;
+    case LessonType.GUITAR: return 4500;
+    case LessonType.BASS: return 4000;
+    case LessonType.DRUMS: return 3500;
+    default: throw new Error(`Unsupported lesson type: ${lessonType}`);
   }
 }
 
@@ -132,81 +62,41 @@ function addToDate(date, days, hours) {
   return newDate;
 }
 
-// Hash password function
-async function hashPassword(password) {
-  const saltRounds = 10;
-  return bcryptjs.hash(password, saltRounds);
-}
+// Hash password function REMOVED - Handled by services
+// async function hashPassword(password) { ... }
 
-// Sample addresses for lessons
+// Sample addresses 
 const sampleAddresses = [
-  {
-    street: '123 Main Street',
-    city: 'New York',
-    state: 'NY',
-    postalCode: '10001',
-    country: 'USA'
-  },
-  {
-    street: '456 Oak Avenue',
-    city: 'Los Angeles',
-    state: 'CA',
-    postalCode: '90001',
-    country: 'USA'
-  },
-  {
-    street: '789 Pine Boulevard',
-    city: 'Chicago',
-    state: 'IL',
-    postalCode: '60601',
-    country: 'USA'
-  },
-  {
-    street: '101 Maple Drive',
-    city: 'Houston',
-    state: 'TX',
-    postalCode: '77001',
-    country: 'USA'
-  },
-  {
-    street: '202 Cedar Lane',
-    city: 'Miami',
-    state: 'FL',
-    postalCode: '33101',
-    country: 'USA'
-  }
+  { street: '123 Main Street', city: 'New York', state: 'NY', postalCode: '10001', country: 'USA' },
+  { street: '456 Oak Avenue', city: 'Los Angeles', state: 'CA', postalCode: '90001', country: 'USA' },
+  { street: '789 Pine Boulevard', city: 'Chicago', state: 'IL', postalCode: '60601', country: 'USA' },
+  { street: '101 Maple Drive', city: 'Houston', state: 'TX', postalCode: '77001', country: 'USA' },
+  { street: '202 Cedar Lane', city: 'Miami', state: 'FL', postalCode: '33101', country: 'USA' }
 ];
 
 async function main() {
-  console.log('Starting database seeding...');
+  console.log('Starting database seeding using services...');
 
-  // Ensure Prisma client is initialized before proceeding
-  const isPrismaInitialized = await ensurePrismaClientIsInitialized();
-  if (!isPrismaInitialized) {
-    throw new Error('Failed to initialize Prisma client. Cannot proceed with seeding.');
-  }
-
-  // Hash the common password "1234" once 
-  const hashedPassword = await hashPassword("1234");
+  const commonPassword = "1234";
+  // const hashedPassword = await hashPassword(commonPassword); // No longer needed
 
   try {
-    // Clear existing data
+    // Clear existing data (using direct Prisma for seed cleanup)
     console.log('Clearing existing data...');
     await prisma.$transaction([
       prisma.lessonStatus.deleteMany(),
       prisma.lesson.deleteMany(),
       prisma.lessonQuote.deleteMany(),
       prisma.lessonRequest.deleteMany(),
+      prisma.teacherLessonHourlyRate.deleteMany(), 
       prisma.address.deleteMany(),
-      prisma.teacherLessonHourlyRate.deleteMany(),
       prisma.teacher.deleteMany(),
       prisma.student.deleteMany(),
     ]);
-    
     console.log('Existing data cleared');
 
-    // Create 5 teachers with believable names
-    console.log('Creating teachers...');
+    // Create Teachers using TeacherService
+    console.log('Creating teachers (via service)...');
     const teacherData = [
       { firstName: 'Emily', lastName: 'Richardson', email: 'emily.richardson@musicschool.com', phoneNumber: '123-456-7890', dateOfBirth: new Date('1980-04-12') },
       { firstName: 'Michael', lastName: 'Chen', email: 'michael.chen@musicschool.com', phoneNumber: '123-456-7891', dateOfBirth: new Date('1975-09-23') },
@@ -216,22 +106,19 @@ async function main() {
     ];
     
     const teachers = await Promise.all(
-      teacherData.map(async (teacher) => {
-        return prisma.teacher.create({
-          data: {
-            ...teacher,
-            password: hashedPassword,
-            authMethods: ['PASSWORD'],
-            isActive: true
-          }
-        });
-      })
+      teacherData.map(teacher => teacherService.create(prisma, { ...teacher, password: commonPassword })) 
     );
+    console.log('Teachers created (via service):', teachers.length);
 
-    console.log('Teachers created:', teachers.length);
-
-    // Create 10 students with believable names
-    console.log('Creating students...');
+    // Get Emily Richardson's teacher record (for tests)
+    const emilyRichardson = teachers.find(teacher => teacher.email === 'emily.richardson@musicschool.com');
+    if (!emilyRichardson) {
+      throw new Error('Emily Richardson teacher record not found');
+    }
+    console.log('Found Emily Richardson teacher record for tests:', emilyRichardson.id);
+    
+    // Create Students using StudentService
+    console.log('Creating students (via service)...');
     const studentData = [
       { firstName: 'Ethan', lastName: 'Parker', email: 'ethan.parker@example.com', phoneNumber: '987-654-3210', dateOfBirth: new Date('2000-05-15') },
       { firstName: 'Ava', lastName: 'Johnson', email: 'ava.johnson@example.com', phoneNumber: '987-654-3211', dateOfBirth: new Date('2001-08-22') },
@@ -246,177 +133,222 @@ async function main() {
     ];
     
     const students = await Promise.all(
-      studentData.map(async (student) => {
-        return prisma.student.create({
-          data: {
-            ...student,
-            password: hashedPassword,
-            authMethods: ['PASSWORD'],
-            isActive: true
-          }
-        });
-      })
+      studentData.map(student => studentService.create(prisma, { ...student, password: commonPassword }))
     );
+    console.log('Students created (via service):', students.length);
 
-    console.log('Students created:', students.length);
+    // Create Addresses using AddressService
+    console.log('Creating addresses (via service)...');
+    const addresses = await Promise.all(
+      sampleAddresses.map(addressData => addressService.create(prisma, addressData))
+    );
+    console.log('Addresses created (via service):', addresses.length);
 
-    // Create hourly rates for each teacher (one rate per lesson type)
-    console.log('Creating hourly rates...');
+    // Create Hourly Rates using TeacherLessonHourlyRateService
+    console.log('Creating hourly rates (via service)...');
     const teacherLessonHourlyRates = [];
     for (const teacher of teachers) {
       const teacherRates = await Promise.all(
         Object.values(LessonType).map(async (lessonType) => {
-          // Get base rate for this lesson type (in cents)
           const baseRateInCents = getBaseRateInCents(lessonType);
-          
-          // Adding some variation to rates to make them more realistic (in cents)
-          // Each increment is $5.00 (500 cents) and we add 0-9 increments randomly
           const rateVariationInCents = Math.floor(Math.random() * 10) * 500;
           const rateInCents = baseRateInCents + rateVariationInCents;
           
-          // Create a TeacherLessonHourlyRate record in the database
-          return prisma.teacherLessonHourlyRate.create({
-            data: {
-              teacherId: teacher.id,
-              type: lessonType,
-              rateInCents: rateInCents, // Storing rate in cents
-            },
+          return teacherLessonHourlyRateService.create(prisma, {
+            teacherId: teacher.id, // Pass teacherId here as expected by the service
+            type: lessonType,
+            rateInCents: rateInCents,
           });
         })
       );
       teacherLessonHourlyRates.push(...teacherRates);
     }
+    console.log('TeacherLessonHourlyRates created (via service):', teacherLessonHourlyRates.length);
 
-    console.log('TeacherLessonHourlyRates created:', teacherLessonHourlyRates.length);
-
-    // Create addresses for lesson locations
-    console.log('Creating addresses...');
-    const addresses = await Promise.all(
-      sampleAddresses.map(addressData => 
-        prisma.address.create({
-          data: addressData
-        })
-      )
-    );
-    console.log('Addresses created:', addresses.length);
-
-    // Create 20 lesson requests, quotes, and some confirmed lessons
-    console.log('Creating lesson requests, quotes, and lessons...');
+    // Create Lesson Requests using LessonRequestService
+    console.log('Creating lesson requests (via service)...');
+    const lessonRequests = [];
     const lessonTypes = Object.values(LessonType);
     const today = new Date();
     
-    // Student lesson requests
-    const lessonRequests = [];
-    for (let i = 0; i < 20; i++) {
+    // Create at least 15 lesson requests (for Emily's quotes)
+    const numLessonRequests = 20; // Create a few extra to be safe
+    
+    for (let i = 0; i < numLessonRequests; i++) {
       const student = students[i % students.length];
       const lessonType = lessonTypes[i % lessonTypes.length];
       const address = addresses[i % addresses.length];
+      const startTime = addToDate(today, Math.floor(i / 4), 9 + (i % 8));
       
-      // Create lesson requests at different times over the next 30 days
-      const startTime = addToDate(today, Math.floor(i / 4), 9 + (i % 8)); // Lessons between 9am and 5pm
-      
-      const lessonRequest = await prisma.lessonRequest.create({
-        data: {
-          type: lessonType,
-          startTime,
-          durationMinutes: 60, // 1-hour lessons
-          address: {
-            connect: { id: address.id }
-          },
-          student: {
-            connect: { id: student.id }
-          }
+      // Pass data matching CreateLessonRequestDTO (no prisma arg, use addressObj)
+      const request = await lessonRequestService.createLessonRequest({ 
+        studentId: student.id,
+        // Construct addressObj from the address created earlier
+        addressObj: {
+            street: address.street,
+            city: address.city,
+            state: address.state,
+            postalCode: address.postalCode,
+            country: address.country
         },
+        type: lessonType,
+        startTime,
+        durationMinutes: 60,
+      });
+      lessonRequests.push(request);
+    }
+    console.log('LessonRequests created (via service):', lessonRequests.length);
+
+    // Create Lesson Quotes using LessonQuoteService - specifically for Emily Richardson
+    console.log('Creating lesson quotes for Emily Richardson (via service)...');
+    const emilyQuotes = [];
+    
+    // Get Emily's hourly rates
+    const emilyHourlyRates = teacherLessonHourlyRates.filter(rate => rate.teacherId === emilyRichardson.id);
+    
+    // Ensure we have at least 15 lesson requests
+    if (lessonRequests.length < 15) {
+      throw new Error(`Not enough lesson requests for Emily's quotes. Need at least 15, got ${lessonRequests.length}.`);
+    }
+    
+    // Create exactly 15 quotes for Emily, one for each of the first 15 lesson requests
+    for (let i = 0; i < 15; i++) {
+      const request = lessonRequests[i];
+      
+      // Find Emily's rate for this lesson type
+      const hourlyRate = emilyHourlyRates.find(rate => rate.type === request.type);
+      
+      if (!hourlyRate) {
+        throw new Error(`No hourly rate found for Emily for lesson type ${request.type}`);
+      }
+      
+      const costInCents = Math.round((hourlyRate.rateInCents * request.durationMinutes) / 60);
+      const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+      
+      const quote = await lessonQuoteService.create(prisma, { 
+        lessonRequestId: request.id,
+        teacherId: emilyRichardson.id,  // Always use Emily's ID
+        costInCents,
+        expiresAt,
+        hourlyRateInCents: hourlyRate.rateInCents,
       });
       
-      lessonRequests.push(lessonRequest);
+      emilyQuotes.push(quote);
     }
-
-    console.log('LessonRequests created:', lessonRequests.length);
-
-    // Teacher quotes for lesson requests
-    const lessonQuotes = [];
+    
+    console.log('Lesson quotes created for Emily Richardson:', emilyQuotes.length);
+    
+    // Create additional quotes for other teachers (optional)
+    const otherQuotes = [];
     for (const request of lessonRequests) {
-      // For each request, get 1-3 random teachers to provide quotes
-      const quotesPerRequest = Math.floor(Math.random() * 3) + 1;
-      const shuffledTeachers = [...teachers].sort(() => 0.5 - Math.random());
+      // Skip the first 15 requests (already used for Emily)
+      if (lessonRequests.indexOf(request) < 15) {
+        continue;
+      }
       
-      for (let i = 0; i < quotesPerRequest && i < shuffledTeachers.length; i++) {
-        const teacher = shuffledTeachers[i];
+      // Find a different teacher (not Emily)
+      const otherTeachers = teachers.filter(t => t.id !== emilyRichardson.id);
+      const teacher = otherTeachers[Math.floor(Math.random() * otherTeachers.length)];
+      
+      const hourlyRate = teacherLessonHourlyRates.find(
+          rate => rate.teacherId === teacher.id && rate.type === request.type
+      );
+      
+      if (hourlyRate) {
+        const costInCents = Math.round((hourlyRate.rateInCents * request.durationMinutes) / 60);
+        const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
         
-        // Get the hourly rate for this teacher and lesson type
-        const hourlyRate = await prisma.teacherLessonHourlyRate.findFirst({
-          where: {
-            teacherId: teacher.id,
-            type: request.type,
-          },
+        const quote = await lessonQuoteService.create(prisma, { 
+          lessonRequestId: request.id,
+          teacherId: teacher.id,
+          costInCents,
+          expiresAt,
+          hourlyRateInCents: hourlyRate.rateInCents,
         });
-        
-        if (hourlyRate) {
-          // Calculate cost based on hourly rate and duration
-          const costInCents = Math.round((hourlyRate.rateInCents * request.durationMinutes) / 60);
-          
-          // Create expiration date (48 hours from now)
-          const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
-          
-          const quote = await prisma.lessonQuote.create({
-            data: {
-              costInCents,
-              expiresAt,
-              lessonRequestId: request.id,
-              teacherId: teacher.id,
-              hourlyRateInCents: hourlyRate.rateInCents,
-            },
-          });
-          
-          lessonQuotes.push(quote);
-        }
+        otherQuotes.push(quote);
       }
     }
-
-    console.log('LessonQuotes created:', lessonQuotes.length);
-
-    // Convert some quotes to confirmed lessons (about half)
-    const lessons = [];
-    const confirmedQuotes = lessonQuotes.filter((_, idx) => idx % 2 === 0);
     
-    for (const quote of confirmedQuotes) {
-      // Create the Lesson first, connecting the quote
-      const lesson = await prisma.lesson.create({
-        data: {
-          quote: {
-            connect: { id: quote.id }
-          }
-          // currentStatusId is initially null
-        },
-      });
-      
-      // Create initial REQUESTED status for the lesson
-      const statusId = uuidv4();
-      await prisma.lessonStatus.create({ // Renamed variable to avoid conflict
-        data: {
-          id: statusId,
-          lessonId: lesson.id, // Use the ID of the newly created lesson
-          status: LessonStatusValue.REQUESTED,
-          context: {},
-          // createdAt: lesson.confirmedAt // Use default createdAt
-        }
-      });
-      
-      // Update the lesson with the status ID
-      await prisma.lesson.update({
-        where: { id: lesson.id },
-        data: { currentStatusId: statusId }
-      });
-      
-      lessons.push(lesson);
-    }
+    // Combine all quotes
+    const lessonQuotes = [...emilyQuotes, ...otherQuotes];
+    console.log('Total lesson quotes created:', lessonQuotes.length);
 
-    console.log('Lessons created:', lessons.length);
-    console.log('Seeding completed successfully!');
+    // Create Lessons and Statuses using LessonService
+    console.log('Creating lessons for Emily Richardson (via service)...');
+    const lessons = [];
+    
+    // Create 3 REQUESTED lessons for Emily
+    for (let i = 0; i < 3; i++) {
+        const lesson = await lessonService.create(prisma, emilyQuotes[i].id);
+        lessons.push(lesson);
+    }
+    
+    // Create 3 ACCEPTED lessons for Emily
+    for (let i = 3; i < 6; i++) {
+        const lesson = await lessonService.create(prisma, emilyQuotes[i].id);
+        await lessonService.updateStatus(
+            prisma, 
+            lesson.id, 
+            LessonStatusValue.ACCEPTED, 
+            { acceptedByTeacherId: emilyRichardson.id }
+        );
+        lessons.push(lesson);
+    }
+    
+    // Create 3 COMPLETED lessons for Emily
+    for (let i = 6; i < 9; i++) {
+        const lesson = await lessonService.create(prisma, emilyQuotes[i].id);
+        await lessonService.updateStatus(
+            prisma, 
+            lesson.id, 
+            LessonStatusValue.ACCEPTED, 
+            { acceptedByTeacherId: emilyRichardson.id }
+        );
+        await lessonService.updateStatus(
+            prisma, 
+            lesson.id, 
+            LessonStatusValue.COMPLETED, 
+            { completedByTeacherId: emilyRichardson.id }
+        );
+        lessons.push(lesson);
+    }
+    
+    // Create 3 REJECTED lessons for Emily
+    for (let i = 9; i < 12; i++) {
+        const lesson = await lessonService.create(prisma, emilyQuotes[i].id);
+        await lessonService.updateStatus(
+            prisma, 
+            lesson.id, 
+            LessonStatusValue.REJECTED, 
+            { rejectedByTeacherId: emilyRichardson.id, reason: 'Scheduling conflict' }
+        );
+        lessons.push(lesson);
+    }
+    
+    // Create 3 VOIDED lessons for Emily
+    for (let i = 12; i < 15; i++) {
+        const lesson = await lessonService.create(prisma, emilyQuotes[i].id);
+        await lessonService.updateStatus(
+            prisma, 
+            lesson.id, 
+            LessonStatusValue.ACCEPTED, 
+            { acceptedByTeacherId: emilyRichardson.id }
+        );
+        await lessonService.updateStatus(
+            prisma, 
+            lesson.id, 
+            LessonStatusValue.VOIDED, 
+            { voidedByTeacherId: emilyRichardson.id, reason: 'Student requested cancellation' }
+        );
+        lessons.push(lesson);
+    }
+    
+    console.log('Lessons created for Emily Richardson:', lessons.length);
+    console.log('Seeding completed successfully using services!');
+
   } catch (error) {
-    console.error('Error during seeding:', error);
-    throw error; // Re-throw to ensure the process exits with an error code
+    console.error('Error during service-based seeding:', error);
+    throw error;
   } finally {
     await prisma.$disconnect();
   }

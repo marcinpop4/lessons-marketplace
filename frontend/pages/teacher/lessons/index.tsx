@@ -1,178 +1,225 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { fetchTeacherLessons, updateLessonStatus, FullLessonDetailsForTeacher } from '@frontend/api/lessonApi'; // Import fetch function
-import { LessonStatusValue } from '@shared/models/LessonStatus.js';
-// Import the actual Lesson type from shared models
-import { Lesson } from '@shared/models/Lesson.js'; // Assuming Lesson model exists
-import { useAuth } from '@frontend/contexts/AuthContext'; // Import useAuth
-import '../profile/profile.css';
-import TeacherLessonCard from '@frontend/components/TeacherLessonCard'; // Import the card component
+import React, { useState, useEffect } from 'react';
+import TeacherLessonCard from '../../../components/TeacherLessonCard';
+import { Lesson } from '@shared/models/Lesson';
+import { LessonStatusValue } from '@shared/models/LessonStatus';
+import { getTeacherLessons, TeacherLessonApiResponseItem } from '@frontend/api/teacherApi'; // Import API function and response type
+import { updateLessonStatus } from '@frontend/api/lessonApi'; // Import the update status function
+import { LessonQuote } from '@shared/models/LessonQuote';
+import { LessonRequest } from '@shared/models/LessonRequest';
+import { Student } from '@shared/models/Student';
+import { Teacher } from '@shared/models/Teacher';
+import { Address } from '@shared/models/Address';
+import { LessonType } from '@shared/models/LessonType'; // Import LessonType enum
+import { useAuth } from '@frontend/contexts/AuthContext';
 
-// Define the type used within the component, converting startTime to Date
-interface DisplayLesson extends Omit<FullLessonDetailsForTeacher, 'startTime'> {
-    startTime: Date; // Use Date object for display/logic
-}
+// Helper function to instantiate models from raw API data
+const instantiateLessonFromData = (data: TeacherLessonApiResponseItem): Lesson => {
+    // Provide defaults for missing fields required by constructors, 
+    // as these are NOT fetched from the API anymore.
+    const studentData = {
+        id: data.quote.lessonRequest.student.id,
+        firstName: data.quote.lessonRequest.student.firstName,
+        lastName: data.quote.lessonRequest.student.lastName,
+        email: data.quote.lessonRequest.student.email,
+        phoneNumber: '', // Default value
+        dateOfBirth: new Date(0) // Default value
+    };
+    const teacherData = {
+        id: data.quote.teacher.id,
+        firstName: data.quote.teacher.firstName,
+        lastName: data.quote.teacher.lastName,
+        email: data.quote.teacher.email,
+        phoneNumber: '', // Default value
+        dateOfBirth: new Date(0), // Default value
+        hourlyRates: [] // Default value
+    };
 
+    const student = new Student(studentData);
+    const teacher = new Teacher(teacherData);
+    const address = new Address(data.quote.lessonRequest.address);
+
+    // Ensure LessonRequest type is correctly cast/handled
+    const lessonRequestType = data.quote.lessonRequest.type as LessonType;
+    if (!Object.values(LessonType).includes(lessonRequestType)) {
+        console.warn(`Invalid LessonType received: ${data.quote.lessonRequest.type}`);
+        // Handle invalid type, e.g., default or throw error
+    }
+
+    const lessonRequest = new LessonRequest({
+        // Use only fields available in API response for lessonRequest base
+        id: data.quote.lessonRequest.id,
+        type: lessonRequestType,
+        startTime: new Date(data.quote.lessonRequest.startTime),
+        durationMinutes: data.quote.lessonRequest.durationMinutes,
+        // Pass instantiated objects
+        student: student,
+        address: address,
+    });
+
+    const lessonQuote = new LessonQuote({
+        // Use only fields available in API response for quote base
+        id: data.quote.id,
+        costInCents: data.quote.costInCents,
+        hourlyRateInCents: data.quote.hourlyRateInCents || 0,
+        expiresAt: new Date(data.quote.expiresAt),
+        // Pass instantiated objects
+        lessonRequest: lessonRequest,
+        teacher: teacher,
+        // Omit createdAt, use constructor default
+    });
+
+    const lesson = new Lesson({
+        id: data.id,
+        confirmedAt: data.confirmedAt ? new Date(data.confirmedAt) : undefined,
+        quote: lessonQuote,
+        currentStatusId: data.currentStatus?.id || '',
+    });
+
+    // Attach the status value for easy access in the page component
+    // Use optional chaining in case currentStatus is null
+    (lesson as any)._currentStatusValue = data.currentStatus?.status;
+
+    return lesson;
+};
 
 const TeacherLessonsPage: React.FC = () => {
-    console.log("[TeacherLessonsPage] Component rendering..."); // <-- Log component start
-
-    const { user } = useAuth(); // Get logged-in user
-    const teacherId = user?.id;  // Use actual teacher ID from context
-
-    const [lessons, setLessons] = useState<DisplayLesson[]>([]); // Use DisplayLesson type
+    const [lessons, setLessons] = useState<Lesson[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [updatingLessonId, setUpdatingLessonId] = useState<string | null>(null);
+    const { user } = useAuth();
 
-    // Function to fetch lessons
-    const loadLessons = async () => {
-        if (!teacherId) {
-            setError("Teacher ID not found. Cannot load lessons.");
+    const fetchLessonsData = async () => {
+        if (!user || user.userType !== 'TEACHER') {
+            setError('User not authenticated or not a teacher.');
             setLoading(false);
             return;
         }
-        if (!updatingLessonId && !lessons.length) { // Only set global loading on initial load
-            setLoading(true);
-        }
-        setError(null);
+        const teacherId = user.id;
+
         try {
-            console.log(`[LessonsPage] Fetching lessons for teacher: ${teacherId}`);
-            // *** Use API Call ***
-            const fetchedLessons = await fetchTeacherLessons(teacherId);
+            setLoading(true);
+            setError(null);
+            const rawLessonsData = await getTeacherLessons(teacherId);
 
-            // Process fetched lessons: convert startTime string to Date object
-            const processedLessons = fetchedLessons.map((lesson): DisplayLesson => ({
-                ...lesson,
-                startTime: new Date(lesson.startTime) // Convert string to Date
-            }));
+            // Log the raw data to inspect its structure
+            console.log('Raw Lessons Data from API:', rawLessonsData);
 
-            setLessons(processedLessons);
-        } catch (err: any) {
-            console.error("Failed to fetch lessons:", err);
-            setError(err.message || 'Failed to load lessons.');
+            // Check if it's an array before mapping
+            if (!Array.isArray(rawLessonsData)) {
+                // If it's not an array, try to find the array if nested (common pattern)
+                // Example: Check if data is like { lessons: [...] }
+                const lessonsArray = (rawLessonsData as any)?.lessons || (rawLessonsData as any)?.data;
+
+                if (!Array.isArray(lessonsArray)) {
+                    console.error('API did not return an array of lessons.', rawLessonsData);
+                    throw new Error('Invalid data format received from API. Expected an array of lessons.');
+                }
+                // If found nested array, use it instead
+                const instantiatedLessons = lessonsArray.map(instantiateLessonFromData);
+                setLessons(instantiatedLessons);
+            } else {
+                // If it is an array, proceed as before
+                const instantiatedLessons = rawLessonsData.map(instantiateLessonFromData);
+                setLessons(instantiatedLessons);
+            }
+
+        } catch (err) {
+            console.error('Failed to fetch teacher lessons:', err);
+            setError(err instanceof Error ? err.message : 'An unknown error occurred');
         } finally {
             setLoading(false);
-            // Log state immediately after fetch completes and loading is set to false
-            console.log(`[loadLessons finally] loading=${false}, error=${error}, lessons count=${lessons.length}`);
         }
     };
 
     useEffect(() => {
-        // Only load lessons if we have a teacher ID
-        if (teacherId) {
-            loadLessons();
-        } else {
-            // Handle case where user might not be loaded yet or is not a teacher
-            setLoading(false); // Stop loading if no ID
-            // setError("Could not determine teacher ID."); // Optional: set an error
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [teacherId]); // Rerun if teacherId changes
+        fetchLessonsData();
+    }, [user]);
 
-    // Wrap handler in useCallback
-    const handleUpdateStatus = useCallback(async (lessonId: string, newStatus: LessonStatusValue) => {
-        console.log(`PARENT: handleUpdateStatus useCallback called for ${lessonId} with ${newStatus}`);
-        setUpdatingLessonId(lessonId);
+    // Handle lesson status updates
+    const handleUpdateStatus = async (lessonId: string, newStatus: LessonStatusValue) => {
         try {
+            setUpdatingLessonId(lessonId);
             await updateLessonStatus(lessonId, newStatus);
-            await loadLessons(); // loadLessons needs to be a dependency
-        } catch (err: any) {
-            console.error(`Failed to update lesson ${lessonId} status to ${newStatus}:`, err);
-            alert(`Failed to update lesson status. ${err.message || ''}`);
+
+            // Refresh the lessons after successful update
+            await fetchLessonsData();
+
+            // Optionally show a success message
+            // setSuccessMessage(`Lesson status updated to ${newStatus}`);
+        } catch (err) {
+            console.error('Failed to update lesson status:', err);
+            setError(err instanceof Error ? err.message : 'Failed to update lesson status');
         } finally {
             setUpdatingLessonId(null);
         }
-        // Add loadLessons as a dependency
-        // Note: If loadLessons itself isn't wrapped in useCallback, this might cause unnecessary re-creations
-        // For now, let's add it. We might need to wrap loadLessons too if issues persist.
-    }, [loadLessons]);
+    };
 
-    // Filtering logic remains the same, but ensure properties exist on DisplayLesson
-    const requestedLessons = lessons.filter(l => l.status === LessonStatusValue.REQUESTED);
-    const upcomingLessons = lessons.filter(l => l.status === LessonStatusValue.ACCEPTED && l.startTime > new Date());
-    const pastLessons = lessons.filter(l => l.status !== LessonStatusValue.REQUESTED && (l.status !== LessonStatusValue.ACCEPTED || l.startTime <= new Date()));
+    const groupLessonsByStatus = (lessonsToGroup: Lesson[]): Record<LessonStatusValue, Lesson[]> => {
+        const grouped: Record<string, Lesson[]> = {
+            [LessonStatusValue.REQUESTED]: [],
+            [LessonStatusValue.ACCEPTED]: [],
+            [LessonStatusValue.COMPLETED]: [],
+            [LessonStatusValue.REJECTED]: [],
+            [LessonStatusValue.VOIDED]: [],
+        };
 
-    // Log state right before rendering JSX
-    console.log(`[TeacherLessonsPage] State before render: loading=${loading}, error=${error}, lessons=${lessons.length}, requested=${requestedLessons.length}, upcoming=${upcomingLessons.length}, past=${pastLessons.length}`);
+        lessonsToGroup.forEach(lesson => {
+            // Access the status value attached during instantiation
+            const statusValue = (lesson as any)._currentStatusValue as LessonStatusValue;
 
-    if (loading) return <div className="text-center p-4">Loading lessons...</div>;
-    // Handle case where teacherId wasn't available initially
-    if (!teacherId && !loading) return <div className="alert alert-warning">Could not load lessons. Teacher information not available.</div>;
-    if (error) return <div className="alert alert-error">{error}</div>;
+            if (statusValue && grouped[statusValue]) {
+                grouped[statusValue].push(lesson);
+            } else {
+                console.warn(`Lesson ${lesson.id} has missing or invalid status: ${statusValue}`);
+            }
+        });
+        return grouped;
+    };
 
-    // JSX rendering remains largely the same...
+    const groupedLessons = groupLessonsByStatus(lessons);
+    const lessonStatuses = Object.values(LessonStatusValue);
+
+    if (loading) return <div className="text-center py-10">Loading lessons...</div>;
+    if (error) return <div className="alert alert-error m-4">Error: {error}</div>;
+
     return (
-        <div className="teacher-dashboard-lessons container mx-auto p-4">
-            <h2 className="text-2xl font-semibold mb-6">Manage Lessons</h2>
+        <div className="p-4 md:p-6 max-w-7xl mx-auto">
+            <h1 className="text-2xl font-semibold mb-6">Lessons Dashboard</h1>
 
-            <section className="lesson-section mb-8">
-                <h3 className="text-xl font-medium mb-4">Requested Lessons ({requestedLessons.length})</h3>
-                {requestedLessons.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {requestedLessons.map(lesson => {
-                            console.log(`Mapping Requested ${lesson.id}. typeof handleUpdateStatus: ${typeof handleUpdateStatus}`);
-                            return (
+            {lessonStatuses.map(status => (
+                groupedLessons[status] && groupedLessons[status].length > 0 && (
+                    <div key={status} className="mb-8">
+                        <h2 className="text-xl font-semibold mb-4 capitalize">{status.toLowerCase()}</h2>
+                        <div
+                            className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4`}
+                            role="list"
+                            id={`lessons-${status.toLowerCase()}-section`}
+                        >
+                            {groupedLessons[status].map(lesson => (
                                 <TeacherLessonCard
                                     key={lesson.id}
-                                    lesson={lesson as any}
-                                    currentStatus={lesson.status as LessonStatusValue}
+                                    lesson={lesson}
+                                    // Pass the correct status value attached during instantiation
+                                    currentStatus={(lesson as any)._currentStatusValue}
                                     onUpdateStatus={handleUpdateStatus}
                                     isUpdating={updatingLessonId === lesson.id}
                                 />
-                            );
-                        })}
+                            ))}
+                        </div>
                     </div>
-                ) : (
-                    <p className="text-gray-500">No pending lesson requests.</p>
-                )}
-            </section>
+                )
+            ))}
 
-            <section className="lesson-section mb-8">
-                <h3 className="text-xl font-medium mb-4">Upcoming Lessons ({upcomingLessons.length})</h3>
-                {upcomingLessons.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {upcomingLessons.map(lesson => {
-                            console.log(`Mapping Upcoming ${lesson.id}. typeof handleUpdateStatus: ${typeof handleUpdateStatus}`);
-                            return (
-                                <TeacherLessonCard
-                                    key={lesson.id}
-                                    lesson={lesson as any}
-                                    currentStatus={lesson.status as LessonStatusValue}
-                                    onUpdateStatus={handleUpdateStatus}
-                                    isUpdating={updatingLessonId === lesson.id}
-                                />
-                            );
-                        })}
-                    </div>
-                ) : (
-                    <p className="text-gray-500">No upcoming accepted lessons.</p>
-                )}
-            </section>
-
-            <section className="lesson-section">
-                <h3 className="text-xl font-medium mb-4">Past Lessons ({pastLessons.length})</h3>
-                {pastLessons.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {pastLessons.map(lesson => {
-                            console.log(`Mapping Past ${lesson.id}. typeof handleUpdateStatus: ${typeof handleUpdateStatus}`);
-                            return (
-                                <TeacherLessonCard
-                                    key={lesson.id}
-                                    lesson={lesson as any}
-                                    currentStatus={lesson.status as LessonStatusValue}
-                                    onUpdateStatus={handleUpdateStatus}
-                                    isUpdating={updatingLessonId === lesson.id}
-                                />
-                            );
-                        })}
-                    </div>
-                ) : (
-                    <p className="text-gray-500">No past lessons found.</p>
-                )}
-            </section>
+            {lessons.length === 0 && !loading && (
+                <div
+                    className="text-center py-10 text-gray-500"
+                >
+                    No lessons found for this teacher.
+                </div>
+            )}
         </div>
     );
-
 };
 
 export default TeacherLessonsPage; 

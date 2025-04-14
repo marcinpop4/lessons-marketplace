@@ -5,6 +5,122 @@ import { v4 as uuidv4 } from 'uuid';
 class LessonService {
 
     /**
+     * Create a new lesson from a quote and set its initial status to REQUESTED
+     * @param prisma Prisma client instance
+     * @param quoteId The ID of the quote to create a lesson from
+     * @returns The created lesson
+     * @throws Error if creation fails
+     */
+    async create(prisma: PrismaClient, quoteId: string) {
+        try {
+            // Use transaction to ensure both lesson and status are created
+            return await prisma.$transaction(async (tx) => {
+                // Fetch the quote with related data
+                const quote = await tx.lessonQuote.findUnique({
+                    where: { id: quoteId },
+                    include: {
+                        teacher: true,
+                        lessonRequest: {
+                            include: {
+                                student: true,
+                                address: true
+                            }
+                        }
+                    }
+                });
+
+                if (!quote) {
+                    throw new Error(`Quote with ID ${quoteId} not found`);
+                }
+
+                // Generate lesson ID
+                const lessonId = uuidv4();
+
+                // Create the lesson first (without status)
+                const lesson = await tx.lesson.create({
+                    data: {
+                        id: lessonId,
+                        quoteId: quote.id,
+                        confirmedAt: new Date()
+                    }
+                });
+
+                // Use the updateStatus method to set the initial status to REQUESTED
+                // Since we're in a transaction, we'll use the transaction context instead of prisma directly
+                const statusId = await this.updateStatusInternal(
+                    tx,
+                    lesson.id,
+                    LessonStatusValue.REQUESTED,
+                    {}
+                );
+
+                // Return the lesson with all related data
+                const updatedLesson = await tx.lesson.findUnique({
+                    where: { id: lesson.id },
+                    include: {
+                        quote: {
+                            include: {
+                                teacher: true,
+                                lessonRequest: {
+                                    include: {
+                                        student: true,
+                                        address: true
+                                    }
+                                }
+                            }
+                        },
+                        currentStatus: true,
+                        lessonStatuses: true
+                    }
+                });
+
+                return updatedLesson;
+            });
+        } catch (error) {
+            console.error(`Error creating lesson from quote ${quoteId}:`, error);
+            throw new Error(`Failed to create lesson: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Internal method to update status - used within transactions
+     * @param tx Transaction client
+     * @param lessonId The ID of the lesson to update
+     * @param newStatusValue The new status value
+     * @param context Additional context about the status change
+     * @returns The ID of the newly created status record
+     */
+    private async updateStatusInternal(
+        tx: any,
+        lessonId: string,
+        newStatusValue: LessonStatusValue,
+        context: Record<string, unknown> = {}
+    ): Promise<string> {
+        const newStatusId = uuidv4();
+
+        // Create the new status record
+        await tx.lessonStatus.create({
+            data: {
+                id: newStatusId,
+                lessonId: lessonId,
+                status: newStatusValue,
+                context: context,
+                createdAt: new Date()
+            }
+        });
+
+        // Update the lesson to reference the new status
+        await tx.lesson.update({
+            where: { id: lessonId },
+            data: {
+                currentStatusId: newStatusId
+            }
+        });
+
+        return newStatusId;
+    }
+
+    /**
      * Update the lesson's status by creating a new status record and updating the lesson's reference.
      * Handles the transaction internally.
      * @param prisma Prisma client instance
@@ -20,44 +136,22 @@ class LessonService {
         newStatusValue: LessonStatusValue,
         context: Record<string, unknown> = {}
     ): Promise<string> {
-        const newStatusId = uuidv4(); // Generate ID for the new status record
-
-        // Use any casting to bypass TypeScript errors - consider defining Prisma Tx type if possible
-        const client = prisma as any;
-
         try {
-            await client.$transaction(async (tx: any) => {
-                // Create the new status record
-                await tx.lessonStatus.create({
-                    data: {
-                        id: newStatusId,
-                        lessonId: lessonId,
-                        status: newStatusValue,
-                        context: context,
-                        createdAt: new Date()
-                    }
+            return await prisma.$transaction(async (tx) => {
+                // Ensure the lesson exists before trying to update
+                const lessonExists = await tx.lesson.findUnique({
+                    where: { id: lessonId },
+                    select: { id: true }
                 });
 
-                // Update the lesson to reference the new status
-                // Ensure the lesson exists before trying to update
-                const lessonExists = await tx.lesson.findUnique({ where: { id: lessonId }, select: { id: true } });
                 if (!lessonExists) {
                     throw new Error(`Lesson with ID ${lessonId} not found.`);
                 }
 
-                await tx.lesson.update({
-                    where: { id: lessonId },
-                    data: {
-                        currentStatusId: newStatusId
-                    }
-                });
+                return this.updateStatusInternal(tx, lessonId, newStatusValue, context);
             });
-
-            return newStatusId; // Return the ID of the new status
-
         } catch (error) {
             console.error(`Error updating status for lesson ${lessonId} to ${newStatusValue}:`, error);
-            // Rethrow or handle error appropriately
             throw new Error(`Failed to update lesson status: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }

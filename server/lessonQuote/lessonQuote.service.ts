@@ -8,7 +8,54 @@ import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourly
 import { Student } from '../../shared/models/Student.js';
 import { Address } from '../../shared/models/Address.js';
 
-export class TeacherQuoteService {
+class LessonQuoteService {
+    /**
+     * Create a single lesson quote directly.
+     * @param prismaClient - Prisma client instance
+     * @param quoteData - Data for creating the quote
+     * @returns The created quote
+     */
+    async create(
+        prismaClient: PrismaClient,
+        quoteData: {
+            lessonRequestId: string;
+            teacherId: string;
+            costInCents: number;
+            expiresAt: Date;
+            hourlyRateInCents: number;
+        }
+    ) {
+        try {
+            // Use the provided prisma client
+            const tx = prismaClient;
+
+            // Create the quote
+            const quote = await tx.lessonQuote.create({
+                data: {
+                    lessonRequest: { connect: { id: quoteData.lessonRequestId } },
+                    teacher: { connect: { id: quoteData.teacherId } },
+                    costInCents: quoteData.costInCents,
+                    expiresAt: quoteData.expiresAt,
+                    hourlyRateInCents: quoteData.hourlyRateInCents
+                },
+                include: {
+                    teacher: true,
+                    lessonRequest: {
+                        include: {
+                            address: true,
+                            student: true
+                        }
+                    }
+                }
+            });
+
+            return quote;
+        } catch (error) {
+            console.error('Error creating quote:', error);
+            throw new Error(`Failed to create quote: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
     /**
      * Get available teachers for a lesson type
      * @param lessonType - Type of lesson
@@ -338,4 +385,4 @@ export class TeacherQuoteService {
 }
 
 // Export a singleton instance
-export const teacherQuoteService = new TeacherQuoteService(); 
+export const lessonQuoteService = new LessonQuoteService(); 

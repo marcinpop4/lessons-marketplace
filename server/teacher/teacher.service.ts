@@ -1,6 +1,7 @@
 import prisma from '../prisma.js';
-import { Lesson, LessonQuote, LessonRequest, Teacher, Student, Address, LessonStatus } from '@prisma/client';
+import { Lesson, LessonQuote, LessonRequest, Teacher, Student, Address, LessonStatus, Prisma, PrismaClient } from '@prisma/client';
 import { LessonStatusValue } from '../../shared/models/LessonStatus.js';
+import bcryptjs from 'bcryptjs';
 
 // Type representing a full Lesson object with related data for display
 // We need the student name, lesson time/duration/address/cost, and current status.
@@ -16,6 +17,56 @@ export type FullLessonDetails = Lesson & {
 };
 
 export class TeacherService {
+
+    private readonly saltRounds = 10;
+
+    /**
+     * Creates a new teacher, hashing their password.
+     * @param prisma Prisma client instance
+     * @param teacherData Data for the new teacher, including a plain text password.
+     * @returns The created teacher object (excluding password).
+     * @throws Error if creation fails.
+     */
+    async create(prisma: PrismaClient, teacherData: Prisma.TeacherCreateInput & { password: string }): Promise<Omit<Teacher, 'password'> | null> {
+        try {
+            const { password, ...restData } = teacherData;
+
+            if (!password) {
+                throw new Error('Password is required to create a teacher.');
+            }
+
+            const hashedPassword = await bcryptjs.hash(password, this.saltRounds);
+
+            const newTeacher = await prisma.teacher.create({
+                data: {
+                    ...restData,
+                    password: hashedPassword,
+                    authMethods: ['PASSWORD'],
+                    isActive: true
+                },
+                select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    phoneNumber: true,
+                    dateOfBirth: true,
+                    isActive: true,
+                    authMethods: true,
+                    createdAt: true,
+                    updatedAt: true
+                }
+            });
+
+            return newTeacher;
+        } catch (error) {
+            console.error('Error creating teacher:', error);
+            if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+                throw new Error(`Teacher with email ${teacherData.email} already exists.`);
+            }
+            throw new Error(`Failed to create teacher: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
 
     /**
      * Find all lessons associated with a specific teacher, including details
@@ -34,7 +85,6 @@ export class TeacherService {
                     currentStatus: true,
                     quote: {
                         include: {
-                            // Select specific teacher fields, excluding password
                             teacher: {
                                 select: {
                                     id: true,
@@ -44,15 +94,12 @@ export class TeacherService {
                                     phoneNumber: true,
                                     dateOfBirth: true,
                                     isActive: true,
-                                    // Explicitly EXCLUDE password
-                                    // password: false, // Not valid Prisma syntax, just omit it
                                     createdAt: true,
                                     updatedAt: true
                                 }
                             },
                             lessonRequest: {
                                 include: {
-                                    // Select specific student fields, excluding password
                                     student: {
                                         select: {
                                             id: true,
@@ -155,4 +202,7 @@ export class TeacherService {
     }
 
     // Add other teacher-related service methods here...
-} 
+}
+
+// Export a singleton instance with the expected name
+export const teacherService = new TeacherService(); 

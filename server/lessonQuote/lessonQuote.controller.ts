@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 import prisma from '../prisma.js';
-import { teacherQuoteService } from './lessonQuote.service.js';
+import { lessonQuoteService } from './lessonQuote.service.js';
 
 const prismaClient = new PrismaClient();
 
@@ -27,7 +27,7 @@ export const lessonQuoteController = {
         return;
       }
 
-      const quotes = await teacherQuoteService.createQuotesForLessonRequest(lessonRequestId, lessonType);
+      const quotes = await lessonQuoteService.createQuotesForLessonRequest(lessonRequestId, lessonType);
       res.status(201).json(quotes);
     } catch (error) {
       console.error('Error creating lesson quotes:', error);
@@ -89,7 +89,7 @@ export const lessonQuoteController = {
         return;
       }
 
-      const quotes = await teacherQuoteService.getQuotesByLessonRequest(lessonRequestId);
+      const quotes = await lessonQuoteService.getQuotesByLessonRequest(lessonRequestId);
       res.json(quotes);
     } catch (error) {
       console.error('Error fetching lesson quotes:', error);

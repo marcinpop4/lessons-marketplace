@@ -3,7 +3,7 @@ import { lessonRequestService } from './lessonRequest.service.js';
 import type { LessonRequest as PrismaLessonRequest } from '@prisma/client';
 import { LessonRequest } from '../../shared/models/LessonRequest.js';
 import { Address } from '../../shared/models/Address.js';
-import { teacherQuoteService } from '../lessonQuote/lessonQuote.service.js';
+import { lessonQuoteService } from '../lessonQuote/lessonQuote.service.js';
 
 export class LessonRequestController {
   constructor() {
@@ -105,7 +105,7 @@ export class LessonRequestController {
       const modelLessonRequest = this.transformToModel(lessonRequest);
 
       // Automatically create quotes for the lesson request
-      const quotes = await teacherQuoteService.createQuotesForLessonRequest(
+      const quotes = await lessonQuoteService.createQuotesForLessonRequest(
         lessonRequest.id,
         type
       );
