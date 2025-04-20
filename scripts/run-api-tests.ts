@@ -3,13 +3,11 @@ import * as process from 'process';
 import {
     loadEnvironment,
     prepareDatabase,
-    startProcessAndWait,
     runPnpmScript
 } from './test-lifecycle'; // Import from the new utility
 
 // --- Main Orchestration Function ---
 async function runApiTests() {
-    let backgroundProcess: ChildProcess | null = null;
     let finalExitCode = 1; // Default to failure
 
     try {
@@ -31,9 +29,6 @@ async function runApiTests() {
         // 2. Reset Database and Run Seeds
         await prepareDatabase();
 
-        // 3. Start Server and Wait
-        backgroundProcess = await startProcessAndWait('dev:server', [SERVER_RESOURCE]);
-
         // 4. Run API Tests
         const testResult = await runPnpmScript('test:api');
         finalExitCode = testResult.code ?? 1; // Capture exit code
@@ -43,7 +38,6 @@ async function runApiTests() {
         console.error('\n❌ API tests failed:', error);
         finalExitCode = 1;
     } finally {
-        // Stop the background server process
         console.log('\n---> API test script finished.');
         process.exit(finalExitCode);
     }

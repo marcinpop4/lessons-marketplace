@@ -3,13 +3,11 @@ import * as process from 'process';
 import {
     loadEnvironment,
     prepareDatabase,
-    startProcessAndWait,
     runPnpmScript
 } from './test-lifecycle';
 
 // --- Main Orchestration Function ---
 async function runE2ETests() {
-    let backgroundProcess: ChildProcess | null = null;
     let finalExitCode = 1; // Default to failure
 
     try {
@@ -36,9 +34,6 @@ async function runE2ETests() {
 
         // 2. Reset Database and Run Seeds
         await prepareDatabase();
-
-        // 3. Start Full Dev Stack (Server + Frontend) and Wait
-        backgroundProcess = await startProcessAndWait('dev:full', [SERVER_RESOURCE, FRONTEND_RESOURCE]);
 
         // 4. Run E2E Tests
         const testResult = await runPnpmScript('test:e2e');
