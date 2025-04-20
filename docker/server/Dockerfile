@@ -78,15 +78,11 @@ COPY tsconfig.json ./
 COPY env ./env
 
 # Copy entrypoint script
-COPY docker/scripts/server-entrypoint.sh /usr/local/bin/server-entrypoint.sh
+COPY docker/server/server-entrypoint.sh /usr/local/bin/server-entrypoint.sh
 RUN chmod +x /usr/local/bin/server-entrypoint.sh
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
-
-# Set environment variables
-ENV NODE_ENV=production
-# NODE_ENV already set from base image
 
 # Expose the port the app runs on
 EXPOSE ${PORT:-3000}

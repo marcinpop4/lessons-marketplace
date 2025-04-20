@@ -1,6 +1,26 @@
 // Jest setup file to run after environment is set up
 import '@testing-library/jest-dom';
 import { jest } from '@jest/globals';
+// Use require for built-in Node modules in Jest setup
+const path = require('path');
+const fs = require('fs');
+import { fileURLToPath } from 'url';
+
+// Log the setup file location
+console.log(`[Unit Tests Setup] Running setup from: ${__filename}`);
+console.log(`[Unit Tests Setup] Current working directory: ${process.cwd()}`);
+
+// Explicitly check if path is loaded before using it
+if (!path || typeof path.resolve !== 'function') {
+  console.error('[Unit Tests Setup] FATAL: path module not loaded correctly!');
+  process.exit(1); // Exit immediately if path is not available
+}
+
+// Check if tsconfig exists - helps diagnose issues
+const testTsConfigPath = path.resolve(process.cwd(), 'tests/tsconfig.test.json');
+const rootTsConfigPath = path.resolve(process.cwd(), 'tsconfig.test.json');
+console.log(`[Unit Tests Setup] tests/tsconfig.test.json exists: ${fs.existsSync(testTsConfigPath)}`);
+console.log(`[Unit Tests Setup] ./tsconfig.test.json exists: ${fs.existsSync(rootTsConfigPath)}`);
 
 // Reset mocks after each test
 afterEach(() => {

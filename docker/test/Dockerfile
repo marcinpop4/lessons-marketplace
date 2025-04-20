@@ -9,15 +9,18 @@ RUN npm config set registry https://registry.npmjs.org/ && \
     npm install -g pnpm@latest && \
     pnpm install --frozen-lockfile
 
-# Copy only the necessary files for testing
-# Base config (needed because tests/tsconfig.test.json extends it)
+# Copy base config first
 COPY tsconfig.json ./
 
 # Environment configuration
 COPY env/.env.* ./env/
 
-# Test directories (includes tests/tsconfig.json and tests/tsconfig.test.json)
+# Test directories with all configurations
 COPY tests/ ./tests/
+
+# Copy tsconfig.test.json to root as a backup
+# Some Jest configs might look for it here
+COPY tests/tsconfig.test.json ./tsconfig.test.json
 
 # Frontend code (needed for some tests)
 COPY frontend/ ./frontend/
@@ -28,5 +31,11 @@ COPY server/ ./server/
 # Shared code (needed for tests)
 COPY shared/ ./shared/
 
-# Set the default command to run tests
-CMD ["pnpm", "test:docker"]
+# COPY the new entrypoint script
+COPY docker/test/entrypoint.sh /app/entrypoint.sh
+
+# Make the script executable
+RUN chmod +x /app/entrypoint.sh
+
+# Set the entrypoint script as the default command
+CMD ["/app/entrypoint.sh"]

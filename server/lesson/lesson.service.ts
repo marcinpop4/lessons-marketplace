@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { LessonStatusValue } from '@shared/models/LessonStatus';
+import { LessonStatusValue } from '../../shared/models/LessonStatus.js';
 import { v4 as uuidv4 } from 'uuid';
 
 class LessonService {

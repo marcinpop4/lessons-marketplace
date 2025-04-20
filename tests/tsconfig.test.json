@@ -4,7 +4,10 @@
   "compilerOptions": {
     // Keep settings suitable for testing environments
     "allowImportingTsExtensions": true, // Required for tests importing .ts files directly
-    "noEmit": true // Tests don't need to emit JS files, just type-check/transform
+    "noEmit": true, // Tests don't need to emit JS files, just type-check/transform
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "isolatedModules": true
     
     // We can add other test-specific overrides here if needed later,
     // like potentially different 'types' or module settings.

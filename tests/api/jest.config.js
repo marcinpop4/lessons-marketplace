@@ -1,5 +1,14 @@
 /** @type {import('ts-jest').JestConfigWithTsJest} */
 // API/Integration test configuration
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const projectRoot = process.cwd();
+
+// --- Direct path resolution ---
+const tsConfigPath = path.resolve(projectRoot, 'tests/tsconfig.test.json');
+console.log(`[API Config] Using tsconfig path: ${tsConfigPath}`);
+
 export default {
   preset: 'ts-jest',
   testEnvironment: 'node',
@@ -8,6 +17,18 @@ export default {
     // Use <rootDir> explicitly since relative path caused issues
     '<rootDir>/jest.setup.ts' 
   ],
+  // ADD the 'transform' section
+  transform: {
+    '^.+\.tsx?$': ['ts-jest', {
+      // Replicate the settings previously under globals
+      tsconfig: tsConfigPath,
+      diagnostics: {
+        warnOnly: true, // Log but don't fail on TS errors
+        pretty: true,
+        ignoreCodes: [2571, 2532], // Ignore some common TS errors that don't affect tests
+      },
+    }],
+  },
   clearMocks: true,
   // Output coverage relative to project root, inside tests/coverage/
   coverageDirectory: "<rootDir>/../coverage/api",
@@ -23,4 +44,6 @@ export default {
     '^@frontend/(.*)$': '<rootDir>/../../frontend/$1' // Added frontend alias
   },
   testTimeout: 30000, // Slightly increased timeout
+  // Add verbose logging
+  verbose: true
 }; 

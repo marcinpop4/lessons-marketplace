@@ -1,0 +1,18 @@
+# Server Import Conventions
+
+## Shared Module Imports
+
+- When importing modules from the `shared` directory (or using the `@shared` path alias) within any file located in the `server` directory, **always append the `.js` extension** to the import path.
+- This is necessary because the TypeScript code in `shared` is compiled to JavaScript, and Node.js ES Modules require the full file path, including the extension, for correct module resolution at runtime.
+
+**Example:**
+
+```typescript
+// Correct:
+import { SomeModel } from '@shared/models/SomeModel.js';
+import { anotherUtil } from '../../shared/utils/anotherUtil.js';
+
+// Incorrect:
+import { SomeModel } from '@shared/models/SomeModel';
+import { anotherUtil } from '../../shared/utils/anotherUtil';
+``` 

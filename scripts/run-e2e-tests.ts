@@ -1,0 +1,58 @@
+import { ChildProcess } from 'child_process';
+import * as process from 'process';
+import {
+    loadEnvironment,
+    prepareDatabase,
+    startProcessAndWait,
+    runPnpmScript
+} from './test-lifecycle';
+
+// --- Main Orchestration Function ---
+async function runE2ETests() {
+    let backgroundProcess: ChildProcess | null = null;
+    let finalExitCode = 1; // Default to failure
+
+    try {
+        // 1. Load Environment
+        // Populates process.env directly
+        loadEnvironment();
+
+        // --- Configuration Check (use process.env) ---
+        const PORT = process.env.PORT;
+        const FRONTEND_URL = process.env.FRONTEND_URL;
+
+        if (!PORT || !FRONTEND_URL) {
+            console.error('\n*** ERROR: Missing required environment variables after loading .env file. ***');
+            if (!PORT) console.error('- PORT is not set.');
+            if (!FRONTEND_URL) console.error('- FRONTEND_URL is not set (needed by Playwright and wait-on).');
+            console.error('Please ensure these are defined in your .env file.');
+            process.exit(1);
+        }
+        const SERVER_RESOURCE = `tcp:${PORT}`;
+        const FRONTEND_RESOURCE = FRONTEND_URL;
+        console.log(`Will wait for server on port: ${PORT}`);
+        console.log(`Will wait for frontend on: ${FRONTEND_RESOURCE}`);
+        // --- End Configuration Check ---
+
+        // 2. Reset Database and Run Seeds
+        await prepareDatabase();
+
+        // 3. Start Full Dev Stack (Server + Frontend) and Wait
+        backgroundProcess = await startProcessAndWait('dev:full', [SERVER_RESOURCE, FRONTEND_RESOURCE]);
+
+        // 4. Run E2E Tests
+        const testResult = await runPnpmScript('test:e2e');
+        finalExitCode = testResult.code ?? 1; // Capture exit code
+        console.log('\n✅ E2E tests completed successfully.');
+
+    } catch (error) {
+        console.error('\n❌ E2E tests failed:', error);
+        finalExitCode = 1; // Ensure failure code on error
+    } finally {
+        console.log('\n---> E2E test script finished.');
+        process.exit(finalExitCode);
+    }
+}
+
+// --- Run the Orchestrator ---
+runE2ETests(); 

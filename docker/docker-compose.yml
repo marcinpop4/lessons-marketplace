@@ -90,17 +90,8 @@ services:
     container_name: lessons-marketplace-test
     network_mode: "container:lessons-marketplace-frontend"
     environment:
-      - JEST_JUNIT_OUTPUT_DIR=/app/tests/results/test-results/
-      - JEST_JUNIT_OUTPUT_NAME=junit.xml
-      - PLAYWRIGHT_HEADLESS=true
-      - SKIP_WEB_SERVER=true
-      - MOCK_API=false
-      - PLAYWRIGHT_TIMEOUT=30000
-      - PLAYWRIGHT_ACTION_TIMEOUT=15000
-      - PLAYWRIGHT_NAVIGATION_TIMEOUT=20000
-      - DOCKER_FRONTEND_URL=http://localhost
-      - TEST_ENV=docker
       - NODE_ENV=${NODE_ENV}
+      - TEST_ENV=docker
     volumes:
       - ../tests/results/test-results:/app/tests/results/test-results:rw
       - ../tests/results/playwright-report:/app/tests/results/playwright-report:rw
