@@ -84,6 +84,7 @@ import authRoutes from './auth/auth.routes.js';
 import lessonQuoteRoutes from './lessonQuote/lessonQuote.routes.js';
 import addressRoutes from './address/address.routes.js';
 import healthRoutes from './health/health.routes.js';
+import studentRoutes from './student/student.routes.js';
 
 // --- Express App Setup --- 
 const app: Express = express();
@@ -201,6 +202,7 @@ app.use('/api/v1/lessons', lessonRoutes);
 app.use('/api/v1/lesson-quotes', lessonQuoteRoutes);
 app.use('/api/v1/addresses', addressRoutes);
 app.use('/api/v1/health', healthRoutes);
+app.use('/api/v1/students', studentRoutes);
 
 // Root Documentation Endpoint
 app.get('/', (req: Request, res: Response, next: NextFunction): void => {
@@ -213,7 +215,8 @@ app.get('/', (req: Request, res: Response, next: NextFunction): void => {
       '/api/v1/teachers': 'Teacher endpoints (v1)',
       '/api/v1/lessons': 'Lesson endpoints (v1)',
       '/api/v1/lesson-quotes': 'Lesson quotes endpoints (v1)',
-      '/api/v1/addresses': 'Address endpoints (v1)'
+      '/api/v1/addresses': 'Address endpoints (v1)',
+      '/api/v1/students': 'Student endpoints (v1)'
     }
   });
 });

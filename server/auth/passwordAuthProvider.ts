@@ -1,6 +1,8 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../prisma.js';
 import authService, { AuthProvider } from './authService.js';
+import { studentService } from '../student/student.service.js';
+import { teacherService } from '../teacher/teacher.service.js';
 
 interface PasswordCredentials {
   email: string;
@@ -88,48 +90,44 @@ class PasswordAuthProvider implements AuthProvider {
       userType
     } = userData;
 
-    // Hash the password
-    const hashedPassword = await authService.hashPassword(password);
-
     // Create user based on userType
     let user;
     try {
       if (userType === 'STUDENT') {
-        user = await prisma.student.create({
-          data: {
-            email,
-            password: hashedPassword,
-            firstName,
-            lastName,
-            phoneNumber,
-            dateOfBirth,
-            authMethods: ['PASSWORD'],
-          },
+        user = await studentService.create(prisma, {
+          email,
+          password,
+          firstName,
+          lastName,
+          phoneNumber,
+          dateOfBirth,
         });
+
+        if (!user) {
+          throw new Error('Student creation failed unexpectedly in service.');
+        }
       } else if (userType === 'TEACHER') {
-        user = await prisma.teacher.create({
-          data: {
-            email,
-            password: hashedPassword,
-            firstName,
-            lastName,
-            phoneNumber,
-            dateOfBirth,
-            authMethods: ['PASSWORD'],
-          },
+        user = await teacherService.create(prisma, {
+          email,
+          password,
+          firstName,
+          lastName,
+          phoneNumber,
+          dateOfBirth,
         });
+
+        if (!user) {
+          throw new Error('Teacher creation failed unexpectedly in service.');
+        }
       } else {
         throw new Error('Invalid user type');
       }
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        // Handle unique constraint violation
-        if (error.code === 'P2002') {
-          throw new Error('Email already exists');
-        }
+      console.error('Error during user creation in passwordAuthProvider:', error);
+      if (error instanceof Error) {
+        throw new Error(error.message);
       }
-      // Rethrow the error
-      throw error;
+      throw new Error('An unexpected error occurred during registration.');
     }
 
     // Generate tokens

@@ -25,7 +25,7 @@ export class TeacherService {
      * @param prisma Prisma client instance
      * @param teacherData Data for the new teacher, including a plain text password.
      * @returns The created teacher object (excluding password).
-     * @throws Error if creation fails.
+     * @throws Error if creation fails, including specific error for unique constraints.
      */
     async create(prisma: PrismaClient, teacherData: Prisma.TeacherCreateInput & { password: string }): Promise<Omit<Teacher, 'password'> | null> {
         try {
@@ -62,9 +62,10 @@ export class TeacherService {
         } catch (error) {
             console.error('Error creating teacher:', error);
             if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-                throw new Error(`Teacher with email ${teacherData.email} already exists.`);
+                const targetField = error.meta?.target ? (error.meta.target as string[]).join(', ') : 'resource';
+                throw new Error(`Teacher creation failed: The ${targetField} already exists.`);
             }
-            throw new Error(`Failed to create teacher: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            throw new Error(`Failed to create teacher: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 

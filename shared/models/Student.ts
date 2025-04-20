@@ -8,6 +8,7 @@ interface StudentProps {
   email: string;
   phoneNumber: string;
   dateOfBirth: Date;
+  isActive?: boolean;
 }
 
 /**
@@ -15,11 +16,11 @@ interface StudentProps {
  * Extends the base Person model
  */
 export class Student extends Person {
-  // You could add student-specific properties here in the future
-  // For example: preferences, payment information, lesson history
+  isActive?: boolean;
 
   // Updated constructor using object destructuring
   constructor(props: StudentProps) { // Use the interface for type annotation
     super(props); // Pass the whole props object to the parent constructor
+    this.isActive = props.isActive;
   }
 } 

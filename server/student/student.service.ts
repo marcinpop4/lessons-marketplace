@@ -47,8 +47,14 @@ class StudentService {
             return newStudent;
         } catch (error) {
             console.error('Error creating student:', error);
-            // Consider more specific error handling (e.g., for unique constraint violations)
-            throw new Error(`Failed to create student: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            // Specific handling for unique constraint violation (e.g., duplicate email)
+            if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+                // Extract the field name if possible, default to "resource"
+                const targetField = error.meta?.target ? (error.meta.target as string[]).join(', ') : 'resource';
+                throw new Error(`Student creation failed: The ${targetField} already exists.`);
+            }
+            // Handle other Prisma errors or unexpected errors by wrapping the original message
+            throw new Error(`Failed to create student: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
