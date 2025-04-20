@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma.js';
+import { addressService } from './address.service.js';
 
 /**
  * Controller for address-related operations
@@ -30,6 +31,40 @@ export const addressController = {
       console.error('Error fetching address:', error);
       res.status(500).json({
         message: 'An error occurred while fetching the address',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  },
+
+  /**
+   * Create a new address
+   * @param req Request with address data in the body
+   * @param res Response
+   */
+  createAddress: async (req: Request, res: Response): Promise<void> => {
+    try {
+      // Basic validation: Check if required fields are present
+      const { street, city, state, postalCode, country } = req.body;
+      if (!street || !city || !state || !postalCode || !country) {
+        res.status(400).json({ message: 'Missing required address fields.' });
+        return;
+      }
+
+      // Use the service to create the address
+      // We pass prisma here, consistent with other service calls
+      const newAddress = await addressService.create(prisma, {
+        street,
+        city,
+        state,
+        postalCode,
+        country
+      });
+
+      res.status(201).json(newAddress);
+    } catch (error) {
+      console.error('Error creating address:', error);
+      res.status(500).json({
+        message: 'An error occurred while creating the address',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }

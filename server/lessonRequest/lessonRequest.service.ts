@@ -1,6 +1,6 @@
 import prisma from '../prisma.js';
 import type { Prisma, PrismaClient } from '@prisma/client';
-import { Address } from '@shared/models/Address.js';
+import { addressService } from '../address/address.service.js';
 import { LessonType } from '@shared/models/LessonType.js';
 import { LessonStatus } from '@shared/models/LessonStatus.js';
 
@@ -27,51 +27,58 @@ export class LessonRequestService {
    * @returns Created lesson request
    */
   async createLessonRequest(data: CreateLessonRequestDTO) {
+    // Validate that the student exists first (outside transaction is fine)
+    const student = await prisma.student.findUnique({
+      where: { id: data.studentId }
+    });
+    if (!student) {
+      throw new Error(`Student with ID ${data.studentId} not found`);
+    }
+
     try {
-      // Validate that the student exists
-      const student = await prisma.student.findUnique({
-        where: { id: data.studentId }
-      });
-
-      if (!student) {
-        throw new Error(`Student with ID ${data.studentId} not found`);
-      }
-
-      // Create the lesson request with the address relationship
-      return await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => {
-        // Create an Address record
-        const addressRecord = await tx.address.create({
-          data: {
-            street: data.addressObj.street,
-            city: data.addressObj.city,
-            state: data.addressObj.state,
-            postalCode: data.addressObj.postalCode,
-            country: data.addressObj.country
-          }
+      // Use transaction for Address + LessonRequest creation
+      const lessonRequest = await prisma.$transaction(async (tx) => {
+        // 1. Create Address using AddressService, passing the transaction client
+        const addressRecord = await addressService.create(tx as PrismaClient, {
+          street: data.addressObj.street,
+          city: data.addressObj.city,
+          state: data.addressObj.state,
+          postalCode: data.addressObj.postalCode,
+          country: data.addressObj.country
         });
 
-        // Create the lesson request with the address relationship
-        const lessonRequest = await tx.lessonRequest.create({
+        // Throw error if address creation failed within the service call (should not return null)
+        if (!addressRecord) {
+          throw new Error('Address creation failed during the transaction.');
+        }
+
+        // 2. Create the lesson request using the new address ID
+        const newLessonRequest = await tx.lessonRequest.create({
           data: {
-            type: data.type as any, // Type cast for TypeScript
+            type: data.type,
             startTime: data.startTime,
             durationMinutes: data.durationMinutes,
-            address: {
-              connect: { id: addressRecord.id }
-            },
-            student: {
-              connect: { id: data.studentId }
-            }
+            addressId: addressRecord.id, // Connect via ID
+            studentId: data.studentId, // Connect via ID
           },
           include: {
-            student: true,
-            address: true
+            student: true, // Include student details
+            address: true // Include the newly created address details
           }
         });
 
-        return lessonRequest;
+        return newLessonRequest;
       });
+
+      // Remove password hash from the student object before returning
+      if (lessonRequest.student) {
+        delete (lessonRequest.student as any).passwordHash;
+      }
+
+      return lessonRequest;
+
     } catch (error) {
+      console.error('Error creating lesson request in service:', error);
       // Re-throw the error for handling in the controller
       throw error;
     }

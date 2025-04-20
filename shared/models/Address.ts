@@ -11,6 +11,8 @@ interface AddressProps {
   state: string;
   postalCode: string;
   country: string;
+  createdAt?: Date; // Add optional createdAt
+  updatedAt?: Date; // Add optional updatedAt
 }
 
 export class Address {
@@ -20,15 +22,19 @@ export class Address {
   state: string;
   postalCode: string;
   country: string;
+  createdAt?: Date; // Add optional property
+  updatedAt?: Date; // Add optional property
 
   // Updated constructor using object destructuring
-  constructor({ id, street, city, state, postalCode, country }: AddressProps) {
+  constructor({ id, street, city, state, postalCode, country, createdAt, updatedAt }: AddressProps) {
     this.id = id;
     this.street = street;
     this.city = city;
     this.state = state;
     this.postalCode = postalCode;
     this.country = country;
+    this.createdAt = createdAt;
+    this.updatedAt = updatedAt;
   }
 
   /**
