@@ -2,10 +2,6 @@ import apiClient from './apiClient';
 import { Lesson } from '@shared/models/Lesson'; // Import the shared Lesson model
 import { LessonStatusValue } from '@shared/models/LessonStatus'; // Needed for the status enum
 import { LessonType } from '@shared/models/LessonType'; // Needed for the lesson type enum
-// Assuming FullLessonDetails type from backend matches this structure
-// We might need to define a corresponding type here if not using shared types directly
-// Or adjust based on the actual API response structure.
-import { FullLessonDetails } from '@server/teacher/teacher.service'; // Adjust path if needed
 
 // Define the expected structure, reflecting the selected fields from the API
 export interface TeacherLessonApiResponseItem {

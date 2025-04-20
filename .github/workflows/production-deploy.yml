@@ -49,5 +49,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Deploy server to Fly.io
+      - name: Deploy server and frontend to Fly.io
         run: pnpm docker:deploy:fly
