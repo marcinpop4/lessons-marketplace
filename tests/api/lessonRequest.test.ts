@@ -26,7 +26,6 @@ describe('API Integration: /api/v1/lessonRequests using Seed Data', () => {
 
     // --- Authentication Setup ---
     beforeAll(async () => {
-        console.log('[Test Setup] Logging in as seeded student...');
         try {
             const loginResponse = await request(API_BASE_URL!)
                 .post('/api/v1/auth/login')
@@ -37,16 +36,13 @@ describe('API Integration: /api/v1/lessonRequests using Seed Data', () => {
                 });
 
             if (loginResponse.status !== 200 || !loginResponse.body.accessToken || !loginResponse.body.user?.id) {
-                console.error('Failed Seeded Student Login Response:', loginResponse.status, loginResponse.body);
                 throw new Error(`Failed to log in as seeded student ${SEEDED_STUDENT_EMAIL}: ${loginResponse.body.error || 'Login endpoint failed'}`);
             }
 
             seededStudentId = loginResponse.body.user.id;
             seededStudentAuthToken = `Bearer ${loginResponse.body.accessToken}`;
-            console.log(`[Test Setup] Successfully logged in as Student ID: ${seededStudentId}`);
 
         } catch (error) {
-            console.error('[Test Setup] Error logging in as seeded student:', error);
             throw error; // Fail fast if login doesn't work
         }
     }, 30000); // Timeout for login request

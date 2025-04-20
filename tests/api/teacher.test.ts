@@ -22,7 +22,6 @@ describe('API Integration: /api/v1/teachers using Seed Data', () => {
     let seededTeacherAuthToken: string | null = null;
 
     beforeAll(async () => {
-        console.log('[Test Setup] Logging in as seeded teacher...');
         try {
             const loginResponse = await request(API_BASE_URL!)
                 .post('/api/v1/auth/login')
@@ -39,7 +38,6 @@ describe('API Integration: /api/v1/teachers using Seed Data', () => {
 
             seededTeacherId = loginResponse.body.user.id;
             seededTeacherAuthToken = `Bearer ${loginResponse.body.accessToken}`;
-            console.log(`[Test Setup] Successfully logged in as Teacher ID: ${seededTeacherId}`);
 
         } catch (error) {
             console.error('[Test Setup] Error logging in as seeded teacher:', error);
@@ -73,7 +71,6 @@ describe('API Integration: /api/v1/teachers using Seed Data', () => {
 
             // Assert: All returned lessons belong to the correct teacher and have no passwords
             if (response.body.length > 0) {
-                console.log(`[Test Assertion] Found ${response.body.length} lessons for teacher ${seededTeacherId}. Checking ownership and sanitization...`);
                 for (const lesson of response.body) {
                     // Check ownership
                     expect(lesson.quote?.teacher?.id).toBeDefined();
@@ -87,9 +84,7 @@ describe('API Integration: /api/v1/teachers using Seed Data', () => {
                         expect(lesson.quote.lessonRequest.student).not.toHaveProperty('password');
                     }
                 }
-                console.log(`[Test Assertion] Ownership and sanitization checks passed for all returned lessons.`);
             } else {
-                console.log(`[Test Assertion] No lessons found for teacher ${seededTeacherId}. This might be expected depending on seed randomness.`);
                 // Test still passes if no lessons are returned, as the endpoint worked correctly.
             }
         });

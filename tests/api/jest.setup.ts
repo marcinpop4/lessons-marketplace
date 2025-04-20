@@ -3,10 +3,6 @@ import * as dotenv from 'dotenv';
 const path = require('path');
 const fs = require('fs');
 
-// Log the setup file location
-console.log(`[API Tests Setup] Running setup from: ${__filename}`);
-console.log(`[API Tests Setup] Current working directory: ${process.cwd()}`);
-
 // Explicitly check if path is loaded before using it
 if (!path || typeof path.resolve !== 'function') {
     console.error('[API Tests Setup] FATAL: path module not loaded correctly!');
@@ -16,8 +12,6 @@ if (!path || typeof path.resolve !== 'function') {
 // Check if tsconfig exists - helps diagnose issues
 const testTsConfigPath = path.resolve(process.cwd(), 'tests/tsconfig.test.json');
 const rootTsConfigPath = path.resolve(process.cwd(), 'tsconfig.test.json');
-console.log(`[API Tests Setup] tests/tsconfig.test.json exists: ${fs.existsSync(testTsConfigPath)}`);
-console.log(`[API Tests Setup] ./tsconfig.test.json exists: ${fs.existsSync(rootTsConfigPath)}`);
 
 // Assume Jest runs from the project root
 const projectRoot = process.cwd();
@@ -29,10 +23,6 @@ if (!nodeEnv) {
 }
 
 const envFile = path.resolve(projectRoot, `env/.env.${nodeEnv}`);
-
-console.log(`[API Tests Setup] Attempting to load environment variables from: ${envFile}`);
-console.log(`[API Tests Setup] env directory exists: ${fs.existsSync(path.resolve(projectRoot, 'env'))}`);
-console.log(`[API Tests Setup] Environment file exists: ${fs.existsSync(envFile)}`);
 
 const result = dotenv.config({ path: envFile });
 
@@ -46,10 +36,9 @@ if (result.error) {
 } else {
     // Optional: Check if critical variables are loaded
     if (!process.env.DATABASE_URL) {
-        console.warn(`[API Tests Setup] Warning: DATABASE_URL not found in ${envFile}`);
+        // Potentially add a check here if needed, but no console output
     }
     if (!process.env.VITE_API_BASE_URL) {
-        console.warn(`[API Tests Setup] Warning: VITE_API_BASE_URL not found in ${envFile}`);
+        // Potentially add a check here if needed, but no console output
     }
-    console.log(`[API Tests Setup] Successfully loaded ${envFile}. VITE_API_BASE_URL=${process.env.VITE_API_BASE_URL}`);
 } 
