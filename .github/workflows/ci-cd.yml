@@ -95,7 +95,7 @@ jobs:
           # Run tests and tee output to both console and file
           # Use a temporary file to capture exit code
           set -o pipefail  # This makes pipeline exit status the status of the last failing command
-          DEBUG=pw:api pnpm docker:test:rebuild 2>&1 | tee tests/results/test-logs/test-output.log
+          DEBUG=pw:api pnpm docker:test 2>&1 | tee tests/results/test-logs/test-output.log
 
       - name: Upload test execution logs
         uses: actions/upload-artifact@v4
