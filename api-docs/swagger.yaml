@@ -145,9 +145,6 @@ components:
         costInCents:
           type: integer
           minimum: 0
-        expiresAt:
-          type: string
-          format: date-time
         lessonRequestId:
           type: string
         teacherId:
@@ -164,7 +161,6 @@ components:
           $ref: '#/components/schemas/LessonRequest'
       required:
         - costInCents
-        - expiresAt
         - lessonRequestId
         - teacherId
     
@@ -1080,9 +1076,6 @@ paths:
                           type: string
                         costInCents:
                           type: integer
-                        expiresAt:
-                          type: string
-                          format: date-time
                         lessonRequestId:
                           type: string
                         teacherId:
@@ -1135,7 +1128,6 @@ paths:
                       required:
                         - id
                         - costInCents
-                        - expiresAt
                         - lessonRequestId
                         - teacherId
                         - createdAt

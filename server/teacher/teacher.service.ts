@@ -75,7 +75,6 @@ export class TeacherService {
      * @returns A promise that resolves to an array of lessons with details.
      */
     async findLessonsByTeacherId(teacherId: string): Promise<FullLessonDetails[]> {
-        console.log(`[SERVICE] Fetching lessons for teacher ID: ${teacherId}`);
         try {
             const lessons = await prisma.lesson.findMany({
                 where: {
@@ -126,15 +125,12 @@ export class TeacherService {
                 }
             });
 
-            console.log(`[SERVICE] Found ${lessons.length} lessons for teacher ID: ${teacherId}`);
             if (!Array.isArray(lessons)) {
-                console.error('[SERVICE] Prisma did not return an array!', lessons);
                 throw new Error('Database query returned unexpected data format.');
             }
             // Revert cast to original type
             return lessons as FullLessonDetails[];
         } catch (error) {
-            console.error(`[SERVICE] Error fetching lessons for teacher ${teacherId}:`, error);
             throw error;
         }
     }

@@ -7,7 +7,6 @@ const projectRoot = process.cwd();
 
 // --- Direct path resolution ---
 const tsConfigPath = path.resolve(projectRoot, 'tests/tsconfig.test.json');
-console.log(`[API Config] Using tsconfig path: ${tsConfigPath}`);
 
 export default {
   preset: 'ts-jest',

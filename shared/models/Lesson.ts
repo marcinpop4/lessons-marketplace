@@ -9,6 +9,9 @@ interface LessonProps {
   id: string;
   quote: LessonQuote;
   currentStatusId: string;
+  currentStatus: LessonStatusValue;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 /**
@@ -19,16 +22,25 @@ export class Lesson {
   id: string;
   quote: LessonQuote;
   currentStatusId: string;
+  currentStatus: LessonStatusValue;
+  createdAt?: Date;
+  updatedAt?: Date;
 
   // Updated constructor using object destructuring
   constructor({
     id,
     quote,
     currentStatusId,
+    currentStatus,
+    createdAt,
+    updatedAt,
   }: LessonProps) {
     this.id = id;
     this.quote = quote;
     this.currentStatusId = currentStatusId;
+    this.currentStatus = currentStatus;
+    this.createdAt = createdAt;
+    this.updatedAt = updatedAt;
   }
 
   /**

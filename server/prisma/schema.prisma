@@ -131,7 +131,6 @@ model LessonQuote {
   id                String        @id @default(uuid())
   costInCents       Int
   hourlyRateInCents Int
-  expiresAt         DateTime
   lessonRequestId   String
   teacherId         String
   createdAt         DateTime      @default(now())

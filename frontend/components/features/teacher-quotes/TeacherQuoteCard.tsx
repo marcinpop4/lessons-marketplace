@@ -52,7 +52,7 @@ const TeacherQuoteCard: React.FC<TeacherQuoteCardProps> = ({ quote, onAccept }) 
       <div className="quote-actions">
         <button
           onClick={handleAccept}
-          disabled={loading || !quote.isValid()}
+          disabled={loading}
           className="btn btn-accent"
         >
           {loading ? 'Accepting...' : 'Accept Quote'}

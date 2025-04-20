@@ -10,7 +10,7 @@ interface LessonQuoteProps {
   costInCents: number;
   hourlyRateInCents: number;
   createdAt?: Date; // Optional, defaults to new Date()
-  expiresAt: Date;
+  updatedAt?: Date; // ADDED optional updatedAt
 }
 
 /**
@@ -24,7 +24,7 @@ export class LessonQuote {
   costInCents: number;
   hourlyRateInCents: number;
   createdAt: Date;
-  expiresAt: Date; // Quotes can expire after a certain time period
+  updatedAt?: Date; // ADDED optional property
 
   // Updated constructor using object destructuring
   constructor({
@@ -34,7 +34,7 @@ export class LessonQuote {
     costInCents,
     hourlyRateInCents,
     createdAt = new Date(), // Default value for optional prop
-    expiresAt
+    updatedAt, // ADDED parameter
   }: LessonQuoteProps) {
     this.id = id;
     this.lessonRequest = lessonRequest;
@@ -42,7 +42,7 @@ export class LessonQuote {
     this.costInCents = costInCents;
     this.hourlyRateInCents = hourlyRateInCents;
     this.createdAt = createdAt;
-    this.expiresAt = expiresAt;
+    this.updatedAt = updatedAt; // ADDED assignment
   }
 
   /**
@@ -51,14 +51,12 @@ export class LessonQuote {
    * @param id Unique identifier for the quote
    * @param lessonRequest The lesson request
    * @param teacher The teacher providing the quote
-   * @param expiresAt When the quote expires
    * @returns A new LessonQuote instance
    */
   static createFromRequest(
     id: string,
     lessonRequest: LessonRequest,
     teacher: Teacher,
-    expiresAt: Date
   ): LessonQuote {
     const hourlyRate = teacher.getHourlyRate(lessonRequest.type);
 
@@ -78,7 +76,7 @@ export class LessonQuote {
       costInCents,
       hourlyRateInCents: hourlyRate.rateInCents,
       // createdAt uses default
-      expiresAt
+      updatedAt: new Date(), // updatedAt uses default
     });
   }
 
@@ -94,13 +92,5 @@ export class LessonQuote {
       style: 'currency',
       currency: currency
     }).format(centsToDisplayDollars(this.costInCents));
-  }
-
-  /**
-   * Check if the quote is still valid (not expired)
-   * @returns Boolean indicating if the quote is still valid
-   */
-  isValid(): boolean {
-    return new Date() < this.expiresAt;
   }
 } 

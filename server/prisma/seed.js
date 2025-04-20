@@ -75,14 +75,13 @@ const sampleAddresses = [
 ];
 
 async function main() {
-  console.log('Starting database seeding using services...');
+  // console.log('Starting database seeding using services...');
 
   const commonPassword = "1234";
-  // const hashedPassword = await hashPassword(commonPassword); // No longer needed
 
   try {
     // Clear existing data (using direct Prisma for seed cleanup)
-    console.log('Clearing existing data...');
+    // console.log('Clearing existing data...');
     await prisma.$transaction([
       prisma.lessonStatus.deleteMany(),
       prisma.lesson.deleteMany(),
@@ -93,10 +92,10 @@ async function main() {
       prisma.teacher.deleteMany(),
       prisma.student.deleteMany(),
     ]);
-    console.log('Existing data cleared');
+    // console.log('Existing data cleared');
 
     // Create Teachers using TeacherService
-    console.log('Creating teachers (via service)...');
+    // console.log('Creating teachers (via service)...');
     const teacherData = [
       { firstName: 'Emily', lastName: 'Richardson', email: 'emily.richardson@musicschool.com', phoneNumber: '123-456-7890', dateOfBirth: new Date('1980-04-12') },
       { firstName: 'Michael', lastName: 'Chen', email: 'michael.chen@musicschool.com', phoneNumber: '123-456-7891', dateOfBirth: new Date('1975-09-23') },
@@ -115,10 +114,10 @@ async function main() {
     if (!emilyRichardson) {
       throw new Error('Emily Richardson teacher record not found');
     }
-    console.log('Found Emily Richardson teacher record for tests:', emilyRichardson.id);
+    // console.log('Found Emily Richardson teacher record for tests:', emilyRichardson.id);
     
     // Create Students using StudentService
-    console.log('Creating students (via service)...');
+    // console.log('Creating students (via service)...');
     const studentData = [
       { firstName: 'Ethan', lastName: 'Parker', email: 'ethan.parker@example.com', phoneNumber: '987-654-3210', dateOfBirth: new Date('2000-05-15') },
       { firstName: 'Ava', lastName: 'Johnson', email: 'ava.johnson@example.com', phoneNumber: '987-654-3211', dateOfBirth: new Date('2001-08-22') },
@@ -138,14 +137,14 @@ async function main() {
     console.log('Students created (via service):', students.length);
 
     // Create Addresses using AddressService
-    console.log('Creating addresses (via service)...');
+    // console.log('Creating addresses (via service)...');
     const addresses = await Promise.all(
       sampleAddresses.map(addressData => addressService.create(prisma, addressData))
     );
     console.log('Addresses created (via service):', addresses.length);
 
     // Create Hourly Rates using TeacherLessonHourlyRateService
-    console.log('Creating hourly rates (via service)...');
+    // console.log('Creating hourly rates (via service)...');
     const teacherLessonHourlyRates = [];
     for (const teacher of teachers) {
       const teacherRates = await Promise.all(
@@ -166,7 +165,7 @@ async function main() {
     console.log('TeacherLessonHourlyRates created (via service):', teacherLessonHourlyRates.length);
 
     // Create Lesson Requests using LessonRequestService
-    console.log('Creating lesson requests (via service)...');
+    // console.log('Creating lesson requests (via service)...');
     const lessonRequests = [];
     const lessonTypes = Object.values(LessonType);
     const today = new Date();
@@ -200,7 +199,7 @@ async function main() {
     console.log('LessonRequests created (via service):', lessonRequests.length);
 
     // Create Lesson Quotes using LessonQuoteService - specifically for Emily Richardson
-    console.log('Creating lesson quotes for Emily Richardson (via service)...');
+    // console.log('Creating lesson quotes for Emily Richardson (via service)...');
     const emilyQuotes = [];
     
     // Get Emily's hourly rates
@@ -223,20 +222,16 @@ async function main() {
       }
       
       const costInCents = Math.round((hourlyRate.rateInCents * request.durationMinutes) / 60);
-      const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
       
       const quote = await lessonQuoteService.create(prisma, { 
         lessonRequestId: request.id,
         teacherId: emilyRichardson.id,  // Always use Emily's ID
         costInCents,
-        expiresAt,
         hourlyRateInCents: hourlyRate.rateInCents,
       });
       
       emilyQuotes.push(quote);
     }
-    
-    console.log('Lesson quotes created for Emily Richardson:', emilyQuotes.length);
     
     // Create additional quotes for other teachers (optional)
     const otherQuotes = [];
@@ -256,13 +251,11 @@ async function main() {
       
       if (hourlyRate) {
         const costInCents = Math.round((hourlyRate.rateInCents * request.durationMinutes) / 60);
-        const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
         
         const quote = await lessonQuoteService.create(prisma, { 
           lessonRequestId: request.id,
           teacherId: teacher.id,
           costInCents,
-          expiresAt,
           hourlyRateInCents: hourlyRate.rateInCents,
         });
         otherQuotes.push(quote);
@@ -274,7 +267,7 @@ async function main() {
     console.log('Total lesson quotes created:', lessonQuotes.length);
 
     // Create Lessons and Statuses using LessonService
-    console.log('Creating lessons for Emily Richardson (via service)...');
+    // console.log('Creating lessons for Emily Richardson (via service)...');
     const lessons = [];
     
     // Create 3 REQUESTED lessons for Emily
@@ -344,7 +337,7 @@ async function main() {
     }
     
     console.log('Lessons created for Emily Richardson:', lessons.length);
-    console.log('Seeding completed successfully using services!');
+    // console.log('Seeding completed successfully using services!');
 
   } catch (error) {
     console.error('Error during service-based seeding:', error);

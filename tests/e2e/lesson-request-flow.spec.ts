@@ -92,6 +92,7 @@ test.describe.serial('Lesson request flow', () => {
     await expect(page.locator('.lesson-details-grid .lesson-detail-datetime')).toBeVisible();
     await expect(page.locator('.lesson-details-grid .lesson-detail-duration')).toBeVisible();
     await expect(page.locator('.lesson-details-grid .lesson-detail-location')).toBeVisible();
-    await expect(page.locator('.lesson-details-grid .lesson-detail-expiry')).toBeVisible();
+
+    // Optional: Further checks like verifying specific text content
   });
 }); 

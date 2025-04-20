@@ -1,9 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+// import { PrismaClient } from '@prisma/client'; // Remove unused
 import prisma from '../prisma.js';
 import { lessonQuoteService } from './lessonQuote.service.js';
+import { lessonService } from '../lesson/lesson.service.js'; // Import LessonService
+import { LessonType as SharedLessonType } from '@shared/models/LessonType.js'; // Alias for clarity
 
-const prismaClient = new PrismaClient();
+// const prismaClient = new PrismaClient(); // Remove unused
 
 /**
  * Controller for lesson quote-related operations
@@ -11,24 +13,40 @@ const prismaClient = new PrismaClient();
 export const lessonQuoteController = {
   /**
    * Create quotes for a lesson request
-   * @param req Request with lessonRequestId and lessonType in the body
+   * Requires STUDENT role.
+   * @param req Request with lessonRequestId in the body
    * @param res Response
-   * @param next NextFunction
    */
-  createLessonQuotes: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  createLessonQuotes: async (req: Request, res: Response): Promise<void> => {
     try {
-      const { lessonRequestId, lessonType } = req.body;
+      const { lessonRequestId } = req.body;
+      // No lessonType needed here, service should derive it from request
 
-      // Validate required fields
-      if (!lessonRequestId || !lessonType) {
-        res.status(400).json({
-          message: 'Missing required fields. Please provide lessonRequestId and lessonType.'
-        });
+      if (!lessonRequestId) {
+        res.status(400).json({ message: 'Missing required field: lessonRequestId.' });
         return;
       }
 
-      const quotes = await lessonQuoteService.createQuotesForLessonRequest(lessonRequestId, lessonType);
-      res.status(201).json(quotes);
+      // --- Check if Lesson Request exists --- //
+      const lessonRequest = await prisma.lessonRequest.findUnique({
+        where: { id: lessonRequestId },
+        select: { id: true, type: true } // Select only needed fields
+      });
+
+      if (!lessonRequest) {
+        res.status(404).json({ message: `Lesson request with ID ${lessonRequestId} not found.` });
+        return;
+      }
+      // --- End Check --- //
+
+      // Pass lesson type to the service as well, casting Prisma enum to Shared enum
+      const quotes = await lessonQuoteService.createQuotesForLessonRequest(
+        lessonRequestId,
+        lessonRequest.type as SharedLessonType // Cast Prisma type to Shared type
+      );
+
+      // Respond with 200 OK as we are returning existing/newly created quotes
+      res.status(200).json(quotes);
     } catch (error) {
       console.error('Error creating lesson quotes:', error);
       res.status(500).json({
@@ -39,58 +57,35 @@ export const lessonQuoteController = {
   },
 
   /**
-   * Get a lesson quote by ID
-   * @param req Request with quoteId as a route parameter
-   * @param res Response
-   * @param next NextFunction
-   */
-  getLessonQuoteById: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const { id } = req.params;
-
-      const lessonQuote = await prismaClient.lessonQuote.findUnique({
-        where: { id },
-        include: {
-          lessonRequest: true,
-          teacher: true
-        }
-      });
-
-      if (!lessonQuote) {
-        res.status(404).json({
-          message: `Lesson quote with ID ${id} not found.`
-        });
-        return;
-      }
-
-      res.status(200).json(lessonQuote);
-    } catch (error) {
-      console.error('Error fetching lesson quote:', error);
-      res.status(500).json({
-        message: 'An error occurred while fetching the lesson quote',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
-  },
-
-  /**
    * Get quotes for a lesson request
+   * Requires authentication.
    * @param req Request with lessonRequestId as a route parameter
    * @param res Response
-   * @param next NextFunction
    */
-  getLessonQuotesByRequestId: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getLessonQuotesByRequestId: async (req: Request, res: Response): Promise<void> => {
     try {
       const { lessonRequestId } = req.params;
 
-      // Validate the request ID
       if (!lessonRequestId) {
         res.status(400).json({ error: 'Lesson request ID is required' });
         return;
       }
 
+      // --- Check if Lesson Request exists --- //
+      const lessonRequestExists = await prisma.lessonRequest.findUnique({
+        where: { id: lessonRequestId },
+        select: { id: true } // Only need to check existence
+      });
+
+      if (!lessonRequestExists) {
+        res.status(404).json({ message: `Lesson request with ID ${lessonRequestId} not found.` });
+        return;
+      }
+      // --- End Check --- //
+
+      // Use the service
       const quotes = await lessonQuoteService.getQuotesByLessonRequest(lessonRequestId);
-      res.json(quotes);
+      res.status(200).json(quotes);
     } catch (error) {
       console.error('Error fetching lesson quotes:', error);
       res.status(500).json({ error: 'Failed to fetch lesson quotes' });
@@ -98,125 +93,69 @@ export const lessonQuoteController = {
   },
 
   /**
-   * Accept a lesson quote
+   * Accept a lesson quote and create a corresponding lesson.
+   * Requires STUDENT role.
    * @param req Request with quoteId as a route parameter
    * @param res Response
-   * @param next NextFunction
    */
-  acceptLessonQuote: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const { quoteId } = req.params;
-      const userId = req.user?.id;
-      const userType = req.user?.userType;
-
-      // Check if the user is a student
-      if (userType !== 'STUDENT') {
-        res.status(403).json({ error: 'Only students can accept quotes' });
-        return;
-      }
-
-      // Get the quote with the lesson request
-      const quote = await prismaClient.lessonQuote.findUnique({
-        where: { id: quoteId },
-        include: {
-          lessonRequest: true,
-          teacher: true
-        }
-      });
-
-      if (!quote) {
-        res.status(404).json({ error: 'Quote not found' });
-        return;
-      }
-
-      // Check if the quote belongs to the student's request
-      if (quote.lessonRequest.studentId !== userId) {
-        res.status(403).json({ error: 'You can only accept quotes for your own lesson requests' });
-        return;
-      }
-
-      // Check if the quote has already been accepted (a lesson already exists)
-      const existingLesson = await prismaClient.lesson.findFirst({
-        where: {
-          quoteId
-        }
-      });
-
-      if (existingLesson) {
-        res.status(400).json({ error: 'This quote has already been accepted' });
-        return;
-      }
-
-      // Check if the quote has expired
-      if (new Date(quote.expiresAt) < new Date()) {
-        res.status(400).json({ error: 'This quote has expired' });
-        return;
-      }
-
-      // Create the lesson
-      const lesson = await prismaClient.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => {
-        // Create the lesson
-        const newLesson = await tx.lesson.create({
-          data: {
-            quote: {
-              connect: { id: quoteId }
-            }
-          },
-          include: {
-            quote: {
-              include: {
-                lessonRequest: true,
-                teacher: true
-              }
-            }
-          }
-        });
-
-        return newLesson;
-      });
-
-      res.status(201).json({
-        message: 'Quote accepted successfully',
-        lesson
-      });
-    } catch (error) {
-      console.error('Error accepting lesson quote:', error);
-      res.status(500).json({ error: 'Failed to accept lesson quote' });
-    }
-  },
-
-  /**
-   * Accept a lesson quote and create a corresponding lesson.
-   */
-  acceptQuote: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  acceptQuote: async (req: Request, res: Response): Promise<void> => {
     const { quoteId } = req.params;
-    const studentId = (req as any).user?.id; // Assuming student ID is from authenticated user
+    const userId = req.user?.id;
+    // We already check role in middleware, so userType check isn't strictly needed here
+    // const userType = req.user?.userType;
 
     if (!quoteId) {
       res.status(400).json({ error: 'Missing quoteId parameter' });
       return;
     }
-    if (!studentId) {
-      res.status(401).json({ error: 'Unauthorized' });
+    if (!userId) {
+      // This case should ideally be caught by authMiddleware, but good practice to check
+      res.status(401).json({ error: 'Unauthorized - User ID not found on request' });
       return;
     }
 
     try {
-      // TODO: Fetch the quote
-      // TODO: Verify the quote belongs to the authenticated student (or is for their request)
-      // TODO: Verify the quote is still valid (not expired)
-      // TODO: Call a service/function to create the lesson from the quote (e.g., createLessonFromQuote)
-      // This might involve instantiating Lesson/LessonQuote models
+      // --- Check if Quote exists and belongs to the user's request --- //
+      const quote = await prisma.lessonQuote.findUnique({
+        where: { id: quoteId },
+        include: {
+          lessonRequest: { select: { studentId: true } }, // Select only needed field
+          Lesson: { select: { id: true } } // Check if a lesson already exists
+        }
+      });
 
-      // --- Placeholder --- 
-      console.log(`Student ${studentId} attempting to accept quote ${quoteId}`);
-      const mockLessonId = `lesson_for_${quoteId}`;
-      // --- End Placeholder ---
+      if (!quote) {
+        res.status(404).json({ error: `Quote with ID ${quoteId} not found.` });
+        return;
+      }
 
-      res.status(200).json({ message: 'Quote accepted successfully', lessonId: mockLessonId });
+      if (quote.lessonRequest.studentId !== userId) {
+        res.status(403).json({ error: 'Forbidden: You can only accept quotes for your own lesson requests.' });
+        return;
+      }
+
+      // Check if quote is already associated with a lesson
+      if (quote.Lesson) {
+        // Use 409 Conflict as it's a state conflict
+        res.status(409).json({ error: 'Conflict: This quote has already been accepted and has an associated lesson.' });
+        return;
+      }
+
+      // --- End Checks --- //
+
+      // Use LessonService to create the lesson (handles transaction internally)
+      const createdLesson = await lessonService.create(prisma, quoteId);
+
+      // Return the created lesson (service should handle sanitization)
+      res.status(200).json(createdLesson); // Use 200 OK as resource (Lesson) was implicitly created
+
     } catch (error) {
       console.error('Error accepting quote:', error);
-      next(error); // Pass error to centralized error handler
+      // Handle potential specific errors from the service if necessary
+      res.status(500).json({ error: 'Failed to accept lesson quote' });
     }
   },
+
+  // Removed getLessonQuoteById as it's not used in routes
+  // Removed acceptLessonQuote as it was replaced by acceptQuote
 }; 

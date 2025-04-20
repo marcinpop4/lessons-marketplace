@@ -21,7 +21,6 @@ class LessonQuoteService {
             lessonRequestId: string;
             teacherId: string;
             costInCents: number;
-            expiresAt: Date;
             hourlyRateInCents: number;
         }
     ) {
@@ -35,7 +34,6 @@ class LessonQuoteService {
                     lessonRequest: { connect: { id: quoteData.lessonRequestId } },
                     teacher: { connect: { id: quoteData.teacherId } },
                     costInCents: quoteData.costInCents,
-                    expiresAt: quoteData.expiresAt,
                     hourlyRateInCents: quoteData.hourlyRateInCents
                 },
                 include: {
@@ -196,10 +194,6 @@ class LessonQuoteService {
                     return null;
                 }
 
-                // Calculate quote expiration (24 hours from now)
-                const expiresAt = new Date();
-                expiresAt.setHours(expiresAt.getHours() + 24);
-
                 // Calculate cost based on lesson duration and hourly rate
                 const costInCents = hourlyRate.calculateCostForDuration(lessonRequest.durationMinutes);
 
@@ -208,7 +202,6 @@ class LessonQuoteService {
                         lessonRequest: { connect: { id: lessonRequestId } },
                         teacher: { connect: { id: teacherModel.id } },
                         costInCents,
-                        expiresAt,
                         hourlyRateInCents: hourlyRate.rateInCents,
                     },
                     include: {
@@ -239,7 +232,9 @@ class LessonQuoteService {
 
         // Convert database quotes to domain model
         return createdQuotes.map(dbQuote => {
-            // Transform student data
+            // dbQuote already contains nested lessonRequest and teacher with their relations
+
+            // Transform student data from nested structure
             const studentModel = new Student({
                 id: dbQuote.lessonRequest.student.id,
                 firstName: dbQuote.lessonRequest.student.firstName,
@@ -249,16 +244,19 @@ class LessonQuoteService {
                 dateOfBirth: dbQuote.lessonRequest.student.dateOfBirth
             });
 
-            // Transform address data
+            // Transform address data from nested structure
             const addressModel = new Address({
+                id: dbQuote.lessonRequest.address.id, // Include ID if needed
                 street: dbQuote.lessonRequest.address.street,
                 city: dbQuote.lessonRequest.address.city,
                 state: dbQuote.lessonRequest.address.state,
                 postalCode: dbQuote.lessonRequest.address.postalCode,
-                country: dbQuote.lessonRequest.address.country
+                country: dbQuote.lessonRequest.address.country,
+                createdAt: dbQuote.lessonRequest.address.createdAt, // Include timestamps if needed
+                updatedAt: dbQuote.lessonRequest.address.updatedAt,
             });
 
-            // Create LessonRequest model
+            // Create LessonRequest model from nested structure
             const lessonRequestModel = new LessonRequest({
                 id: dbQuote.lessonRequest.id,
                 type: dbQuote.lessonRequest.type as LessonType,
@@ -268,7 +266,7 @@ class LessonQuoteService {
                 student: studentModel
             });
 
-            // Transform teacher data
+            // Transform teacher data from nested structure
             const teacherModel = new Teacher({
                 id: dbQuote.teacher.id,
                 firstName: dbQuote.teacher.firstName,
@@ -291,9 +289,9 @@ class LessonQuoteService {
                 lessonRequest: lessonRequestModel,
                 teacher: teacherModel,
                 costInCents: dbQuote.costInCents,
-                hourlyRateInCents: dbQuote.hourlyRateInCents!,
+                hourlyRateInCents: dbQuote.hourlyRateInCents!, // Assuming not null based on logic
                 createdAt: new Date(dbQuote.createdAt),
-                expiresAt: new Date(dbQuote.expiresAt)
+                updatedAt: new Date(dbQuote.updatedAt),
             });
         });
     }
@@ -324,7 +322,7 @@ class LessonQuoteService {
 
         // Convert database quotes to domain model
         return dbQuotes.map(dbQuote => {
-            // Transform student data
+            // Transform student data from nested structure
             const studentModel = new Student({
                 id: dbQuote.lessonRequest.student.id,
                 firstName: dbQuote.lessonRequest.student.firstName,
@@ -334,16 +332,19 @@ class LessonQuoteService {
                 dateOfBirth: new Date(dbQuote.lessonRequest.student.dateOfBirth)
             });
 
-            // Transform address data
+            // Transform address data from nested structure
             const addressModel = new Address({
+                id: dbQuote.lessonRequest.address.id, // Include ID if needed
                 street: dbQuote.lessonRequest.address.street,
                 city: dbQuote.lessonRequest.address.city,
                 state: dbQuote.lessonRequest.address.state,
                 postalCode: dbQuote.lessonRequest.address.postalCode,
-                country: dbQuote.lessonRequest.address.country
+                country: dbQuote.lessonRequest.address.country,
+                createdAt: dbQuote.lessonRequest.address.createdAt, // Include timestamps if needed
+                updatedAt: dbQuote.lessonRequest.address.updatedAt,
             });
 
-            // Create LessonRequest model
+            // Create LessonRequest model from nested structure
             const lessonRequestModel = new LessonRequest({
                 id: dbQuote.lessonRequest.id,
                 type: dbQuote.lessonRequest.type as LessonType,
@@ -353,7 +354,7 @@ class LessonQuoteService {
                 student: studentModel
             });
 
-            // Transform teacher data
+            // Transform teacher data from nested structure
             const teacherModel = new Teacher({
                 id: dbQuote.teacher.id,
                 firstName: dbQuote.teacher.firstName,
@@ -376,9 +377,9 @@ class LessonQuoteService {
                 lessonRequest: lessonRequestModel,
                 teacher: teacherModel,
                 costInCents: dbQuote.costInCents,
-                hourlyRateInCents: dbQuote.hourlyRateInCents!,
+                hourlyRateInCents: dbQuote.hourlyRateInCents!, // Assuming not null
                 createdAt: new Date(dbQuote.createdAt),
-                expiresAt: new Date(dbQuote.expiresAt)
+                updatedAt: new Date(dbQuote.updatedAt),
             });
         });
     }

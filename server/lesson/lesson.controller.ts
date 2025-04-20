@@ -73,13 +73,16 @@ export const lessonController = {
       costInCents: prismaLesson.quote.costInCents,
       hourlyRateInCents: prismaLesson.quote.hourlyRateInCents,
       createdAt: new Date(prismaLesson.quote.createdAt),
-      expiresAt: new Date(prismaLesson.quote.expiresAt)
+      updatedAt: new Date(prismaLesson.quote.updatedAt)
     });
 
     return new Lesson({
       id: prismaLesson.id,
       quote: lessonQuote,
       currentStatusId: prismaLesson.currentStatusId,
+      currentStatus: prismaLesson.currentStatus?.status as LessonStatusValue,
+      createdAt: prismaLesson.createdAt,
+      updatedAt: prismaLesson.updatedAt
     });
   },
 

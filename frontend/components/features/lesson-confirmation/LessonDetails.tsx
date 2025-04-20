@@ -43,13 +43,6 @@ const LessonDetails: React.FC<LessonDetailsProps> = ({ quote }) => {
             <FormattedAddress address={quote.lessonRequest.address} />
           </p>
         </div>
-
-        <div className="lesson-detail-item lesson-detail-expiry">
-          <p className="lesson-detail-label">Quote Expires</p>
-          <p className="lesson-detail-value">
-            <FormattedDateTime date={quote.expiresAt} />
-          </p>
-        </div>
       </div>
     </div>
   );

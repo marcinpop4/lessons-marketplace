@@ -6,10 +6,6 @@ const path = require('path');
 const fs = require('fs');
 import { fileURLToPath } from 'url';
 
-// Log the setup file location
-console.log(`[Unit Tests Setup] Running setup from: ${__filename}`);
-console.log(`[Unit Tests Setup] Current working directory: ${process.cwd()}`);
-
 // Explicitly check if path is loaded before using it
 if (!path || typeof path.resolve !== 'function') {
   console.error('[Unit Tests Setup] FATAL: path module not loaded correctly!');
@@ -19,8 +15,6 @@ if (!path || typeof path.resolve !== 'function') {
 // Check if tsconfig exists - helps diagnose issues
 const testTsConfigPath = path.resolve(process.cwd(), 'tests/tsconfig.test.json');
 const rootTsConfigPath = path.resolve(process.cwd(), 'tsconfig.test.json');
-console.log(`[Unit Tests Setup] tests/tsconfig.test.json exists: ${fs.existsSync(testTsConfigPath)}`);
-console.log(`[Unit Tests Setup] ./tsconfig.test.json exists: ${fs.existsSync(rootTsConfigPath)}`);
 
 // Reset mocks after each test
 afterEach(() => {

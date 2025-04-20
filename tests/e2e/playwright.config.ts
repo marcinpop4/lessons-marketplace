@@ -12,11 +12,9 @@ if (!nodeEnv) {
     console.error('Please run Playwright tests with NODE_ENV prefix (e.g., NODE_ENV=development pnpm test:e2e:local).');
     process.exit(1);
 }
-console.log(`[Playwright Config] Using NODE_ENV: ${nodeEnv}`);
 
 // 2. Construct .env path and load
 const envFilePath = path.resolve(projectRoot, `env/.env.${nodeEnv}`);
-console.log(`[Playwright Config] Loading environment variables from: ${envFilePath}`);
 const envConfig = dotenv.config({ path: envFilePath });
 
 if (envConfig.error) {
@@ -27,8 +25,6 @@ if (envConfig.error) {
     }
     process.exit(1);
 }
-console.log(`[Playwright Config] Environment variables loaded successfully.`);
-// --- End Environment Loading ---
 
 
 // 3. Determine baseURL AFTER loading .env
@@ -40,7 +36,6 @@ if (!baseURL) {
     console.error(`Ensure FRONTEND_URL is defined in ${envFilePath}`);
     process.exit(1);
 }
-console.log(`[Playwright Config] Using baseURL: ${baseURL}`);
 
 
 // 5. Process timeout values ONLY if they are set in the environment
@@ -58,9 +53,6 @@ if (timeoutStr) {
         process.exit(1);
     }
     configOverrides.timeout = parsed;
-    console.log(`[Playwright Config] Overriding default test timeout: ${parsed}ms`);
-} else {
-    console.log(`[Playwright Config] Using default test timeout (30000ms).`);
 }
 
 if (actionTimeoutStr) {
@@ -70,9 +62,6 @@ if (actionTimeoutStr) {
         process.exit(1);
     }
     useOverrides.actionTimeout = parsed;
-    console.log(`[Playwright Config] Overriding default action timeout: ${parsed}ms`);
-} else {
-    console.log(`[Playwright Config] Using default action timeout (0ms - uses test timeout).`);
 }
 
 if (navigationTimeoutStr) {
@@ -82,9 +71,6 @@ if (navigationTimeoutStr) {
         process.exit(1);
     }
     useOverrides.navigationTimeout = parsed;
-    console.log(`[Playwright Config] Overriding default navigation timeout: ${parsed}ms`);
-} else {
-    console.log(`[Playwright Config] Using default navigation timeout (0ms - uses test timeout).`);
 }
 
 

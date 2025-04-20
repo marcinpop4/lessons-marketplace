@@ -464,42 +464,30 @@ export const teacherController = {
   },
 
   /**
-   * Get all lessons for a specific teacher.
-   * Requires authentication.
-   * Ensures the authenticated user is the teacher whose lessons are requested.
+   * Get all lessons for a specific teacher
+   * Ensures the authenticated user matches the requested teacherId.
+   * @param req Request with teacherId as a route parameter
+   * @param res Response
    */
-  getTeacherLessons: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    console.log(`[CONTROLLER] Entering getTeacherLessons for teacherId: ${req.params.teacherId}`);
+  getTeacherLessons: async (req: Request, res: Response): Promise<void> => {
+    const { teacherId } = req.params;
+    const authenticatedUserId = req.user?.id;
+    const authenticatedUserType = req.user?.userType;
+
+    // Authorization: Check if the authenticated user is the teacher they are requesting lessons for
+    if (!authenticatedUserId || authenticatedUserId !== teacherId || authenticatedUserType !== 'TEACHER') {
+      res.status(403).json({ error: 'Forbidden', message: 'You can only view your own lessons.' });
+      return;
+    }
+
     try {
-      const requestedTeacherId = req.params.teacherId;
-      const authenticatedUserId = (req as any).user?.id;
-      const authenticatedUserType = (req as any).user?.userType;
+      const lessons = await teacherService.findLessonsByTeacherId(teacherId);
 
-      if (!authenticatedUserId || authenticatedUserType !== 'TEACHER' || authenticatedUserId !== requestedTeacherId) {
-        console.warn(`[CONTROLLER] Forbidden access attempt for teacher lessons. Requested: ${requestedTeacherId}, Auth User: ${authenticatedUserId}, Type: ${authenticatedUserType}`);
-        res.status(403).json({ error: 'Forbidden: You can only access your own lessons.' });
-        return;
-      }
-
-      console.log(`[CONTROLLER] Calling service findLessonsByTeacherId for: ${requestedTeacherId}`);
-      const lessons = await teacherService.findLessonsByTeacherId(requestedTeacherId);
-      console.log(`[CONTROLLER] Service returned ${lessons.length} lessons.`);
-
+      // Respond with the lessons (service should handle sanitization if needed)
       res.status(200).json(lessons);
-      console.log(`[CONTROLLER] Successfully sent lessons response for teacherId: ${requestedTeacherId}`);
-
     } catch (error) {
-      // Log the specific error caught within this controller method
-      console.error(`[CONTROLLER] Error in getTeacherLessons for teacherId ${req.params.teacherId}:`, error);
-
-      // Decide if we handle specific errors here or pass all to global handler
-      if (error instanceof Error && error.message.includes('not found')) {
-        console.log('[CONTROLLER] Handling 404 error locally.');
-        res.status(404).json({ error: error.message });
-      } else {
-        console.log('[CONTROLLER] Passing error to global handler.');
-        next(error); // Pass other errors to the global error handler
-      }
+      console.error(`[CONTROLLER] Error fetching lessons for teacher ${teacherId}:`, error);
+      res.status(500).json({ error: 'Failed to fetch teacher lessons' });
     }
   },
 

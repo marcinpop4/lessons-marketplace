@@ -1,0 +1,22 @@
+# Enforce Code Deletion
+
+When the user requests to "delete" or "remove" code, ensure the specified lines are completely **deleted** from the file.
+
+**Do not** comment out the code instead of deleting it.
+
+Example:
+
+User request: "Delete the console.log statement on line 10."
+
+**Incorrect Action (Commenting Out):**
+```diff
+- console.log("Debug message");
++ // console.log("Debug message");
+```
+
+**Correct Action (Deleting):**
+```diff
+- console.log("Debug message");
+```
+
+Always prefer complete removal when deletion is requested.

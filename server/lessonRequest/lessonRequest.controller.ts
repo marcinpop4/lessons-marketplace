@@ -66,9 +66,6 @@ export class LessonRequestController {
       }
       // --- End Authorization Check --- 
 
-      // Log the request body for debugging
-      console.debug('Received lesson request data:', req.body);
-
       // --- Validation: Basic Fields & addressObj Existence --- 
       if (!type || !startTime || !durationMinutes || !studentId || !addressObj) {
         res.status(400).json({
