@@ -44,6 +44,13 @@ const FRONTEND_URL = `${FRONTEND_HOST}:${FRONTEND_PORT}`;
 
 const SERVER_URL = `http://localhost:${SERVER_PORT}`;
 
+// Base environment for child processes
+const baseEnv = {
+    ...process.env,
+    NODE_NO_WARNINGS: '1',
+    SILENCE_PRISMA_EXPECTED_ERRORS: 'true' // Add variable to silence prisma errors
+};
+
 // Helper to run commands and log output
 const runCommand = async (
     command: string,
@@ -55,7 +62,7 @@ const runCommand = async (
         const subprocess = execa(command, args, {
             stdio: 'inherit', // Show output directly
             cwd: options.cwd || process.cwd(),
-            env: process.env, // Pass environment
+            env: baseEnv, // Use the base environment with NODE_NO_WARNINGS
         });
         const result = await subprocess;
         console.log(chalk.green(`---> Finished: ${options.title} (Success)`));
@@ -125,9 +132,12 @@ async function main() {
         // 2. Start Server and Frontend in background
         console.log(chalk.blue('\n---> Starting background services...'));
         // Start server explicitly with NODE_ENV. The dev:server script uses dotenv-cli which respects process.env.NODE_ENV
-        serverProcess = execa('pnpm', ['run', 'dev:server:no-watch'], { stdio: 'inherit', env: process.env });
+        // Ignore stderr for the server process during tests to hide expected Prisma errors
+        serverProcess = execa('pnpm', ['run', 'dev:server:no-watch'], { stdio: ['inherit', 'inherit', 'ignore'], env: baseEnv });
         // Start frontend. The dev:frontend script also uses dotenv-cli.
-        frontendProcess = execa('pnpm', ['run', 'dev:frontend'], { stdio: 'inherit', env: process.env });
+        // Set the environment variable to disable proxy logs for this specific process
+        const frontendEnv = { ...baseEnv, DISABLE_VITE_PROXY_LOGS: 'true' }; // Merge baseEnv with specific var
+        frontendProcess = execa('pnpm', ['run', 'dev:frontend'], { stdio: 'inherit', env: frontendEnv });
 
         // Handle potential early exit of background processes (optional but good practice)
         serverProcess.catch((e: Error) => {

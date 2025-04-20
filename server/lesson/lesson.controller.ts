@@ -245,16 +245,6 @@ export const lessonController = {
         return;
       }
 
-      // Authorization check should be handled by roleMiddleware, but we can double-check if needed
-      // For example, ensure the authenticated teacher is associated with the lesson being updated
-      // const lesson = await lessonService.findLessonById(lessonId); // Fetch lesson to check teacher ID
-      // if (!lesson || lesson.quote.teacherId !== authenticatedTeacherId) {
-      //   res.status(403).json({ error: 'Forbidden', message: 'You can only update status for your own lessons.' });
-      //   return;
-      // }
-
-      console.debug(`[CONTROLLER] Updating status for lesson ${lessonId} to ${newStatus} with context:`, context);
-
       // Call the service to update the status
       const updatedLesson = await lessonService.updateStatus(
         prisma, // Pass prisma client

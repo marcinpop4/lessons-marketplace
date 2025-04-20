@@ -111,11 +111,16 @@ export default defineConfig(({ mode }) => {
           // Optional: Rewrite path if backend doesn't expect /api/v1 prefix
           // rewrite: (path) => path.replace(/^\/api\/v1/, ''), 
           configure: (proxy, options) => {
+            const disableLogs = process.env.DISABLE_VITE_PROXY_LOGS === 'true';
             proxy.on('proxyReq', (proxyReq, req, res) => {
-              console.log(`[VITE PROXY /api/v1] Sending request to target: ${options.target}${proxyReq.path}`);
+              if (!disableLogs) {
+                console.log(`[VITE PROXY /api/v1] Sending request to target: ${options.target}${proxyReq.path}`);
+              }
             });
             proxy.on('proxyRes', (proxyRes, req, res) => {
-              console.log(`[VITE PROXY /api/v1] Received response from target: ${proxyRes.statusCode} ${req.url}`);
+              if (!disableLogs) {
+                console.log(`[VITE PROXY /api/v1] Received response from target: ${proxyRes.statusCode} ${req.url}`);
+              }
             });
             proxy.on('error', (err, req, res) => {
               console.error('[VITE PROXY /api/v1] Proxy error:', err);
