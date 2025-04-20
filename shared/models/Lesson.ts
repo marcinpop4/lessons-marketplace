@@ -9,7 +9,6 @@ interface LessonProps {
   id: string;
   quote: LessonQuote;
   currentStatusId: string;
-  confirmedAt?: Date; // Optional, defaults to new Date()
 }
 
 /**
@@ -19,11 +18,6 @@ interface LessonProps {
 export class Lesson {
   id: string;
   quote: LessonQuote;
-  /**
-   * @deprecated Use lesson status tracking instead. This field will be removed in a future version.
-   * The confirmation status should be tracked through LessonStatus records.
-   */
-  confirmedAt: Date;
   currentStatusId: string;
 
   // Updated constructor using object destructuring
@@ -31,11 +25,9 @@ export class Lesson {
     id,
     quote,
     currentStatusId,
-    confirmedAt = new Date() // Default value for optional prop
   }: LessonProps) {
     this.id = id;
     this.quote = quote;
-    this.confirmedAt = confirmedAt;
     this.currentStatusId = currentStatusId;
   }
 

@@ -70,7 +70,6 @@ const instantiateLessonFromData = (data: TeacherLessonApiResponseItem): Lesson =
 
     const lesson = new Lesson({
         id: data.id,
-        confirmedAt: data.confirmedAt ? new Date(data.confirmedAt) : undefined,
         quote: lessonQuote,
         currentStatusId: data.currentStatus?.id || '',
     });
@@ -101,9 +100,6 @@ const TeacherLessonsPage: React.FC = () => {
             setLoading(true);
             setError(null);
             const rawLessonsData = await getTeacherLessons(teacherId);
-
-            // Log the raw data to inspect its structure
-            console.log('Raw Lessons Data from API:', rawLessonsData);
 
             // Check if it's an array before mapping
             if (!Array.isArray(rawLessonsData)) {
@@ -144,9 +140,6 @@ const TeacherLessonsPage: React.FC = () => {
 
             // Refresh the lessons after successful update
             await fetchLessonsData();
-
-            // Optionally show a success message
-            // setSuccessMessage(`Lesson status updated to ${newStatus}`);
         } catch (err) {
             console.error('Failed to update lesson status:', err);
             setError(err instanceof Error ? err.message : 'Failed to update lesson status');

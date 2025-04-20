@@ -173,9 +173,6 @@ components:
       properties:
         id:
           type: string
-        confirmedAt:
-          type: string
-          format: date-time
         quoteId:
           type: string
         createdAt:
@@ -184,9 +181,13 @@ components:
         updatedAt:
           type: string
           format: date-time
+        currentStatusId:
+          type: string
       required:
-        - confirmedAt
         - quoteId
+        - createdAt
+        - updatedAt
+        - currentStatusId
     
     UserCredentials:
       type: object
@@ -645,9 +646,6 @@ paths:
               properties:
                 quoteId:
                   type: string
-                confirmedAt:
-                  type: string
-                  format: date-time
               required:
                 - quoteId
       responses:
@@ -1050,9 +1048,8 @@ paths:
                   properties:
                     id:
                       type: string
-                    confirmedAt:
+                    quoteId:
                       type: string
-                      format: date-time
                     createdAt:
                        type: string
                        format: date-time
@@ -1147,7 +1144,7 @@ paths:
                         - lessonRequest
                   required:
                     - id
-                    - confirmedAt
+                    - quoteId
                     - createdAt
                     - updatedAt
                     - currentStatus

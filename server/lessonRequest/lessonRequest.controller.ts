@@ -3,6 +3,7 @@ import { lessonRequestService } from './lessonRequest.service.js';
 import type { LessonRequest as PrismaLessonRequest } from '@prisma/client';
 import { LessonRequest } from '../../shared/models/LessonRequest.js';
 import { Address } from '../../shared/models/Address.js';
+import { Student } from '../../shared/models/Student.js';
 import { lessonQuoteService } from '../lessonQuote/lessonQuote.service.js';
 
 export class LessonRequestController {
@@ -18,11 +19,23 @@ export class LessonRequestController {
    */
   private transformToModel(prismaRequest: any): LessonRequest {
     const address = new Address({
+      id: prismaRequest.address.id,
       street: prismaRequest.address.street,
       city: prismaRequest.address.city,
       state: prismaRequest.address.state,
       postalCode: prismaRequest.address.postalCode,
       country: prismaRequest.address.country
+    });
+
+    // Create Student model instance, excluding password
+    const student = new Student({
+      id: prismaRequest.student.id,
+      firstName: prismaRequest.student.firstName,
+      lastName: prismaRequest.student.lastName,
+      email: prismaRequest.student.email,
+      phoneNumber: prismaRequest.student.phoneNumber,
+      dateOfBirth: new Date(prismaRequest.student.dateOfBirth),
+      // Explicitly exclude password
     });
 
     return new LessonRequest({
@@ -31,7 +44,7 @@ export class LessonRequestController {
       startTime: new Date(prismaRequest.startTime),
       durationMinutes: prismaRequest.durationMinutes,
       address,
-      student: prismaRequest.student // Assuming student is raw data here
+      student // Use the sanitized Student model instance
     });
   }
 
@@ -44,26 +57,44 @@ export class LessonRequestController {
   async createLessonRequest(req: Request, res: Response): Promise<void> {
     try {
       const { type, startTime, durationMinutes, addressObj, studentId } = req.body;
+      const authenticatedUserId = req.user?.id; // Get ID from token (added by authMiddleware)
+
+      // --- Authorization Check --- 
+      if (!authenticatedUserId || studentId !== authenticatedUserId) {
+        res.status(403).json({ error: 'Forbidden', message: 'You can only create lesson requests for yourself.' });
+        return;
+      }
+      // --- End Authorization Check --- 
 
       // Log the request body for debugging
       console.debug('Received lesson request data:', req.body);
 
-      // --- Default country if missing --- 
-      if (!addressObj.country) {
-        console.log('Country missing in request, defaulting to USA.');
-        addressObj.country = "USA";
-      }
-      // --- End Default country --- 
-
-      // Validate required fields (checking addressObj itself, not just country)
-      if (!type || !startTime || !durationMinutes || !addressObj || !studentId ||
-        !addressObj.street || !addressObj.city || !addressObj.state || !addressObj.postalCode || !addressObj.country) { // Ensure all parts of address are present
+      // --- Validation: Basic Fields & addressObj Existence --- 
+      if (!type || !startTime || !durationMinutes || !studentId || !addressObj) {
         res.status(400).json({
           error: 'Missing required fields',
-          message: 'Please provide type, startTime, durationMinutes, studentId, and a complete address (street, city, state, postalCode, country)'
+          message: 'Please provide type, startTime, durationMinutes, studentId, and addressObj'
         });
         return;
       }
+      // --- End Basic Validation --- 
+
+      // --- Validation: Address Properties --- 
+      if (!addressObj.street || !addressObj.city || !addressObj.state || !addressObj.postalCode) {
+        res.status(400).json({
+          error: 'Missing required address fields',
+          message: 'Address object must include street, city, state, and postalCode'
+        });
+        return;
+      }
+      // --- End Address Validation --- 
+
+      // --- Default country if missing (AFTER checking addressObj exists) --- 
+      if (!addressObj.country) {
+        console.log('Country missing in request, defaulting to USA.');
+        addressObj.country = "USA"; // Mutate the object safely now
+      }
+      // --- End Default country --- 
 
       // Convert string dates to Date objects
       const parsedStartTime = new Date(startTime);
@@ -84,18 +115,10 @@ export class LessonRequestController {
         country: addressObj.country // Will be defaulted if was missing
       });
 
-      // --- Removing Debug Logging --- 
-      // console.log('Controller: addressModel created:', JSON.stringify(addressModel, null, 2));
-      // console.log('Controller: Calling service with type:', type);
-      // console.log('Controller: Calling service with startTime:', new Date(startTime));
-      // console.log('Controller: Calling service with duration:', parseInt(durationMinutes, 10));
-      // console.log('Controller: Calling service with studentId:', studentId);
-      // --- End Removing Debug Logging --- 
-
       // Create lesson request
       const lessonRequest = await lessonRequestService.createLessonRequest({
         type: type,
-        startTime: new Date(startTime),
+        startTime: parsedStartTime, // Use parsed date
         durationMinutes: parseInt(durationMinutes, 10),
         addressObj: addressModel, // Pass the model instance
         studentId: studentId
@@ -104,17 +127,18 @@ export class LessonRequestController {
       // Transform to shared model
       const modelLessonRequest = this.transformToModel(lessonRequest);
 
-      // Automatically create quotes for the lesson request
+      // --- Restore automatic quote creation ---
       const quotes = await lessonQuoteService.createQuotesForLessonRequest(
         lessonRequest.id,
         type
       );
 
-      // Return both the lesson request and the created quotes
+      // Return the created lesson request and the generated quotes
       res.status(201).json({
         lessonRequest: modelLessonRequest,
         quotes
       });
+
     } catch (error) {
       console.error('Error creating lesson request:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

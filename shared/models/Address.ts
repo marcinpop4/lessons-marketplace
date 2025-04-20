@@ -5,6 +5,7 @@
 
 // Interface for constructor properties
 interface AddressProps {
+  id?: string; // Make ID optional as it might not exist before creation
   street: string;
   city: string;
   state: string;
@@ -13,6 +14,7 @@ interface AddressProps {
 }
 
 export class Address {
+  id?: string; // Add optional ID property
   street: string;
   city: string;
   state: string;
@@ -20,7 +22,8 @@ export class Address {
   country: string;
 
   // Updated constructor using object destructuring
-  constructor({ street, city, state, postalCode, country }: AddressProps) {
+  constructor({ id, street, city, state, postalCode, country }: AddressProps) {
+    this.id = id;
     this.street = street;
     this.city = city;
     this.state = state;

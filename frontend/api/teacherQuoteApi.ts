@@ -100,11 +100,9 @@ export const createLessonQuotes = async (
  */
 export const bookLesson = async (quoteId: string): Promise<any> => {
   try {
-    const confirmedAt = new Date().toISOString();
-
+    // Make the POST request to create the lesson
     const response = await apiClient.post(`/api/v1/lessons`, {
       quoteId,
-      confirmedAt,
     });
 
     return response.data;

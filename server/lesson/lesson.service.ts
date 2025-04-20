@@ -2,6 +2,22 @@ import { PrismaClient } from '@prisma/client';
 import { LessonStatusValue } from '../../shared/models/LessonStatus.js';
 import { v4 as uuidv4 } from 'uuid';
 
+// Define the includes needed for the controller's transformToModel
+const lessonIncludeForTransform = {
+    quote: {
+        include: {
+            teacher: true,
+            lessonRequest: {
+                include: {
+                    student: true,
+                    address: true
+                }
+            }
+        }
+    },
+    currentStatus: true // Include the current status object
+};
+
 class LessonService {
 
     /**
@@ -41,7 +57,6 @@ class LessonService {
                     data: {
                         id: lessonId,
                         quoteId: quote.id,
-                        confirmedAt: new Date()
                     }
                 });
 
@@ -127,7 +142,7 @@ class LessonService {
      * @param lessonId The ID of the lesson to update
      * @param newStatusValue The new status value
      * @param context Additional context about the status change
-     * @returns The ID of the newly created status record.
+     * @returns The updated Lesson object with includes.
      * @throws Error if the update fails
      */
     async updateStatus(
@@ -135,7 +150,7 @@ class LessonService {
         lessonId: string,
         newStatusValue: LessonStatusValue,
         context: Record<string, unknown> = {}
-    ): Promise<string> {
+    ): Promise<any> {
         try {
             return await prisma.$transaction(async (tx) => {
                 // Ensure the lesson exists before trying to update
@@ -148,7 +163,22 @@ class LessonService {
                     throw new Error(`Lesson with ID ${lessonId} not found.`);
                 }
 
-                return this.updateStatusInternal(tx, lessonId, newStatusValue, context);
+                // Update the status internally
+                await this.updateStatusInternal(tx, lessonId, newStatusValue, context);
+
+                // Fetch and return the fully updated lesson with necessary includes
+                const updatedLesson = await tx.lesson.findUnique({
+                    where: { id: lessonId },
+                    include: lessonIncludeForTransform // Use the defined include object
+                });
+
+                if (!updatedLesson) {
+                    // Should not happen if lessonExists was found, but defensive check
+                    throw new Error(`Failed to fetch updated lesson data for ID ${lessonId} after status update.`);
+                }
+
+                // Return the full lesson object
+                return updatedLesson;
             });
         } catch (error) {
             console.error(`Error updating status for lesson ${lessonId} to ${newStatusValue}:`, error);

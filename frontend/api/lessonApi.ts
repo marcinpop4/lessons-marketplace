@@ -95,7 +95,6 @@ export const getLessonById = async (id: string): Promise<Lesson> => {
       id: data.id,
       quote: lessonQuote,
       currentStatusId: data.currentStatusId,
-      confirmedAt: new Date(data.confirmedAt)
     });
   } catch (error) {
     console.error('Error in getLessonById:', error);
@@ -152,8 +151,7 @@ export const fetchTeacherLessons = async (teacherId: string): Promise<FullLesson
  */
 export const updateLessonStatus = async (lessonId: string, status: LessonStatusValue): Promise<void> => {
   try {
-    await apiClient.patch(`/api/v1/lessons/${lessonId}`, { status });
-    console.log(`Lesson ${lessonId} status updated to ${status}`);
+    await apiClient.patch(`/api/v1/lessons/${lessonId}`, { newStatus: status });
   } catch (error) {
     console.error(`Error updating lesson ${lessonId} status:`, error);
     // Re-throw the error to be handled by the calling component

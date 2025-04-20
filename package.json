@@ -69,8 +69,7 @@
     "prisma:resolve-rolled-back": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate resolve --schema=server/prisma/schema.prisma --rolled-back",
     "prisma:fresh-start": "dotenv -e env/.env.${NODE_ENV} -- sh -c 'psql \"$(echo $DATABASE_URL | sed \"s/?schema=public//\")\" -c \"DROP TABLE IF EXISTS _prisma_migrations;\" && prisma migrate dev --name initial_migration --create-only --schema=server/prisma/schema.prisma'",
     "prisma:create-migration": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate dev --schema=server/prisma/schema.prisma",
-    "backfill:lesson-statuses": "dotenv -e env/.env.${NODE_ENV} -- node scripts/backfill-lesson-statuses.js",
-    "validate:full": "pnpm clean && pnpm install && NODE_ENV=development pnpm prisma:reset --force && NODE_ENV=development pnpm prisma:seed && pnpm prisma:generate && pnpm test && pnpm diagnose:ts"
+    "validate:full": "pnpm clean && pnpm install && NODE_ENV=development pnpm prisma:reset --force && NODE_ENV=development pnpm prisma:seed && pnpm prisma:generate && pnpm test:local && pnpm diagnose:ts"
   },
   "dependencies": {
     "@tailwindcss/forms": "0.5.10",

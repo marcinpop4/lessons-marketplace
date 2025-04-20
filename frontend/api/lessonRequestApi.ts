@@ -62,6 +62,8 @@ export const createLessonRequest = async (data: CreateLessonRequestPayload): Pro
     console.log('Sending lesson request data:', payload);
     const response = await apiClient.post('/api/v1/lesson-requests', payload);
 
+    // Expect the nested structure again
+    // const responseData = response.data as ApiResponseData;
     const { lessonRequest: responseData, quotes } = response.data as { lessonRequest: ApiResponseData; quotes: ApiQuoteData[] };
 
     // Ensure proper date instantiation
@@ -80,7 +82,7 @@ export const createLessonRequest = async (data: CreateLessonRequestPayload): Pro
       student: responseData.student
     });
 
-    // Transform quotes
+    // Restore quote transformation
     const transformedQuotes = quotes.map(quote => new LessonQuote({
       id: quote.id,
       lessonRequest,
@@ -93,7 +95,8 @@ export const createLessonRequest = async (data: CreateLessonRequestPayload): Pro
 
     return {
       lessonRequest,
-      quotes: transformedQuotes
+      quotes: transformedQuotes // Return transformed quotes
+      // quotes: [] 
     };
   } catch (error) {
     console.error('Error creating lesson request:', error);

@@ -153,7 +153,6 @@ model Lesson {
   currentStatusId String?        @unique
   currentStatus   LessonStatus?  @relation("CurrentStatus", fields: [currentStatusId], references: [id])
   lessonStatuses  LessonStatus[] @relation("LessonStatuses")
-  confirmedAt     DateTime       @default(now())
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }

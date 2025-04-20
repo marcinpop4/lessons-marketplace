@@ -58,8 +58,8 @@ import prisma from './prisma.js';
 // REMOVED: Runtime Prisma Client Generation - This should be done at build/install time
 // try { ... execSync('npx prisma generate ...') ... } catch { ... }
 
-// Verify database connection on startup
-(async function testDatabaseConnection() {
+// Define database connection test function
+async function testDatabaseConnection() {
   try {
     console.log('Testing database connection...');
     await prisma.$queryRaw`SELECT 1`;
@@ -74,7 +74,7 @@ import prisma from './prisma.js';
       console.warn('Continuing despite database connection failure');
     }
   }
-})();
+}
 
 // --- Route Imports --- 
 import lessonRequestRoutes from './lessonRequest/lessonRequest.routes.js';
@@ -250,20 +250,44 @@ app.use((err: Error | any, req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-// --- Server Activation --- 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'unknown'} mode`);
-});
+// --- Start Server Logic --- 
+async function startServer() {
+  try {
+    // Ensure database is connected BEFORE starting the listener
+    await testDatabaseConnection();
 
-// --- Graceful Shutdown --- 
-async function gracefulShutdown(signal: string) {
-  console.log(`Received ${signal}. Shutting down gracefully.`);
-  await prisma.$disconnect();
-  console.log('Prisma client disconnected.');
-  process.exit(0);
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV} mode`);
+    });
+
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1); // Exit if server fails to start (e.g., DB connection failed initially)
+  }
 }
 
+// --- Graceful Shutdown Logic --- 
+async function gracefulShutdown(signal: string) {
+  console.log(`\nReceived signal ${signal}. Shutting down gracefully...`);
+  try {
+    await prisma.$disconnect();
+    console.log('Database connection closed.');
+    // Add any other cleanup tasks here (e.g., closing message queues)
+    console.log('Shutdown complete.');
+    process.exit(0);
+  } catch (error) {
+    console.error('Error during graceful shutdown:', error);
+    process.exit(1);
+  }
+}
+
+// Listen for termination signals
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
+// --- Initialize Server --- 
+startServer();
+
+// Keep export default app if needed for other purposes (like programmatic testing imports)
+// If not needed, it can be safely removed when running as a script.
 export default app; 

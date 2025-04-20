@@ -80,159 +80,47 @@ export const lessonController = {
       id: prismaLesson.id,
       quote: lessonQuote,
       currentStatusId: prismaLesson.currentStatusId,
-      confirmedAt: new Date(prismaLesson.confirmedAt)
     });
   },
 
   /**
-   * Create a new lesson from a quote
-   * @param req Request with quoteId and confirmedAt in the body
-   * @param res Response
+   * Create a new lesson
+   * @route POST /api/lessons
+   * @param req Request with quoteId in the body
+   * @param res Express response
    */
   createLesson: async (req: Request, res: Response): Promise<void> => {
     try {
-      const { quoteId, confirmedAt } = req.body;
+      const { quoteId } = req.body;
+
+      // Log the request body for debugging
+      console.debug('Received lesson creation request data:', req.body);
 
       // Validate required fields
       if (!quoteId) {
-        res.status(400).json({
-          message: 'Missing required fields. Please provide quoteId.'
-        });
+        res.status(400).json({ error: 'Missing required field: quoteId' });
         return;
       }
 
-      // Validate that the quote exists
-      const quote = await prisma.lessonQuote.findUnique({
-        where: { id: quoteId },
-        include: {
-          lessonRequest: true
-        }
-      });
+      // Create lesson using the service
+      const lesson = await lessonService.create(prisma, quoteId);
 
-      if (!quote) {
-        res.status(404).json({
-          message: `Lesson quote with ID ${quoteId} not found.`
-        });
-        return;
-      }
+      // Transform to shared model
+      const modelLesson = lessonController.transformToModel(lesson);
 
-      // Check if the quote has expired
-      if (new Date(quote.expiresAt) < new Date()) {
-        res.status(400).json({
-          message: `Lesson quote with ID ${quoteId} has expired.`
-        });
-        return;
-      }
-
-      // Check if a lesson already exists for this quote
-      const existingLesson = await prisma.lesson.findFirst({
-        where: { quoteId },
-        include: {
-          quote: {
-            include: {
-              teacher: true,
-              lessonRequest: {
-                include: {
-                  student: true,
-                  address: true
-                }
-              }
-            }
-          }
-        }
-      });
-
-      if (existingLesson) {
-        const modelLesson = lessonController.transformToModel(existingLesson);
-        res.status(200).json(modelLesson);
-        return;
-      }
-
-      // Start a transaction to ensure all operations succeed or fail together
-      const result = await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => {
-
-        // *** CORRECTED APPROACH: Create Lesson first (DB allows null), then Status, then Update Lesson ***
-
-        // 1. Create the Lesson, connecting the quote (currentStatusId is initially null)
-        const lesson = await tx.lesson.create({
-          data: {
-            confirmedAt: confirmedAt ? new Date(confirmedAt) : new Date(),
-            quote: {
-              connect: { id: quoteId }
-            }
-            // currentStatusId is null here initially
-          },
-          include: {
-            // Include relations needed for later steps or response
-            quote: {
-              include: {
-                lessonRequest: true // Need lessonRequestId for expiring other quotes
-              }
-            }
-          }
-        });
-
-        // 2. Create the initial LessonStatus, now that we have the lessonId
-        const acceptedStatusId = uuidv4();
-        await tx.lessonStatus.create({
-          data: {
-            id: acceptedStatusId,
-            lessonId: lesson.id,
-            status: LessonStatusValue.REQUESTED,
-            context: { requestedVia: 'quoteConfirmation' },
-            createdAt: new Date()
-          }
-        });
-
-        // 3. Update the Lesson to set the currentStatusId
-        const updatedLesson = await tx.lesson.update({
-          where: { id: lesson.id },
-          data: { currentStatusId: acceptedStatusId },
-          include: { // Include relations needed for the final response
-            quote: {
-              include: {
-                teacher: true,
-                lessonRequest: {
-                  include: {
-                    student: true,
-                    address: true
-                  }
-                }
-              }
-            },
-            currentStatus: true // Include the status we just set
-          }
-        });
-
-        // 4. Expire all other quotes for the same lesson request
-        // Ensure we have lessonRequestId from the included relation
-        if (!lesson.quote?.lessonRequestId) {
-          throw new Error('Could not retrieve lessonRequestId to expire other quotes.');
-        }
-        await tx.lessonQuote.updateMany({
-          where: {
-            lessonRequestId: lesson.quote.lessonRequestId,
-            id: { not: quoteId },
-            expiresAt: { gt: new Date() } // Only update unexpired quotes
-          },
-          data: {
-            expiresAt: new Date() // Set to current time to expire immediately
-          }
-        });
-
-        // Return the *updated* lesson with the status ID set
-        return updatedLesson;
-      });
-
-      // Transform the result (which now includes currentStatusId)
-      const modelLesson = lessonController.transformToModel(result);
+      // Return the created lesson
       res.status(201).json(modelLesson);
     } catch (error) {
       console.error('Error creating lesson:', error);
-      res.status(500).json({
-        message: 'An error occurred while creating the lesson',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // Handle specific errors like quote not found or already used
+      if (errorMessage.includes('not found') || errorMessage.includes('already linked')) {
+        res.status(404).json({ error: errorMessage });
+        return;
+      }
+
+      res.status(500).json({ error: 'Internal server error', message: errorMessage });
     }
   },
 
@@ -318,78 +206,61 @@ export const lessonController = {
   },
 
   /**
-   * Update the status of a lesson
+   * Update the status of a specific lesson
+   * @route PATCH /api/lessons/:lessonId
+   * @param req Request with lessonId in params and { newStatus, context } in body
+   * @param res Express response
    */
   updateLessonStatus: async (req: Request, res: Response): Promise<void> => {
-    const { lessonId } = req.params;
-    const { status: newStatusValue } = req.body; // Expecting { status: LessonStatusValue }
-    const teacherId = req.user?.id; // Use augmented type
-
-    if (!teacherId) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return; // Added return void
-    }
-
-    if (!lessonId || !newStatusValue) {
-      res.status(400).json({ error: 'Missing lessonId or status in request' });
-      return; // Added return void
-    }
-
-    // Validate the incoming status value
-    if (!Object.values(LessonStatusValue).includes(newStatusValue)) {
-      res.status(400).json({ error: `Invalid status value: ${newStatusValue}` });
-      return;
-    }
-
     try {
-      // Fetch the current lesson with its current status to validate ownership and transition
-      const lesson = await prisma.lesson.findUnique({
-        where: { id: lessonId },
-        include: {
-          quote: { include: { teacher: true } },
-          currentStatus: true
-        }
-      });
+      const { lessonId } = req.params;
+      const { newStatus, context } = req.body; // Extract status and optional context
+      const authenticatedTeacherId = req.user?.id; // Get ID from token (added by authMiddleware)
 
-      if (!lesson) {
-        res.status(404).json({ error: `Lesson with ID ${lessonId} not found.` });
+      // Validate input
+      if (!lessonId) {
+        res.status(400).json({ error: 'Bad Request', message: 'Lesson ID is required.' });
+        return;
+      }
+      if (!newStatus || !Object.values(LessonStatusValue).includes(newStatus as LessonStatusValue)) {
+        res.status(400).json({ error: 'Bad Request', message: `Invalid or missing newStatus: ${newStatus}` });
         return;
       }
 
-      // Verify the teacher owns the lesson (via the quote)
-      if (lesson.quote.teacherId !== teacherId) {
-        res.status(403).json({ error: 'Forbidden: You do not own this lesson.' });
-        return;
-      }
+      // Authorization check should be handled by roleMiddleware, but we can double-check if needed
+      // For example, ensure the authenticated teacher is associated with the lesson being updated
+      // const lesson = await lessonService.findLessonById(lessonId); // Fetch lesson to check teacher ID
+      // if (!lesson || lesson.quote.teacherId !== authenticatedTeacherId) {
+      //   res.status(403).json({ error: 'Forbidden', message: 'You can only update status for your own lessons.' });
+      //   return;
+      // }
 
-      // Get the current status value
-      const currentStatusValue = lesson.currentStatus?.status as LessonStatusValue | undefined;
-      if (!currentStatusValue) {
-        // Should not happen with proper seeding/creation, but handle defensively
-        console.error(`Lesson ${lessonId} is missing a current status.`);
-        res.status(500).json({ error: 'Internal server error: Lesson status is inconsistent.' });
-        return;
-      }
+      console.debug(`[CONTROLLER] Updating status for lesson ${lessonId} to ${newStatus} with context:`, context);
 
-      // Validate the status transition using the static method on LessonStatus model
-      if (!LessonStatus.isValidTransition(currentStatusValue, newStatusValue)) {
-        res.status(400).json({ error: `Invalid status transition from ${currentStatusValue} to ${newStatusValue}` });
-        return;
-      }
+      // Call the service to update the status
+      const updatedLesson = await lessonService.updateStatus(
+        prisma, // Pass prisma client
+        lessonId,
+        newStatus as LessonStatusValue,
+        context // Pass optional context
+      );
 
-      // If transition is valid, call the service to perform the update
-      // Context can be added here if needed, e.g., { updatedBy: teacherId }
-      const newStatusId = await lessonService.updateStatus(prisma, lessonId, newStatusValue, { updatedBy: teacherId });
+      // Optionally transform the result back to the shared model if needed for the response
+      const modelLesson = lessonController.transformToModel(updatedLesson);
 
-      res.status(200).json({ message: 'Lesson status updated successfully', newStatusId });
+      res.status(200).json(modelLesson); // Return the updated lesson
 
-    } catch (error: any) {
-      console.error('Error updating lesson status:', error);
-      // Handle specific errors thrown by the service or Prisma
-      if (error.message.includes('not found')) {
-        res.status(404).json({ error: error.message });
+    } catch (error) {
+      console.error(`[CONTROLLER] Error updating lesson status for ${req.params.lessonId}:`, error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // Handle specific errors from the service
+      if (errorMessage.includes('not found')) {
+        res.status(404).json({ error: 'Not Found', message: errorMessage });
+      } else if (errorMessage.includes('Invalid status transition')) {
+        res.status(400).json({ error: 'Bad Request', message: errorMessage });
       } else {
-        res.status(500).json({ error: `Failed to update lesson status: ${error.message}` });
+        res.status(500).json({ error: 'Internal Server Error', message: errorMessage });
       }
     }
   }

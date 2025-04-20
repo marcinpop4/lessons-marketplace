@@ -6,7 +6,6 @@ import { LessonType } from '@shared/models/LessonType'; // Needed for the lesson
 // Define the expected structure, reflecting the selected fields from the API
 export interface TeacherLessonApiResponseItem {
     id: string;
-    confirmedAt?: string | null; // API might return null or string date
     createdAt: string;
     updatedAt: string;
     currentStatus: {
@@ -69,9 +68,7 @@ export interface TeacherLessonApiResponseItem {
  */
 export const getTeacherLessons = async (teacherId: string): Promise<TeacherLessonApiResponseItem[]> => {
     try {
-        console.log(`API: Fetching lessons for teacher ${teacherId}`);
         const response = await apiClient.get<TeacherLessonApiResponseItem[]>(`/api/v1/teachers/${teacherId}/lessons`);
-        console.log(`API: Received ${response.data.length} lessons.`);
         // Return the raw data. Instantiation will happen in the component.
         return response.data;
     } catch (error) {
