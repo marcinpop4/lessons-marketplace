@@ -76,11 +76,19 @@ export const lessonController = {
       updatedAt: new Date(prismaLesson.quote.updatedAt)
     });
 
+    // Get the status value from the included relation
+    const latestStatus = prismaLesson.lessonStatuses?.[0]?.status as LessonStatusValue;
+    if (!latestStatus) {
+      // This should ideally not happen if a lesson always has a status, but handle defensively
+      console.error(`Lesson ${prismaLesson.id} is missing status information.`);
+      throw new Error(`Lesson ${prismaLesson.id} is missing status information.`);
+    }
+
     return new Lesson({
       id: prismaLesson.id,
       quote: lessonQuote,
       currentStatusId: prismaLesson.currentStatusId,
-      currentStatus: prismaLesson.currentStatus?.status as LessonStatusValue,
+      currentStatus: latestStatus, // Use the status from the included relation
       createdAt: prismaLesson.createdAt,
       updatedAt: prismaLesson.updatedAt
     });
@@ -149,6 +157,13 @@ export const lessonController = {
                 }
               }
             }
+          },
+          // Include the related LessonStatus records, ordered by createdAt descending, take 1
+          lessonStatuses: {
+            orderBy: {
+              createdAt: 'desc'
+            },
+            take: 1
           }
         }
       });

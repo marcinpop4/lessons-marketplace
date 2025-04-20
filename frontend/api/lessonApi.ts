@@ -46,11 +46,8 @@ export const createLessonFromQuote = async (quoteId: string): Promise<Lesson> =>
  * @returns Lesson data
  */
 export const getLessonById = async (id: string): Promise<Lesson> => {
-  console.log('getLessonById called with id:', id);
   try {
-    console.log('Making API request to:', `/api/v1/lessons/${id}`);
     const response = await apiClient.get(`/api/v1/lessons/${id}`);
-    console.log('API response received:', response.data);
     const data = response.data;
 
     const lessonQuote = new LessonQuote({
@@ -87,14 +84,24 @@ export const getLessonById = async (id: string): Promise<Lesson> => {
       }),
       costInCents: data.quote.costInCents,
       hourlyRateInCents: data.quote.hourlyRateInCents,
-      createdAt: new Date(data.quote.createdAt),
-      expiresAt: new Date(data.quote.expiresAt)
+      createdAt: new Date(data.quote.createdAt)
     });
+
+    // Ensure currentStatus is provided as LessonStatusValue enum
+    // Assuming the API returns the status string like "ACCEPTED" in data.currentStatus
+    const statusValue = data.currentStatus as LessonStatusValue;
+    if (!statusValue || !Object.values(LessonStatusValue).includes(statusValue)) {
+      console.error(`Invalid or missing status value received from API: ${statusValue}`);
+      // Handle the error appropriately, maybe throw or return a default/error state
+      // For now, throwing an error:
+      throw new Error(`Invalid or missing status value received from API: ${statusValue}`);
+    }
 
     return new Lesson({
       id: data.id,
       quote: lessonQuote,
       currentStatusId: data.currentStatusId,
+      currentStatus: statusValue, // Pass the validated enum value
     });
   } catch (error) {
     console.error('Error in getLessonById:', error);

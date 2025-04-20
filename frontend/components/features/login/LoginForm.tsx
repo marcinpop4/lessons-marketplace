@@ -52,11 +52,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
     }
 
     setIsSubmitting(true);
-    console.log('Attempting login...');
 
     try {
       const loginSuccess = await login(email, password, userType);
-      console.log('Login result:', { loginSuccess, authError });
       if (loginSuccess) {
         setSuccess(true);
         if (onSuccess) {
@@ -71,7 +69,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setIsSubmitting(false);
-      console.log('Final state:', { error, authError, displayError });
     }
   };
 

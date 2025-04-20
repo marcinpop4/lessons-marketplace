@@ -203,9 +203,7 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
         studentId: formData.studentId
       };
 
-      console.log('Submitting payload:', payload);
       const response = await createLessonRequest(payload);
-      console.log('Lesson request created:', response);
 
       setShowSuccessMessage(true);
       if (onSubmitSuccess && response && response.lessonRequest && response.lessonRequest.id) {

@@ -4,6 +4,7 @@ import prisma from '../prisma.js';
 import { lessonQuoteService } from './lessonQuote.service.js';
 import { lessonService } from '../lesson/lesson.service.js'; // Import LessonService
 import { LessonType as SharedLessonType } from '@shared/models/LessonType.js'; // Alias for clarity
+import { lessonController } from '../lesson/lesson.controller.js'; // Import lessonController
 
 // const prismaClient = new PrismaClient(); // Remove unused
 
@@ -146,8 +147,11 @@ export const lessonQuoteController = {
       // Use LessonService to create the lesson (handles transaction internally)
       const createdLesson = await lessonService.create(prisma, quoteId);
 
-      // Return the created lesson (service should handle sanitization)
-      res.status(200).json(createdLesson); // Use 200 OK as resource (Lesson) was implicitly created
+      // Transform the result before sending
+      const modelLesson = lessonController.transformToModel(createdLesson);
+
+      // Return the transformed created lesson
+      res.status(200).json(modelLesson); // Use 200 OK as resource (Lesson) was implicitly created
 
     } catch (error) {
       console.error('Error accepting quote:', error);

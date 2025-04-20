@@ -8,7 +8,6 @@ const LessonRequestPage: React.FC = () => {
   const navigate = useNavigate();
 
   const handleSubmitSuccess = (lessonRequestId: string) => {
-    console.log('LessonRequestPage: handleSubmitSuccess called with ID:', lessonRequestId);
     navigate(`/student/teacher-quotes/${lessonRequestId}`);
   };
 

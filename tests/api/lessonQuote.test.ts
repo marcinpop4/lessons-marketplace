@@ -232,7 +232,7 @@ describe('API Integration: /api/v1/lesson-quotes', () => {
             const createdLesson = response.body as any;
             expect(createdLesson.id).toBeDefined();
             expect(createdLesson.quote?.id).toEqual(quoteToAccept.id);
-            expect(createdLesson.currentStatus?.status).toEqual('REQUESTED');
+            expect(createdLesson.currentStatus).toEqual('REQUESTED');
             expect(createdLesson.createdAt).toBeDefined();
             expect(createdLesson.updatedAt).toBeDefined();
 

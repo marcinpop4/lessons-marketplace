@@ -271,7 +271,7 @@ export const teacherController = {
         res.status(200).json({
           id: updatedRate.id,
           teacherId: teacherId, // Include teacherId from context
-          lessonType: lessonType, // Include lessonType from request
+          type: updatedRate.type, // Use the type from the updated record, not the request
           rateInCents: updatedRate.rateInCents,
           isActive: updatedRate.deactivatedAt === null, // Calculate isActive
           deactivatedAt: updatedRate.deactivatedAt, // Include deactivatedAt (should be null)

@@ -82,9 +82,9 @@ const TeacherLessonRatesManager: React.FC<Props> = ({ lessonRates = [], onRatesU
     try {
       setError(null);
 
-      // The API expects lessonType in the body
+      // The backend expects the ID of the specific rate record
       const apiPayload = {
-        lessonType: rate.type
+        lessonRateId: rate.id // Send the ID of the rate being toggled
       };
 
       // Use the appropriate endpoint based on current status

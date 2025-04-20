@@ -25,8 +25,7 @@ export const getLessonQuotesByRequestId = async (lessonRequestId: string): Promi
       teacher,
       costInCents: quote.costInCents,
       hourlyRateInCents: quote.hourlyRateInCents,
-      createdAt: new Date(quote.createdAt),
-      expiresAt: new Date(quote.expiresAt)
+      createdAt: new Date(quote.createdAt)
     });
   });
 };

@@ -142,8 +142,6 @@ export class TeacherService {
      * @returns Teacher statistics.
      */
     async getTeacherStatistics(teacherId: string): Promise<any> { // Replace 'any' with a specific stats type
-        console.log(`Fetching statistics for teacher ID: ${teacherId}`);
-
         // Using a transaction ensures data consistency for calculations
         const stats = await prisma.$transaction(async (tx) => {
             // Fetch all lessons related to the teacher via their quotes
@@ -194,7 +192,6 @@ export class TeacherService {
             };
         });
 
-        console.log(`Calculated statistics for teacher ID: ${teacherId}`, stats);
         return stats;
     }
 

@@ -9,22 +9,25 @@ export default function LessonConfirmation() {
   const { lessonId } = useParams<{ lessonId: string }>();
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    console.log('LessonConfirmation useEffect triggered with lessonId:', lessonId);
     if (lessonId) {
-      console.log('Making API call to getLessonById');
-      getLessonById(lessonId)
-        .then((lesson) => {
-          console.log('Successfully got lesson:', lesson);
-          setLesson(lesson);
-        })
-        .catch((err) => {
+      const fetchLesson = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          const fetchedLesson = await getLessonById(lessonId as string);
+          setLesson(fetchedLesson);
+        } catch (err: any) {
           console.error('Error fetching lesson:', err);
           setError(err.message);
-        });
+        }
+        setLoading(false);
+      };
+      fetchLesson();
     } else {
-      console.log('No lessonId provided in URL params');
+      console.log('No lessonId provided in URL params'); // Kept this one
     }
   }, [lessonId]);
 

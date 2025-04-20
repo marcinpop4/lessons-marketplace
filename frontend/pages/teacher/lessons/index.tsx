@@ -13,7 +13,7 @@ import { LessonType } from '@shared/models/LessonType'; // Import LessonType enu
 import { useAuth } from '@frontend/contexts/AuthContext';
 
 // Helper function to instantiate models from raw API data
-const instantiateLessonFromData = (data: TeacherLessonApiResponseItem): Lesson => {
+const instantiateLessonFromData = (data: TeacherLessonApiResponseItem): Lesson | null => {
     // Provide defaults for missing fields required by constructors, 
     // as these are NOT fetched from the API anymore.
     const studentData = {
@@ -61,22 +61,29 @@ const instantiateLessonFromData = (data: TeacherLessonApiResponseItem): Lesson =
         id: data.quote.id,
         costInCents: data.quote.costInCents,
         hourlyRateInCents: data.quote.hourlyRateInCents || 0,
-        expiresAt: new Date(data.quote.expiresAt),
         // Pass instantiated objects
         lessonRequest: lessonRequest,
         teacher: teacher,
         // Omit createdAt, use constructor default
     });
 
+    // Get the status value from the nested object
+    const statusValue = data.currentStatus?.status as LessonStatusValue;
+    if (!statusValue || !Object.values(LessonStatusValue).includes(statusValue)) {
+        console.warn(`Lesson ${data.id} has missing or invalid status from API: ${statusValue}. Skipping instantiation.`);
+        // Return null or throw an error? Returning null for now to allow filtering.
+        return null; // Indicate failure to instantiate
+    }
+
     const lesson = new Lesson({
         id: data.id,
         quote: lessonQuote,
-        currentStatusId: data.currentStatus?.id || '',
+        currentStatusId: data.currentStatus?.id || '', // Keep ID
+        currentStatus: statusValue // Pass the validated enum value
     });
 
-    // Attach the status value for easy access in the page component
-    // Use optional chaining in case currentStatus is null
-    (lesson as any)._currentStatusValue = data.currentStatus?.status;
+    // Attach the status value for easy access in the page component (no longer needed?)
+    // (lesson as any)._currentStatusValue = statusValue; // Can likely remove this line
 
     return lesson;
 };
@@ -113,11 +120,11 @@ const TeacherLessonsPage: React.FC = () => {
                 }
                 // If found nested array, use it instead
                 const instantiatedLessons = lessonsArray.map(instantiateLessonFromData);
-                setLessons(instantiatedLessons);
+                setLessons(instantiatedLessons.filter((lesson): lesson is Lesson => lesson !== null));
             } else {
                 // If it is an array, proceed as before
                 const instantiatedLessons = rawLessonsData.map(instantiateLessonFromData);
-                setLessons(instantiatedLessons);
+                setLessons(instantiatedLessons.filter((lesson): lesson is Lesson => lesson !== null));
             }
 
         } catch (err) {
@@ -158,8 +165,8 @@ const TeacherLessonsPage: React.FC = () => {
         };
 
         lessonsToGroup.forEach(lesson => {
-            // Access the status value attached during instantiation
-            const statusValue = (lesson as any)._currentStatusValue as LessonStatusValue;
+            // Access the status value directly from the lesson object
+            const statusValue = lesson.currentStatus as LessonStatusValue;
 
             if (statusValue && grouped[statusValue]) {
                 grouped[statusValue].push(lesson);
@@ -193,8 +200,8 @@ const TeacherLessonsPage: React.FC = () => {
                                 <TeacherLessonCard
                                     key={lesson.id}
                                     lesson={lesson}
-                                    // Pass the correct status value attached during instantiation
-                                    currentStatus={(lesson as any)._currentStatusValue}
+                                    // Pass the correct status value directly from the lesson
+                                    currentStatus={lesson.currentStatus}
                                     onUpdateStatus={handleUpdateStatus}
                                     isUpdating={updatingLessonId === lesson.id}
                                 />

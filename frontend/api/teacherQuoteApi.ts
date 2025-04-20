@@ -87,8 +87,7 @@ export const createLessonQuotes = async (
       teacher,
       costInCents: quote.costInCents,
       hourlyRateInCents: quote.hourlyRateInCents,
-      createdAt: new Date(quote.createdAt),
-      expiresAt: new Date(quote.expiresAt)
+      createdAt: new Date(quote.createdAt)
     });
   });
 };
@@ -170,8 +169,7 @@ const transformQuotes = (quotesData: ApiQuoteData[]): LessonQuote[] => {
       teacher,
       costInCents: quote.costInCents,
       hourlyRateInCents: quote.hourlyRateInCents,
-      createdAt: new Date(quote.createdAt),
-      expiresAt: new Date(quote.expiresAt)
+      createdAt: new Date(quote.createdAt)
     });
   });
 };

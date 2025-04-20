@@ -15,7 +15,13 @@ const lessonIncludeForTransform = {
             }
         }
     },
-    currentStatus: true // Include the current status object
+    // Include the lessonStatuses relation, ordered, to match transformToModel expectation
+    lessonStatuses: {
+        orderBy: {
+            createdAt: 'desc' as const
+        },
+        take: 1
+    }
 };
 
 class LessonService {
@@ -84,7 +90,6 @@ class LessonService {
                                 }
                             }
                         },
-                        currentStatus: true,
                         lessonStatuses: true
                     }
                 });

@@ -59,7 +59,6 @@ export const createLessonRequest = async (data: CreateLessonRequestPayload): Pro
       startTime: data.startTime.toISOString()
     };
 
-    console.log('Sending lesson request data:', payload);
     const response = await apiClient.post('/api/v1/lesson-requests', payload);
 
     // Expect the nested structure again
@@ -89,8 +88,7 @@ export const createLessonRequest = async (data: CreateLessonRequestPayload): Pro
       teacher: quote.teacher,
       costInCents: quote.costInCents,
       hourlyRateInCents: quote.hourlyRateInCents,
-      createdAt: new Date(quote.createdAt),
-      expiresAt: new Date(quote.expiresAt)
+      createdAt: new Date(quote.createdAt)
     }));
 
     return {

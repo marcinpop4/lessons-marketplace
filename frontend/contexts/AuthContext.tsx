@@ -133,10 +133,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         password,
         userType,
       };
-      console.log('Login request payload:', payload);
 
       const response = await apiClient.post(`/api/v1/auth/login`, payload);
-      console.log('Login result:', response.data);
 
       if (response.data && response.data.accessToken) {
         setUser(response.data.user);
@@ -161,11 +159,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (registerData: RegisterData) => {
     setLoading(true);
     setError(null);
-    console.log('Starting registration in AuthContext:', { ...registerData, password: '[REDACTED]' });
 
     try {
       const response = await apiClient.post(`/api/v1/auth/register`, registerData);
-      console.log('Registration API response:', response.data);
 
       if (response.data && response.data.accessToken) {
         setUser(response.data.user);

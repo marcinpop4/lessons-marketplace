@@ -237,7 +237,7 @@ describe('API Integration: /api/v1/teachers using Seed Data', () => {
             expect(response.status).toBe(200); // Expect 200 OK for update
             expect(response.body.id).toBe(existingGuitarRateId);
             expect(response.body.teacherId).toBe(seededTeacherId);
-            expect(response.body.lessonType).toBe(rateUpdateData.lessonType);
+            expect(response.body.type).toBe(rateUpdateData.lessonType);
             expect(response.body.rateInCents).toBe(rateUpdateData.rateInCents);
             expect(response.body.rateInCents).not.toBe(originalRateInCents); // Ensure rate changed
             expect(response.body.isActive).toBe(true); // Assuming update doesn't deactivate
