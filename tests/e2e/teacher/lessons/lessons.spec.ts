@@ -54,6 +54,9 @@ test.describe('Teacher Lesson Management', () => {
         // 2. Wait for page to fully load
         await waitForNetworkIdle(page);
 
+        // Define locator for success banner
+        const successBanner = page.locator('#success-message-banner');
+
         // 3. Verify that sections for all statuses are visible
         for (const status of Object.values(STATUS)) {
             await expect(
@@ -73,6 +76,10 @@ test.describe('Teacher Lesson Management', () => {
         await acceptButton.click();
         await waitForNetworkIdle(page);
 
+        // Assert success message appears for ACCEPTED
+        await expect(successBanner).toBeVisible();
+        await expect(successBanner).toContainText(/Successfully updated status.*to accepted/i);
+
         // 5. Test ACCEPTED -> COMPLETED transition
         // Find a lesson card in the ACCEPTED section
         const acceptedCard = page.locator('#lessons-accepted-section .card').first();
@@ -84,6 +91,10 @@ test.describe('Teacher Lesson Management', () => {
         await completeButton.click();
         await waitForNetworkIdle(page);
 
+        // Assert success message appears for COMPLETED
+        await expect(successBanner).toBeVisible();
+        await expect(successBanner).toContainText(/Successfully updated status.*to completed/i);
+
         // 6. Test ACCEPTED -> VOIDED transition
         // There should be another ACCEPTED card (since we created multiple in seed.js)
         const anotherAcceptedCard = page.locator('#lessons-accepted-section .card').first();
@@ -94,6 +105,10 @@ test.describe('Teacher Lesson Management', () => {
         await expect(voidButton).toBeVisible();
         await voidButton.click();
         await waitForNetworkIdle(page);
+
+        // Assert success message appears for VOIDED
+        await expect(successBanner).toBeVisible();
+        await expect(successBanner).toContainText(/Successfully updated status.*to voided/i);
 
         // 7. Verify all status sections are still visible after transitions
         for (const status of Object.values(STATUS)) {

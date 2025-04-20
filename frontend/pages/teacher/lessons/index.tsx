@@ -94,6 +94,7 @@ const TeacherLessonsPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [updatingLessonId, setUpdatingLessonId] = useState<string | null>(null);
     const { user } = useAuth();
+    const [successMessage, setSuccessMessage] = useState<string | null>(null); // State for success message
 
     const fetchLessonsData = async () => {
         if (!user || user.userType !== 'TEACHER') {
@@ -139,17 +140,37 @@ const TeacherLessonsPage: React.FC = () => {
         fetchLessonsData();
     }, [user]);
 
+    // Effect to clear success message after a delay
+    useEffect(() => {
+        if (successMessage) {
+            const timer = setTimeout(() => {
+                setSuccessMessage(null);
+            }, 5000); // Clear after 5 seconds
+            return () => clearTimeout(timer); // Cleanup timer on component unmount or if message changes
+        }
+    }, [successMessage]);
+
     // Handle lesson status updates
     const handleUpdateStatus = async (lessonId: string, newStatus: LessonStatusValue) => {
+        // Find the lesson details to include in the message
+        const lesson = lessons.find(l => l.id === lessonId);
+        const studentName = lesson?.quote?.lessonRequest?.student?.fullName || 'the lesson';
+        const newStatusText = newStatus.toLowerCase().replace('_', ' ');
+
         try {
             setUpdatingLessonId(lessonId);
             await updateLessonStatus(lessonId, newStatus);
 
             // Refresh the lessons after successful update
             await fetchLessonsData();
+
+            // Set success message
+            setSuccessMessage(`Successfully updated status for ${studentName} to ${newStatusText}.`);
+            setError(null); // Clear any previous errors
         } catch (err) {
             console.error('Failed to update lesson status:', err);
             setError(err instanceof Error ? err.message : 'Failed to update lesson status');
+            setSuccessMessage(null); // Clear success message on error
         } finally {
             setUpdatingLessonId(null);
         }
@@ -185,6 +206,21 @@ const TeacherLessonsPage: React.FC = () => {
 
     return (
         <div className="p-4 md:p-6 max-w-7xl mx-auto">
+            {/* Success Message Area */}
+            {successMessage && (
+                <div
+                    className="alert alert-success mb-4 shadow-lg"
+                    role="alert"
+                    id="success-message-banner" // Added ID for testing
+                >
+                    <div className="flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current flex-shrink-0 h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span>{successMessage}</span>
+                    </div>
+                </div>
+            )}
+            {/* End Success Message Area */}
+
             <h1 className="text-2xl font-semibold mb-6">Lessons Dashboard</h1>
 
             {lessonStatuses.map(status => (
