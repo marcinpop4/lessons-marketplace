@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import TeacherLessonCard from '../../../components/TeacherLessonCard';
 import { Lesson } from '@shared/models/Lesson';
-import { LessonStatusValue } from '@shared/models/LessonStatus';
+import { LessonStatusValue, LessonStatusTransition, LessonStatus } from '@shared/models/LessonStatus';
 import { getTeacherLessons, TeacherLessonApiResponseItem } from '@frontend/api/teacherApi'; // Import API function and response type
 import { updateLessonStatus } from '@frontend/api/lessonApi'; // Import the update status function
 import { LessonQuote } from '@shared/models/LessonQuote';
@@ -151,15 +151,29 @@ const TeacherLessonsPage: React.FC = () => {
     }, [successMessage]);
 
     // Handle lesson status updates
-    const handleUpdateStatus = async (lessonId: string, newStatus: LessonStatusValue) => {
+    const handleUpdateStatus = async (lessonId: string, currentStatus: LessonStatusValue, transition: LessonStatusTransition) => {
         // Find the lesson details to include in the message
         const lesson = lessons.find(l => l.id === lessonId);
         const studentName = lesson?.quote?.lessonRequest?.student?.fullName || 'the lesson';
-        const newStatusText = newStatus.toLowerCase().replace('_', ' ');
+
+        // Calculate the resulting status from the transition
+        const resultingStatus = LessonStatus.getResultingStatus(currentStatus, transition);
+
+        // Ensure the transition is valid and resulted in a status
+        if (!resultingStatus) {
+            const errorMsg = `Invalid transition (${transition}) attempted for current status (${currentStatus}).`;
+            console.error(errorMsg);
+            setError(errorMsg); // Show error to the user
+            setSuccessMessage(null); // Clear any success message
+            return; // Stop execution
+        }
+
+        const newStatusText = resultingStatus.toLowerCase().replace('_', ' '); // Use calculated status for message
 
         try {
             setUpdatingLessonId(lessonId);
-            await updateLessonStatus(lessonId, newStatus);
+            // Pass the calculated resulting status to the API
+            await updateLessonStatus(lessonId, resultingStatus);
 
             // Refresh the lessons after successful update
             await fetchLessonsData();

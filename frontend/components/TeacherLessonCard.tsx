@@ -1,10 +1,11 @@
 import React from 'react';
 // Import shared models
 import { Lesson } from '@shared/models/Lesson';
-import { LessonStatus, LessonStatusValue } from '@shared/models/LessonStatus';
+// Import necessary enums and the class for static methods
+import { LessonStatusValue, LessonStatusTransition, LessonStatus } from '@shared/models/LessonStatus';
 import Card from '@frontend/components/shared/Card/Card'; // Import shared Card
 import Button from '@frontend/components/shared/Button/Button'; // Import shared Button
-import { updateLessonStatus } from '@frontend/api/lessonApi'; // Import the API function
+// Removed unused import: import { updateLessonStatus } from '@frontend/api/lessonApi';
 
 // Remove placeholder type
 // interface LessonPlaceholder {
@@ -18,113 +19,95 @@ import { updateLessonStatus } from '@frontend/api/lessonApi'; // Import the API 
 interface TeacherLessonCardProps {
     lesson: Lesson; // Use actual Lesson type
     currentStatus: LessonStatusValue; // Pass current status explicitly
-    // Function prop for handling status updates
-    onUpdateStatus?: (lessonId: string, newStatus: LessonStatusValue) => Promise<void>; // Make optional
-    isUpdating?: boolean; // Add optional prop for loading state
+    // Updated Function prop signature for handling status updates via transition
+    onUpdateStatus: (lessonId: string, currentStatus: LessonStatusValue, transition: LessonStatusTransition) => void;
+    isUpdating: boolean; // Use loading state from parent
 }
 
 const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
     lesson,
     currentStatus,
-    onUpdateStatus, // Destructure the prop
-    isUpdating = false // Default to false
+    onUpdateStatus, // Use the required prop from parent
+    isUpdating // Use the required prop from parent
 }) => {
-    const [localIsUpdating, setLocalIsUpdating] = React.useState(isUpdating);
-    const [statusUpdateError, setStatusUpdateError] = React.useState<string | null>(null);
+    // Removed local state for loading and error, now handled by parent
 
-    // Call the prop function passed from the parent or use the direct API call
-    const handleStatusUpdate = async (newStatus: LessonStatusValue) => {
-        try {
-            setLocalIsUpdating(true);
-            setStatusUpdateError(null);
+    // --- New Logic ---
+    const student = lesson.quote.lessonRequest.student; // Access student details
+    const request = lesson.quote.lessonRequest; // Access request details
 
-            if (typeof onUpdateStatus === 'function') {
-                // Use parent's handler if provided
-                await onUpdateStatus(lesson.id, newStatus);
-            } else {
-                // Otherwise call API directly
-                await updateLessonStatus(lesson.id, newStatus);
-                // Reload the page to reflect changes
-                window.location.reload();
-            }
-        } catch (error) {
-            console.error('Error updating lesson status:', error);
-            setStatusUpdateError('Failed to update status. Please try again.');
-        } finally {
-            setLocalIsUpdating(false);
-        }
+    // Get the map of possible transitions for the current status
+    const possibleTransitionsMap = LessonStatus.StatusTransitions[currentStatus] || {};
+    // Extract the transition names (keys) from the map
+    const availableTransitions = Object.keys(possibleTransitionsMap) as LessonStatusTransition[];
+
+    // Helper to format transition enum keys (e.g., ACCEPT -> Accept)
+    const formatTransition = (transition: LessonStatusTransition): string => {
+        if (!transition) return '';
+        return transition.charAt(0).toUpperCase() + transition.slice(1).toLowerCase();
     };
+    // --- End New Logic ---
 
-    // Determine possible next statuses
-    let possibleNextStatuses = Object.values(LessonStatusValue).filter(
-        newStatus => LessonStatus.isValidTransition(currentStatus, newStatus) && newStatus !== currentStatus
-    );
-
-    // Prioritize 'Completed' button to be first
-    if (possibleNextStatuses.includes(LessonStatusValue.COMPLETED)) {
-        possibleNextStatuses = [
-            LessonStatusValue.COMPLETED,
-            ...possibleNextStatuses.filter(status => status !== LessonStatusValue.COMPLETED)
-        ];
-    }
-
-    // Format status for display (still needed for grouping title, but not subtitle)
-    // const formattedStatus = currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1).toLowerCase();
-    const studentName = `${lesson.student?.firstName || 'N/A'} ${lesson.student?.lastName || ''}`;
-
-    // Function to determine button variant based on status
-    const getButtonVariant = (status: LessonStatusValue): 'primary' | 'secondary' => {
-        switch (status) {
-            case LessonStatusValue.ACCEPTED:
-            case LessonStatusValue.COMPLETED:
+    // Function to determine button variant based on transition
+    const getButtonVariant = (transition: LessonStatusTransition): 'primary' | 'secondary' => {
+        switch (transition) {
+            case LessonStatusTransition.ACCEPT:
+            case LessonStatusTransition.COMPLETE:
                 return 'primary';
-            case LessonStatusValue.REJECTED:
-            case LessonStatusValue.VOIDED:
+            case LessonStatusTransition.REJECT:
+            case LessonStatusTransition.VOID:
                 return 'secondary';
             default:
-                return 'secondary'; // Default to secondary for any other cases
+                return 'primary'; // Default to primary
         }
     };
+
+    // Use original studentName logic if needed for title
+    const studentName = `${student?.firstName || 'N/A'} ${student?.lastName || ''}`;
 
     return (
         <Card
             title={`Lesson with ${studentName}`}
-            // Remove Status and Start Time from subtitle
-            // subtitle={`Status: ${formattedStatus} | Start: ${lesson.startTime ? new Date(lesson.startTime).toLocaleString() : 'N/A'}`}
             className="mb-4"
             headingLevel="h4"
         >
+            {/* Original body content */}
             <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                {/* Move Start Time here */}
-                <p>Start Time: {lesson.startTime ? new Date(lesson.startTime).toLocaleString() : 'N/A'}</p>
-                <p>Duration: {lesson.durationMinutes || 'N/A'} minutes</p>
-                <p>Address: {lesson.address ? lesson.address.toString() : 'N/A'}</p>
-                <p>Cost: {lesson.getFormattedCost ? lesson.getFormattedCost() : ('N/A')}</p>
+                <p>Start Time: {request?.startTime ? new Date(request.startTime).toLocaleString() : 'N/A'}</p>
+                <p>Duration: {request?.durationMinutes || 'N/A'} minutes</p>
+                <p>Address: {request?.address?.toString() || 'N/A'}</p>
+                <p>Cost: {lesson.quote?.getFormattedCost() || 'N/A'}</p>
                 <p>Status: <span className="font-medium capitalize">{currentStatus.toLowerCase()}</span></p>
             </div>
 
-            {statusUpdateError && (
-                <div className="mt-2 text-sm text-red-600 dark:text-red-400">
-                    {statusUpdateError}
-                </div>
-            )}
+            {/* Removed local statusUpdateError display */}
 
-            {/* Action Buttons */}
+            {/* Updated Action Buttons based on transitions */}
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-2">
-                {possibleNextStatuses.length > 0 ? (
-                    possibleNextStatuses.map(nextStatus => (
-                        <Button
-                            key={nextStatus}
-                            onClick={() => handleStatusUpdate(nextStatus)}
-                            variant={getButtonVariant(nextStatus)}
-                            size="sm"
-                            disabled={localIsUpdating || isUpdating} // Use either local or prop state
-                        >
-                            {localIsUpdating ? 'Updating...' : (nextStatus.charAt(0).toUpperCase() + nextStatus.slice(1).toLowerCase())}
-                        </Button>
-                    ))
+                {isUpdating ? (
+                    // Display loading state using the isUpdating prop
+                    <Button variant="secondary" size="sm" disabled>
+                        Updating...
+                    </Button>
                 ) : (
-                    <span className="text-sm text-gray-500 italic">No actions available</span>
+                    availableTransitions.length > 0 ? (
+                        availableTransitions.map(transition => (
+                            <Button
+                                key={transition}
+                                // Call the parent's onUpdateStatus with the transition
+                                onClick={() => onUpdateStatus(lesson.id, currentStatus, transition)}
+                                variant={getButtonVariant(transition)}
+                                size="sm"
+                                // Disable based on the parent's isUpdating state
+                                disabled={isUpdating}
+                            >
+                                {/* Display formatted transition name */}
+                                {formatTransition(transition)}
+                            </Button>
+                        ))
+                    ) : (
+                        <span className="text-sm text-gray-500 italic">No actions available</span>
+                    )
                 )}
             </div>
         </Card>

@@ -104,9 +104,6 @@ export const lessonController = {
     try {
       const { quoteId } = req.body;
 
-      // Log the request body for debugging
-      console.debug('Received lesson creation request data:', req.body);
-
       // Validate required fields
       if (!quoteId) {
         res.status(400).json({ error: 'Missing required field: quoteId' });

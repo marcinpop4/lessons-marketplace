@@ -5,7 +5,8 @@ import { Teacher } from '@shared/models/Teacher';
 import { Address } from '@shared/models/Address';
 import { Student } from '@shared/models/Student';
 import apiClient from './apiClient';
-import { LessonStatusValue } from '@shared/models/LessonStatus';
+import { LessonStatusValue, LessonStatusTransition } from '@shared/models/LessonStatus';
+import axios, { AxiosError } from 'axios';
 
 // Check for API base URL using Vite's import.meta.env
 if (!import.meta.env.VITE_API_BASE_URL) {
@@ -151,17 +152,43 @@ export const fetchTeacherLessons = async (teacherId: string): Promise<FullLesson
 };
 
 /**
- * Updates the status of a specific lesson.
+ * Update the status of a lesson.
  * @param lessonId The ID of the lesson to update.
- * @param status The new status value.
- * @returns A promise that resolves when the update is complete.
+ * @param newStatus The new status value to set.
  */
-export const updateLessonStatus = async (lessonId: string, status: LessonStatusValue): Promise<void> => {
+export const updateLessonStatus = async (lessonId: string, newStatus: LessonStatusValue): Promise<void> => {
+  // Check if the provided status is a valid enum value
+  if (!Object.values(LessonStatusValue).includes(newStatus)) {
+    const errorMsg = `Invalid status value provided: ${newStatus}`;
+    console.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  const requestUrl = `/api/v1/lessons/${lessonId}`;
+  const requestBody = { newStatus: newStatus };
+  const requestMethod = 'PATCH';
+
   try {
-    await apiClient.patch(`/api/v1/lessons/${lessonId}`, { newStatus: status });
+    // Send the resulting status value to the endpoint
+    await apiClient.patch(requestUrl, requestBody);
   } catch (error) {
-    console.error(`Error updating lesson ${lessonId} status:`, error);
-    // Re-throw the error to be handled by the calling component
+    let logMessage = `API Error updating lesson status: ${error}`; // Default message
+
+    // Check if it's an AxiosError with response info
+    if (axios.isAxiosError(error) && error.response) {
+      logMessage =
+        `${requestMethod} ${requestUrl} ${JSON.stringify(requestBody)} - Failed with Status Code: ${error.response.status} (${error.response.statusText})`;
+
+      // Optionally log the response data if available
+      if (error.response.data) {
+        logMessage += `\nResponse Body: ${JSON.stringify(error.response.data)}`;
+      }
+    } else if (error instanceof Error) {
+      logMessage = `API Error updating lesson status (${requestMethod} ${requestUrl}): ${error.message}`;
+    }
+
+    console.error(logMessage);
+    // Rethrow the original error to be handled by the calling component
     throw error;
   }
 }; 

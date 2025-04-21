@@ -12,6 +12,19 @@ export enum LessonStatusValue {
 }
 
 /**
+ * Defines the possible transition actions that can be taken
+ */
+export enum LessonStatusTransition {
+    ACCEPT = 'ACCEPT',
+    REJECT = 'REJECT',
+    COMPLETE = 'COMPLETE',
+    VOID = 'VOID'
+}
+
+// Define the type alias outside the class, referencing the static property
+export type LessonStatusTransitionName = keyof (typeof LessonStatus.StatusTransitions)[LessonStatusValue];
+
+/**
  * Properties required to create a LessonStatus instance.
  */
 interface LessonStatusProps {
@@ -67,31 +80,48 @@ export class LessonStatus {
     }
 
     /**
+     * Defines valid status transitions and their results
+     */
+    static readonly StatusTransitions = {
+        [LessonStatusValue.REQUESTED]: {
+            [LessonStatusTransition.ACCEPT]: LessonStatusValue.ACCEPTED,
+            [LessonStatusTransition.REJECT]: LessonStatusValue.REJECTED
+        },
+        [LessonStatusValue.ACCEPTED]: {
+            [LessonStatusTransition.COMPLETE]: LessonStatusValue.COMPLETED,
+            [LessonStatusTransition.VOID]: LessonStatusValue.VOIDED
+        },
+        [LessonStatusValue.REJECTED]: {
+            [LessonStatusTransition.VOID]: LessonStatusValue.VOIDED
+        },
+        [LessonStatusValue.COMPLETED]: {
+            [LessonStatusTransition.VOID]: LessonStatusValue.VOIDED
+        },
+        [LessonStatusValue.VOIDED]: {}
+    } as const;
+
+    /**
+     * Gets the resulting status after a transition
+     * @param currentStatus The current status of the lesson
+     * @param transition The requested transition
+     * @returns The resulting status if valid, undefined otherwise
+     */
+    static getResultingStatus(currentStatus: LessonStatusValue, transition: LessonStatusTransition): LessonStatusValue | undefined {
+        const possibleTransitions = LessonStatus.StatusTransitions[currentStatus];
+        if (transition in possibleTransitions) {
+            return possibleTransitions[transition as keyof typeof possibleTransitions];
+        }
+        return undefined;
+    }
+
+    /**
      * Validates if a transition from a current status to a new status is allowed.
      * @param currentStatus The current status of the lesson.
-     * @param newStatus The desired new status.
+     * @param transition The requested transition.
      * @returns True if the transition is valid, false otherwise.
      */
-    static isValidTransition(currentStatus: LessonStatusValue, newStatus: LessonStatusValue): boolean {
-        if (currentStatus === newStatus) {
-            // Handled as no-op by controller, considered valid here for completeness
-            return true;
-        }
-
-        switch (currentStatus) {
-            case LessonStatusValue.REQUESTED:
-                return [LessonStatusValue.ACCEPTED, LessonStatusValue.REJECTED].includes(newStatus);
-            case LessonStatusValue.ACCEPTED:
-                // Allowing REJECTED from ACCEPTED as discussed
-                return [LessonStatusValue.COMPLETED, LessonStatusValue.VOIDED, LessonStatusValue.REJECTED].includes(newStatus);
-            case LessonStatusValue.REJECTED:
-            case LessonStatusValue.COMPLETED:
-            case LessonStatusValue.VOIDED:
-                return false; // Terminal states
-            default:
-                // Should not happen with valid enum values, treat as invalid
-                console.error(`Unexpected currentStatus: ${currentStatus}`);
-                return false;
-        }
+    static isValidTransition(currentStatus: LessonStatusValue, transition: LessonStatusTransition): boolean {
+        const possibleTransitions = LessonStatus.StatusTransitions[currentStatus];
+        return transition in possibleTransitions;
     }
 }

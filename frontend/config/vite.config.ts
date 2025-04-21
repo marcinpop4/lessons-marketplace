@@ -3,6 +3,34 @@ import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import fs from 'fs'
 
+// --- Helper function to scrub sensitive data --- 
+const scrubSensitiveData = (obj: any, keysToScrub: string[] = ['password', 'email', 'token', 'authorization', 'apiKey', 'secret']): any => {
+  if (obj === null || typeof obj !== 'object') {
+    return obj; // Return non-objects as is
+  }
+
+  if (Array.isArray(obj)) {
+    // Recursively scrub elements in arrays
+    return obj.map(item => scrubSensitiveData(item, keysToScrub));
+  }
+
+  // Create a new object to avoid modifying the original
+  const scrubbedObj: { [key: string]: any } = {};
+
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      if (keysToScrub.includes(key.toLowerCase())) {
+        scrubbedObj[key] = '[SCRUBBED]';
+      } else {
+        // Recursively scrub nested objects/arrays
+        scrubbedObj[key] = scrubSensitiveData(obj[key], keysToScrub);
+      }
+    }
+  }
+  return scrubbedObj;
+};
+// --- End Helper function --- 
+
 // Get absolute path to the project root directory
 const projectRoot = resolve(__dirname, '../..')
 
@@ -102,26 +130,42 @@ export default defineConfig(({ mode }) => {
         'Expires': '0'
       } : undefined,
       proxy: {
-
-        // Add a proxy rule specifically for /api/v1
         '/api/v1': {
           target: 'http://localhost:3000', // Your backend server address
           changeOrigin: true,
           secure: false,
-          // Optional: Rewrite path if backend doesn't expect /api/v1 prefix
-          // rewrite: (path) => path.replace(/^\/api\/v1/, ''), 
           configure: (proxy, options) => {
             const disableLogs = process.env.DISABLE_VITE_PROXY_LOGS === 'true';
+
             proxy.on('proxyReq', (proxyReq, req, res) => {
-              if (!disableLogs) {
-                console.log(`[VITE PROXY /api/v1] Sending request to target: ${options.target}${proxyReq.path}`);
-              }
+              let body = '';
+              req.on('data', (chunk) => { body += chunk; });
+              req.on('end', () => { (req as any)._body = body; });
             });
+
             proxy.on('proxyRes', (proxyRes, req, res) => {
               if (!disableLogs) {
-                console.log(`[VITE PROXY /api/v1] Received response from target: ${proxyRes.statusCode} ${req.url}`);
+                const rawBody = (req as any)._body || '';
+                let scrubbedBodyString = rawBody;
+
+                // Attempt to parse and scrub if body is not empty
+                if (rawBody) {
+                  try {
+                    const parsedBody = JSON.parse(rawBody);
+                    const scrubbedBody = scrubSensitiveData(parsedBody);
+                    scrubbedBodyString = JSON.stringify(scrubbedBody);
+                  } catch (e) {
+                    // Keep raw body if JSON parsing fails (might not be JSON)
+                    scrubbedBodyString = rawBody;
+                    console.warn('[VITE PROXY /api/v1] Failed to parse/scrub request body for logging.');
+                  }
+                }
+
+                // Log with tabs using the scrubbed body
+                console.log(`${proxyRes.statusCode}\t${req.method}\t${req.url}\t${scrubbedBodyString}`);
               }
             });
+
             proxy.on('error', (err, req, res) => {
               console.error('[VITE PROXY /api/v1] Proxy error:', err);
               if (!res.headersSent) {
@@ -131,7 +175,6 @@ export default defineConfig(({ mode }) => {
             });
           }
         },
-        // You might still need a separate rule for /api/health if it's not under /v1
         '/api/health': {
           target: 'http://localhost:3000',
           changeOrigin: true,

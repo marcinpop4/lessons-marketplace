@@ -51,16 +51,28 @@ test.describe('Teacher Lesson Management', () => {
         // 1. Login as Teacher
         await loginAsTeacher(page);
 
-        // 2. Wait for page to fully load
-        await waitForNetworkIdle(page);
+        // --- NEW: Wait for dashboard structure to be visible ---
+        await expect(page.getByRole('heading', { name: 'Lessons Dashboard', level: 1 })).toBeVisible();
+
+        // Define status values directly (consider importing if possible later)
+        // Using the STATUS object defined at the top
+        const lessonStatuses = Object.values(STATUS);
+        for (const status of lessonStatuses) {
+            await expect(page.getByRole('heading', { name: new RegExp(status, 'i'), level: 2 })).toBeVisible();
+        }
+        // --- END NEW ---
+
+        // 2. Wait for page to fully load (optional, maybe remove if above checks suffice)
+        // await waitForNetworkIdle(page);
 
         // Define locator for success banner
         const successBanner = page.locator('#success-message-banner');
 
         // 3. Verify that sections for all statuses are visible
-        for (const status of Object.values(STATUS)) {
+        // This loop might be redundant now, keeping for robustness
+        for (const status of lessonStatuses) { // Use defined statuses
             await expect(
-                page.locator(`#lessons-${status}-section`),
+                page.locator(`#lessons-${status.toLowerCase()}-section`), // Ensure lowercase ID
                 `Lesson section for "${status}" should be visible`
             ).toBeVisible();
         }

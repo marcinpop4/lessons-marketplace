@@ -28,6 +28,13 @@ test.describe.serial('Lesson request flow', () => {
     // Wait for navigation to lesson request page
     await expect(page).toHaveURL(/.*\/lesson-request.*/, { timeout: 5000 });
 
+    // --- NEW: Wait for key form elements to be visible ---
+    await expect(page.getByRole('heading', { name: 'Request a Lesson' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Submit Request' })).toBeVisible();
+    // Also ensure the form container itself is visible before proceeding
+    await expect(page.locator('form')).toBeVisible();
+    // --- END NEW ---
+
     // 2. Fill out the lesson request form
     await expect(page.locator('form')).toBeVisible();
 
