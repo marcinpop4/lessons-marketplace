@@ -114,7 +114,10 @@ const GoalManager: React.FC<GoalManagerProps> = ({ initialGoals, lessonId, onGoa
                 const goalsInSection = groupedGoals[status] || [];
                 return (
                     <section key={status} className="goal-status-section">
-                        <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-3 border-b border-gray-300 dark:border-gray-600 pb-1">
+                        <h3
+                            className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-3 border-b border-gray-300 dark:border-gray-600 pb-1"
+                            data-testid={`goal-section-heading-${formatStatus(status)}`}
+                        >
                             {formatStatus(status)} ({goalsInSection.length})
                         </h3>
                         {goalsInSection.length > 0 ? (

@@ -1,6 +1,7 @@
 import request from 'supertest';
 // We only need Prisma types now, not the client
 import { Teacher, Student, Address, LessonRequest, LessonQuote, Lesson, LessonStatus, LessonType } from '@prisma/client';
+import { LessonStatusValue } from '@shared/models/LessonStatus'; // Import LessonStatusValue enum
 
 // --- Seed Data Constants ---
 // Use credentials matching a user created in server/prisma/seed.js
@@ -100,6 +101,114 @@ describe('API Integration: /api/v1/teachers using Seed Data', () => {
             expect(response.status).toBe(403);
             expect(response.body.error).toContain('Forbidden');
         });
+
+        it('should return lessons for the authenticated seeded teacher with correct structure and goal counts', async () => {
+            if (!seededTeacherId || !seededTeacherAuthToken) throw new Error('Seeded teacher auth info not available');
+
+            const response = await request(API_BASE_URL!)
+                .get(`/api/v1/teachers/${seededTeacherId}/lessons`)
+                .set('Authorization', seededTeacherAuthToken);
+
+            // Basic assertions
+            expect(response.status).toBe(200);
+            expect(response.body).toBeInstanceOf(Array);
+            expect(response.body.length).toBe(31);
+
+            // --- Validate Goal Counts ---
+            let lessonsWithGoalsCount = 0;
+            let lessonsWithoutGoalsCount = 0;
+
+            response.body.forEach((lesson: any) => {
+                // --- Top-Level Lesson Properties ---
+                expect(lesson).toHaveProperty('id');
+                expect(lesson).toHaveProperty('type'); // Already asserted type earlier
+                expect(lesson).toHaveProperty('createdAt');
+                expect(lesson).toHaveProperty('updatedAt');
+                expect(lesson).toHaveProperty('goalCount'); // Already asserted goalCount earlier
+                expect(typeof lesson.goalCount).toBe('number'); // Already asserted type
+
+                // --- Current Status ---
+                expect(lesson).toHaveProperty('currentStatus');
+                expect(lesson.currentStatus).toHaveProperty('id');
+                expect(lesson.currentStatus).toHaveProperty('status');
+                expect(lesson.currentStatus).toHaveProperty('createdAt');
+                expect(lesson.currentStatus).toHaveProperty('context'); // Could be {} or null
+
+                // --- Quote ---
+                expect(lesson).toHaveProperty('quote');
+                expect(lesson.quote).toHaveProperty('id');
+                expect(lesson.quote).toHaveProperty('costInCents');
+                expect(lesson.quote).toHaveProperty('hourlyRateInCents');
+                expect(lesson.quote).toHaveProperty('createdAt');
+                expect(lesson.quote).toHaveProperty('updatedAt');
+                expect(lesson.quote).toHaveProperty('lessonRequestId');
+                expect(lesson.quote).toHaveProperty('teacherId', seededTeacherId); // Check teacherId matches
+
+                // --- Quote > Teacher ---
+                expect(lesson.quote).toHaveProperty('teacher');
+                expect(lesson.quote.teacher).toHaveProperty('id', seededTeacherId);
+                expect(lesson.quote.teacher).toHaveProperty('firstName');
+                expect(lesson.quote.teacher).toHaveProperty('lastName');
+                expect(lesson.quote.teacher).toHaveProperty('email');
+                expect(lesson.quote.teacher).not.toHaveProperty('password'); // Ensure password is not exposed
+
+                // --- Quote > Lesson Request ---
+                expect(lesson.quote).toHaveProperty('lessonRequest');
+                expect(lesson.quote.lessonRequest).toHaveProperty('id', lesson.quote.lessonRequestId);
+                expect(lesson.quote.lessonRequest).toHaveProperty('type');
+                expect(lesson.quote.lessonRequest).toHaveProperty('startTime');
+                expect(lesson.quote.lessonRequest).toHaveProperty('durationMinutes');
+                expect(lesson.quote.lessonRequest).toHaveProperty('studentId');
+                expect(lesson.quote.lessonRequest).toHaveProperty('addressId');
+                expect(lesson.quote.lessonRequest).toHaveProperty('createdAt');
+                expect(lesson.quote.lessonRequest).toHaveProperty('updatedAt');
+
+                // --- Quote > Lesson Request > Student ---
+                expect(lesson.quote.lessonRequest).toHaveProperty('student');
+                expect(lesson.quote.lessonRequest.student).toHaveProperty('id');
+                expect(lesson.quote.lessonRequest.student).toHaveProperty('firstName');
+                expect(lesson.quote.lessonRequest.student).toHaveProperty('lastName');
+                expect(lesson.quote.lessonRequest.student).toHaveProperty('email');
+                expect(lesson.quote.lessonRequest.student).not.toHaveProperty('password'); // Ensure password is not exposed
+
+                // --- Quote > Lesson Request > Address ---
+                expect(lesson.quote.lessonRequest).toHaveProperty('address');
+                expect(lesson.quote.lessonRequest.address).toHaveProperty('id');
+                expect(lesson.quote.lessonRequest.address).toHaveProperty('street');
+                expect(lesson.quote.lessonRequest.address).toHaveProperty('city');
+                expect(lesson.quote.lessonRequest.address).toHaveProperty('state');
+                expect(lesson.quote.lessonRequest.address).toHaveProperty('postalCode');
+                expect(lesson.quote.lessonRequest.address).toHaveProperty('country');
+                expect(lesson.quote.lessonRequest.address).toHaveProperty('createdAt');
+                expect(lesson.quote.lessonRequest.address).toHaveProperty('updatedAt');
+            });
+        });
+    });
+
+    // --- GET /api/v1/teachers/:teacherId/lessons/:lessonId/goals ---
+    describe('GET /api/v1/teachers/:teacherId/lessons/:lessonId/goals', () => {
+        // ... potentially add tests here in the future ...
+        it('should return 404 for a lesson that does not exist', async () => {
+            // Placeholder for future test
+        });
+        it('should return goals for a specific lesson associated with the teacher', async () => {
+            // Placeholder for future test
+        });
+    });
+
+    // --- POST /api/v1/teachers/:teacherId/lessons/:lessonId/goals ---
+    describe('POST /api/v1/teachers/:teacherId/lessons/:lessonId/goals', () => {
+        // Placeholder for future tests
+    });
+
+    // --- PUT /api/v1/teachers/:teacherId/lessons/:lessonId/goals/:goalId ---
+    describe('PUT /api/v1/teachers/:teacherId/lessons/:lessonId/goals/:goalId', () => {
+        // Placeholder for future tests
+    });
+
+    // --- DELETE /api/v1/teachers/:teacherId/lessons/:lessonId/goals/:goalId ---
+    describe('DELETE /api/v1/teachers/:teacherId/lessons/:lessonId/goals/:goalId', () => {
+        // Placeholder for future tests
     });
 
     // --- New Tests Start Here ---

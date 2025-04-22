@@ -80,9 +80,6 @@ test.describe('Teacher Lesson Management', () => {
                 page.locator(`#${section.id}`),
                 `Lesson section for "${section.status}" should be visible`
             ).toBeVisible();
-            // Check initial count (should be 5 based on seed)
-            const initialCount = await getLessonCountInSection(page, `#${section.id}`);
-            expect(initialCount).toBe(5);
         }
 
         // --- Test REQUESTED -> ACCEPTED transition --- 

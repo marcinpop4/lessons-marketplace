@@ -136,6 +136,16 @@ async function main() {
 
   const commonPassword = "1234";
 
+  // --- Define target statuses early --- 
+  const targetStatuses = [
+      LessonStatusValue.REQUESTED,
+      LessonStatusValue.ACCEPTED,
+      LessonStatusValue.DEFINED,
+      LessonStatusValue.REJECTED,
+      LessonStatusValue.COMPLETED,
+      LessonStatusValue.VOIDED
+  ];
+
   try {
     // Clear existing data (using direct Prisma for seed cleanup)
     await prisma.$transaction([
@@ -224,8 +234,12 @@ async function main() {
     const lessonRequests = [];
     const lessonTypes = Object.values(LessonType);
     const today = new Date();
-    const numLessonRequests = 30; // INCREASED number of requests
-    for (let i = 0; i < numLessonRequests; i++) {
+    const numLessonsPerStatus = 5; // Keep track of lessons per status
+    const numTargetStatuses = targetStatuses.length; // Now targetStatuses is defined
+    const numBaseLessonRequests = numLessonsPerStatus * numTargetStatuses; // Requests needed for the main loop
+    const numTotalLessonRequests = numBaseLessonRequests + 1; // +1 for the special goal-free defined lesson
+
+    for (let i = 0; i < numTotalLessonRequests; i++) { // Create total needed requests
       const student = students[i % students.length];
       const lessonType = lessonTypes[i % lessonTypes.length];
       const address = addresses[i % addresses.length];
@@ -251,9 +265,11 @@ async function main() {
     // Create Lesson Quotes using LessonQuoteService - specifically for Emily Richardson
     const emilyQuotes = [];
     const emilyHourlyRates = teacherLessonHourlyRates.filter(rate => rate.teacherId === emilyRichardson.id);
-    if (lessonRequests.length < numLessonRequests) throw new Error(`Not enough lesson requests for seeding. Need ${numLessonRequests}, got ${lessonRequests.length}.`);
+    if (lessonRequests.length < numTotalLessonRequests) { // Check against total needed
+        throw new Error(`Not enough lesson requests for seeding. Need ${numTotalLessonRequests}, got ${lessonRequests.length}.`);
+    }
     
-    for (let i = 0; i < numLessonRequests; i++) { // Create 30 quotes for Emily
+    for (let i = 0; i < numTotalLessonRequests; i++) { // Create total needed quotes
         const request = lessonRequests[i];
         const hourlyRate = emilyHourlyRates.find(rate => rate.type === request.type);
         if (!hourlyRate) throw new Error(`No rate for Emily for ${request.type} on request ${i}`);
@@ -270,21 +286,14 @@ async function main() {
     console.log(`LessonQuotes created for Emily (via service): ${emilyQuotes.length}`);
 
     // --- NEW SEEDING LOGIC: Create 5 Lessons per Status --- 
-    const targetStatuses = [
-        LessonStatusValue.REQUESTED,
-        LessonStatusValue.ACCEPTED,
-        LessonStatusValue.DEFINED,
-        LessonStatusValue.REJECTED,
-        LessonStatusValue.COMPLETED,
-        LessonStatusValue.VOIDED
-    ];
     const createdLessonsData = [];
     let quoteIndex = 0;
 
     for (const targetStatus of targetStatuses) {
         for (let i = 0; i < 5; i++) {
-            if (quoteIndex >= emilyQuotes.length) {
-                throw new Error('Ran out of quotes for Emily to create lessons.');
+            if (quoteIndex >= numBaseLessonRequests) { // Only use base quotes for the status loop
+                console.warn('Warning: Reached quote limit unexpectedly during status loop.');
+                break; 
             }
             const quote = emilyQuotes[quoteIndex++];
             
@@ -327,9 +336,26 @@ async function main() {
         } // End inner loop (i < 5)
     } // End outer loop (targetStatuses)
 
+    // --- Create 1 extra DEFINED lesson with NO goals for testing --- 
+    const extraQuoteForDefinedLesson = emilyQuotes[numBaseLessonRequests]; // Get the last quote reserved for this
+    let goalFreeDefinedLesson = null;
+    try {
+        const initialLesson = await lessonService.create(prisma, extraQuoteForDefinedLesson.id);
+        if (!initialLesson?.id) throw new Error('Failed to create initial goal-free lesson.');
+        // Transition to ACCEPTED
+        const acceptedLesson = await lessonService.updateStatus(prisma, initialLesson.id, LessonStatusTransition.ACCEPT, {}, emilyRichardson.id);
+        // Transition to DEFINED
+        goalFreeDefinedLesson = await lessonService.updateStatus(prisma, acceptedLesson.id, LessonStatusTransition.DEFINE, {}, emilyRichardson.id);
+        // Intentionally DO NOT add this lesson to createdLessonsData or process it for goals
+    } catch (error) {
+        console.error(`   ERROR creating special goal-free DEFINED lesson: ${error instanceof Error ? error.message : error}`);
+    }
+    // --- End extra lesson creation --- 
+
     // --- Create Goals for DEFINED/COMPLETED lessons --- 
     let goalsCreatedCount = 0;
     // Filter lessons based on the finalStatus stored in createdLessonsData
+    // This selection remains unchanged and will NOT include the goalFreeDefinedLesson
     const lessonsForGoals = createdLessonsData.filter(data => 
         data.finalStatus === LessonStatusValue.DEFINED || data.finalStatus === LessonStatusValue.COMPLETED
     ).map(data => data.lesson); // Extract the lesson object

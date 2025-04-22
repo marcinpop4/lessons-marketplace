@@ -60,35 +60,56 @@ const AddGoalForm: React.FC<AddGoalFormProps> = ({ lessonId, onGoalAdded }) => {
             headingLevel="h3"
         >
             <div className="space-y-3">
-                <input
-                    type="text"
-                    placeholder="Enter goal title..."
-                    value={newGoalTitle}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewGoalTitle(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:focus:ring-offset-gray-900"
-                    disabled={isAdding}
-                />
-                <textarea
-                    placeholder="Enter goal description..."
-                    value={newGoalDescription}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNewGoalDescription(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:focus:ring-offset-gray-900"
-                    disabled={isAdding}
-                    rows={3}
-                />
-                {/* Estimated Lessons Input */}
-                <input
-                    type="number"
-                    placeholder="Estimated lessons (e.g., 5)"
-                    value={newGoalEstimate}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewGoalEstimate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:focus:ring-offset-gray-900"
-                    disabled={isAdding}
-                    min="1" // Basic HTML5 validation
-                    step="1"
-                />
+                <div>
+                    <label htmlFor="goal-title" className="block text-sm font-medium mb-1">
+                        Goal Title
+                    </label>
+                    <input
+                        id="goal-title"
+                        type="text"
+                        placeholder="Enter goal title..."
+                        value={newGoalTitle}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewGoalTitle(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:focus:ring-offset-gray-900"
+                        disabled={isAdding}
+                        aria-label="Goal Title"
+                    />
+                </div>
+                <div>
+                    <label htmlFor="goal-description" className="block text-sm font-medium mb-1">
+                        Goal Description
+                    </label>
+                    <textarea
+                        id="goal-description"
+                        placeholder="Enter goal description..."
+                        value={newGoalDescription}
+                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNewGoalDescription(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:focus:ring-offset-gray-900"
+                        disabled={isAdding}
+                        rows={3}
+                        aria-label="Goal Description"
+                    />
+                </div>
+                <div>
+                    <label htmlFor="goal-estimate" className="block text-sm font-medium mb-1">
+                        Lessons to Achieve
+                    </label>
+                    <input
+                        id="goal-estimate"
+                        type="number"
+                        placeholder="Estimated lessons (e.g., 5)"
+                        value={newGoalEstimate}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewGoalEstimate(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:focus:ring-offset-gray-900"
+                        disabled={isAdding}
+                        min="1"
+                        step="1"
+                        aria-label="Lessons to Achieve"
+                    />
+                </div>
                 <div className="flex justify-end">
                     <Button
+                        id="add-goal-button"
                         variant="primary"
                         onClick={handleAddGoal}
                         disabled={isAdding || !newGoalTitle.trim() || !newGoalDescription.trim() || !newGoalEstimate.trim()}
@@ -98,7 +119,7 @@ const AddGoalForm: React.FC<AddGoalFormProps> = ({ lessonId, onGoalAdded }) => {
                     </Button>
                 </div>
             </div>
-            {error && <p className="text-sm text-red-500 mt-2">Error: {error}</p>}
+            {error && <p className="text-sm text-red-500 mt-2" role="alert">Error: {error}</p>}
         </Card>
     );
 };

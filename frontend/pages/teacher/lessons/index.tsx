@@ -12,8 +12,14 @@ import { Address } from '@shared/models/Address';
 import { LessonType } from '@shared/models/LessonType'; // Import LessonType enum
 import { useAuth } from '@frontend/contexts/AuthContext';
 
+// Interface to hold both lesson model and extra display data
+interface LessonDisplayData {
+    lesson: Lesson;
+    goalCount: number;
+}
+
 // Helper function to instantiate models from raw API data
-const instantiateLessonFromData = (data: TeacherLessonApiResponseItem): Lesson | null => {
+const instantiateLessonFromData = (data: TeacherLessonApiResponseItem): LessonDisplayData | null => {
     // Provide defaults for missing fields required by constructors, 
     // as these are NOT fetched from the API anymore.
     const studentData = {
@@ -90,11 +96,12 @@ const instantiateLessonFromData = (data: TeacherLessonApiResponseItem): Lesson |
         currentStatus: lessonStatus // Pass the full LessonStatus object
     });
 
-    return lesson;
+    // Return the combined object
+    return { lesson, goalCount: data.goalCount };
 };
 
 const TeacherLessonsPage: React.FC = () => {
-    const [lessons, setLessons] = useState<Lesson[]>([]);
+    const [lessonsData, setLessonsData] = useState<LessonDisplayData[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [updatingLessonId, setUpdatingLessonId] = useState<string | null>(null);
@@ -114,24 +121,25 @@ const TeacherLessonsPage: React.FC = () => {
             setError(null);
             const rawLessonsData = await getTeacherLessons(teacherId);
 
-            // Check if it's an array before mapping
-            if (!Array.isArray(rawLessonsData)) {
-                // If it's not an array, try to find the array if nested (common pattern)
-                // Example: Check if data is like { lessons: [...] }
-                const lessonsArray = (rawLessonsData as any)?.lessons || (rawLessonsData as any)?.data;
+            let lessonsArray: TeacherLessonApiResponseItem[];
 
+            // Check if API returns data nested or directly
+            if (!Array.isArray(rawLessonsData)) {
+                lessonsArray = (rawLessonsData as any)?.lessons || (rawLessonsData as any)?.data;
                 if (!Array.isArray(lessonsArray)) {
                     console.error('API did not return an array of lessons.', rawLessonsData);
                     throw new Error('Invalid data format received from API. Expected an array of lessons.');
                 }
-                // If found nested array, use it instead
-                const instantiatedLessons = lessonsArray.map(instantiateLessonFromData);
-                setLessons(instantiatedLessons.filter((lesson): lesson is Lesson => lesson !== null));
             } else {
-                // If it is an array, proceed as before
-                const instantiatedLessons = rawLessonsData.map(instantiateLessonFromData);
-                setLessons(instantiatedLessons.filter((lesson): lesson is Lesson => lesson !== null));
+                lessonsArray = rawLessonsData;
             }
+
+            // Map raw data to LessonDisplayData
+            const instantiatedLessonsData = lessonsArray
+                .map(instantiateLessonFromData)
+                .filter((item): item is LessonDisplayData => item !== null);
+
+            setLessonsData(instantiatedLessonsData); // Update state with the new structure
 
         } catch (err) {
             console.error('Failed to fetch teacher lessons:', err);
@@ -157,7 +165,9 @@ const TeacherLessonsPage: React.FC = () => {
 
     // Handle lesson status updates
     const handleUpdateStatus = async (lessonId: string, currentStatus: LessonStatusValue, transition: LessonStatusTransition) => {
-        const lesson = lessons.find(l => l.id === lessonId);
+        // Find the lesson DATA object first
+        const lessonDataItem = lessonsData.find(item => item.lesson.id === lessonId);
+        const lesson = lessonDataItem?.lesson; // Extract the lesson model
         const studentName = lesson?.quote?.lessonRequest?.student?.fullName || 'the lesson';
 
         const expectedResultingStatus = LessonStatus.getResultingStatus(currentStatus, transition);
@@ -183,8 +193,9 @@ const TeacherLessonsPage: React.FC = () => {
         }
     };
 
-    const groupLessonsByStatus = (lessonsToGroup: Lesson[]): Record<LessonStatusValue, Lesson[]> => {
-        const grouped: Record<string, Lesson[]> = {
+    // Update grouping function to work with LessonDisplayData
+    const groupLessonsByStatus = (dataToGroup: LessonDisplayData[]): Record<LessonStatusValue, LessonDisplayData[]> => {
+        const grouped: Record<string, LessonDisplayData[]> = {
             [LessonStatusValue.REQUESTED]: [],
             [LessonStatusValue.ACCEPTED]: [],
             [LessonStatusValue.DEFINED]: [],
@@ -193,23 +204,18 @@ const TeacherLessonsPage: React.FC = () => {
             [LessonStatusValue.VOIDED]: [],
         };
 
-        lessonsToGroup.forEach(lesson => {
-            // Access the status value *from* the currentStatus object
-            const statusValue = lesson.currentStatus?.status;
-
-            // Use hasOwnProperty for safer check
+        dataToGroup.forEach(item => {
+            // Access the status value *from* the lesson object within the item
+            const statusValue = item.lesson.currentStatus?.status;
             if (statusValue && Object.prototype.hasOwnProperty.call(grouped, statusValue)) {
-                grouped[statusValue].push(lesson);
-            } else {
-                console.warn(`Lesson ${lesson.id} has missing, invalid, or unhandled status: ${statusValue}`);
+                grouped[statusValue].push(item);
             }
         });
-        return grouped as Record<LessonStatusValue, Lesson[]>; // Assert type after population
+
+        return grouped as Record<LessonStatusValue, LessonDisplayData[]>;
     };
 
-    const groupedLessons = groupLessonsByStatus(lessons);
-
-    // Get all possible status values from the enum
+    const groupedLessons = groupLessonsByStatus(lessonsData);
     const allLessonStatuses = Object.values(LessonStatusValue);
 
     if (loading) return <div className="text-center py-10">Loading lessons...</div>;
@@ -247,13 +253,14 @@ const TeacherLessonsPage: React.FC = () => {
                             role="list"
                             id={`lessons-${status.toLowerCase()}-section`}
                         >
-                            {groupedLessons[status].map(lesson => (
+                            {groupedLessons[status].map(item => (
                                 <TeacherLessonCard
-                                    key={lesson.id}
-                                    lesson={lesson}
-                                    currentStatus={lesson.currentStatus.status} // Pass the status value
+                                    key={item.lesson.id}
+                                    lesson={item.lesson}
+                                    goalCount={item.goalCount}
+                                    currentStatus={item.lesson.currentStatus.status}
                                     onUpdateStatus={handleUpdateStatus}
-                                    isUpdating={updatingLessonId === lesson.id}
+                                    isUpdating={updatingLessonId === item.lesson.id}
                                 />
                             ))}
                         </div>
@@ -268,7 +275,7 @@ const TeacherLessonsPage: React.FC = () => {
             ))}
 
             {/* Overall empty state if no lessons at all */}
-            {lessons.length === 0 && !loading && (
+            {lessonsData.length === 0 && !loading && (
                 <div
                     className="text-center py-10 text-gray-500"
                 >

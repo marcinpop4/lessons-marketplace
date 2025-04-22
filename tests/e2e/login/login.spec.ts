@@ -78,8 +78,8 @@ test('Student login form submission', async ({ page }) => {
 });
 
 test('Teacher login form submission', async ({ page }) => {
-  // Go to the login page
-  await page.goto('/login');
+  // Go to the login page and wait for network idle
+  await page.goto('/login', { waitUntil: 'networkidle' });
 
   // Get form elements
   const form = page.locator('form');
@@ -94,33 +94,41 @@ test('Teacher login form submission', async ({ page }) => {
     expect(emailInput).toBeVisible(),
     expect(passwordInput).toBeVisible(),
     expect(teacherRadio).toBeVisible(),
-    expect(submitButton).toBeVisible()
+    expect(submitButton).toBeVisible(),
+    expect(submitButton).toBeEnabled() // Ensure button is enabled
   ]);
 
   // Fill the login form
+  await emailInput.clear(); // Clear potential pre-filled values
+  await passwordInput.clear();
   await emailInput.fill('emily.richardson@musicschool.com');
   await passwordInput.fill('1234');
   await teacherRadio.check();
 
-  // Set up response promise before clicking
+  // Set up response and navigation promises before clicking
   const responsePromise = page.waitForResponse(
     response => response.url().includes('/api/v1/auth/login') && response.request().method() === 'POST'
   );
+  // Use waitForURL for navigation confirmation
+  const navigationPromise = page.waitForURL(/.*\/teacher\/lessons.*/, { timeout: 4000 });
 
   // Submit form
   await submitButton.click();
 
-  // Wait for response
+  // Wait for API response
   const response = await responsePromise;
   const status = response.status();
 
-  // If login successful, wait for redirect
+  // If login successful, wait for navigation to complete and page to be stable
   if (status === 200) {
-    await expect(page).toHaveURL(/.*\/teacher\/lessons.*/, { timeout: 2000 });
+    await navigationPromise; // Wait for the URL to match
+    await page.waitForLoadState('networkidle'); // Wait for network stability after navigation
+    // Optional: Wait for a specific element on the dashboard to confirm load
+    await expect(page.locator('h1:has-text("Lessons Dashboard")'), 'Lessons Dashboard title should be visible').toBeVisible({ timeout: 3000 });
   } else {
-    // If login failed, verify error message
+    // If login failed, wait for and verify error message
     const errorMessage = page.locator('.alert-error');
-    await expect(errorMessage).toBeVisible();
+    await expect(errorMessage, `Login failed with status ${status}, expected error message`).toBeVisible();
     throw new Error(`Login failed with status ${status}`);
   }
 }); 

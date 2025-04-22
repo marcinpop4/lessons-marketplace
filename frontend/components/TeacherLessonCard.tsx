@@ -56,6 +56,7 @@ const NotesModal: React.FC<NotesModalProps> = ({ isOpen, onClose, onConfirm, les
 interface TeacherLessonCardProps {
     lesson: Lesson; // Use actual Lesson type
     currentStatus: LessonStatusValue; // Pass current status explicitly
+    goalCount: number; // Added goal count prop
     onUpdateStatus: (lessonId: string, currentStatus: LessonStatusValue, transition: LessonStatusTransition) => void;
     isUpdating: boolean; // Use loading state from parent
 }
@@ -63,6 +64,7 @@ interface TeacherLessonCardProps {
 const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
     lesson,
     currentStatus,
+    goalCount, // Destructure goalCount
     onUpdateStatus,
     isUpdating
 }) => {
@@ -163,6 +165,13 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
                 <span className="font-semibold mr-1">Status:</span>
                 {LessonStatus.getDisplayLabelForStatus(currentStatus)}
             </p>
+            {/* Conditionally display goal count below status */}
+            {canManageGoals && (
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                    <span className="font-semibold mr-1">Goals:</span>
+                    {goalCount}
+                </p>
+            )}
 
             {/* Updated Action Buttons based on transitions */}
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-2 flex-wrap gap-y-2">
@@ -185,7 +194,7 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
                             </Button>
                         ))}
 
-                        {/* Render Manage Goals button conditionally */}
+                        {/* Render Manage Goals button conditionally with goal count */}
                         {canManageGoals && (
                             <Button
                                 key="manage-goals"

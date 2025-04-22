@@ -14,11 +14,11 @@ export interface TeacherLessonApiResponseItem {
         context: string | null;
         createdAt: string;
     } | null;
+    goalCount: number;
     quote: {
         id: string;
         costInCents: number;
         hourlyRateInCents: number; // Assume API provides this for the quote
-        expiresAt: string;
         lessonRequestId: string;
         teacherId: string;
         createdAt: string;
