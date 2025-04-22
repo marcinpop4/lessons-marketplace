@@ -27,23 +27,24 @@ const TeacherLessonDetailCard: React.FC<TeacherLessonDetailCardProps> = ({ lesso
         >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700 dark:text-gray-300">
                 <div>
-                    <p><span className="font-semibold">Student:</span> {studentName}</p>
-                    <p><span className="font-semibold">Email:</span> {student?.email || 'N/A'}</p>
-                    <p><span className="font-semibold">Phone:</span> {student?.phoneNumber || 'N/A'}</p>
+                    <p><span className="font-semibold mr-1">Student:</span> {studentName}</p>
+                    <p><span className="font-semibold mr-1">Age:</span> {student?.age !== null ? student.age : 'N/A'}</p>
+                    <p><span className="font-semibold mr-1">Email:</span> {student?.email || 'N/A'}</p>
+                    <p><span className="font-semibold mr-1">Phone:</span> {student?.phoneNumber || 'N/A'}</p>
                 </div>
                 <div>
-                    <p><span className="font-semibold">Start Time:</span> {request?.startTime ? new Date(request.startTime).toLocaleString() : 'N/A'}</p>
-                    <p><span className="font-semibold">End Time:</span> {lesson.endTime ? new Date(lesson.endTime).toLocaleString() : 'N/A'}</p>
-                    <p><span className="font-semibold">Duration:</span> {request?.durationMinutes || 'N/A'} minutes</p>
-                    <p><span className="font-semibold">Type:</span> {request?.type || 'N/A'}</p>
+                    <p><span className="font-semibold mr-1">Start Time:</span> {request?.startTime ? new Date(request.startTime).toLocaleString() : 'N/A'}</p>
+                    <p><span className="font-semibold mr-1">End Time:</span> {lesson.endTime ? new Date(lesson.endTime).toLocaleString() : 'N/A'}</p>
+                    <p><span className="font-semibold mr-1">Duration:</span> {request?.durationMinutes || 'N/A'} minutes</p>
+                    <p><span className="font-semibold mr-1">Type:</span> {request?.type || 'N/A'}</p>
                 </div>
                 <div>
-                    <p><span className="font-semibold">Address:</span> {request?.address?.toString() || 'N/A'}</p>
+                    <p><span className="font-semibold mr-1">Address:</span> {request?.address?.toString() || 'N/A'}</p>
                 </div>
                 <div>
-                    <p><span className="font-semibold">Cost:</span> {quote?.getFormattedCost() || 'N/A'}</p>
+                    <p><span className="font-semibold mr-1">Cost:</span> {quote?.getFormattedCost() || 'N/A'}</p>
                     <p>
-                        <span className="font-semibold">Rate (at time of quote):</span>
+                        <span className="font-semibold mr-1">Rate (at time of quote):</span>
                         {quote?.hourlyRateInCents !== undefined
                             ? `${(quote.hourlyRateInCents / 100).toLocaleString('en-US', {
                                 style: 'currency',

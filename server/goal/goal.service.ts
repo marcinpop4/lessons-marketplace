@@ -5,8 +5,13 @@ import { randomUUID } from 'crypto';
 import { NotFoundError } from '../errors/NotFoundError.js';
 import { BadRequestError } from '../errors/BadRequestError.js';
 
-// Define Prisma types locally to avoid potential import issues from Goal.ts
-type PrismaGoalStatus = Prisma.GoalStatusGetPayload<{}>;
+// Define Prisma types correctly using Prisma.ModelNameGetPayload
+// Type for the GoalStatus payload when no specific includes are needed
+type PrismaGoalStatusPayload = Prisma.GoalStatusGetPayload<{}>;
+// Type for the Goal payload when no specific includes are needed
+type PrismaGoalPayload = Prisma.GoalGetPayload<{}>;
+// Type for Goal payload when currentStatus is included
+type PrismaGoalWithStatusPayload = Prisma.GoalGetPayload<{ include: { currentStatus: true } }>;
 
 const prisma = new PrismaClient();
 
@@ -32,10 +37,11 @@ export const goalService = {
         const initialStatusId = randomUUID();
         const initialStatusValue = GoalStatusValue.CREATED;
 
-        let createdGoalData: Prisma.GoalGetPayload<{}>;
-        let newStatusRecord: PrismaGoalStatus;
+        let createdGoalData: PrismaGoalPayload; // Use corrected type
+        let newStatusRecord: PrismaGoalStatusPayload; // Use corrected type
 
         await prisma.$transaction(async (tx) => {
+            // Access model via tx.goal
             const newGoal = await tx.goal.create({
                 data: {
                     id: goalId,
@@ -45,6 +51,7 @@ export const goalService = {
                     estimatedLessonCount: estimatedLessonCount,
                 },
             });
+            // Access model via tx.goalStatus
             newStatusRecord = await tx.goalStatus.create({
                 data: {
                     id: initialStatusId,
@@ -52,6 +59,7 @@ export const goalService = {
                     status: initialStatusValue,
                 },
             });
+            // Access model via tx.goal
             createdGoalData = await tx.goal.update({
                 where: { id: newGoal.id },
                 data: { currentStatusId: newStatusRecord.id },
@@ -76,17 +84,10 @@ export const goalService = {
         context: Prisma.JsonValue | null = null
     ): Promise<Goal> {
         // Fetch the goal *just to check existence* before transaction
+        // Access model via prisma.goal
         const goalExists = await prisma.goal.findUnique({
             where: { id: goalId },
-            select: { id: true } // Only select id, we don't need the data here
-            // REMOVED Problematic Include block:
-            // include: {
-            //     statuses: { 
-            //         where: { id: { equals: { /* ... */ } } }, 
-            //         orderBy: { createdAt: 'desc' }, 
-            //         take: 1 
-            //     }
-            // }
+            select: { id: true }
         });
 
         if (!goalExists) {
@@ -94,12 +95,14 @@ export const goalService = {
             throw new NotFoundError(`Goal with ID ${goalId} not found.`);
         }
 
-        let updatedGoalData: Prisma.GoalGetPayload<{}>;
+        let updatedGoalData: PrismaGoalPayload; // Use corrected type
         let newStatusValue: GoalStatusValue;
-        let newStatusRecord: PrismaGoalStatus;
+        let newStatusRecord: PrismaGoalStatusPayload; // Use corrected type
 
         await prisma.$transaction(async (tx) => {
+            // Access model via tx.goal
             const currentGoal = await tx.goal.findUniqueOrThrow({ where: { id: goalId } });
+            // Access model via tx.goalStatus
             const currentStatusRecord = await tx.goalStatus.findUniqueOrThrow({
                 where: { id: currentGoal.currentStatusId },
             });
@@ -113,6 +116,7 @@ export const goalService = {
             newStatusValue = maybeNewStatusValue;
 
             const newStatusId = randomUUID();
+            // Access model via tx.goalStatus
             newStatusRecord = await tx.goalStatus.create({
                 data: {
                     id: newStatusId,
@@ -121,6 +125,7 @@ export const goalService = {
                     context: context,
                 },
             });
+            // Access model via tx.goal
             updatedGoalData = await tx.goal.update({
                 where: { id: goalId },
                 data: { currentStatusId: newStatusRecord.id },
@@ -140,9 +145,10 @@ export const goalService = {
      * Retrieves a Goal by its ID.
      */
     async getGoalById(goalId: string): Promise<Goal | null> {
+        // Access model via prisma.goal
         const goalData = await prisma.goal.findUnique({
             where: { id: goalId },
-            include: { currentStatus: true } // Ensure currentStatus relation is included
+            include: { currentStatus: true }
         });
         if (!goalData || !goalData.currentStatus) return null;
 
@@ -154,23 +160,17 @@ export const goalService = {
     * Retrieves all Goals for a specific Lesson.
     */
     async getGoalsByLessonId(lessonId: string): Promise<Goal[]> {
-        // Define the type we expect back from Prisma, including the nested relation
-        // This requires knowing the relation name in your Prisma schema (assuming 'currentStatus')
-        type GoalWithStatus = Prisma.GoalGetPayload<{
-            include: { currentStatus: true }
-        }>;
-
-        const goalsData: GoalWithStatus[] = await prisma.goal.findMany({
+        // Use corrected type
+        const goalsData: PrismaGoalWithStatusPayload[] = await prisma.goal.findMany({
             where: { lessonId: lessonId },
             orderBy: { createdAt: 'asc' },
-            // Include the related currentStatus record
             include: {
-                currentStatus: true // Assumes relation named 'currentStatus' linked via 'currentStatusId'
+                currentStatus: true
             }
         });
 
         // Map the Prisma data (including the nested status) to the Goal model
-        return goalsData.map((goalData: GoalWithStatus) => { // Explicitly type goalData
+        return goalsData.map((goalData: PrismaGoalWithStatusPayload) => {
             if (!goalData.currentStatus) {
                 // Handle cases where a goal might somehow be missing its status link
                 // This case should be rare if the DB schema enforces the relation

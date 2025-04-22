@@ -13,7 +13,10 @@ import { v4 as uuidv4 } from 'uuid';
 
 // Import shared models and enums
 import { LessonType } from '@shared/models/LessonType';
-import { LessonStatusValue } from '@shared/models/LessonStatus';
+// Import both value and transition enums for LessonStatus
+import { LessonStatusValue, LessonStatusTransition } from '@shared/models/LessonStatus';
+import { GoalStatusValue, GoalStatusTransition } from '@shared/models/GoalStatus';
+import { Goal } from '@shared/models/Goal';
 
 // Import ALL services 
 import { teacherService } from '../teacher/teacher.service.js'; 
@@ -24,6 +27,8 @@ import { lessonRequestService } from '../lessonRequest/lessonRequest.service.js'
 import { lessonQuoteService } from '../lessonQuote/lessonQuote.service.js'; 
 import { lessonService } from '../lesson/lesson.service.js'; 
 import { teacherLessonHourlyRateService } from '../teacher/teacherLessonHourlyRate.service.js'; 
+// Import Goal service
+import { goalService } from '../goal/goal.service.js';
 
 // Initialize Prisma client (passed to services)
 import { PrismaClient } from '@prisma/client';
@@ -74,28 +79,61 @@ const sampleAddresses = [
   { street: '202 Cedar Lane', city: 'Miami', state: 'FL', postalCode: '33101', country: 'USA' }
 ];
 
+// Sample Goal Data Generator
+function getSampleGoalData(lessonType, studentAge) {
+  // Basic goals, customize further based on type/age
+  const goals = [
+    {
+      created: { title: 'Understand Basic Theory', description: 'Learn the fundamental concepts related to the instrument.', estimatedLessonCount: 2 },
+      started: { title: 'Practice Basic Scales', description: 'Practice the major and minor scales daily.', estimatedLessonCount: 4 },
+      achieved: { title: 'Play First Simple Song', description: 'Learn and play a simple song from start to finish.', estimatedLessonCount: 3, context: { notes: 'Student successfully played \'Twinkle Twinkle Little Star\' with steady rhythm and correct notes.' } }
+    }
+  ];
+
+  // Example customization (can be expanded)
+  if (lessonType === LessonType.GUITAR && studentAge > 12) {
+    goals[0].started.title = 'Practice Chord Transitions';
+    goals[0].started.description = 'Practice transitioning smoothly between G, C, and D chords.';
+    goals[0].achieved.context.notes = 'Student can now play the basic chord progression for \'Knockin\' on Heaven\'s Door\'.';
+  }
+   if (lessonType === LessonType.DRUMS) {
+    goals[0].created.title = 'Basic Drum Setup & Grip';
+    goals[0].created.description = 'Learn how to set up the drum kit correctly and hold the sticks properly.';
+    goals[0].started.title = 'Practice Basic Rock Beat';
+    goals[0].started.description = 'Practice a standard 4/4 rock beat (kick, snare, hi-hat).';
+    goals[0].achieved.title = 'Play Beat with Simple Fill';
+     goals[0].achieved.description = 'Maintain a steady rock beat and incorporate a simple drum fill.';
+    goals[0].achieved.context.notes = 'Student can play a steady basic rock beat for 1 minute and execute a simple snare fill on cue.';
+  }
+
+  // Select one set for this lesson
+  return goals[0]; // Just returning the first set for simplicity
+}
+
 async function main() {
-  // console.log('Starting database seeding using services...');
 
   const commonPassword = "1234";
 
   try {
     // Clear existing data (using direct Prisma for seed cleanup)
-    // console.log('Clearing existing data...');
     await prisma.$transaction([
+      // Delete records that depend on others first
+      prisma.goalStatus.deleteMany(),
+      prisma.goal.deleteMany(),
       prisma.lessonStatus.deleteMany(),
-      prisma.lesson.deleteMany(),
-      prisma.lessonQuote.deleteMany(),
-      prisma.lessonRequest.deleteMany(),
-      prisma.teacherLessonHourlyRate.deleteMany(), 
+      // Now delete records that others depended on
+      prisma.lesson.deleteMany(),       // Depends on LessonQuote
+      prisma.lessonQuote.deleteMany(),    // Depends on LessonRequest, Teacher
+      prisma.lessonRequest.deleteMany(),  // Depends on Student, Address
+      prisma.teacherLessonHourlyRate.deleteMany(), // Depends on Teacher
+      // Now delete the base records
       prisma.address.deleteMany(),
       prisma.teacher.deleteMany(),
       prisma.student.deleteMany(),
+      // Note: RefreshToken might need deletion if used, but not included here
     ]);
-    // console.log('Existing data cleared');
 
     // Create Teachers using TeacherService
-    // console.log('Creating teachers (via service)...');
     const teacherData = [
       { firstName: 'Emily', lastName: 'Richardson', email: 'emily.richardson@musicschool.com', phoneNumber: '123-456-7890', dateOfBirth: new Date('1980-04-12') },
       { firstName: 'Michael', lastName: 'Chen', email: 'michael.chen@musicschool.com', phoneNumber: '123-456-7891', dateOfBirth: new Date('1975-09-23') },
@@ -114,10 +152,8 @@ async function main() {
     if (!emilyRichardson) {
       throw new Error('Emily Richardson teacher record not found');
     }
-    // console.log('Found Emily Richardson teacher record for tests:', emilyRichardson.id);
     
     // Create Students using StudentService
-    // console.log('Creating students (via service)...');
     const studentData = [
       { firstName: 'Ethan', lastName: 'Parker', email: 'ethan.parker@example.com', phoneNumber: '987-654-3210', dateOfBirth: new Date('2000-05-15') },
       { firstName: 'Ava', lastName: 'Johnson', email: 'ava.johnson@example.com', phoneNumber: '987-654-3211', dateOfBirth: new Date('2001-08-22') },
@@ -137,14 +173,12 @@ async function main() {
     console.log('Students created (via service):', students.length);
 
     // Create Addresses using AddressService
-    // console.log('Creating addresses (via service)...');
     const addresses = await Promise.all(
       sampleAddresses.map(addressData => addressService.create(prisma, addressData))
     );
     console.log('Addresses created (via service):', addresses.length);
 
     // Create Hourly Rates using TeacherLessonHourlyRateService
-    // console.log('Creating hourly rates (via service)...');
     const teacherLessonHourlyRates = [];
     for (const teacher of teachers) {
       const teacherRates = await Promise.all(
@@ -165,14 +199,10 @@ async function main() {
     console.log('TeacherLessonHourlyRates created (via service):', teacherLessonHourlyRates.length);
 
     // Create Lesson Requests using LessonRequestService
-    // console.log('Creating lesson requests (via service)...');
     const lessonRequests = [];
     const lessonTypes = Object.values(LessonType);
     const today = new Date();
-    
-    // Create at least 15 lesson requests (for Emily's quotes)
-    const numLessonRequests = 20; // Create a few extra to be safe
-    
+    const numLessonRequests = 20; 
     for (let i = 0; i < numLessonRequests; i++) {
       const student = students[i % students.length];
       const lessonType = lessonTypes[i % lessonTypes.length];
@@ -199,159 +229,139 @@ async function main() {
     console.log('LessonRequests created (via service):', lessonRequests.length);
 
     // Create Lesson Quotes using LessonQuoteService - specifically for Emily Richardson
-    // console.log('Creating lesson quotes for Emily Richardson (via service)...');
     const emilyQuotes = [];
-    
-    // Get Emily's hourly rates
     const emilyHourlyRates = teacherLessonHourlyRates.filter(rate => rate.teacherId === emilyRichardson.id);
-    
-    // Ensure we have at least 15 lesson requests
-    if (lessonRequests.length < 15) {
-      throw new Error(`Not enough lesson requests for Emily's quotes. Need at least 15, got ${lessonRequests.length}.`);
-    }
-    
-    // Create exactly 15 quotes for Emily, one for each of the first 15 lesson requests
-    for (let i = 0; i < 15; i++) {
-      const request = lessonRequests[i];
-      
-      // Find Emily's rate for this lesson type
-      const hourlyRate = emilyHourlyRates.find(rate => rate.type === request.type);
-      
-      if (!hourlyRate) {
-        throw new Error(`No hourly rate found for Emily for lesson type ${request.type}`);
-      }
-      
-      const costInCents = Math.round((hourlyRate.rateInCents * request.durationMinutes) / 60);
-      
-      const quote = await lessonQuoteService.create(prisma, { 
-        lessonRequestId: request.id,
-        teacherId: emilyRichardson.id,  // Always use Emily's ID
-        costInCents,
-        hourlyRateInCents: hourlyRate.rateInCents,
-      });
-      
-      emilyQuotes.push(quote);
-    }
-    
-    // Create additional quotes for other teachers (optional)
-    const otherQuotes = [];
-    for (const request of lessonRequests) {
-      // Skip the first 15 requests (already used for Emily)
-      if (lessonRequests.indexOf(request) < 15) {
-        continue;
-      }
-      
-      // Find a different teacher (not Emily)
-      const otherTeachers = teachers.filter(t => t.id !== emilyRichardson.id);
-      const teacher = otherTeachers[Math.floor(Math.random() * otherTeachers.length)];
-      
-      const hourlyRate = teacherLessonHourlyRates.find(
-          rate => rate.teacherId === teacher.id && rate.type === request.type
-      );
-      
-      if (hourlyRate) {
+    if (lessonRequests.length < 5) throw new Error(`Not enough lesson requests for seeding. Need 5, got ${lessonRequests.length}.`);
+    for (let i = 0; i < 5; i++) { // Create 5 quotes to become lessons
+        const request = lessonRequests[i];
+        const hourlyRate = emilyHourlyRates.find(rate => rate.type === request.type);
+        if (!hourlyRate) throw new Error(`No rate for Emily for ${request.type}`);
         const costInCents = Math.round((hourlyRate.rateInCents * request.durationMinutes) / 60);
-        
         const quote = await lessonQuoteService.create(prisma, { 
-          lessonRequestId: request.id,
-          teacherId: teacher.id,
-          costInCents,
-          hourlyRateInCents: hourlyRate.rateInCents,
+            lessonRequestId: request.id,
+            teacherId: emilyRichardson.id,
+            costInCents,
+            hourlyRateInCents: hourlyRate.rateInCents,
         });
-        otherQuotes.push(quote);
-      }
+        emilyQuotes.push(quote);
     }
-    
-    // Combine all quotes
-    const lessonQuotes = [...emilyQuotes, ...otherQuotes];
-    console.log('Total lesson quotes created:', lessonQuotes.length);
+    console.log('LessonQuotes created for Emily (via service):', emilyQuotes.length);
 
-    // Create Lessons and Statuses using LessonService
-    // console.log('Creating lessons for Emily Richardson (via service)...');
-    const lessons = [];
+    // --- NEW SEEDING LOGIC --- 
     
-    // Create 3 REQUESTED lessons for Emily
-    for (let i = 0; i < 3; i++) {
-        const lesson = await lessonService.create(prisma, emilyQuotes[i].id);
-        lessons.push(lesson);
-    }
-    
-    // Create 3 ACCEPTED lessons for Emily
-    for (let i = 3; i < 6; i++) {
-        const lesson = await lessonService.create(prisma, emilyQuotes[i].id);
-        await lessonService.updateStatus(
-            prisma, 
-            lesson.id, 
-            LessonStatusValue.ACCEPTED, 
-            { acceptedByTeacherId: emilyRichardson.id }
-        );
-        lessons.push(lesson);
-    }
-    
-    // Create 3 COMPLETED lessons for Emily
-    for (let i = 6; i < 9; i++) {
-        const lesson = await lessonService.create(prisma, emilyQuotes[i].id);
-        await lessonService.updateStatus(
-            prisma, 
-            lesson.id, 
-            LessonStatusValue.ACCEPTED, 
-            { acceptedByTeacherId: emilyRichardson.id }
-        );
-        await lessonService.updateStatus(
-            prisma, 
-            lesson.id, 
-            LessonStatusValue.COMPLETED, 
-            { completedByTeacherId: emilyRichardson.id }
-        );
-        lessons.push(lesson);
-    }
-    
-    // Create 3 REJECTED lessons for Emily
-    for (let i = 9; i < 12; i++) {
-        const lesson = await lessonService.create(prisma, emilyQuotes[i].id);
-        await lessonService.updateStatus(
-            prisma, 
-            lesson.id, 
-            LessonStatusValue.REJECTED, 
-            { rejectedByTeacherId: emilyRichardson.id, reason: 'Scheduling conflict' }
-        );
-        lessons.push(lesson);
-    }
-    
-    // Create 3 VOIDED lessons for Emily
-    for (let i = 12; i < 15; i++) {
-        const lesson = await lessonService.create(prisma, emilyQuotes[i].id);
-        await lessonService.updateStatus(
-            prisma, 
-            lesson.id, 
-            LessonStatusValue.ACCEPTED, 
-            { acceptedByTeacherId: emilyRichardson.id }
-        );
-        await lessonService.updateStatus(
-            prisma, 
-            lesson.id, 
-            LessonStatusValue.VOIDED, 
-            { voidedByTeacherId: emilyRichardson.id, reason: 'Student requested cancellation' }
-        );
-        lessons.push(lesson);
-    }
-    
-    console.log('Lessons created for Emily Richardson:', lessons.length);
-    // console.log('Seeding completed successfully using services!');
+    // 1. Create Lessons from the first 5 Emily Quotes and transition them to DEFINED
+    const definedLessons = [];
+    for (const quote of emilyQuotes) {
+      // --- Corrected Order ---
+      // a. Create the Lesson record first, linking to the quote
+      const lesson = await prisma.lesson.create({
+        data: {
+          quoteId: quote.id,
+          // currentStatusId will be set after creating the initial status
+        }
+      });
 
-  } catch (error) {
-    console.error('Error during service-based seeding:', error);
-    throw error;
+      // b. Create initial LessonStatus (REQUESTED), linking to the new lesson.id
+      const requestedStatus = await prisma.lessonStatus.create({
+        data: {
+          lessonId: lesson.id, // Link to the lesson we just created
+          status: LessonStatusValue.REQUESTED
+        }
+      });
+
+      // c. Update the Lesson record to set the initial currentStatusId
+      await prisma.lesson.update({
+        where: { id: lesson.id },
+        data: { currentStatusId: requestedStatus.id }
+      });
+      // --- End Corrected Order ---
+
+      // d. Transition status: ACCEPTED
+      await lessonService.updateStatus(
+        prisma,
+        lesson.id,
+        LessonStatusTransition.ACCEPT,
+        {},
+        emilyRichardson.id // Assuming teacher accepts
+      );
+
+      // e. Transition status: DEFINED
+      const finalStatus = await lessonService.updateStatus(
+        prisma,
+        lesson.id,
+        LessonStatusTransition.DEFINE,
+        {},
+        emilyRichardson.id // Assuming teacher defines
+      );
+
+      // Fetch the fully updated lesson to add to our list (optional, but good practice)
+      const updatedLesson = await prisma.lesson.findUnique({
+           where: { id: lesson.id },
+           include: { quote: { include: { lessonRequest: { include: { student: true } }, teacher: true } } }
+       });
+      definedLessons.push(updatedLesson);
+    }
+    console.log('Lessons created and transitioned to DEFINED:', definedLessons.length);
+
+    // 2. Create Goals for each DEFINED lesson using goalService
+    let goalsCreatedCount = 0;
+    for (const lesson of definedLessons) {
+        const student = lesson.quote.lessonRequest.student;
+        const lessonType = lesson.quote.lessonRequest.type;
+        const studentAge = new Date().getFullYear() - new Date(student.dateOfBirth).getFullYear();
+        
+        const sampleGoals = getSampleGoalData(lessonType, studentAge);
+
+        // Create goals using the service
+        try {
+            // Create the goal (initial status: CREATED)
+            const createdGoal = await goalService.createGoal(
+                lesson.id,
+                sampleGoals.created.title,
+                sampleGoals.created.description,
+                sampleGoals.created.estimatedLessonCount
+            );
+            goalsCreatedCount++;
+
+            // Create the 'started' goal data instance and transition
+            const startedGoal = await goalService.createGoal(
+                lesson.id,
+                sampleGoals.started.title,
+                sampleGoals.started.description,
+                sampleGoals.started.estimatedLessonCount
+            );
+            await goalService.updateGoalStatus(startedGoal.id, GoalStatusTransition.START);
+            goalsCreatedCount++;
+
+            // Create the 'achieved' goal data instance, transition, and add context
+            const achievedGoal = await goalService.createGoal(
+                lesson.id,
+                sampleGoals.achieved.title,
+                sampleGoals.achieved.description,
+                sampleGoals.achieved.estimatedLessonCount
+            );
+            await goalService.updateGoalStatus(achievedGoal.id, GoalStatusTransition.START); // Need to start first
+            await goalService.updateGoalStatus(achievedGoal.id, GoalStatusTransition.COMPLETE, sampleGoals.achieved.context);
+            goalsCreatedCount++;
+
+        } catch (goalError) {
+            console.error(`Failed to create goals for lesson ${lesson.id}:`, goalError);
+            // Decide if you want to stop the seed or continue with other lessons
+            // throw goalError; // Stop seeding
+        }
+    }
+    console.log('Goals creation process completed (via service). Actual count depends on service success:', goalsCreatedCount);
+
+    // --- END NEW SEEDING LOGIC ---
+
+  } catch (e) {
+    console.error("Seeding failed:", e);
+    await prisma.$disconnect();
+    process.exit(1);
   } finally {
+    console.log('Seeding finished successfully.');
     await prisma.$disconnect();
   }
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  }); 
+main(); 
