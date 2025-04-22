@@ -5,7 +5,7 @@ import { Teacher } from '@shared/models/Teacher';
 import { Address } from '@shared/models/Address';
 import { Student } from '@shared/models/Student';
 import apiClient from './apiClient';
-import { LessonStatusValue, LessonStatusTransition } from '@shared/models/LessonStatus';
+import { LessonStatus, LessonStatusValue, LessonStatusTransition } from '@shared/models/LessonStatus';
 import axios, { AxiosError } from 'axios';
 
 // Check for API base URL using Vite's import.meta.env
@@ -88,21 +88,29 @@ export const getLessonById = async (id: string): Promise<Lesson> => {
       createdAt: new Date(data.quote.createdAt)
     });
 
-    // Ensure currentStatus is provided as LessonStatusValue enum
-    // Assuming the API returns the status string like "ACCEPTED" in data.currentStatus
-    const statusValue = data.currentStatus as LessonStatusValue;
-    if (!statusValue || !Object.values(LessonStatusValue).includes(statusValue)) {
-      console.error(`Invalid or missing status value received from API: ${statusValue}`);
-      // Handle the error appropriately, maybe throw or return a default/error state
-      // For now, throwing an error:
-      throw new Error(`Invalid or missing status value received from API: ${statusValue}`);
+    // Assuming the API response data includes the full currentStatus object
+    // or at least the necessary fields to construct it.
+    // Let's assume data.currentStatus is an object like { id, status, context, createdAt }
+    const statusData = data.currentStatus; // Assuming API returns the full status object
+    if (!statusData || typeof statusData !== 'object' || !statusData.status || !Object.values(LessonStatusValue).includes(statusData.status as LessonStatusValue)) {
+      console.error(`Invalid or missing status data received from API:`, statusData);
+      throw new Error(`Invalid or incomplete lesson status data received from API.`);
     }
+
+    // Construct the LessonStatus object
+    const lessonStatus = new LessonStatus({
+      id: statusData.id, // Use the ID from the status object
+      lessonId: data.id, // Use the main lesson ID
+      status: statusData.status as LessonStatusValue,
+      context: statusData.context || null,
+      createdAt: statusData.createdAt ? new Date(statusData.createdAt) : new Date()
+    });
 
     return new Lesson({
       id: data.id,
       quote: lessonQuote,
-      currentStatusId: data.currentStatusId,
-      currentStatus: statusValue, // Pass the validated enum value
+      currentStatusId: lessonStatus.id, // Use the ID from the constructed LessonStatus object
+      currentStatus: lessonStatus, // Pass the full LessonStatus object
     });
   } catch (error) {
     console.error('Error in getLessonById:', error);
@@ -152,24 +160,21 @@ export const fetchTeacherLessons = async (teacherId: string): Promise<FullLesson
 };
 
 /**
- * Update the status of a lesson.
+ * Update the status of a lesson using a transition.
  * @param lessonId The ID of the lesson to update.
- * @param newStatus The new status value to set.
+ * @param transition The transition action to perform.
+ * @param context Optional context data for the status change.
  */
-export const updateLessonStatus = async (lessonId: string, newStatus: LessonStatusValue): Promise<void> => {
-  // Check if the provided status is a valid enum value
-  if (!Object.values(LessonStatusValue).includes(newStatus)) {
-    const errorMsg = `Invalid status value provided: ${newStatus}`;
-    console.error(errorMsg);
-    throw new Error(errorMsg);
-  }
+export const updateLessonStatus = async (lessonId: string, transition: LessonStatusTransition, context?: any): Promise<void> => {
+  // Remove validation based on newStatus
+  // if (!Object.values(LessonStatusValue).includes(newStatus)) { ... }
 
   const requestUrl = `/api/v1/lessons/${lessonId}`;
-  const requestBody = { newStatus: newStatus };
+  // Send transition and context in the body
+  const requestBody = { transition, context };
   const requestMethod = 'PATCH';
 
   try {
-    // Send the resulting status value to the endpoint
     await apiClient.patch(requestUrl, requestBody);
   } catch (error) {
     let logMessage = `API Error updating lesson status: ${error}`; // Default message

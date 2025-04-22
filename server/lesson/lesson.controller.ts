@@ -7,7 +7,7 @@ import { LessonRequest } from '../../shared/models/LessonRequest.js';
 import { Address } from '../../shared/models/Address.js';
 import { Teacher } from '../../shared/models/Teacher.js';
 import { Student } from '../../shared/models/Student.js';
-import { LessonStatusValue, LessonStatus } from '../../shared/models/LessonStatus.js';
+import { LessonStatusValue, LessonStatus, LessonStatusTransition } from '../../shared/models/LessonStatus.js';
 import { v4 as uuidv4 } from 'uuid';
 import { lessonService } from './lesson.service.js';
 
@@ -76,19 +76,28 @@ export const lessonController = {
       updatedAt: new Date(prismaLesson.quote.updatedAt)
     });
 
-    // Get the status value from the included relation
-    const latestStatus = prismaLesson.lessonStatuses?.[0]?.status as LessonStatusValue;
-    if (!latestStatus) {
+    // Get the latest status record from the included relation
+    const latestStatusRecord = prismaLesson.lessonStatuses?.[0];
+    if (!latestStatusRecord || !latestStatusRecord.status || !Object.values(LessonStatusValue).includes(latestStatusRecord.status as LessonStatusValue)) {
       // This should ideally not happen if a lesson always has a status, but handle defensively
-      console.error(`Lesson ${prismaLesson.id} is missing status information.`);
-      throw new Error(`Lesson ${prismaLesson.id} is missing status information.`);
+      console.error(`Lesson ${prismaLesson.id} is missing valid status information. Status record:`, latestStatusRecord);
+      throw new Error(`Lesson ${prismaLesson.id} is missing or has invalid status information.`);
     }
+
+    // Construct the LessonStatus object from the Prisma data
+    const currentLessonStatus = new LessonStatus({
+      id: latestStatusRecord.id,
+      lessonId: prismaLesson.id,
+      status: latestStatusRecord.status as LessonStatusValue,
+      context: latestStatusRecord.context || null,
+      createdAt: latestStatusRecord.createdAt ? new Date(latestStatusRecord.createdAt) : new Date()
+    });
 
     return new Lesson({
       id: prismaLesson.id,
       quote: lessonQuote,
-      currentStatusId: prismaLesson.currentStatusId,
-      currentStatus: latestStatus, // Use the status from the included relation
+      currentStatusId: currentLessonStatus.id, // Use the actual ID from the status record
+      currentStatus: currentLessonStatus, // Pass the full LessonStatus object
       createdAt: prismaLesson.createdAt,
       updatedAt: prismaLesson.updatedAt
     });
@@ -223,13 +232,14 @@ export const lessonController = {
   /**
    * Update the status of a specific lesson
    * @route PATCH /api/lessons/:lessonId
-   * @param req Request with lessonId in params and { newStatus, context } in body
+   * @param req Request with lessonId in params and { transition, context } in body
    * @param res Express response
    */
   updateLessonStatus: async (req: Request, res: Response): Promise<void> => {
     try {
       const { lessonId } = req.params;
-      const { newStatus, context } = req.body; // Extract status and optional context
+      // Extract transition and context instead of newStatus
+      const { transition, context } = req.body;
       const authenticatedTeacherId = req.user?.id; // Get ID from token (added by authMiddleware)
 
       // Validate input
@@ -237,35 +247,39 @@ export const lessonController = {
         res.status(400).json({ error: 'Bad Request', message: 'Lesson ID is required.' });
         return;
       }
-      if (!newStatus || !Object.values(LessonStatusValue).includes(newStatus as LessonStatusValue)) {
-        res.status(400).json({ error: 'Bad Request', message: `Invalid or missing newStatus: ${newStatus}` });
+      // Validate transition using the enum
+      if (!transition || !Object.values(LessonStatusTransition).includes(transition as LessonStatusTransition)) {
+        res.status(400).json({ error: 'Bad Request', message: `Invalid or missing transition: ${transition}` });
         return;
       }
 
-      // Call the service to update the status
+      // Call the service to update the status using transition
       const updatedLesson = await lessonService.updateStatus(
         prisma, // Pass prisma client
         lessonId,
-        newStatus as LessonStatusValue,
-        context // Pass optional context
+        transition as LessonStatusTransition,
+        context, // Pass optional context
+        authenticatedTeacherId // Pass teacher ID for validation
       );
 
-      // Optionally transform the result back to the shared model if needed for the response
+      // Transform and return
       const modelLesson = lessonController.transformToModel(updatedLesson);
-
-      res.status(200).json(modelLesson); // Return the updated lesson
-
+      res.status(200).json(modelLesson);
     } catch (error) {
-      console.error(`[CONTROLLER] Error updating lesson status for ${req.params.lessonId}:`, error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      // Handle specific errors from the service
-      if (errorMessage.includes('not found')) {
-        res.status(404).json({ error: 'Not Found', message: errorMessage });
-      } else if (errorMessage.includes('Invalid status transition')) {
-        res.status(400).json({ error: 'Bad Request', message: errorMessage });
+      console.error('Error updating lesson status:', error);
+      // Handle specific errors (like lesson not found, invalid transition, unauthorized)
+      if (error instanceof Error) {
+        if (error.message.includes('not found')) {
+          res.status(404).json({ error: 'Not Found', message: error.message });
+        } else if (error.message.includes('Invalid status transition')) {
+          res.status(400).json({ error: 'Bad Request', message: error.message });
+        } else if (error.message.includes('Unauthorized')) {
+          res.status(403).json({ error: 'Forbidden', message: error.message });
+        } else {
+          res.status(500).json({ error: 'Internal Server Error', message: error.message });
+        }
       } else {
-        res.status(500).json({ error: 'Internal Server Error', message: errorMessage });
+        res.status(500).json({ error: 'Internal Server Error', message: 'An unknown error occurred' });
       }
     }
   }

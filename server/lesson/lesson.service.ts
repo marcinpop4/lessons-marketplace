@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
-import { LessonStatusValue } from '../../shared/models/LessonStatus.js';
+import { LessonStatus, LessonStatusValue, LessonStatusTransition } from '../../shared/models/LessonStatus.js';
 import { v4 as uuidv4 } from 'uuid';
+import { lessonIncludeForTransform, transformLesson } from './lesson.transformer.js';
 
 // Define the includes needed for the controller's transformToModel
 const lessonIncludeForTransform = {
@@ -111,64 +112,83 @@ class LessonService {
      * @returns The ID of the newly created status record
      */
     private async updateStatusInternal(
-        tx: any,
+        tx: Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">,
         lessonId: string,
         newStatusValue: LessonStatusValue,
         context: Record<string, unknown> = {}
-    ): Promise<string> {
+    ): Promise<void> {
         const newStatusId = uuidv4();
-
-        // Create the new status record
         await tx.lessonStatus.create({
             data: {
                 id: newStatusId,
                 lessonId: lessonId,
                 status: newStatusValue,
                 context: context,
-                createdAt: new Date()
             }
         });
 
-        // Update the lesson to reference the new status
+        // Update the lesson to point to the new latest status
         await tx.lesson.update({
             where: { id: lessonId },
-            data: {
-                currentStatusId: newStatusId
-            }
+            data: { currentStatusId: newStatusId }
         });
-
-        return newStatusId;
     }
 
     /**
      * Update the lesson's status by creating a new status record and updating the lesson's reference.
      * Handles the transaction internally.
+     * **Validates the transition based on current status.**
      * @param prisma Prisma client instance
      * @param lessonId The ID of the lesson to update
-     * @param newStatusValue The new status value
+     * @param transition The requested status transition
      * @param context Additional context about the status change
+     * @param authenticatedUserId ID of the user performing the action (for validation)
      * @returns The updated Lesson object with includes.
-     * @throws Error if the update fails
+     * @throws Error if the update fails or transition is invalid
      */
     async updateStatus(
         prisma: PrismaClient,
         lessonId: string,
-        newStatusValue: LessonStatusValue,
-        context: Record<string, unknown> = {}
+        transition: LessonStatusTransition,
+        context: Record<string, unknown> = {},
+        authenticatedUserId?: string // Optional user ID for authorization
     ): Promise<any> {
         try {
             return await prisma.$transaction(async (tx) => {
-                // Ensure the lesson exists before trying to update
-                const lessonExists = await tx.lesson.findUnique({
+                // Fetch the current lesson with its latest status
+                const currentLesson = await tx.lesson.findUnique({
                     where: { id: lessonId },
-                    select: { id: true }
+                    include: {
+                        quote: { select: { teacherId: true } }, // Need teacherId for auth check
+                        lessonStatuses: {
+                            orderBy: { createdAt: 'desc' },
+                            take: 1
+                        }
+                    }
                 });
 
-                if (!lessonExists) {
+                if (!currentLesson) {
                     throw new Error(`Lesson with ID ${lessonId} not found.`);
                 }
 
-                // Update the status internally
+                // Basic authorization: Check if the authenticated user is the teacher of this lesson
+                // Note: Add more robust authorization if students or other roles can perform actions
+                if (authenticatedUserId && currentLesson.quote?.teacherId !== authenticatedUserId) {
+                    throw new Error('Unauthorized: You are not the teacher for this lesson.'); // More specific error
+                }
+
+                const currentStatusValue = currentLesson.lessonStatuses?.[0]?.status as LessonStatusValue;
+                if (!currentStatusValue) {
+                    throw new Error(`Could not determine current status for Lesson ID ${lessonId}.`);
+                }
+
+                // Validate the requested transition
+                const newStatusValue = LessonStatus.getResultingStatus(currentStatusValue, transition);
+                if (!newStatusValue) {
+                    throw new Error(`Invalid status transition '${transition}' for current status '${currentStatusValue}'.`);
+                }
+
+                // Proceed with updating the status internally using the VALIDATED newStatusValue
                 await this.updateStatusInternal(tx, lessonId, newStatusValue, context);
 
                 // Fetch and return the fully updated lesson with necessary includes
@@ -178,15 +198,14 @@ class LessonService {
                 });
 
                 if (!updatedLesson) {
-                    // Should not happen if lessonExists was found, but defensive check
                     throw new Error(`Failed to fetch updated lesson data for ID ${lessonId} after status update.`);
                 }
 
-                // Return the full lesson object
                 return updatedLesson;
             });
         } catch (error) {
-            console.error(`Error updating status for lesson ${lessonId} to ${newStatusValue}:`, error);
+            console.error(`Error updating status for lesson ${lessonId} via transition ${transition}:`, error);
+            // Re-throw error with more specific message if possible
             throw new Error(`Failed to update lesson status: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }

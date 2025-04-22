@@ -16,6 +16,7 @@ import LessonConfirmation from '@frontend/pages/student/lesson-confirmation';
 // Teacher Pages
 import TeacherProfilePage from '@frontend/pages/teacher/profile'; // Renamed from TeacherDashboard
 import TeacherLessonsPage from '@frontend/pages/teacher/lessons'; // New lessons page
+import TeacherLessonDetailPage from '@frontend/pages/TeacherLessonDetailPage'; // Import the detail page
 
 import ProtectedRoute from '@frontend/components/common/ProtectedRoute';
 import { ThemeSwitcher, Button } from '@frontend/components/shared';
@@ -136,6 +137,11 @@ const AppRoutes: React.FC = () => {
             <Route
               path="lessons" // Add route for the new lessons page
               element={<TeacherLessonsPage />}
+            />
+            {/* Add the route for the lesson detail page */}
+            <Route
+              path="lessons/:lessonId"
+              element={<TeacherLessonDetailPage />}
             />
           </Route>
 

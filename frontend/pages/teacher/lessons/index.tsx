@@ -67,23 +67,28 @@ const instantiateLessonFromData = (data: TeacherLessonApiResponseItem): Lesson |
         // Omit createdAt, use constructor default
     });
 
-    // Get the status value from the nested object
-    const statusValue = data.currentStatus?.status as LessonStatusValue;
-    if (!statusValue || !Object.values(LessonStatusValue).includes(statusValue)) {
-        console.warn(`Lesson ${data.id} has missing or invalid status from API: ${statusValue}. Skipping instantiation.`);
-        // Return null or throw an error? Returning null for now to allow filtering.
+    // Get the full status object from the API data
+    const statusData = data.currentStatus;
+    if (!statusData || typeof statusData !== 'object' || !statusData.status || !Object.values(LessonStatusValue).includes(statusData.status as LessonStatusValue)) {
+        console.warn(`Lesson ${data.id} has missing or invalid status data from API:`, statusData, ". Skipping instantiation.");
         return null; // Indicate failure to instantiate
     }
+
+    // Construct the LessonStatus object
+    const lessonStatus = new LessonStatus({
+        id: statusData.id,
+        lessonId: data.id,
+        status: statusData.status as LessonStatusValue,
+        context: statusData.context || null, // Assuming context might be included
+        createdAt: statusData.createdAt ? new Date(statusData.createdAt) : new Date()
+    });
 
     const lesson = new Lesson({
         id: data.id,
         quote: lessonQuote,
-        currentStatusId: data.currentStatus?.id || '', // Keep ID
-        currentStatus: statusValue // Pass the validated enum value
+        currentStatusId: lessonStatus.id, // Use ID from constructed status
+        currentStatus: lessonStatus // Pass the full LessonStatus object
     });
-
-    // Attach the status value for easy access in the page component (no longer needed?)
-    // (lesson as any)._currentStatusValue = statusValue; // Can likely remove this line
 
     return lesson;
 };
@@ -152,39 +157,27 @@ const TeacherLessonsPage: React.FC = () => {
 
     // Handle lesson status updates
     const handleUpdateStatus = async (lessonId: string, currentStatus: LessonStatusValue, transition: LessonStatusTransition) => {
-        // Find the lesson details to include in the message
         const lesson = lessons.find(l => l.id === lessonId);
         const studentName = lesson?.quote?.lessonRequest?.student?.fullName || 'the lesson';
 
-        // Calculate the resulting status from the transition
-        const resultingStatus = LessonStatus.getResultingStatus(currentStatus, transition);
-
-        // Ensure the transition is valid and resulted in a status
-        if (!resultingStatus) {
-            const errorMsg = `Invalid transition (${transition}) attempted for current status (${currentStatus}).`;
-            console.error(errorMsg);
-            setError(errorMsg); // Show error to the user
-            setSuccessMessage(null); // Clear any success message
-            return; // Stop execution
-        }
-
-        const newStatusText = resultingStatus.toLowerCase().replace('_', ' '); // Use calculated status for message
+        const expectedResultingStatus = LessonStatus.getResultingStatus(currentStatus, transition);
+        const newStatusText = expectedResultingStatus
+            ? LessonStatus.getDisplayLabelForStatus(expectedResultingStatus)
+            : transition.toLowerCase();
 
         try {
             setUpdatingLessonId(lessonId);
-            // Pass the calculated resulting status to the API
-            await updateLessonStatus(lessonId, resultingStatus);
+            await updateLessonStatus(lessonId, transition);
 
-            // Refresh the lessons after successful update
             await fetchLessonsData();
 
-            // Set success message
             setSuccessMessage(`Successfully updated status for ${studentName} to ${newStatusText}.`);
-            setError(null); // Clear any previous errors
+            setError(null);
         } catch (err) {
             console.error('Failed to update lesson status:', err);
-            setError(err instanceof Error ? err.message : 'Failed to update lesson status');
-            setSuccessMessage(null); // Clear success message on error
+            const apiError = err instanceof Error ? err.message : 'Failed to update lesson status';
+            setError(`Error transitioning lesson to ${newStatusText}: ${apiError}`);
+            setSuccessMessage(null);
         } finally {
             setUpdatingLessonId(null);
         }
@@ -194,26 +187,30 @@ const TeacherLessonsPage: React.FC = () => {
         const grouped: Record<string, Lesson[]> = {
             [LessonStatusValue.REQUESTED]: [],
             [LessonStatusValue.ACCEPTED]: [],
+            [LessonStatusValue.DEFINED]: [],
             [LessonStatusValue.COMPLETED]: [],
             [LessonStatusValue.REJECTED]: [],
             [LessonStatusValue.VOIDED]: [],
         };
 
         lessonsToGroup.forEach(lesson => {
-            // Access the status value directly from the lesson object
-            const statusValue = lesson.currentStatus as LessonStatusValue;
+            // Access the status value *from* the currentStatus object
+            const statusValue = lesson.currentStatus?.status;
 
-            if (statusValue && grouped[statusValue]) {
+            // Use hasOwnProperty for safer check
+            if (statusValue && Object.prototype.hasOwnProperty.call(grouped, statusValue)) {
                 grouped[statusValue].push(lesson);
             } else {
-                console.warn(`Lesson ${lesson.id} has missing or invalid status: ${statusValue}`);
+                console.warn(`Lesson ${lesson.id} has missing, invalid, or unhandled status: ${statusValue}`);
             }
         });
-        return grouped;
+        return grouped as Record<LessonStatusValue, Lesson[]>; // Assert type after population
     };
 
     const groupedLessons = groupLessonsByStatus(lessons);
-    const lessonStatuses = Object.values(LessonStatusValue);
+
+    // Get all possible status values from the enum
+    const allLessonStatuses = Object.values(LessonStatusValue);
 
     if (loading) return <div className="text-center py-10">Loading lessons...</div>;
     if (error) return <div className="alert alert-error m-4">Error: {error}</div>;
@@ -237,10 +234,14 @@ const TeacherLessonsPage: React.FC = () => {
 
             <h1 className="text-2xl font-semibold mb-6">Lessons Dashboard</h1>
 
-            {lessonStatuses.map(status => (
-                groupedLessons[status] && groupedLessons[status].length > 0 && (
-                    <div key={status} className="mb-8">
-                        <h2 className="text-xl font-semibold mb-4 capitalize">{status.toLowerCase()}</h2>
+            {/* Map through all possible status values from the enum */}
+            {allLessonStatuses.map(status => (
+                // Always render the section container and header
+                <div key={status} className="mb-8">
+                    {/* Use utility function for display header */}
+                    <h2 className="text-xl font-semibold mb-4 capitalize">{LessonStatus.getDisplayLabelForStatus(status)}</h2>
+                    {/* Conditionally render lessons or placeholder */}
+                    {groupedLessons[status] && groupedLessons[status].length > 0 ? (
                         <div
                             className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4`}
                             role="list"
@@ -250,17 +251,23 @@ const TeacherLessonsPage: React.FC = () => {
                                 <TeacherLessonCard
                                     key={lesson.id}
                                     lesson={lesson}
-                                    // Pass the correct status value directly from the lesson
-                                    currentStatus={lesson.currentStatus}
+                                    currentStatus={lesson.currentStatus.status} // Pass the status value
                                     onUpdateStatus={handleUpdateStatus}
                                     isUpdating={updatingLessonId === lesson.id}
                                 />
                             ))}
                         </div>
-                    </div>
-                )
+                    ) : (
+                        // Placeholder text when no lessons in this status
+                        // Use utility function for placeholder text
+                        <p className="text-sm text-gray-500 italic px-1">
+                            No lessons with status '{LessonStatus.getDisplayLabelForStatus(status)}'.
+                        </p>
+                    )}
+                </div>
             ))}
 
+            {/* Overall empty state if no lessons at all */}
             {lessons.length === 0 && !loading && (
                 <div
                     className="text-center py-10 text-gray-500"

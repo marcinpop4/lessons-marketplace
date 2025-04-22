@@ -9,7 +9,7 @@ interface LessonProps {
   id: string;
   quote: LessonQuote;
   currentStatusId: string;
-  currentStatus: LessonStatusValue;
+  currentStatus: LessonStatus;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -22,7 +22,7 @@ export class Lesson {
   id: string;
   quote: LessonQuote;
   currentStatusId: string;
-  currentStatus: LessonStatusValue;
+  currentStatus: LessonStatus;
   createdAt?: Date;
   updatedAt?: Date;
 
@@ -38,7 +38,23 @@ export class Lesson {
     this.id = id;
     this.quote = quote;
     this.currentStatusId = currentStatusId;
-    this.currentStatus = currentStatus;
+
+    // Add basic validation/handling for currentStatus
+    if (!currentStatus || !(currentStatus instanceof LessonStatus)) {
+      console.warn("Lesson constructor received invalid currentStatus prop", currentStatus);
+      // Attempt to create a default LessonStatus if invalid, though this might indicate a deeper issue
+      // It might be better to throw an error depending on desired strictness
+      this.currentStatus = new LessonStatus({
+        id: currentStatusId || 'unknown-status-id',
+        lessonId: id,
+        // Safely attempt to cast or default the status value
+        status: (currentStatus as any)?.status || LessonStatusValue.REQUESTED, // Default or attempt cast
+        createdAt: new Date()
+      });
+    } else {
+      this.currentStatus = currentStatus;
+    }
+
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }

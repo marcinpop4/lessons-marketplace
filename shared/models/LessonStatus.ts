@@ -6,6 +6,7 @@ import { JsonValue } from '@prisma/client/runtime/library';
 export enum LessonStatusValue {
     REQUESTED = 'REQUESTED',
     ACCEPTED = 'ACCEPTED',
+    DEFINED = 'DEFINED',
     REJECTED = 'REJECTED',
     COMPLETED = 'COMPLETED',
     VOIDED = 'VOIDED'
@@ -16,6 +17,7 @@ export enum LessonStatusValue {
  */
 export enum LessonStatusTransition {
     ACCEPT = 'ACCEPT',
+    DEFINE = 'DEFINE',
     REJECT = 'REJECT',
     COMPLETE = 'COMPLETE',
     VOID = 'VOID'
@@ -88,6 +90,10 @@ export class LessonStatus {
             [LessonStatusTransition.REJECT]: LessonStatusValue.REJECTED
         },
         [LessonStatusValue.ACCEPTED]: {
+            [LessonStatusTransition.DEFINE]: LessonStatusValue.DEFINED,
+            [LessonStatusTransition.VOID]: LessonStatusValue.VOIDED
+        },
+        [LessonStatusValue.DEFINED]: {
             [LessonStatusTransition.COMPLETE]: LessonStatusValue.COMPLETED,
             [LessonStatusTransition.VOID]: LessonStatusValue.VOIDED
         },
@@ -108,7 +114,7 @@ export class LessonStatus {
      */
     static getResultingStatus(currentStatus: LessonStatusValue, transition: LessonStatusTransition): LessonStatusValue | undefined {
         const possibleTransitions = LessonStatus.StatusTransitions[currentStatus];
-        if (transition in possibleTransitions) {
+        if (possibleTransitions && transition in possibleTransitions) {
             return possibleTransitions[transition as keyof typeof possibleTransitions];
         }
         return undefined;
@@ -122,6 +128,35 @@ export class LessonStatus {
      */
     static isValidTransition(currentStatus: LessonStatusValue, transition: LessonStatusTransition): boolean {
         const possibleTransitions = LessonStatus.StatusTransitions[currentStatus];
-        return transition in possibleTransitions;
+        return !!possibleTransitions && transition in possibleTransitions;
+    }
+
+    /**
+     * Gets a user-friendly display label for a given status value.
+     * @param status The status value enum.
+     * @returns A display-friendly string.
+     */
+    static getDisplayLabelForStatus(status: LessonStatusValue): string {
+        if (!status) return 'Unknown Status';
+        // Simple conversion: Replace underscores, capitalize words
+        return status
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(' ');
+    }
+
+    /**
+     * Gets a user-friendly display label for a given transition action.
+     * @param transition The transition enum value.
+     * @returns A display-friendly string.
+     */
+    static getDisplayLabelForTransition(transition: LessonStatusTransition): string {
+        if (!transition) return 'Unknown Action';
+        // Simple conversion: Capitalize first letter, rest lowercase
+        // Special case for DEFINE
+        if (transition === LessonStatusTransition.DEFINE) {
+            return 'Define Goals';
+        }
+        return transition.charAt(0).toUpperCase() + transition.slice(1).toLowerCase();
     }
 }

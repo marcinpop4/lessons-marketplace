@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import fs from 'fs'
+import chalk from 'chalk';
 
 // --- Helper function to scrub sensitive data --- 
 const scrubSensitiveData = (obj: any, keysToScrub: string[] = ['password', 'email', 'token', 'authorization', 'apiKey', 'secret']): any => {
@@ -145,24 +146,51 @@ export default defineConfig(({ mode }) => {
 
             proxy.on('proxyRes', (proxyRes, req, res) => {
               if (!disableLogs) {
-                const rawBody = (req as any)._body || '';
-                let scrubbedBodyString = rawBody;
+                const rawRequestBody = (req as any)._body || '';
+                let scrubbedRequestBodyString = rawRequestBody;
 
-                // Attempt to parse and scrub if body is not empty
-                if (rawBody) {
+                // Attempt to parse and scrub request body if not empty
+                if (rawRequestBody) {
                   try {
-                    const parsedBody = JSON.parse(rawBody);
+                    const parsedBody = JSON.parse(rawRequestBody);
                     const scrubbedBody = scrubSensitiveData(parsedBody);
-                    scrubbedBodyString = JSON.stringify(scrubbedBody);
+                    scrubbedRequestBodyString = JSON.stringify(scrubbedBody);
                   } catch (e) {
-                    // Keep raw body if JSON parsing fails (might not be JSON)
-                    scrubbedBodyString = rawBody;
+                    scrubbedRequestBodyString = rawRequestBody;
                     console.warn('[VITE PROXY /api/v1] Failed to parse/scrub request body for logging.');
                   }
                 }
 
-                // Log with tabs using the scrubbed body
-                console.log(`${proxyRes.statusCode}\t${req.method}\t${req.url}\t${scrubbedBodyString}`);
+                // Capture response body
+                let responseBodyChunks: Buffer[] = [];
+                proxyRes.on('data', (chunk) => {
+                  responseBodyChunks.push(chunk);
+                });
+
+                proxyRes.on('end', () => {
+                  const rawResponseBody = Buffer.concat(responseBodyChunks).toString('utf8');
+                  let scrubbedResponseBodyString = rawResponseBody;
+
+                  // Attempt to parse and scrub response body if not empty
+                  if (rawResponseBody) {
+                    try {
+                      const parsedResponseBody = JSON.parse(rawResponseBody);
+                      const scrubbedResponseBody = scrubSensitiveData(parsedResponseBody);
+                      scrubbedResponseBodyString = JSON.stringify(scrubbedResponseBody);
+                    } catch (e) {
+                      // Keep raw body if JSON parsing fails (might be compressed or not JSON)
+                      scrubbedResponseBodyString = rawResponseBody;
+                      console.warn('[VITE PROXY /api/v1] Failed to parse/scrub response body for logging.');
+                    }
+                  }
+
+                  // Ensure empty bodies are represented as {}
+                  const finalRequestBodyString = scrubbedRequestBodyString || '{}';
+                  const finalResponseBodyString = scrubbedResponseBodyString || '{}';
+
+                  // Log with request and response body separated by -->
+                  console.log(chalk.yellow(`${proxyRes.statusCode}\t${req.method}\t${req.url}\t${finalRequestBodyString} ==>`), chalk.blue(`${finalResponseBodyString}`));
+                });
               }
             });
 

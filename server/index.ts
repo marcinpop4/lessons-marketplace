@@ -85,13 +85,17 @@ import lessonQuoteRoutes from './lessonQuote/lessonQuote.routes.js';
 import addressRoutes from './address/address.routes.js';
 import healthRoutes from './health/health.routes.js';
 import studentRoutes from './student/student.routes.js';
+import goalRoutes from './goal/goal.routes.js';
 
 // --- Express App Setup --- 
 const app: Express = express();
 
 // Core Middleware
 app.use(helmet());
-app.use(compression());
+// Only use compression in non-development environments
+if (process.env.NODE_ENV !== 'development') {
+  app.use(compression());
+}
 
 // Logging Middleware (Conditional)
 if (logLevel >= 2) {
@@ -201,6 +205,7 @@ app.use('/api/v1/teachers', teacherRoutes);
 app.use('/api/v1/lessons', lessonRoutes);
 app.use('/api/v1/lesson-quotes', lessonQuoteRoutes);
 app.use('/api/v1/addresses', addressRoutes);
+app.use('/api/v1/goals', goalRoutes);
 app.use('/api/v1/health', healthRoutes);
 app.use('/api/v1/students', studentRoutes);
 

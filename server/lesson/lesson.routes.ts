@@ -2,6 +2,7 @@ import express, { Router } from 'express';
 import { lessonController } from './lesson.controller.js';
 import { authMiddleware } from '../auth/authMiddleware.js';
 import { checkRole } from '../auth/roleMiddleware.js';
+import { goalController } from '../goal/goal.controller.js';
 
 const router: Router = express.Router();
 
@@ -11,6 +12,10 @@ router.post('/', lessonController.createLesson);
 // Get lessons by quote ID
 // This route must come before the general /:id route to avoid being treated as an ID
 router.get('/quote/:quoteId', authMiddleware, lessonController.getLessonsByQuoteId);
+
+// Get goals for a specific lesson (requires authentication)
+// GET /api/v1/lessons/:lessonId/goals
+router.get('/:lessonId/goals', authMiddleware, goalController.getGoalsByLessonId);
 
 // Get a lesson by ID
 router.get('/:id', authMiddleware, lessonController.getLessonById);

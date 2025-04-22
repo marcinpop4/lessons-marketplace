@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 // Import shared models
 import { Lesson } from '@shared/models/Lesson';
 // Import necessary enums and the class for static methods
@@ -7,19 +8,54 @@ import Card from '@frontend/components/shared/Card/Card'; // Import shared Card
 import Button from '@frontend/components/shared/Button/Button'; // Import shared Button
 // Removed unused import: import { updateLessonStatus } from '@frontend/api/lessonApi';
 
-// Remove placeholder type
-// interface LessonPlaceholder {
-//   id: string;
-//   studentName: string;
-//   dateTime: string;
-//   status: string; // Use LessonStatusValue enum later
-//   // Add other relevant details
-// }
+// Define props for the Notes Modal (can be moved to a separate Modal component later)
+interface NotesModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: (notes: string) => void;
+    lessonTitle: string;
+}
+
+// Simple Modal Component (inline for now)
+const NotesModal: React.FC<NotesModalProps> = ({ isOpen, onClose, onConfirm, lessonTitle }) => {
+    const [notes, setNotes] = useState('');
+
+    if (!isOpen) return null;
+
+    const handleConfirm = () => {
+        onConfirm(notes);
+        setNotes(''); // Clear notes after confirm
+    };
+
+    const handleClose = () => {
+        onClose();
+        setNotes(''); // Clear notes on close
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full">
+                <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Complete Lesson: {lessonTitle}</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Please enter completion notes:</p>
+                <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 dark:focus:ring-offset-gray-900"
+                    placeholder="e.g., Student mastered the scales, needs practice on timing..."
+                />
+                <div className="mt-5 flex justify-end space-x-3">
+                    <Button variant="secondary" onClick={handleClose}>Cancel</Button>
+                    <Button variant="primary" onClick={handleConfirm}>Confirm Completion</Button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 interface TeacherLessonCardProps {
     lesson: Lesson; // Use actual Lesson type
     currentStatus: LessonStatusValue; // Pass current status explicitly
-    // Updated Function prop signature for handling status updates via transition
     onUpdateStatus: (lessonId: string, currentStatus: LessonStatusValue, transition: LessonStatusTransition) => void;
     isUpdating: boolean; // Use loading state from parent
 }
@@ -27,10 +63,10 @@ interface TeacherLessonCardProps {
 const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
     lesson,
     currentStatus,
-    onUpdateStatus, // Use the required prop from parent
-    isUpdating // Use the required prop from parent
+    onUpdateStatus,
+    isUpdating
 }) => {
-    // Removed local state for loading and error, now handled by parent
+    const navigate = useNavigate();
 
     // --- New Logic ---
     const student = lesson.quote.lessonRequest.student; // Access student details
@@ -39,12 +75,14 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
     // Get the map of possible transitions for the current status
     const possibleTransitionsMap = LessonStatus.StatusTransitions[currentStatus] || {};
     // Extract the transition names (keys) from the map
-    const availableTransitions = Object.keys(possibleTransitionsMap) as LessonStatusTransition[];
+    const availableTransitions = (Object.keys(possibleTransitionsMap) as LessonStatusTransition[])
+        // Filter out the DEFINE transition, we'll handle it separately
+        .filter(t => t !== LessonStatusTransition.DEFINE);
 
     // Helper to format transition enum keys (e.g., ACCEPT -> Accept)
     const formatTransition = (transition: LessonStatusTransition): string => {
-        if (!transition) return '';
-        return transition.charAt(0).toUpperCase() + transition.slice(1).toLowerCase();
+        // Use the centralized utility function from the model
+        return LessonStatus.getDisplayLabelForTransition(transition); // Use new function
     };
     // --- End New Logic ---
 
@@ -52,7 +90,8 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
     const getButtonVariant = (transition: LessonStatusTransition): 'primary' | 'secondary' => {
         switch (transition) {
             case LessonStatusTransition.ACCEPT:
-            case LessonStatusTransition.COMPLETE:
+            case LessonStatusTransition.COMPLETE: // COMPLETE uses primary
+            case LessonStatusTransition.DEFINE: // Define uses primary
                 return 'primary';
             case LessonStatusTransition.REJECT:
             case LessonStatusTransition.VOID:
@@ -62,52 +101,103 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
         }
     };
 
+    // Function to handle button click - Reverted logic
+    const handleButtonClick = (transition: LessonStatusTransition) => {
+        // *** DEBUG LOG ***
+        console.log(`handleButtonClick called for Lesson ID: ${lesson.id}, Transition: ${transition}`);
+
+        if (transition === LessonStatusTransition.DEFINE) {
+            // *** DEBUG LOG ***
+            console.log(`Navigating to /teacher/lessons/${lesson.id}`);
+            navigate(`/teacher/lessons/${lesson.id}`);
+        } else {
+            // *** DEBUG LOG ***
+            console.log(`Calling onUpdateStatus for Lesson ID: ${lesson.id}, Status: ${currentStatus}, Transition: ${transition}`);
+            onUpdateStatus(lesson.id, currentStatus, transition);
+        }
+    };
+
+    // Function to specifically handle navigation for managing goals
+    const handleManageGoalsClick = () => {
+        navigate(`/teacher/lessons/${lesson.id}`);
+    };
+
+    // Check if goal management should be enabled
+    const canManageGoals = currentStatus === LessonStatusValue.ACCEPTED ||
+        currentStatus === LessonStatusValue.DEFINED ||
+        currentStatus === LessonStatusValue.COMPLETED; // Add COMPLETED status
+
     // Use original studentName logic if needed for title
     const studentName = `${student?.firstName || 'N/A'} ${student?.lastName || ''}`;
+    const lessonTitle = `Lesson with ${studentName}`; // Keep for title
 
     return (
         <Card
-            title={`Lesson with ${studentName}`}
+            title={lessonTitle}
             className="mb-4"
             headingLevel="h4"
         >
-            {/* Original body content */}
-            <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                <p>Start Time: {request?.startTime ? new Date(request.startTime).toLocaleString() : 'N/A'}</p>
-                <p>Duration: {request?.durationMinutes || 'N/A'} minutes</p>
-                <p>Address: {request?.address?.toString() || 'N/A'}</p>
-                <p>Cost: {lesson.quote?.getFormattedCost() || 'N/A'}</p>
-                <p>Status: <span className="font-medium capitalize">{currentStatus.toLowerCase()}</span></p>
-            </div>
-
-            {/* Removed local statusUpdateError display */}
+            {/* Refactored body content using simple <p> tags */}
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+                <span className="font-semibold mr-1">Start Time:</span>
+                {request?.startTime ? new Date(request.startTime).toLocaleString() : 'N/A'}
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+                <span className="font-semibold mr-1">Duration:</span>
+                {request?.durationMinutes || 'N/A'} minutes
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+                <span className="font-semibold mr-1">Address:</span>
+                {request?.address?.toString() || 'N/A'}
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+                <span className="font-semibold mr-1">Cost:</span>
+                {lesson.quote?.getFormattedCost() || 'N/A'}
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+                <span className="font-semibold mr-1">Status:</span>
+                {LessonStatus.getDisplayLabelForStatus(currentStatus)}
+            </p>
 
             {/* Updated Action Buttons based on transitions */}
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-2">
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-2 flex-wrap gap-y-2">
                 {isUpdating ? (
-                    // Display loading state using the isUpdating prop
                     <Button variant="secondary" size="sm" disabled>
                         Updating...
                     </Button>
                 ) : (
-                    availableTransitions.length > 0 ? (
-                        availableTransitions.map(transition => (
+                    <>
+                        {/* Render standard transition buttons */}
+                        {availableTransitions.map(transition => (
                             <Button
                                 key={transition}
-                                // Call the parent's onUpdateStatus with the transition
-                                onClick={() => onUpdateStatus(lesson.id, currentStatus, transition)}
+                                onClick={() => handleButtonClick(transition)} // Uses reverted handler
                                 variant={getButtonVariant(transition)}
                                 size="sm"
-                                // Disable based on the parent's isUpdating state
                                 disabled={isUpdating}
                             >
-                                {/* Display formatted transition name */}
                                 {formatTransition(transition)}
                             </Button>
-                        ))
-                    ) : (
-                        <span className="text-sm text-gray-500 italic">No actions available</span>
-                    )
+                        ))}
+
+                        {/* Render Manage Goals button conditionally */}
+                        {canManageGoals && (
+                            <Button
+                                key="manage-goals"
+                                onClick={handleManageGoalsClick}
+                                variant="accent" // Change variant to accent
+                                size="sm"
+                                disabled={isUpdating}
+                            >
+                                Manage Goals
+                            </Button>
+                        )}
+
+                        {/* Handle case where no actions are available at all */}
+                        {availableTransitions.length === 0 && !canManageGoals && (
+                            <span className="text-sm text-gray-500 italic">No actions available</span>
+                        )}
+                    </>
                 )}
             </div>
         </Card>
