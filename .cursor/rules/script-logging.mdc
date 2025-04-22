@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+Keep script logging to a minimum and outcome based. For example in [seed.js](mdc:server/prisma/seed.js), I only want to see how many records were created, because seeding is ran constantly and it's hard to keep up with all the output. Same with the server and frontend logging. By default, I only want to see server API logging. We can add temporary logging while debugging an issue, but these need to be deleted once we are done, to keep the output clear and readable my a human.

@@ -67,7 +67,7 @@ export const goalService = {
         });
 
         // Construct the GoalStatus model instance from the Prisma record
-        const initialGoalStatusModel = new GoalStatus(newStatusRecord!);
+        const initialGoalStatusModel = new GoalStatus({ ...newStatusRecord!, status: newStatusRecord!.status as GoalStatusValue });
 
         return new Goal({
             ...createdGoalData!,
@@ -102,9 +102,15 @@ export const goalService = {
         await prisma.$transaction(async (tx) => {
             // Access model via tx.goal
             const currentGoal = await tx.goal.findUniqueOrThrow({ where: { id: goalId } });
+
+            // Explicitly check if currentStatusId is null
+            if (!currentGoal.currentStatusId) {
+                throw new BadRequestError(`Goal with ID ${goalId} has a null currentStatusId, cannot update status.`);
+            }
+
             // Access model via tx.goalStatus
             const currentStatusRecord = await tx.goalStatus.findUniqueOrThrow({
-                where: { id: currentGoal.currentStatusId },
+                where: { id: currentGoal.currentStatusId }, // Now guaranteed not null
             });
             const currentStatusValue = currentStatusRecord.status as GoalStatusValue;
             // Store potentially undefined value first
@@ -122,7 +128,8 @@ export const goalService = {
                     id: newStatusId,
                     goalId: goalId,
                     status: newStatusValue,
-                    context: context,
+                    // Cast context to satisfy Prisma's InputJsonValue requirement
+                    context: context as Prisma.InputJsonValue,
                 },
             });
             // Access model via tx.goal
@@ -133,7 +140,7 @@ export const goalService = {
         });
 
         // Construct the GoalStatus model instance from the new Prisma record
-        const newGoalStatusModel = new GoalStatus(newStatusRecord!);
+        const newGoalStatusModel = new GoalStatus({ ...newStatusRecord!, status: newStatusRecord!.status as GoalStatusValue });
 
         return new Goal({
             ...updatedGoalData!,
@@ -152,7 +159,8 @@ export const goalService = {
         });
         if (!goalData || !goalData.currentStatus) return null;
 
-        const currentGoalStatusModel = new GoalStatus(goalData.currentStatus);
+        // Cast status when constructing the model
+        const currentGoalStatusModel = new GoalStatus({ ...goalData.currentStatus, status: goalData.currentStatus.status as GoalStatusValue });
         return new Goal({ ...goalData, currentStatus: currentGoalStatusModel });
     },
 
@@ -185,7 +193,8 @@ export const goalService = {
                 // });
             }
             // Construct the GoalStatus model instance
-            const currentGoalStatusModel = new GoalStatus(goalData.currentStatus);
+            // Cast status when constructing the model
+            const currentGoalStatusModel = new GoalStatus({ ...goalData.currentStatus, status: goalData.currentStatus.status as GoalStatusValue });
             // Construct the Goal model instance, passing the GoalStatus model
             return new Goal({
                 ...goalData,

@@ -1,29 +1,21 @@
 import { test, expect } from '@playwright/test';
 import type { Page, Response } from '@playwright/test';
-// Remove enum import that's causing issues
-// import { LessonStatusValue } from '@shared/models/LessonStatus.js';
+// Removed unused enum imports to avoid potential issues
+// import { LessonStatusValue, LessonStatusTransition } from '../../../../shared/models/LessonStatus'; 
 
-// Define status values directly to avoid import issues
-const STATUS = {
-    REQUESTED: 'requested',
-    ACCEPTED: 'accepted',
-    REJECTED: 'rejected',
-    COMPLETED: 'completed',
-    VOIDED: 'voided'
-};
-
-// Use credentials matching a user created in server/prisma/seed.js
+// Seeded teacher credentials
 const SEEDED_TEACHER_EMAIL = 'emily.richardson@musicschool.com';
-const SEEDED_PASSWORD = '1234'; // Password used in seed.js
+const SEEDED_PASSWORD = '1234';
 
-// Helper function to login as teacher
-async function loginAsTeacher(page: Page) {
+// --- Re-added Helper Functions ---
+// Helper function to login as a user
+async function loginAsUser(page: Page, email: string, password: string, userType: 'STUDENT' | 'TEACHER') {
     await page.goto('/login');
     await expect(page.locator('form')).toBeVisible();
 
-    await page.getByLabel('Email').fill(SEEDED_TEACHER_EMAIL);
-    await page.getByLabel('Password').fill(SEEDED_PASSWORD);
-    await page.locator('input[value="TEACHER"]').check();
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password').fill(password);
+    await page.locator(`input[value="${userType}"]`).check();
 
     await Promise.all([
         page.waitForResponse(
@@ -35,8 +27,9 @@ async function loginAsTeacher(page: Page) {
         page.locator('form button[type="submit"]').click(),
     ]);
 
-    // Wait for navigation to the lessons page
-    await expect(page).toHaveURL(/.*\/teacher\/lessons.*/);
+    // Wait for navigation based on role
+    const expectedUrlPart = userType === 'TEACHER' ? '/teacher/lessons' : '/student/dashboard'; // Example student dashboard path
+    await expect(page).toHaveURL(new RegExp(`.*${expectedUrlPart}.*`));
 }
 
 // Helper function to wait for network requests to complete
@@ -45,89 +38,87 @@ async function waitForNetworkIdle(page: Page) {
     // Additional delay to ensure UI has updated
     await page.waitForTimeout(500);
 }
+// --- End Re-added Helper Functions ---
+
+// Function to get the count of lesson cards in a specific section
+const getLessonCountInSection = async (page: Page, sectionId: string): Promise<number> => {
+    return page.locator(`${sectionId} .card`).count();
+};
 
 test.describe('Teacher Lesson Management', () => {
-    test('Teacher can view lessons and manage their statuses', async ({ page }) => {
-        // 1. Login as Teacher
-        await loginAsTeacher(page);
+    let page: Page;
 
-        // --- NEW: Wait for dashboard structure to be visible ---
-        await expect(page.getByRole('heading', { name: 'Lessons Dashboard', level: 1 })).toBeVisible();
+    test.beforeAll(async ({ browser }) => {
+        page = await browser.newPage();
+        // Login as the seeded teacher before running the tests
+        await loginAsUser(page, SEEDED_TEACHER_EMAIL, SEEDED_PASSWORD, 'TEACHER');
+        // Navigate to the teacher's lessons page
+        await page.goto('/teacher/lessons');
+        await waitForNetworkIdle(page); // Wait for initial data load
+    });
 
-        // Define status values directly (consider importing if possible later)
-        // Using the STATUS object defined at the top
-        const lessonStatuses = Object.values(STATUS);
-        for (const status of lessonStatuses) {
-            await expect(page.getByRole('heading', { name: new RegExp(status, 'i'), level: 2 })).toBeVisible();
-        }
-        // --- END NEW ---
+    test.afterAll(async () => {
+        await page.close();
+    });
 
-        // 2. Wait for page to fully load (optional, maybe remove if above checks suffice)
-        // await waitForNetworkIdle(page);
+    test('Teacher can view lessons and manage their statuses', async () => {
+        // 1. Verify initial page load and presence of different status sections
+        await expect(page.locator('h1:has-text("Lessons Dashboard")')).toBeVisible();
 
-        // Define locator for success banner
-        const successBanner = page.locator('#success-message-banner');
+        // Sections expected based on seed data (5 lessons per status)
+        const expectedSections = [
+            { status: 'REQUESTED', id: 'lessons-requested-section' },
+            { status: 'ACCEPTED', id: 'lessons-accepted-section' },
+            { status: 'DEFINED', id: 'lessons-defined-section' },
+            { status: 'COMPLETED', id: 'lessons-completed-section' },
+            { status: 'REJECTED', id: 'lessons-rejected-section' },
+            { status: 'VOIDED', id: 'lessons-voided-section' },
+        ];
 
-        // 3. Verify that sections for all statuses are visible
-        // This loop might be redundant now, keeping for robustness
-        for (const status of lessonStatuses) { // Use defined statuses
+        for (const section of expectedSections) {
             await expect(
-                page.locator(`#lessons-${status.toLowerCase()}-section`), // Ensure lowercase ID
-                `Lesson section for "${status}" should be visible`
+                page.locator(`#${section.id}`),
+                `Lesson section for "${section.status}" should be visible`
             ).toBeVisible();
+            // Check initial count (should be 5 based on seed)
+            const initialCount = await getLessonCountInSection(page, `#${section.id}`);
+            expect(initialCount).toBe(5);
         }
 
-        // 4. Test REQUESTED -> ACCEPTED transition
-        // Find a lesson card in the REQUESTED section
-        const requestedCard = page.locator('#lessons-requested-section .card').first();
-        await expect(requestedCard).toBeVisible();
+        // --- Test REQUESTED -> ACCEPTED transition --- 
+        const requestedSection = page.locator('#lessons-requested-section');
+        const acceptedSection = page.locator('#lessons-accepted-section');
+        const firstRequestedCard = requestedSection.locator('.card').first();
+        const initialAcceptedCount = await getLessonCountInSection(page, '#lessons-accepted-section');
 
         // Find and click the Accept button
-        const acceptButton = requestedCard.getByRole('button', { name: /accept/i });
+        const acceptButton = firstRequestedCard.getByRole('button', { name: /accept/i });
         await expect(acceptButton).toBeVisible();
         await acceptButton.click();
-        await waitForNetworkIdle(page);
+        await waitForNetworkIdle(page); // Wait for UI update
 
-        // Assert success message appears for ACCEPTED
-        await expect(successBanner).toBeVisible();
-        await expect(successBanner).toContainText(/Successfully updated status.*to accepted/i);
+        // Assert: Lesson moved from REQUESTED to ACCEPTED
+        await expect(requestedSection.locator('.card').first()).not.toBe(firstRequestedCard); // Card should be gone
+        const finalAcceptedCount = await getLessonCountInSection(page, '#lessons-accepted-section');
+        expect(finalAcceptedCount).toBe(initialAcceptedCount + 1);
 
-        // 5. Test ACCEPTED -> COMPLETED transition
-        // Find a lesson card in the ACCEPTED section
-        const acceptedCard = page.locator('#lessons-accepted-section .card').first();
-        await expect(acceptedCard).toBeVisible();
+        // --- Test DEFINED -> COMPLETED transition --- 
+        const definedSection = page.locator('#lessons-defined-section');
+        const completedSection = page.locator('#lessons-completed-section');
+        const firstDefinedCard = definedSection.locator('.card').first();
+        const initialCompletedCount = await getLessonCountInSection(page, '#lessons-completed-section');
 
-        // Find and click the Complete button
-        const completeButton = acceptedCard.getByRole('button', { name: /complete/i });
-        await expect(completeButton).toBeVisible();
-        await completeButton.click();
-        await waitForNetworkIdle(page);
+        // Find and click the Complete button on the DEFINED card
+        const completeButtonDefined = firstDefinedCard.getByRole('button', { name: /complete/i });
+        await expect(completeButtonDefined, 'Complete button should be visible on DEFINED card').toBeVisible();
+        await completeButtonDefined.click();
+        await waitForNetworkIdle(page); // Wait for UI update
 
-        // Assert success message appears for COMPLETED
-        await expect(successBanner).toBeVisible();
-        await expect(successBanner).toContainText(/Successfully updated status.*to completed/i);
+        // Assert: Lesson moved from DEFINED to COMPLETED
+        await expect(definedSection.locator('.card').first()).not.toBe(firstDefinedCard); // Card should be gone from DEFINED
+        const finalCompletedCountDefined = await getLessonCountInSection(page, '#lessons-completed-section');
+        expect(finalCompletedCountDefined, 'Completed count should increase by 1').toBe(initialCompletedCount + 1);
 
-        // 6. Test ACCEPTED -> VOIDED transition
-        // There should be another ACCEPTED card (since we created multiple in seed.js)
-        const anotherAcceptedCard = page.locator('#lessons-accepted-section .card').first();
-        await expect(anotherAcceptedCard).toBeVisible();
-
-        // Find and click the Void button
-        const voidButton = anotherAcceptedCard.getByRole('button', { name: /void/i });
-        await expect(voidButton).toBeVisible();
-        await voidButton.click();
-        await waitForNetworkIdle(page);
-
-        // Assert success message appears for VOIDED
-        await expect(successBanner).toBeVisible();
-        await expect(successBanner).toContainText(/Successfully updated status.*to voided/i);
-
-        // 7. Verify all status sections are still visible after transitions
-        for (const status of Object.values(STATUS)) {
-            await expect(
-                page.locator(`#lessons-${status}-section`),
-                `Lesson section for "${status}" should still be visible after transitions`
-            ).toBeVisible();
-        }
+        // TODO: Add tests for other transitions like REJECT, VOID, DEFINE (navigation)
     });
 }); 

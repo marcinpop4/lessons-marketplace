@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { LessonStatus, LessonStatusValue, LessonStatusTransition } from '../../shared/models/LessonStatus.js';
 import { v4 as uuidv4 } from 'uuid';
-import { lessonIncludeForTransform, transformLesson } from './lesson.transformer.js';
 
 // Define the includes needed for the controller's transformToModel
 const lessonIncludeForTransform = {
@@ -123,7 +122,7 @@ class LessonService {
                 id: newStatusId,
                 lessonId: lessonId,
                 status: newStatusValue,
-                context: context,
+                context: context as Prisma.InputJsonValue,
             }
         });
 

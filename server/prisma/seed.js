@@ -110,6 +110,28 @@ function getSampleGoalData(lessonType, studentAge) {
   return goals[0]; // Just returning the first set for simplicity
 }
 
+// --- Helper: Determine Transition Sequence ---
+function getTransitionsToReachStatus(targetStatus) {
+    switch (targetStatus) {
+        case LessonStatusValue.REQUESTED:
+            return [];
+        case LessonStatusValue.ACCEPTED:
+            return [LessonStatusTransition.ACCEPT];
+        case LessonStatusValue.REJECTED:
+            return [LessonStatusTransition.REJECT];
+        case LessonStatusValue.DEFINED:
+            return [LessonStatusTransition.ACCEPT, LessonStatusTransition.DEFINE];
+        case LessonStatusValue.COMPLETED:
+            return [LessonStatusTransition.ACCEPT, LessonStatusTransition.DEFINE, LessonStatusTransition.COMPLETE];
+        // Define a path to VOIDED, e.g., via DEFINED state
+        case LessonStatusValue.VOIDED:
+            return [LessonStatusTransition.ACCEPT, LessonStatusTransition.DEFINE, LessonStatusTransition.VOID];
+        default:
+            console.warn(`Unsupported target status for transition generation: ${targetStatus}`);
+            return [];
+    }
+}
+
 async function main() {
 
   const commonPassword = "1234";
@@ -202,17 +224,15 @@ async function main() {
     const lessonRequests = [];
     const lessonTypes = Object.values(LessonType);
     const today = new Date();
-    const numLessonRequests = 20; 
+    const numLessonRequests = 30; // INCREASED number of requests
     for (let i = 0; i < numLessonRequests; i++) {
       const student = students[i % students.length];
       const lessonType = lessonTypes[i % lessonTypes.length];
       const address = addresses[i % addresses.length];
       const startTime = addToDate(today, Math.floor(i / 4), 9 + (i % 8));
       
-      // Pass data matching CreateLessonRequestDTO (no prisma arg, use addressObj)
       const request = await lessonRequestService.createLessonRequest({ 
         studentId: student.id,
-        // Construct addressObj from the address created earlier
         addressObj: {
             street: address.street,
             city: address.city,
@@ -226,17 +246,19 @@ async function main() {
       });
       lessonRequests.push(request);
     }
-    console.log('LessonRequests created (via service):', lessonRequests.length);
+    console.log(`LessonRequests created (via service): ${lessonRequests.length}`);
 
     // Create Lesson Quotes using LessonQuoteService - specifically for Emily Richardson
     const emilyQuotes = [];
     const emilyHourlyRates = teacherLessonHourlyRates.filter(rate => rate.teacherId === emilyRichardson.id);
-    if (lessonRequests.length < 5) throw new Error(`Not enough lesson requests for seeding. Need 5, got ${lessonRequests.length}.`);
-    for (let i = 0; i < 5; i++) { // Create 5 quotes to become lessons
+    if (lessonRequests.length < numLessonRequests) throw new Error(`Not enough lesson requests for seeding. Need ${numLessonRequests}, got ${lessonRequests.length}.`);
+    
+    for (let i = 0; i < numLessonRequests; i++) { // Create 30 quotes for Emily
         const request = lessonRequests[i];
         const hourlyRate = emilyHourlyRates.find(rate => rate.type === request.type);
-        if (!hourlyRate) throw new Error(`No rate for Emily for ${request.type}`);
+        if (!hourlyRate) throw new Error(`No rate for Emily for ${request.type} on request ${i}`);
         const costInCents = Math.round((hourlyRate.rateInCents * request.durationMinutes) / 60);
+        
         const quote = await lessonQuoteService.create(prisma, { 
             lessonRequestId: request.id,
             teacherId: emilyRichardson.id,
@@ -245,76 +267,92 @@ async function main() {
         });
         emilyQuotes.push(quote);
     }
-    console.log('LessonQuotes created for Emily (via service):', emilyQuotes.length);
+    console.log(`LessonQuotes created for Emily (via service): ${emilyQuotes.length}`);
 
-    // --- NEW SEEDING LOGIC --- 
-    
-    // 1. Create Lessons from the first 5 Emily Quotes and transition them to DEFINED
-    const definedLessons = [];
-    for (const quote of emilyQuotes) {
-      // --- Corrected Order ---
-      // a. Create the Lesson record first, linking to the quote
-      const lesson = await prisma.lesson.create({
-        data: {
-          quoteId: quote.id,
-          // currentStatusId will be set after creating the initial status
-        }
-      });
+    // --- NEW SEEDING LOGIC: Create 5 Lessons per Status --- 
+    const targetStatuses = [
+        LessonStatusValue.REQUESTED,
+        LessonStatusValue.ACCEPTED,
+        LessonStatusValue.DEFINED,
+        LessonStatusValue.REJECTED,
+        LessonStatusValue.COMPLETED,
+        LessonStatusValue.VOIDED
+    ];
+    const createdLessonsData = [];
+    let quoteIndex = 0;
 
-      // b. Create initial LessonStatus (REQUESTED), linking to the new lesson.id
-      const requestedStatus = await prisma.lessonStatus.create({
-        data: {
-          lessonId: lesson.id, // Link to the lesson we just created
-          status: LessonStatusValue.REQUESTED
-        }
-      });
+    for (const targetStatus of targetStatuses) {
+        for (let i = 0; i < 5; i++) {
+            if (quoteIndex >= emilyQuotes.length) {
+                throw new Error('Ran out of quotes for Emily to create lessons.');
+            }
+            const quote = emilyQuotes[quoteIndex++];
+            
+            // 1. Create Lesson using the service (initial status is REQUESTED)
+            // Note: lessonService.create uses a transaction internally
+            const createdLessonInitial = await lessonService.create(prisma, quote.id);
+            if (!createdLessonInitial?.id) {
+                 console.error(`Failed to create lesson for quote ${quote.id}`);
+                 continue; // Skip if lesson creation failed
+            }
+            const lessonId = createdLessonInitial.id;
 
-      // c. Update the Lesson record to set the initial currentStatusId
-      await prisma.lesson.update({
-        where: { id: lesson.id },
-        data: { currentStatusId: requestedStatus.id }
-      });
-      // --- End Corrected Order ---
+            // 2. Apply necessary transitions to reach target status
+            const transitions = getTransitionsToReachStatus(targetStatus);
+            let currentLessonState = createdLessonInitial;
 
-      // d. Transition status: ACCEPTED
-      await lessonService.updateStatus(
-        prisma,
-        lesson.id,
-        LessonStatusTransition.ACCEPT,
-        {},
-        emilyRichardson.id // Assuming teacher accepts
-      );
+            try {
+                for (const transition of transitions) {
+                    let context = {};
+                    if (transition === LessonStatusTransition.COMPLETE) {
+                        context = { notes: 'Lesson completed during seed.' };
+                    }
+                    // Use lessonService.updateStatus which handles transactions
+                    currentLessonState = await lessonService.updateStatus(
+                        prisma,
+                        lessonId,
+                        transition,
+                        context,
+                        emilyRichardson.id // Teacher performs action
+                    );
+                }
+                createdLessonsData.push({ lesson: currentLessonState, finalStatus: targetStatus });
+            } catch (transitionError) {
+                console.error(`   ERROR transitioning lesson ${lessonId.substring(0, 8)}... for target ${targetStatus}. Error: ${transitionError instanceof Error ? transitionError.message : transitionError}`);
+                // Store lesson in its current state even if transition failed
+                // Safely access status from the potentially complex currentLessonState object
+                const finalStatusOnError = currentLessonState?.lessonStatuses?.[0]?.status || 'UNKNOWN'; // Default if status cannot be determined
+                createdLessonsData.push({ lesson: currentLessonState, finalStatus: finalStatusOnError }); 
+            }
+        } // End inner loop (i < 5)
+    } // End outer loop (targetStatuses)
 
-      // e. Transition status: DEFINED
-      const finalStatus = await lessonService.updateStatus(
-        prisma,
-        lesson.id,
-        LessonStatusTransition.DEFINE,
-        {},
-        emilyRichardson.id // Assuming teacher defines
-      );
-
-      // Fetch the fully updated lesson to add to our list (optional, but good practice)
-      const updatedLesson = await prisma.lesson.findUnique({
-           where: { id: lesson.id },
-           include: { quote: { include: { lessonRequest: { include: { student: true } }, teacher: true } } }
-       });
-      definedLessons.push(updatedLesson);
-    }
-    console.log('Lessons created and transitioned to DEFINED:', definedLessons.length);
-
-    // 2. Create Goals for each DEFINED lesson using goalService
+    // --- Create Goals for DEFINED/COMPLETED lessons --- 
     let goalsCreatedCount = 0;
-    for (const lesson of definedLessons) {
-        const student = lesson.quote.lessonRequest.student;
-        const lessonType = lesson.quote.lessonRequest.type;
+    // Filter lessons based on the finalStatus stored in createdLessonsData
+    const lessonsForGoals = createdLessonsData.filter(data => 
+        data.finalStatus === LessonStatusValue.DEFINED || data.finalStatus === LessonStatusValue.COMPLETED
+    ).map(data => data.lesson); // Extract the lesson object
+
+    for (const lesson of lessonsForGoals) {
+        // Ensure lesson and necessary nested data exists before proceeding
+        // Use optional chaining extensively for safety
+        const student = lesson?.quote?.lessonRequest?.student;
+        const lessonType = lesson?.quote?.lessonRequest?.type;
+        const lessonId = lesson?.id;
+
+        if (!student || !lessonType || !lessonId) {
+            console.warn(`   Skipping goal creation for lesson ${lessonId?.substring(0,8) ?? 'UNKNOWN'}... due to missing required data.`);
+            continue;
+        }
+        
         const studentAge = new Date().getFullYear() - new Date(student.dateOfBirth).getFullYear();
         
         const sampleGoals = getSampleGoalData(lessonType, studentAge);
 
         // Create goals using the service
         try {
-            // Create the goal (initial status: CREATED)
+            // Create the 'created' goal data instance
             const createdGoal = await goalService.createGoal(
                 lesson.id,
                 sampleGoals.created.title,
@@ -345,14 +383,11 @@ async function main() {
             goalsCreatedCount++;
 
         } catch (goalError) {
-            console.error(`Failed to create goals for lesson ${lesson.id}:`, goalError);
-            // Decide if you want to stop the seed or continue with other lessons
-            // throw goalError; // Stop seeding
+            console.error(`   Failed to create goals for lesson ${lessonId.substring(0,8)}...:`, goalError);
         }
     }
-    console.log('Goals creation process completed (via service). Actual count depends on service success:', goalsCreatedCount);
 
-    // --- END NEW SEEDING LOGIC ---
+    // --- END NEW SEEDING LOGIC --- 
 
   } catch (e) {
     console.error("Seeding failed:", e);

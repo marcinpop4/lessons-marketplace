@@ -7,6 +7,7 @@ import { Student } from '@shared/models/Student';
 import { Teacher } from '@shared/models/Teacher';
 import { LessonType } from '@prisma/client'; // Enum for request payload
 import { v4 as uuidv4 } from 'uuid';
+import { LessonStatusValue } from '@shared/models/LessonStatus';
 
 // Seeded user credentials
 const SEEDED_STUDENT_EMAIL = 'ethan.parker@example.com';
@@ -226,13 +227,14 @@ describe('API Integration: /api/v1/lesson-quotes', () => {
                 .set('Authorization', studentAuthToken);
 
             expect(response.status).toBe(200);
-            expect(response.body).toBeDefined();
+            const createdLesson = response.body as Lesson; // Assuming response body is the lesson
 
-            // Response should be the newly created Lesson object
-            const createdLesson = response.body as any;
+            // Check the lesson structure and initial status
+            expect(createdLesson).toBeDefined();
             expect(createdLesson.id).toBeDefined();
             expect(createdLesson.quote?.id).toEqual(quoteToAccept.id);
-            expect(createdLesson.currentStatus).toEqual('REQUESTED');
+            // Check the status *value* within the currentStatus object
+            expect(createdLesson.currentStatus?.status).toEqual(LessonStatusValue.REQUESTED);
             expect(createdLesson.createdAt).toBeDefined();
             expect(createdLesson.updatedAt).toBeDefined();
 
