@@ -1,512 +1,177 @@
 # Lessons Marketplace
 
-Unlock your potential with Lessons Marketplace – the go-to platform for parents and students to connect with top 1:1 instructors and master their passions!
+This project is a platform for connecting students and parents with 1:1 instructors.
 
-## Prerequisites
+## Development Setup
 
-### Docker Installation
+Follow these steps to set up your local development environment.
 
-To use the Docker-based development environment, you need to install Docker first:
+### Prerequisites
 
-#### For macOS:
+1.  **Node.js**: Version 20 or later.
+2.  **pnpm**: Version 10.3.0 or later. Install using `npm install -g pnpm`.
+3.  **PostgreSQL**: Version 15. Install using Homebrew:
+    ```bash
+    brew install postgresql@15
+    brew services start postgresql@15
+    ```
+4.  **Create Database**: Connect to PostgreSQL and create the development database.
+    ```bash
+    # Connect with your system username (no need for -U flag on macOS with brew)
+    psql postgres
+    CREATE DATABASE arts_marketplace;
+    \q
+    ```
+5.  **Environment File**: Copy `env/.env.development.example` to `env/.env.development` and update `DATABASE_URL` if your local PostgreSQL user is not your system username (often `postgres` on Linux/Windows). For default brew installs on macOS, your system username is the correct value for `POSTGRES_USER` and should be reflected in the `DATABASE_URL`.
 
-**Option 1: Install Docker Desktop (Official Method)**
-1. Download Docker Desktop from [Docker's official website](https://www.docker.com/products/docker-desktop/)
-2. Open the downloaded `.dmg` file
-3. Drag the Docker icon to your Applications folder
-4. Open Docker from your Applications folder
-5. Accept the terms and conditions
+    *Example `DATABASE_URL` for macOS brew install:*
+    `postgresql://YOUR_MACOS_USERNAME@localhost:5432/arts_marketplace?schema=public`
 
-**Option 2: Install using Homebrew (Recommended for developers)**
-```bash
-# Install Homebrew if you don't have it
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    *Example `DATABASE_URL` for standard PostgreSQL install:*
+    `postgresql://postgres:YOUR_PASSWORD@localhost:5432/arts_marketplace?schema=public` (Update password if you set one).
 
-# Install Docker Desktop
-brew install --cask docker
+### Installation and Setup
 
-# Start Docker Desktop from Applications folder
-```
+Run the following commands from the project root:
 
-#### For Windows:
-1. Download Docker Desktop from [Docker's official website](https://www.docker.com/products/docker-desktop/)
-2. Run the installer and follow the instructions
-3. Make sure WSL 2 is enabled if prompted
+1.  **Install Dependencies**:
+    ```bash
+    pnpm install
+    ```
 
-#### For Linux:
-```bash
-# Install Docker Engine
-sudo apt-get update
-sudo apt-get install docker-ce docker-ce-cli containerd.io
+2.  **Generate Prisma Client**:
+    ```bash
+    # Uses NODE_ENV=development by default from env/.env.development
+    pnpm prisma:generate
+    ```
 
-# Install Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-```
+3.  **Run Database Migrations**:
+    ```bash
+    # Uses NODE_ENV=development by default from env/.env.development
+    pnpm prisma:migrate
+    ```
 
-## Database Setup
+4.  **Seed Database**:
+    ```bash
+    # Uses NODE_ENV=development by default from env/.env.development
+    pnpm prisma:seed
+    ```
 
-### Option 1: Install PostgreSQL locally
+5.  **Start Development Servers**:
+    ```bash
+    # Uses NODE_ENV=development implicitly via the script's use of dotenv-cli
+    pnpm dev:full
+    ```
+    This will start the frontend and backend servers concurrently.
+    - Frontend: `http://localhost:5173`
+    - Backend API: `http://localhost:3000`
 
-1. **Install PostgreSQL:**
-   - Mac: 
-     ```bash
-     brew install postgresql@15
-     brew services start postgresql@15
-     ```
-   - Windows: Download and install from [PostgreSQL website](https://www.postgresql.org/download/windows/)
-   - Linux:
-     ```bash
-     sudo apt update
-     sudo apt install postgresql postgresql-contrib
-     ```
+### Running Commands with `NODE_ENV`
 
-2. **Create database:**
-   - macOS (Homebrew installation):
-     ```bash
-     # Connect with your system username (no need for -U flag)
-     psql postgres
-     CREATE DATABASE arts_marketplace;
-     \q
-     ```
-   - Windows/Linux (standard installation):
-     ```bash
-     psql -U postgres
-     CREATE DATABASE arts_marketplace;
-     \q
-     ```
-
-3. **Note for macOS Homebrew users:**
-   - Homebrew PostgreSQL installations use your system username as the default PostgreSQL user
-   - Make sure to update your .env file to use your username in the POSTGRES_USER variable
-   - Example: `POSTGRES_USER=yourusername` instead of `POSTGRES_USER=postgres`
-
-### Option 2: Use Docker
-
-1. **Start PostgreSQL with Docker:**
-   ```bash
-   docker run --name arts-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=arts_marketplace -p 5432:5432 -d postgres:15
-   ```
-   
-   With Docker, use these database environment variables: 
-   ```
-   DB_HOST=localhost
-   DB_PORT=5432
-   DB_NAME=arts_marketplace
-   DB_USER=postgres
-   DB_PASSWORD=postgres
-   DB_SSL=false
-   POSTGRES_DB=arts_marketplace
-   POSTGRES_USER=postgres
-   POSTGRES_PASSWORD=postgres
-   ```
-
-### Option 3: Use Docker Compose (Recommended)
-
-This project includes a Docker Compose configuration (compose.yaml) for local development:
-
-1. **Start all services (database, backend, frontend):**
-   ```bash
-   docker compose up -d
-   ```
-
-2. **Access the services:**
-   - Frontend: http://localhost:5173
-   - Backend API: http://localhost:3000
-   - Database: PostgreSQL on localhost:5432
-
-3. **Stop all services:**
-   ```bash
-   docker compose down
-   ```
-
-4. **View logs:**
-   ```bash
-   docker compose logs -f
-   ```
-
-## Project Setup
-
-1. **Clone the repository:**
-   ```bash
-   git clone <repository-url>
-   cd arts-marketplace
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   pnpm install
-   ```
-
-3. **Configure environment variables:**
-   - Copy the `.env.example` file to `.env` (if not already done)
-   - Update the database connection URL if needed
-
-4. **Apply database migrations:**
-   ```bash
-   pnpm prisma:migrate
-   ```
-
-5. **Seed the database:**
-   ```bash
-   pnpm prisma:seed
-   ```
-
-6. **Start development server:**
-   ```bash
-   pnpm dev:full
-   ```
-
-## Available Scripts
-
-- `pnpm dev` - Start frontend development server
-- `pnpm dev:server` - Start backend development server
-- `pnpm dev:full` - Start both frontend and backend servers
-- `pnpm build` - Build frontend
-- `pnpm build:server` - Build backend
-- `pnpm build:full` - Build entire application
-- `pnpm start` - Start production server
-- `pnpm lint` - Run linter
-- `pnpm prisma:generate` - Generate Prisma client
-- `pnpm prisma:migrate` - Run database migrations
-- `pnpm prisma:studio` - Open Prisma Studio to manage database
-- `pnpm prisma:seed` - Seed the database with initial data
-- `pnpm db:reset` - Reset the database (drop and recreate all tables)
-
-## Deployment
-
-### Deploying to Fly.io
-
-This project is configured for easy deployment to Fly.io using a unified Docker build approach. The same Dockerfile used for local development is used for production deployment, with environment variables controlling the behavior.
-
-#### Prerequisites
-
-1. Install the Fly.io CLI:
-   ```bash
-   # For macOS/Linux
-   curl -L https://fly.io/install.sh | sh
-   
-   # For Windows (in PowerShell)
-   iwr https://fly.io/install.ps1 -useb | iex
-   ```
-
-2. Login to Fly.io:
-   ```bash
-   flyctl auth login
-   ```
-
-3. Ensure you have a `.env.production` file with your production environment variables.
-
-#### Deployment Steps
-
-1. Deploy both frontend and backend:
-   ```bash
-   pnpm deploy:fly
-   ```
-
-2. Deploy with a new Postgres database (first time only):
-   ```bash
-   pnpm deploy:fly:with-db
-   ```
-
-#### Checking Deployment Status
-
-1. Check logs:
-   ```bash
-   # For backend
-   flyctl logs -a lessons-marketplace-server
-   
-   # For frontend
-   flyctl logs -a lessons-marketplace-frontend
-   ```
-
-2. Open the deployed application:
-   ```bash
-   flyctl open -a lessons-marketplace-frontend
-   ```
-
-#### Configuration
-
-The deployment uses the following structure:
-- The main `Dockerfile` is used for both local development and production
-- Environment variables control differences between environments
-- The server automatically detects if it's running in Fly.io and adapts accordingly
-- The frontend configuration is generated at runtime to connect to the correct API endpoint
-
-## Database Schema
-
-The application uses PostgreSQL with Prisma ORM. The main entities are:
-
-- **User**: Stores user information, can be artists or regular users
-- **Product**: Artwork listings with details
-- **Category**: Product categories
-- **Order**: User orders
-- **OrderItem**: Individual items in an order
-
-## Development
-
-### Environment Configuration
-
-The project includes a powerful environment configuration script that manages different environment settings:
+Many scripts rely on the `NODE_ENV` environment variable to load the correct `.env` file (e.g., `env/.env.development`, `env/.env.test`, `env/.env.production`). While some scripts like `pnpm dev:full` set this implicitly via `dotenv-cli`, for ad-hoc commands or scripts that don't explicitly load environment files, you might need to prepend `NODE_ENV`:
 
 ```bash
-# Generate development environment
-pnpm env:dev
+# Example: Running prisma studio with development environment
+NODE_ENV=development pnpm prisma:studio
 
-# Generate Docker environment
-pnpm env:docker
-
-# Generate production environment
-pnpm env:prod
-
-# Generate environment with custom output directory
-pnpm env:docker ./custom-output
+# Example: Running a specific test suite with test environment
+NODE_ENV=test jest --config tests/unit/jest.config.js
 ```
 
-You can also specify a custom output directory with any of the environment commands:
+Generally, prefer using the provided `pnpm` scripts which handle environment loading.
+
+### Full Validation Script
+
+The `validate:full` script provides a comprehensive check of the project setup and integrity:
 
 ```bash
-# Format: pnpm env:<environment> [output-directory]
-pnpm env:dev ./custom-path
-pnpm env:docker /some/other/path
-pnpm env:prod /tmp/prod-env
+# Uses NODE_ENV=development for seeding/prisma commands
+pnpm validate:full
 ```
 
-The script handles:
-- Loading environment variables from base and specific environment files
-- Generating .env files for local development
-- Creating Docker environment configurations
-- Building Fly.io deployment files
-
-### Database Exploration
-
-To explore the database visually:
-
-```bash
-pnpm prisma:studio
-```
-
-To create a new migration after schema changes:
-
-```bash
-pnpm prisma:migrate
-```
-
-## Build Process and Best Practices
-
-This project follows a monorepo structure with three main components:
-
-1. **Frontend**: React application built with Vite
-2. **Server**: Node.js/Express backend
-3. **Shared**: Common code used by both frontend and server
-
-### NPM Scripts
-
-The project uses a streamlined set of npm scripts for development and building:
-
-```bash
-# Development
-npm run dev            # Start frontend development server
-npm run dev:server     # Start backend development server with hot reload
-npm run dev:full       # Start both frontend and backend in development mode
-
-# Building
-npm run build:shared   # Build shared code (automatically generates Prisma client first)
-npm run build:frontend # Build frontend application
-npm run build:server   # Build server (includes building shared code first)
-npm run build          # Build everything (frontend and server, which includes shared)
-npm run clean          # Remove all build artifacts (automatically runs before build)
-
-# Running
-npm run start          # Start the production server
-npm run start:frontend # Start the frontend in preview mode
-```
-
-#### Script Hooks
-
-The project uses npm/pnpm script hooks for automatic sequencing:
-
-- `prebuild:shared`: Automatically runs before `build:shared` to generate the Prisma client
-- `prebuild`: Automatically runs before `build` to clean the dist directory
-
-These hooks ensure that dependencies are generated and old artifacts are cleaned up before building.
-
-### Fresh Checkout Workflow
-
-For a fresh checkout of the project, you only need two commands:
-
-```bash
-# Install dependencies
-pnpm install
-
-# Build everything (includes Prisma client generation)
-pnpm build
-```
-
-This will automatically:
-1. Install all dependencies
-2. Generate the Prisma client
-3. Clean any previous build artifacts
-4. Build all components (shared, frontend, server)
-
-### Build Output Directories
-
-When you run `pnpm build`, all build artifacts are placed in a centralized `dist/` directory:
-
-1. `dist/frontend` - Contains the built frontend application (compiled and bundled by Vite)
-2. `dist/server` - Contains the compiled server TypeScript code
-3. `dist/shared` - Contains the compiled shared TypeScript code
-
-This structure keeps build artifacts separate from source code, making the codebase cleaner and easier to navigate. The centralized `dist/` directory can be easily cleaned with `pnpm run clean`.
-
-### Docker Build Process
-
-The project uses a streamlined multi-stage Dockerfile with explicit build steps:
-
-1. **Build Stage**:
-   - Installs dependencies with `pnpm install`
-   - Explicitly cleans any previous build artifacts with `pnpm clean`
-   - Generates the Prisma client with `pnpm prisma:generate`
-   - Builds frontend and server components with explicit build commands
-   - Creates all build artifacts in the `/app/dist` directory
-
-2. **Frontend Production Stage**:
-   - Uses Nginx as the base image
-   - Copies only the built frontend assets from the build stage
-   - Configures Nginx to serve the frontend application
-
-3. **Server Production Stage**:
-   - Uses a minimal Node.js image
-   - Installs only production dependencies
-   - Copies only the necessary built files and runtime assets
-
-This approach makes the build process explicit and predictable, resulting in optimized production images that contain only what's needed to run each component.
-
-To build and run with Docker:
-
-```bash
-# Build both frontend and server
-docker build -t lessons-marketplace .
-
-# Run frontend only
-docker run -p 5173:80 --target frontend lessons-marketplace
-
-# Run server only
-docker run -p 3000:3000 --target server lessons-marketplace
-```
-
-Or use Docker Compose to run the complete stack:
-
-```bash
-docker-compose up
-```
-
-### Best Practices
-
-1. **Dependency Management**: All dependencies are in the root package.json for simplicity
-2. **Build Order**: Always build shared code first, then server and frontend
-3. **Docker Optimization**: 
-   - Uses multi-stage builds to keep production images small
-   - Copies package.json files first for better layer caching
-   - Installs only production dependencies in final images
-4. **Development Workflow**: Use the dev scripts for local development and docker-compose for a complete environment
-
-## End-to-End Testing
-
-### Running Tests
-
-The project uses Playwright for end-to-end testing. Before running tests, ensure:
-
-1. Your database is seeded with test data: `pnpm prisma:seed`
-2. The application is running: `pnpm dev:full`
-
-Run tests with one of these commands:
-
-```bash
-# Run all E2E tests with console output
-pnpm test:e2e
-
-# Run tests and generate an HTML report
-pnpm test:e2e:report
-```
-
-### Screenshots
-
-All test screenshots are saved in the `tests/screenshots` directory and are excluded from Git. 
-
-Playwright is configured to automatically take screenshots on test failures. Tests also take explicit screenshots at key points for debugging purposes.
-
-## Docker Development Environment
-
-You can run the application using Docker with the following npm scripts:
-
-```bash
-# Start all Docker containers in detached mode
-npm run docker:up
-
-# Stop all Docker containers
-npm run docker:down
-
-# Seed the database in Docker
-npm run docker:seed
-
-# View Docker logs
-npm run docker:logs
-
-# Run end-to-end tests in Docker environment
-npm run docker:test
-
-# Run end-to-end tests with interactive prompt to keep containers running
-npm run docker:test:interactive
-
-# Build Docker images
-npm run docker:build
-
-# Rebuild Docker images without cache
-npm run docker:rebuild
-```
-
-These commands replace the need for direct Docker commands or shell scripts.
-
-## TypeScript Path Alias Troubleshooting
-
-This project uses TypeScript path aliases (e.g., `@shared/*`, `@frontend/*`) to make imports cleaner and more maintainable. If you encounter issues with path aliases not being recognized by your editor, try the following steps:
-
-### Fix TypeScript Configuration
-
-We've provided a script to fix TypeScript configuration files and ensure path aliases work correctly:
-
-```bash
-# Fix TypeScript configuration files and rebuild references
-pnpm fix:typescript
-```
-
-### Editor Setup
-
-For VS Code users:
-1. Restart the TypeScript server: Press `Cmd+Shift+P` (or `Ctrl+Shift+P` on Windows/Linux) and select "TypeScript: Restart TS Server"
-2. Make sure you have the recommended extensions installed (a notification should appear)
-3. Open the project using the workspace file: `.vscode/typescript.code-workspace`
-
-### Path Alias Diagnostic
-
-To diagnose path alias issues:
-
-```bash
-# Run the TypeScript diagnostics tool
-pnpm diagnose:ts
-```
-
-### Last Resort Workaround
-
-If you still encounter issues in your editor while working on the project, you can temporarily use relative imports:
-
-```typescript
-// Instead of
-import { LessonType } from '@shared/models/LessonType';
-
-// You can use a relative path temporarily
-import { LessonType } from '../../../../shared/models/LessonType';
-```
-
-Note that the build process will still work with path aliases, so this is only needed if your editor is showing false errors.
+This script performs the following actions:
+1.  `pnpm clean`: Removes `dist` and `node_modules`.
+2.  `pnpm install`: Installs dependencies.
+3.  `pnpm prisma:reset --force`: Resets the development database.
+4.  `pnpm prisma:seed`: Seeds the database.
+5.  `pnpm prisma:generate`: Generates the Prisma client.
+6.  `pnpm diagnose:ts`: Runs TypeScript diagnostics.
+7.  `pnpm test:local`: Runs all local tests (unit, API, E2E).
+
+Use this script to ensure your environment is correctly configured and all core components are functional.
+
+## Running with Docker
+
+You can run the application and tests within a Docker environment.
+
+1.  **Deploy Locally**: Builds images and starts containers for frontend, server, and database.
+    ```bash
+    # Set NODE_ENV if you want to target a specific environment for the build/run
+    # Defaults often assume development or production based on script definition
+    pnpm docker:deploy
+    ```
+    This uses `docker compose -f docker/docker-compose.yml up -d`.
+
+2.  **Run Tests in Docker**: Builds a test image and runs tests against the Dockerized application.
+    ```bash
+    # The script explicitly sets NODE_ENV=test
+    pnpm docker:test
+    ```
+    This runs the test suite defined in `docker/docker-compose.yml`.
+
+Refer to `package.json` and `docker/docker-compose.yml` for details on the specific environment variables used in these Docker commands.
+
+## Production Build
+
+To build the application for production:
+
+1.  **Build Frontend**:
+    ```bash
+    NODE_ENV=production pnpm build:frontend
+    ```
+2.  **Build Server**:
+    ```bash
+    NODE_ENV=production pnpm build:server
+    ```
+3.  **Build Shared (usually included in server build)**:
+    ```bash
+    NODE_ENV=production pnpm build:shared
+    ```
+
+These commands compile the code and output artifacts to the `dist/` directory, optimized for production deployment. The `NODE_ENV=production` flag ensures production-specific configurations and optimizations are applied.
+
+## CI/CD Pipelines
+
+The project uses GitHub Actions for Continuous Integration and Continuous Deployment.
+
+### 1. CI Pipeline (`.github/workflows/ci-cd.yml`)
+
+-   **Name**: `GitHub CI/CD Pipeline`
+-   **Triggers**: Runs on pushes and pull requests to the `main` branch.
+-   **Jobs**:
+    -   `test`:
+        -   Runs on `ubuntu-latest`.
+        -   Sets `NODE_ENV=test`.
+        -   Checks out code, sets up Node.js and pnpm.
+        -   Installs dependencies (`pnpm install --frozen-lockfile`).
+        -   Sets up Docker Buildx.
+        -   Cleans Docker environment (`pnpm docker:clean`).
+        -   Builds and deploys Docker containers (`pnpm docker:deploy:rebuild`).
+        -   Runs debug scripts (`scripts/docker-debug.ts`) and uploads logs.
+        -   Runs tests within Docker (`pnpm docker:test`).
+        -   Uploads test execution logs, Playwright reports, results, screenshots, and traces as artifacts.
+
+### 2. Production Deployment Pipeline (`.github/workflows/production-deploy.yml`)
+
+-   **Name**: `Production Deployment`
+-   **Triggers**:
+    -   Manual dispatch (`workflow_dispatch`).
+    -   Completion of the `GitHub CI/CD Pipeline` workflow on the `main` branch (`workflow_run`), only if the CI pipeline succeeded.
+-   **Jobs**:
+    -   `deploy`:
+        -   Runs on `ubuntu-latest`.
+        -   Requires the `production` environment (allows for environment secrets like `FLY_API_TOKEN`).
+        -   Sets `NODE_ENV=production`.
+        -   Checks out code, sets up Node.js and pnpm.
+        -   Installs dependencies (`pnpm install --frozen-lockfile`).
+        -   Deploys the application to Fly.io using `pnpm docker:deploy:fly`.
