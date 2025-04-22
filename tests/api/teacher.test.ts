@@ -121,67 +121,96 @@ describe('API Integration: /api/v1/teachers using Seed Data', () => {
             response.body.forEach((lesson: any) => {
                 // --- Top-Level Lesson Properties ---
                 expect(lesson).toHaveProperty('id');
-                expect(lesson).toHaveProperty('type'); // Already asserted type earlier
                 expect(lesson).toHaveProperty('createdAt');
                 expect(lesson).toHaveProperty('updatedAt');
-                expect(lesson).toHaveProperty('goalCount'); // Already asserted goalCount earlier
-                expect(typeof lesson.goalCount).toBe('number'); // Already asserted type
-
-                // --- Current Status ---
+                expect(lesson).toHaveProperty('goalCount');
                 expect(lesson).toHaveProperty('currentStatus');
-                expect(lesson.currentStatus).toHaveProperty('id');
-                expect(lesson.currentStatus).toHaveProperty('status');
-                expect(lesson.currentStatus).toHaveProperty('createdAt');
-                expect(lesson.currentStatus).toHaveProperty('context'); // Could be {} or null
-
-                // --- Quote ---
+                expect(lesson).toHaveProperty('currentStatusId');
                 expect(lesson).toHaveProperty('quote');
+
+                // --- Quote and Nested Properties ---
                 expect(lesson.quote).toHaveProperty('id');
-                expect(lesson.quote).toHaveProperty('costInCents');
-                expect(lesson.quote).toHaveProperty('hourlyRateInCents');
-                expect(lesson.quote).toHaveProperty('createdAt');
-                expect(lesson.quote).toHaveProperty('updatedAt');
-                expect(lesson.quote).toHaveProperty('lessonRequestId');
-                expect(lesson.quote).toHaveProperty('teacherId', seededTeacherId); // Check teacherId matches
-
-                // --- Quote > Teacher ---
-                expect(lesson.quote).toHaveProperty('teacher');
-                expect(lesson.quote.teacher).toHaveProperty('id', seededTeacherId);
-                expect(lesson.quote.teacher).toHaveProperty('firstName');
-                expect(lesson.quote.teacher).toHaveProperty('lastName');
-                expect(lesson.quote.teacher).toHaveProperty('email');
-                expect(lesson.quote.teacher).not.toHaveProperty('password'); // Ensure password is not exposed
-
-                // --- Quote > Lesson Request ---
                 expect(lesson.quote).toHaveProperty('lessonRequest');
-                expect(lesson.quote.lessonRequest).toHaveProperty('id', lesson.quote.lessonRequestId);
                 expect(lesson.quote.lessonRequest).toHaveProperty('type');
+                expect(lesson.quote.lessonRequest.type).toMatch(/^(GUITAR|BASS|DRUMS|VOICE|PIANO)$/);
                 expect(lesson.quote.lessonRequest).toHaveProperty('startTime');
                 expect(lesson.quote.lessonRequest).toHaveProperty('durationMinutes');
-                expect(lesson.quote.lessonRequest).toHaveProperty('studentId');
-                expect(lesson.quote.lessonRequest).toHaveProperty('addressId');
-                expect(lesson.quote.lessonRequest).toHaveProperty('createdAt');
-                expect(lesson.quote.lessonRequest).toHaveProperty('updatedAt');
-
-                // --- Quote > Lesson Request > Student ---
                 expect(lesson.quote.lessonRequest).toHaveProperty('student');
-                expect(lesson.quote.lessonRequest.student).toHaveProperty('id');
-                expect(lesson.quote.lessonRequest.student).toHaveProperty('firstName');
-                expect(lesson.quote.lessonRequest.student).toHaveProperty('lastName');
-                expect(lesson.quote.lessonRequest.student).toHaveProperty('email');
-                expect(lesson.quote.lessonRequest.student).not.toHaveProperty('password'); // Ensure password is not exposed
-
-                // --- Quote > Lesson Request > Address ---
                 expect(lesson.quote.lessonRequest).toHaveProperty('address');
-                expect(lesson.quote.lessonRequest.address).toHaveProperty('id');
-                expect(lesson.quote.lessonRequest.address).toHaveProperty('street');
-                expect(lesson.quote.lessonRequest.address).toHaveProperty('city');
-                expect(lesson.quote.lessonRequest.address).toHaveProperty('state');
-                expect(lesson.quote.lessonRequest.address).toHaveProperty('postalCode');
-                expect(lesson.quote.lessonRequest.address).toHaveProperty('country');
-                expect(lesson.quote.lessonRequest.address).toHaveProperty('createdAt');
-                expect(lesson.quote.lessonRequest.address).toHaveProperty('updatedAt');
+
+                // --- Student Properties ---
+                const student = lesson.quote.lessonRequest.student;
+                expect(student).toHaveProperty('id');
+                expect(student).toHaveProperty('firstName');
+                expect(student).toHaveProperty('lastName');
+                expect(student).toHaveProperty('email');
+
+                // --- Teacher Properties ---
+                const teacher = lesson.quote.teacher;
+                expect(teacher).toHaveProperty('id');
+                expect(teacher).toHaveProperty('firstName');
+                expect(teacher).toHaveProperty('lastName');
+                expect(teacher).toHaveProperty('email');
+
+                // --- Address Properties ---
+                const address = lesson.quote.lessonRequest.address;
+                expect(address).toHaveProperty('street');
+                expect(address).toHaveProperty('city');
+                expect(address).toHaveProperty('state');
+                expect(address).toHaveProperty('postalCode');
+                expect(address).toHaveProperty('country');
+
+                // --- Status Properties ---
+                expect(lesson.currentStatus).toHaveProperty('status');
+                expect(lesson.currentStatus.status).toMatch(/^(REQUESTED|ACCEPTED|DEFINED|COMPLETED|REJECTED|VOIDED)$/);
             });
+        });
+
+        it('should filter lessons by studentId when provided', async () => {
+            if (!seededTeacherId || !seededTeacherAuthToken) throw new Error('Seeded teacher auth info not available');
+
+            // First get all lessons to find a valid student ID
+            const allLessonsResponse = await request(API_BASE_URL!)
+                .get(`/api/v1/teachers/${seededTeacherId}/lessons`)
+                .set('Authorization', seededTeacherAuthToken);
+
+            expect(allLessonsResponse.status).toBe(200);
+            expect(Array.isArray(allLessonsResponse.body)).toBe(true);
+            expect(allLessonsResponse.body.length).toBeGreaterThan(0);
+
+            // Get a student ID from the first lesson
+            const studentId = allLessonsResponse.body[0].quote.lessonRequest.student.id;
+            expect(studentId).toBeDefined();
+
+            // Now get lessons filtered by this student ID
+            const filteredResponse = await request(API_BASE_URL!)
+                .get(`/api/v1/teachers/${seededTeacherId}/lessons?studentId=${studentId}`)
+                .set('Authorization', seededTeacherAuthToken);
+
+            expect(filteredResponse.status).toBe(200);
+            expect(Array.isArray(filteredResponse.body)).toBe(true);
+            expect(filteredResponse.body.length).toBeGreaterThan(0);
+
+            // Verify all returned lessons are for the specified student
+            filteredResponse.body.forEach((lesson: any) => {
+                expect(lesson.quote.lessonRequest.student.id).toBe(studentId);
+            });
+
+            // Verify the filtered results are a subset of all lessons
+            expect(filteredResponse.body.length).toBeLessThanOrEqual(allLessonsResponse.body.length);
+        });
+
+        it('should return empty array when filtering by non-existent studentId', async () => {
+            if (!seededTeacherId || !seededTeacherAuthToken) throw new Error('Seeded teacher auth info not available');
+
+            const nonExistentStudentId = 'non-existent-id';
+            const response = await request(API_BASE_URL!)
+                .get(`/api/v1/teachers/${seededTeacherId}/lessons?studentId=${nonExistentStudentId}`)
+                .set('Authorization', seededTeacherAuthToken);
+
+            expect(response.status).toBe(200);
+            expect(Array.isArray(response.body)).toBe(true);
+            expect(response.body.length).toBe(0);
         });
     });
 

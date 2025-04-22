@@ -4,8 +4,10 @@ info:
   description: API for the Lessons Marketplace application
   version: 1.0.0
 servers:
+  - url: 'http://localhost:3000/api/v1'
+    description: Development server
   - url: '/api/v1'
-    description: Version 1 API
+    description: Production relative path
 
 components:
   securitySchemes:
@@ -22,6 +24,16 @@ components:
     LessonType:
       type: string
       enum: [VOICE, GUITAR, BASS, DRUMS]
+    
+    GoalStatusValue:
+      type: string
+      enum: [CREATED, IN_PROGRESS, COMPLETED, CANCELLED]
+      description: Possible statuses for a goal
+    
+    GoalStatusTransition:
+      type: string
+      enum: [START, COMPLETE, CANCEL]
+      description: Possible transitions for a goal status
     
     Address:
       type: object
@@ -107,6 +119,34 @@ components:
               additionalProperties:
                 type: number
     
+    Goal:
+      type: object
+      properties:
+        id:
+          type: string
+        lessonId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        estimatedLessonCount:
+          type: integer
+          minimum: 1
+        currentStatus:
+          $ref: '#/components/schemas/GoalStatusValue'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - lessonId
+        - title
+        - description
+        - estimatedLessonCount
+    
     LessonRequest:
       type: object
       properties:
@@ -179,6 +219,10 @@ components:
           format: date-time
         currentStatusId:
           type: string
+        goals:
+          type: array
+          items:
+            $ref: '#/components/schemas/Goal'
       required:
         - quoteId
         - createdAt
@@ -266,17 +310,29 @@ components:
                 type: object
             bio:
               type: string
-            lessonHourlyRates:
+            lessonRates:
               type: array
               items:
                 type: object
                 properties:
+                  id:
+                    type: string
                   type:
                     $ref: '#/components/schemas/LessonType'
                   rateInCents:
                     type: integer
                   isActive:
                     type: boolean
+                  deactivatedAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  createdAt:
+                    type: string
+                    format: date-time
+                  updatedAt:
+                    type: string
+                    format: date-time
     
     Error:
       type: object
@@ -290,6 +346,7 @@ security:
   - BearerAuth: []
 
 paths:
+  # Auth endpoints
   /auth/register:
     post:
       summary: Register a new user
@@ -334,6 +391,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/UserCredentials'
+            example:
+              email: "ethan.parker@example.com"
+              password: "1234"
+              userType: "STUDENT"
       responses:
         '200':
           description: Login successful
@@ -411,11 +472,416 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
   
+  # Goals endpoints
+  /goals:
+    post:
+      summary: Create a new goal
+      tags:
+        - Goals
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lessonId:
+                  type: string
+                title:
+                  type: string
+                description:
+                  type: string
+                estimatedLessonCount:
+                  type: integer
+                  minimum: 1
+              required:
+                - lessonId
+                - title
+                - description
+                - estimatedLessonCount
+      responses:
+        '201':
+          description: Goal created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /goals/{goalId}:
+    get:
+      summary: Get a goal by ID
+      tags:
+        - Goals
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: goalId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Goal details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+        '404':
+          description: Goal not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /lessons/{lessonId}/goals:
+    get:
+      summary: Get all goals for a lesson
+      tags:
+        - Goals
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lessonId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of goals for the lesson
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Goal'
+        '404':
+          description: Lesson not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  # Health endpoint
+  /health:
+    get:
+      summary: Health check endpoint
+      tags:
+        - Health
+      security: []
+      responses:
+        '200':
+          description: Server is healthy and database is connected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+                  message:
+                    type: string
+        '500':
+          description: Server is unhealthy or database is disconnected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  timestamp:
+                    type: string
+                    format: date-time
+                  message:
+                    type: string
+  
+  # Lesson endpoints
+  /lessons:
+    post:
+      summary: Create a new lesson from a quote
+      tags:
+        - Lessons
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                quoteId:
+                  type: string
+              required:
+                - quoteId
+      responses:
+        '201':
+          description: Lesson created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lesson'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /lessons/{lessonId}:
+    get:
+      summary: Get a lesson by ID
+      tags:
+        - Lessons
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lessonId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lesson details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lesson'
+        '404':
+          description: Lesson not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      summary: Update the status of a lesson
+      tags:
+        - Lessons
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lessonId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  $ref: '#/components/schemas/LessonStatusValue'
+              required:
+                - status
+      responses:
+        '200':
+          description: Lesson status updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /lessons/quote/{quoteId}:
+    get:
+      summary: Get a lesson by quote ID
+      tags:
+        - Lessons
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lesson details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lesson'
+        '404':
+          description: Lesson not found or quote not accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  # Lesson Quotes endpoints
+  /lesson-quotes/create-quotes:
+    post:
+      summary: Create initial quotes for a lesson request
+      tags:
+        - Lesson Quotes
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lessonRequestId:
+                  type: string
+                lessonType:
+                  $ref: '#/components/schemas/LessonType'
+              required:
+                - lessonRequestId
+                - lessonType
+      responses:
+        '201':
+          description: Quotes created successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LessonQuote'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden (User is not a student)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /lesson-quotes/request/{lessonRequestId}:
+    get:
+      summary: Get all quotes for a lesson request
+      tags:
+        - Lesson Quotes
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lessonRequestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of lesson quotes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LessonQuote'
+        '404':
+          description: Lesson request not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /lesson-quotes/{quoteId}/accept:
+    post:
+      summary: Accept a lesson quote
+      tags:
+        - Lesson Quotes
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Quote accepted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  lesson:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Quote not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  # Lesson Requests endpoints
   /lesson-requests:
     post:
       summary: Create a new lesson request
       tags:
         - Lesson Requests
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -450,6 +916,12 @@ paths:
                 $ref: '#/components/schemas/LessonRequest'
         '400':
           description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
           content:
             application/json:
               schema:
@@ -507,13 +979,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
   
-  /lesson-quotes/create-quotes:
+  # Student endpoints
+  /students:
     post:
-      summary: Create initial quotes for a lesson request
+      summary: Create a new student
       tags:
-        - Lesson Quotes
-      security:
-        - BearerAuth: []
+        - Students
+      security: []
       requestBody:
         required: true
         content:
@@ -521,36 +993,82 @@ paths:
             schema:
               type: object
               properties:
-                lessonRequestId:
+                firstName:
                   type: string
-                lessonType:
-                  $ref: '#/components/schemas/LessonType'
+                  example: 'Test'
+                lastName:
+                  type: string
+                  example: 'Student'
+                email:
+                  type: string
+                  format: email
+                  example: 'test.student.new@example.com'
+                password:
+                  type: string
+                  format: password
+                  example: 'password123'
+                phoneNumber:
+                  type: string
+                  example: '111-222-3333'
+                dateOfBirth:
+                  type: string
+                  format: date
+                  example: '2005-06-07'
               required:
-                - lessonRequestId
-                - lessonType
+                - firstName
+                - lastName
+                - email
+                - password
+                - phoneNumber
+                - dateOfBirth
       responses:
         '201':
-          description: Quotes created successfully
+          description: Student created successfully
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/LessonQuote'
+                $ref: '#/components/schemas/Student'
         '400':
           description: Bad request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        '401':
-          description: Unauthorized
+        '409':
+          description: Email already exists
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        '403':
-          description: Forbidden (User is not a student)
+
+  /students/{id}:
+    get:
+      summary: Get student details by ID
+      description: Retrieves detailed information about a specific student.
+      tags:
+        - Students
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The student's unique identifier
+      responses:
+        '200':
+          description: Student details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Student'
+        '404':
+          description: Student not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '400':
+          description: Invalid ID format
           content:
             application/json:
               schema:
@@ -562,220 +1080,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
   
-  /lesson-quotes/request/{lessonRequestId}:
-    get:
-      summary: Get all quotes for a lesson request
-      tags:
-        - Lesson Quotes
-      parameters:
-        - name: lessonRequestId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: List of lesson quotes
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/LessonQuote'
-        '404':
-          description: Lesson request not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-  
-  /lesson-quotes/{quoteId}/accept:
-    post:
-      summary: Accept a lesson quote
-      tags:
-        - Lesson Quotes
-      parameters:
-        - name: quoteId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Quote accepted successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  id:
-                    type: string
-                  lesson:
-                    type: object
-                    properties:
-                      id:
-                        type: string
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: Quote not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-  
-  /lessons:
-    post:
-      summary: Create a new lesson from a quote
-      tags:
-        - Lessons
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                quoteId:
-                  type: string
-              required:
-                - quoteId
-      responses:
-        '201':
-          description: Lesson created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Lesson'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-  
-  /lessons/{lessonId}:
-    get:
-      summary: Get a lesson by ID
-      tags:
-        - Lessons
-      parameters:
-        - name: lessonId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Lesson details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Lesson'
-        '404':
-          description: Lesson not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-    patch:
-      summary: Update the status of a lesson
-      tags:
-        - Lessons
-      description: Allows an authenticated teacher to update the status of a lesson they are assigned to.
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: lessonId
-          in: path
-          required: true
-          description: The ID of the lesson to update.
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                status:
-                  $ref: '#/components/schemas/LessonStatusValue'
-              required:
-                - status
-      responses:
-        '200':
-          description: Lesson status updated successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  # Optionally return the updated lesson object:
-                  # lesson:
-                  #   $ref: '#/components/schemas/Lesson' 
-        '400':
-          description: Bad Request (e.g., invalid status value, invalid status transition)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '401':
-          description: Unauthorized (e.g., missing or invalid token)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '403':
-          description: Forbidden (e.g., user is not a teacher, teacher does not own the lesson)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: Lesson not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-  
-  /lessons/quote/{quoteId}:
-    get:
-      summary: Get a lesson by quote ID
-      tags:
-        - Lessons
-      parameters:
-        - name: quoteId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Lesson details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Lesson'
-        '404':
-          description: Lesson not found or quote not accepted
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-  
+  # Teacher endpoints
   /teachers:
     get:
       summary: Get available teachers
@@ -784,12 +1089,12 @@ paths:
       parameters:
         - name: lessonType
           in: query
-          required: false
+          required: true
           schema:
             $ref: '#/components/schemas/LessonType'
         - name: limit
           in: query
-          required: false
+          required: true
           schema:
             type: integer
             minimum: 1
@@ -803,12 +1108,20 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/TeacherWithRates'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   
   /teachers/profile:
     get:
       summary: Get the current teacher's profile
       tags:
         - Teachers
+      security:
+        - BearerAuth: []
       responses:
         '200':
           description: Teacher profile details
@@ -834,6 +1147,8 @@ paths:
       summary: Get the current teacher's statistics
       tags:
         - Teachers
+      security:
+        - BearerAuth: []
       responses:
         '200':
           description: Teacher statistics
@@ -859,6 +1174,8 @@ paths:
       summary: Add or update a lesson rate for a teacher
       tags:
         - Teachers
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -903,259 +1220,50 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
   
-  /teachers/lesson-rates/deactivate:
-    post:
-      summary: Deactivate a lesson rate for a teacher
-      tags:
-        - Teachers
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                lessonType:
-                  $ref: '#/components/schemas/LessonType'
-              required:
-                - lessonType
-      responses:
-        '200':
-          description: Lesson rate deactivated successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-  
-  /teachers/lesson-rates/reactivate:
-    post:
-      summary: Reactivate a lesson rate for a teacher
-      tags:
-        - Teachers
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                lessonType:
-                  $ref: '#/components/schemas/LessonType'
-              required:
-                - lessonType
-      responses:
-        '200':
-          description: Lesson rate reactivated successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-  
-  /health:
-    get:
-      summary: Health check endpoint
-      tags:
-        - Health
-      security: []
-      responses:
-        '200':
-          description: Server is healthy and database is connected
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: ok
-                  database:
-                    type: string
-                    example: connected
-        '500':
-          description: Server is unhealthy or database is disconnected
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: error
-                  database:
-                    type: string
-                    example: disconnected
-  
   /teachers/{teacherId}/lessons:
     get:
       summary: Get all lessons for a specific teacher
+      description: Retrieves all lessons for a teacher. Can be optionally filtered by student ID.
       tags:
         - Teachers
-      description: Retrieves a list of lessons associated with the specified teacher ID. Requires authentication, and the authenticated user must match the teacherId.
       security:
         - BearerAuth: []
       parameters:
         - name: teacherId
           in: path
           required: true
-          description: The ID of the teacher whose lessons are to be retrieved.
           schema:
             type: string
+          description: The teacher's unique identifier
+        - name: studentId
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional filter to show only lessons for a specific student
       responses:
         '200':
-          description: A list of lessons for the teacher.
+          description: List of lessons for the teacher
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  # Define a schema for the detailed lesson object returned
-                  # This should align with the FullLessonDetails type in the service
-                  type: object
-                  properties:
-                    id:
-                      type: string
-                    quoteId:
-                      type: string
-                    createdAt:
-                       type: string
-                       format: date-time
-                    updatedAt:
-                      type: string
-                      format: date-time
-                    currentStatus:
-                      type: object # Represents the LessonStatus relation
+                  allOf:
+                    - $ref: '#/components/schemas/Lesson'
+                    - type: object
                       properties:
-                        id:
-                          type: string
-                        status:
-                          $ref: '#/components/schemas/LessonStatusValue'
-                        context:
-                          type: string
-                          nullable: true
-                        createdAt:
-                          type: string
-                          format: date-time
-                      required:
-                        - id
-                        - status
-                        - createdAt
-                    quote:
-                      type: object # Represents the LessonQuote relation
-                      properties:
-                        id:
-                          type: string
-                        costInCents:
+                        goalCount:
                           type: integer
-                        lessonRequestId:
-                          type: string
-                        teacherId:
-                          type: string
-                        createdAt:
-                          type: string
-                          format: date-time
-                        updatedAt:
-                          type: string
-                          format: date-time
-                        teacher:
-                          $ref: '#/components/schemas/Teacher'
-                        lessonRequest:
-                          type: object # Represents the LessonRequest relation
-                          properties:
-                            id:
-                              type: string
-                            type:
-                              $ref: '#/components/schemas/LessonType'
-                            startTime:
-                              type: string
-                              format: date-time
-                            durationMinutes:
-                              type: integer
-                            studentId:
-                              type: string
-                            addressId:
-                              type: string # Assuming Address relation is fetched via ID
-                            createdAt:
-                              type: string
-                              format: date-time
-                            updatedAt:
-                              type: string
-                              format: date-time
-                            student:
-                              $ref: '#/components/schemas/Student'
-                            address:
-                              $ref: '#/components/schemas/Address'
-                          required:
-                            - id
-                            - type
-                            - startTime
-                            - durationMinutes
-                            - studentId
-                            - addressId
-                            - createdAt
-                            - updatedAt
-                            - student
-                            - address
-                      required:
-                        - id
-                        - costInCents
-                        - lessonRequestId
-                        - teacherId
-                        - createdAt
-                        - updatedAt
-                        - teacher
-                        - lessonRequest
-                  required:
-                    - id
-                    - quoteId
-                    - createdAt
-                    - updatedAt
-                    - currentStatus
-                    - quote
-
+                          description: Number of goals associated with this lesson
         '401':
-          description: Unauthorized (Missing or invalid token)
+          description: Unauthorized
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '403':
-          description: Forbidden (Authenticated user does not match teacherId)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: Teacher not found (or no lessons for the teacher, depending on implementation)
+          description: Forbidden - Can only access your own lessons
           content:
             application/json:
               schema:

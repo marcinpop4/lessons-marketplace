@@ -442,134 +442,88 @@ export const teacherController = {
   },
 
   /**
-   * Get all lessons for a specific teacher
-   * Ensures the authenticated user matches the requested teacherId.
-   * @param req Request with teacherId as a route parameter
+   * Get all lessons for a specific teacher.
+   * Optionally filter by student ID.
+   * @param req Request - must include teacherId from authenticated user
    * @param res Response
    */
   getTeacherLessons: async (req: Request, res: Response): Promise<void> => {
     try {
       const requestedTeacherId = req.params.teacherId;
+      const studentId = req.query.studentId as string | undefined;
       const authenticatedUserId = req.user?.id;
 
       // Authorization: Ensure the authenticated user is requesting their own lessons
       if (!authenticatedUserId || authenticatedUserId !== requestedTeacherId) {
-        // Use 'error' key to match test expectations and potential standard
-        res.status(403).json({ error: 'Forbidden: You can only view your own lessons.' });
+        res.status(403).json({ error: 'Forbidden: Can only access your own lessons' });
         return;
       }
-
-      // Define the include structure for reuse
-      const lessonInclude = {
-        quote: {
-          include: {
-            teacher: { // Select specific teacher fields
-              select: { id: true, firstName: true, lastName: true, email: true }
-            },
-            lessonRequest: {
-              include: {
-                student: { // Select specific student fields
-                  select: { id: true, firstName: true, lastName: true, email: true }
-                },
-                address: true // Include full address
-              }
-            }
-          }
-        },
-        lessonStatuses: {
-          orderBy: { createdAt: 'desc' as const },
-          take: 1
-        },
-        // Include count of non-abandoned goals
-        _count: {
-          select: {
-            goals: {
-              where: {
-                currentStatus: {
-                  status: {
-                    not: GoalStatusValue.ABANDONED
-                  }
-                }
-              }
-            }
-          }
-        }
-      };
 
       // Fetch lessons for the authenticated teacher
       const lessons = await prisma.lesson.findMany({
         where: {
           quote: {
-            teacherId: authenticatedUserId
+            teacherId: authenticatedUserId,
+            lessonRequest: studentId ? {
+              studentId
+            } : undefined
           }
         },
-        include: lessonInclude,
-        orderBy: {
+        include: {
+          currentStatus: true,
           quote: {
-            lessonRequest: {
-              startTime: 'asc' as const // Order by upcoming lesson start time
+            include: {
+              teacher: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  phoneNumber: true,
+                  dateOfBirth: true
+                }
+              },
+              lessonRequest: {
+                include: {
+                  student: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                      phoneNumber: true,
+                      dateOfBirth: true
+                    }
+                  },
+                  address: true
+                }
+              }
             }
           }
+        },
+        orderBy: {
+          createdAt: 'desc'
         }
       });
 
-      // Transform the data for the response
-      // Explicitly type the lesson object received from Prisma based on the include
-      type LessonWithIncludesAndCount = Prisma.LessonGetPayload<{ include: typeof lessonInclude }>;
-
-      const transformedLessons = lessons.map((lesson: LessonWithIncludesAndCount) => {
-        // Basic check for essential data
-        if (!lesson.quote || !lesson.quote.lessonRequest || !lesson.quote.teacher || !lesson.lessonStatuses || lesson.lessonStatuses.length === 0) {
-          console.warn(`Lesson ${lesson.id} is missing critical relation data, skipping transformation.`);
-          return null; // Skip this lesson if data is incomplete
-        }
+      // Transform lessons to include goal count
+      const lessonsWithGoalCount = await Promise.all(lessons.map(async (lesson) => {
+        const goalCount = await prisma.goal.count({
+          where: { lessonId: lesson.id }
+        });
 
         return {
-          id: lesson.id,
-          type: lesson.quote.lessonRequest.type, // Add type to the top level
-          createdAt: lesson.createdAt,
-          updatedAt: lesson.updatedAt,
-          // Safely access the first status record
-          currentStatus: lesson.lessonStatuses[0] ? {
-            id: lesson.lessonStatuses[0].id,
-            status: lesson.lessonStatuses[0].status,
-            context: lesson.lessonStatuses[0].context as string | null, // Assuming context is simple JSON or null
-            createdAt: lesson.lessonStatuses[0].createdAt
-          } : null,
-          goalCount: lesson._count.goals, // Add the goal count
-          // Simplified quote structure for the response
-          quote: {
-            id: lesson.quote.id,
-            costInCents: lesson.quote.costInCents,
-            hourlyRateInCents: lesson.quote.hourlyRateInCents,
-            lessonRequestId: lesson.quote.lessonRequestId,
-            teacherId: lesson.quote.teacherId,
-            createdAt: lesson.quote.createdAt,
-            updatedAt: lesson.quote.updatedAt,
-            teacher: lesson.quote.teacher, // Already selected specific fields
-            lessonRequest: {
-              id: lesson.quote.lessonRequest.id,
-              type: lesson.quote.lessonRequest.type,
-              startTime: lesson.quote.lessonRequest.startTime,
-              durationMinutes: lesson.quote.lessonRequest.durationMinutes,
-              studentId: lesson.quote.lessonRequest.studentId,
-              addressId: lesson.quote.lessonRequest.addressId,
-              createdAt: lesson.quote.lessonRequest.createdAt,
-              updatedAt: lesson.quote.lessonRequest.updatedAt,
-              student: lesson.quote.lessonRequest.student, // Already selected specific fields
-              address: lesson.quote.lessonRequest.address // Full address included
-            }
-          }
+          ...lesson,
+          goalCount
         };
-      }).filter(lesson => lesson !== null); // Filter out any skipped lessons
+      }));
 
-      res.status(200).json(transformedLessons);
-
+      res.status(200).json(lessonsWithGoalCount);
     } catch (error) {
-      console.error(`Error fetching lessons for teacher ${req.params.teacherId}:`, error);
+      console.error('Error fetching teacher lessons:', error);
       res.status(500).json({
-        message: 'An error occurred while fetching lessons',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: 'Failed to fetch lessons',
+        message: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   },

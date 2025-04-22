@@ -58,6 +58,43 @@ class StudentService {
         }
     }
 
+    /**
+     * Finds a student by their ID.
+     * @param prisma Prisma client instance
+     * @param id The student's ID
+     * @returns The student object (excluding password) or null if not found
+     * @throws Error if the operation fails
+     */
+    async findById(prisma: PrismaClient, id: string): Promise<Omit<Student, 'password'> | null> {
+        try {
+            const student = await prisma.student.findUnique({
+                where: { id },
+                select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    phoneNumber: true,
+                    dateOfBirth: true,
+                    isActive: true,
+                    authMethods: true,
+                    createdAt: true,
+                    updatedAt: true
+                }
+            });
+
+            return student;
+        } catch (error) {
+            console.error('Error finding student by ID:', error);
+            if (error instanceof Prisma.PrismaClientKnownRequestError) {
+                if (error.code === 'P2023') {
+                    throw new Error('Invalid ID format.');
+                }
+            }
+            throw new Error(`Failed to find student: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
     // --- Potential future methods ---
     // async findById(prisma: PrismaClient, id: string): Promise<Omit<Student, 'password'> | null> { ... }
     // async update(prisma: PrismaClient, id: string, data: Prisma.StudentUpdateInput): Promise<Omit<Student, 'password'> | null> { ... }

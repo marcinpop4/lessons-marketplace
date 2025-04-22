@@ -98,6 +98,56 @@ describe('API Integration: /api/v1/students', () => {
         // Add more tests for other missing fields or invalid data (e.g., phone format) if needed
     });
 
+    describe('GET /:id', () => {
+        it('should get student details successfully (200)', async () => {
+            // First create a student
+            const studentData = generateUniqueStudentData();
+            const createResponse = await request(API_BASE_URL!)
+                .post('/api/v1/students')
+                .send(studentData);
+            expect(createResponse.status).toBe(201);
+
+            const createdStudent: Student = createResponse.body;
+
+            // Now fetch the student details
+            const response = await request(API_BASE_URL!)
+                .get(`/api/v1/students/${createdStudent.id}`);
+
+            expect(response.status).toBe(200);
+            expect(response.headers['content-type']).toMatch(/application\/json/);
+
+            const fetchedStudent: Student = response.body;
+            expect(fetchedStudent).toBeDefined();
+            expect(fetchedStudent.id).toEqual(createdStudent.id);
+            expect(fetchedStudent.email).toEqual(studentData.email);
+            expect(fetchedStudent.firstName).toEqual(studentData.firstName);
+            expect(fetchedStudent.lastName).toEqual(studentData.lastName);
+            expect(fetchedStudent.phoneNumber).toEqual(studentData.phoneNumber);
+            expect(new Date(fetchedStudent.dateOfBirth).toISOString().split('T')[0]).toEqual(studentData.dateOfBirth);
+            expect(fetchedStudent.isActive).toBe(true);
+            // Password should NOT be returned
+            expect(fetchedStudent).not.toHaveProperty('password');
+        });
+
+        it('should return 404 Not Found for non-existent student ID', async () => {
+            const nonExistentId = 'non-existent-id';
+            const response = await request(API_BASE_URL!)
+                .get(`/api/v1/students/${nonExistentId}`);
+
+            expect(response.status).toBe(404);
+            expect(response.body.message).toContain('not found');
+        });
+
+        it('should return 404 Not Found for invalid student ID format', async () => {
+            const invalidId = 'invalid-id-format';
+            const response = await request(API_BASE_URL!)
+                .get(`/api/v1/students/${invalidId}`);
+
+            expect(response.status).toBe(404);
+            expect(response.body.message).toBeDefined();
+        });
+    });
+
     // Add describe blocks for other student endpoints (GET /:id, etc.) if they are implemented later
 
 }); 

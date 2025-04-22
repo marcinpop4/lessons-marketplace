@@ -41,6 +41,34 @@ const router: Router = express.Router();
  */
 router.post('/', studentController.createStudent);
 
+/**
+ * @swagger
+ * /api/v1/students/{id}:
+ *   get:
+ *     summary: Get student details by ID
+ *     description: Retrieves detailed information about a specific student.
+ *     tags: [Students]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The student's unique identifier
+ *     responses:
+ *       200:
+ *         description: Student details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Student'
+ *       404:
+ *         description: Student not found
+ *       500:
+ *         description: Internal Server Error
+ */
+router.get('/:id', studentController.getStudentById);
+
 // Add other student routes here (e.g., GET /:id if needed, likely authenticated)
 
 export default router; 

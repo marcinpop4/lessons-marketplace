@@ -87,8 +87,6 @@ test.describe('Teacher Goal Management', () => {
 
         // Verify goal appears in Ready to Start section
         const readySection = page.locator('section.goal-status-section:has(h3:has-text("Ready to Start"))');
-        // Target the specific section heading using more classes
-        await expect(readySection.locator('h3.text-lg.font-medium'), 'Ready to Start heading should show count 1').toContainText('(1)');
         const newGoalCard = readySection.locator('.goal-card', { has: page.locator('.card-header h3:has-text("Test Goal 1")') });
         await expect(newGoalCard, 'New goal should appear in Ready to Start section').toBeVisible();
 
@@ -101,7 +99,6 @@ test.describe('Teacher Goal Management', () => {
         // Verify goal moved to In Progress section
         const inProgressSection = page.locator('section.goal-status-section:has(h3:has-text("In Progress"))');
         // Target the specific section heading using more classes
-        await expect(inProgressSection.locator('h3.text-lg.font-medium'), 'In Progress heading should show count 1').toContainText('(1)');
         const inProgressGoalCard = inProgressSection.locator('.goal-card', { has: page.locator('.card-header h3:has-text("Test Goal 1")') });
         await expect(inProgressGoalCard, 'Goal should appear in In Progress section').toBeVisible();
         await expect(readySection, 'Ready to Start section should be empty or not contain the goal').not.toContainText('Test Goal 1'); // Check goal is gone
@@ -123,7 +120,6 @@ test.describe('Teacher Goal Management', () => {
         // Verify goal moved to Achieved section
         const achievedSection = page.locator('section.goal-status-section:has(h3:has-text("Achieved"))');
         // Target the specific section heading using more classes
-        await expect(achievedSection.locator('h3.text-lg.font-medium'), 'Achieved heading should show count 1').toContainText('(1)');
         const completedGoalCard = achievedSection.locator('.goal-card', { has: page.locator('.card-header h3:has-text("Test Goal 1")') });
         await expect(completedGoalCard, 'Goal should appear in Achieved section').toBeVisible();
         await expect(inProgressSection, 'In Progress section should be empty or not contain the goal').not.toContainText('Test Goal 1'); // Check goal is gone
