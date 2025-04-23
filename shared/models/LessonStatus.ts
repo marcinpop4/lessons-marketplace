@@ -1,4 +1,5 @@
 import { JsonValue } from '@prisma/client/runtime/library';
+import type { LessonStatus as DbLessonStatus } from '@prisma/client'; // Import Prisma type
 
 /**
  * Possible status values for a lesson
@@ -158,5 +159,31 @@ export class LessonStatus {
             return 'Define Goals';
         }
         return transition.charAt(0).toUpperCase() + transition.slice(1).toLowerCase();
+    }
+
+    /**
+     * Static factory method to create a LessonStatus instance from a Prisma object.
+     * @param dbStatus The plain object returned by Prisma.
+     * @returns A new instance of the shared LessonStatus model.
+     */
+    public static fromDb(dbStatus: DbLessonStatus): LessonStatus {
+        const { createdAt, context, ...statusProps } = dbStatus;
+
+        // Validate status value against the shared enum
+        const statusValue = Object.values(LessonStatusValue).includes(dbStatus.status as LessonStatusValue)
+            ? dbStatus.status as LessonStatusValue
+            : LessonStatusValue.REQUESTED; // Default or throw? Defaulting for now.
+        if (statusValue !== dbStatus.status) {
+            console.warn(`Invalid status value '${dbStatus.status}' received from DB for status ID ${dbStatus.id}. Defaulting to ${statusValue}.`);
+        }
+
+        // Construct the shared model instance
+        return new LessonStatus({
+            ...statusProps, // Includes id, lessonId
+            status: statusValue,
+            // Handle context (assuming it's JSON in Prisma)
+            context: context ? JSON.parse(JSON.stringify(context)) : null, // Basic JSON handling
+            createdAt: createdAt ?? undefined
+        });
     }
 }

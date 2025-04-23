@@ -1,6 +1,15 @@
 import { LessonRequest } from './LessonRequest.js';
 import { Teacher } from './Teacher.js';
 import { centsToDisplayDollars } from '../types/CurrencyTypes.js';
+// Import necessary Prisma types using Db prefix consistently
+import type {
+  LessonQuote as DbLessonQuote,
+  Teacher as DbTeacher,
+  LessonRequest as DbLessonRequest,
+  Student as DbStudent,
+  Address as DbAddress,
+  TeacherLessonHourlyRate as DbTeacherLessonHourlyRate
+} from '@prisma/client';
 
 // Interface for constructor properties
 interface LessonQuoteProps {
@@ -43,6 +52,43 @@ export class LessonQuote {
     this.hourlyRateInCents = hourlyRateInCents;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt; // ADDED assignment
+  }
+
+  /**
+   * Static factory method to create a LessonQuote instance from Prisma objects.
+   * @param dbQuote The plain LessonQuote object returned by Prisma.
+   * @param dbTeacher The plain Teacher object returned by Prisma (potentially with rates).
+   * @param dbLessonRequest The plain LessonRequest object returned by Prisma (with student and address).
+   * @returns A new instance of the shared LessonQuote model.
+   */
+  public static fromDb(
+    dbQuote: DbLessonQuote,
+    // The dbTeacher object passed here already includes rates due to the include in the service query
+    dbTeacher: DbTeacher & { teacherLessonHourlyRates?: DbTeacherLessonHourlyRate[] },
+    dbLessonRequest: DbLessonRequest & { student: DbStudent, address: DbAddress }
+  ): LessonQuote {
+    const { id, costInCents, hourlyRateInCents, createdAt, updatedAt } = dbQuote;
+
+    const dbStudentData = dbLessonRequest.student;
+    const dbAddressData = dbLessonRequest.address;
+
+    // Extract rates from dbTeacher object
+    const dbTeacherRatesData = dbTeacher.teacherLessonHourlyRates;
+
+    // Pass dbTeacher and its rates separately to Teacher.fromDb
+    const teacherModel = Teacher.fromDb(dbTeacher, dbTeacherRatesData);
+    const lessonRequestModel = LessonRequest.fromDb(dbLessonRequest, dbStudentData, dbAddressData);
+
+    // Construct the shared model instance
+    return new LessonQuote({
+      id: id,
+      lessonRequest: lessonRequestModel,
+      teacher: teacherModel,
+      costInCents: costInCents,
+      hourlyRateInCents: hourlyRateInCents ?? 0,
+      createdAt: createdAt ?? undefined,
+      updatedAt: updatedAt ?? undefined
+    });
   }
 
   /**

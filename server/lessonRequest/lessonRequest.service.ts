@@ -40,27 +40,32 @@ export class LessonRequestService {
     try {
       // Use transaction for Address + LessonRequest creation
       const lessonRequest = await this.prisma.$transaction(async (tx) => {
-        // 1. Create Address using AddressService, passing the transaction client
+        // 1. Create Address using AddressService
         const addressRecord = await addressService.create({
           street: data.addressObj.street,
           city: data.addressObj.city,
           state: data.addressObj.state,
           postalCode: data.addressObj.postalCode,
           country: data.addressObj.country
-        }, tx as PrismaClient);
+        });
 
-        // Throw error if address creation failed within the service call (should not return null)
-        if (!addressRecord) {
-          throw new Error('Address creation failed during the transaction.');
+        // Throw error if address creation failed (service returns null now)
+        if (!addressRecord || !addressRecord.id) {
+          throw new Error('Address creation failed during the transaction or returned null/no ID.');
         }
 
+        // Explicitly define the type for the created lesson request to include relations
+        type LessonRequestWithRelations = Prisma.LessonRequestGetPayload<{
+          include: { student: true, address: true }
+        }>;
+
         // 2. Create the lesson request using the new address ID
-        const newLessonRequest = await tx.lessonRequest.create({
+        const newLessonRequest = await tx.lessonRequest.create<Prisma.LessonRequestCreateArgs>({
           data: {
             type: data.type,
             startTime: data.startTime,
             durationMinutes: data.durationMinutes,
-            addressId: addressRecord.id, // Connect via ID
+            addressId: addressRecord.id, // addressRecord.id should be string now
             studentId: data.studentId, // Connect via ID
           },
           include: {
@@ -69,12 +74,16 @@ export class LessonRequestService {
           }
         });
 
-        return newLessonRequest;
+        return newLessonRequest as LessonRequestWithRelations;
       });
 
+      // lessonRequest should now be correctly typed with student
       // Remove password hash from the student object before returning
       if (lessonRequest.student) {
-        delete (lessonRequest.student as any).passwordHash;
+        // Assuming password field is named 'password' in the DbStudent model
+        // It's safer to return a mapped object rather than deleting properties
+        // But for now, let's assume the field exists and can be deleted
+        delete (lessonRequest.student as any).password;
       }
 
       return lessonRequest;

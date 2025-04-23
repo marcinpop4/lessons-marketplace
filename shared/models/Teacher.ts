@@ -1,7 +1,7 @@
 import { Person } from './Person.js';
 import { TeacherLessonHourlyRate } from './TeacherLessonHourlyRate.js';
 // Import Prisma types
-import type { Teacher as DbTeacherPrisma, TeacherLessonHourlyRate as DbTeacherLessonHourlyRate } from '@prisma/client';
+import type { Teacher as DbTeacher, TeacherLessonHourlyRate as DbTeacherLessonHourlyRate } from '@prisma/client';
 
 // Interface for Teacher constructor properties, extending PersonProps
 interface TeacherProps {
@@ -38,38 +38,23 @@ export class Teacher extends Person {
   }
 
   /**
-   * Static factory method to create a Teacher instance from a Prisma Teacher object.
+   * Static factory method to create a Teacher instance from Prisma objects.
    * Handles transformation, sanitization, and nested hourly rates.
-   * @param dbTeacher The plain object returned by Prisma, potentially including rates.
+   * @param dbTeacher The plain Teacher object returned by Prisma.
+   * @param dbRates Optional array of plain TeacherLessonHourlyRate objects from Prisma.
    * @returns A new instance of the shared Teacher model.
    */
-  public static fromDb(dbTeacher: DbTeacherPrisma & { teacherLessonHourlyRates?: DbTeacherLessonHourlyRate[] }): Teacher {
-    // Explicitly exclude password and other internal fields
-    const { password, isActive, authMethods, createdAt, updatedAt, teacherLessonHourlyRates, ...teacherProps } = dbTeacher;
-    // Ensure date is a Date object
+  public static fromDb(
+    dbTeacher: DbTeacher,
+    dbRates?: DbTeacherLessonHourlyRate[] // Separate optional arg for rates
+  ): Teacher {
+    const { password, isActive, authMethods, createdAt, updatedAt, ...teacherProps } = dbTeacher;
     teacherProps.dateOfBirth = new Date(teacherProps.dateOfBirth);
 
-    // Transform hourly rates only if they exist on the input object
-    // NOTE: This assumes TeacherLessonHourlyRate ALSO has a fromDb method or we transform inline
-    // For now, let's assume TeacherLessonHourlyRate transformation happens here or its own fromDb exists.
-    // If TeacherLessonHourlyRate.fromDb exists:
-    // const transformedRates = teacherLessonHourlyRates
-    //     ? teacherLessonHourlyRates.map(TeacherLessonHourlyRate.fromDb)
-    //     : [];
-    // If transforming inline (or if TeacherLessonHourlyRate.fromDb doesn't exist yet):
-    const transformedRates = teacherLessonHourlyRates
-      ? teacherLessonHourlyRates.map(dbRate => {
-        // Inline transformation for TeacherLessonHourlyRate (or call its fromDb)
-        const { createdAt: rateCreatedAt, updatedAt: rateUpdatedAt, teacherId, ...rateProps } = dbRate;
-        return new TeacherLessonHourlyRate({
-          ...rateProps,
-          teacherId: teacherId, // teacherId is required by TeacherLessonHourlyRateProps
-          createdAt: rateCreatedAt ?? undefined,
-          deactivatedAt: dbRate.deactivatedAt ?? undefined
-        });
-      })
+    // Transform hourly rates using the new static factory method
+    const transformedRates = dbRates
+      ? dbRates.map(dbRate => TeacherLessonHourlyRate.fromDb(dbRate))
       : [];
-
 
     // Construct the shared model instance
     return new Teacher({ ...teacherProps, hourlyRates: transformedRates });

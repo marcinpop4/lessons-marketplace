@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma, Teacher as DbTeacherPrisma, TeacherLessonHourlyRate as DbTeacherLessonHourlyRate, Lesson as DbLesson, Student as DbStudent, Address as DbAddress, LessonRequest as DbLessonRequest, LessonQuote as DbLessonQuote, LessonStatus as DbLessonStatus, Goal as DbGoal } from '@prisma/client';
+import { PrismaClient, Prisma, Teacher as DbTeacherPrisma, TeacherLessonHourlyRate as DbTeacherLessonHourlyRate, Lesson as DbLesson, Student as DbStudent, Address as DbAddress, LessonRequest as DbLessonRequestPrisma, LessonQuote as DbLessonQuote, LessonStatus as DbLessonStatus, Goal as DbGoal } from '@prisma/client';
 // Import shared models
 import { Teacher } from '../../shared/models/Teacher.js';
 import { Student } from '../../shared/models/Student.js';
@@ -10,21 +10,21 @@ import { LessonStatus, LessonStatusValue } from '../../shared/models/LessonStatu
 import { Goal } from '../../shared/models/Goal.js'; // Goal might be needed for stats or future methods
 import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourlyRate.js';
 import { LessonType } from '../../shared/models/LessonType.js';
-import bcrypt from 'bcrypt';
+import * as bcrypt from 'bcrypt';
 import prisma from '../prisma.js';
 
 
 // Define more specific Prisma types with includes for transformation
 type DbLessonWithRelations = DbLesson & {
     currentStatus: DbLessonStatus | null;
-    // Ensure quote and nested relations are non-null based on include structure
+    // Update quote type to reflect full nesting needed for LessonQuote.fromDb
     quote: (DbLessonQuote & {
-        teacher: DbTeacherPrisma;
-        lessonRequest: (DbLessonRequest & {
+        teacher: DbTeacherPrisma & { teacherLessonHourlyRates?: DbTeacherLessonHourlyRate[] },
+        lessonRequest: (DbLessonRequestPrisma & {
             student: DbStudent;
             address: DbAddress;
         })
-    }); // Adjusted to non-null based on include below
+    });
 };
 
 // Keep DbTeacherWithRates for other raw methods if needed
@@ -40,62 +40,29 @@ class TeacherService {
     * Transform database student to shared Student model
     */
     private transformDbStudentToModel(dbStudent: DbStudent): Student {
-        // Explicitly exclude password and other internal fields
-        const { password, isActive, authMethods, createdAt, updatedAt, ...studentProps } = dbStudent;
-        studentProps.dateOfBirth = new Date(studentProps.dateOfBirth);
-        return new Student({ ...studentProps, isActive: isActive ?? undefined }); // Handle potential null isActive
+        // TODO: Remove this method and use Student.fromDb directly
+        return Student.fromDb(dbStudent);
     }
 
     /**
      * Transform database address to shared Address model
      */
     private transformDbAddressToModel(dbAddress: DbAddress): Address {
-        const { createdAt, updatedAt, ...addressProps } = dbAddress;
-        return new Address(addressProps);
-    }
-
-    /**
-     * Transform database lesson request to shared LessonRequest model
-     */
-    private transformDbLessonRequestToModel(dbRequest: DbLessonRequest & { student: DbStudent, address: DbAddress }): LessonRequest {
-        const { createdAt, updatedAt, studentId, addressId, student, address, ...requestProps } = dbRequest;
-        return new LessonRequest({
-            ...requestProps,
-            // Explicitly cast Prisma LessonType to shared LessonType
-            type: dbRequest.type as LessonType,
-            student: this.transformDbStudentToModel(student),
-            address: this.transformDbAddressToModel(address)
-            // createdAt and updatedAt are not part of LessonRequestProps
-        });
+        // TODO: Remove this method and use Address.fromDb directly
+        return Address.fromDb(dbAddress);
     }
 
     /**
     * Transform database teacher rate to shared TeacherLessonHourlyRate model
     */
     private transformDbTeacherRateToModel(dbRate: DbTeacherLessonHourlyRate): TeacherLessonHourlyRate {
+        // TODO: Replace with TeacherLessonHourlyRate.fromDb later
         const { createdAt, updatedAt, teacherId, ...rateProps } = dbRate;
         return new TeacherLessonHourlyRate({
             ...rateProps,
             teacherId: teacherId,
-            // Pass createdAt from DB if available, otherwise constructor defaults
             createdAt: dbRate.createdAt ?? undefined,
-            // Pass deactivatedAt from DB if available, otherwise constructor defaults
             deactivatedAt: dbRate.deactivatedAt ?? undefined
-            // updatedAt is not part of TeacherLessonHourlyRateProps
-        });
-    }
-
-    /**
-     * Transform database lesson quote to shared LessonQuote model
-     */
-    private transformDbLessonQuoteToModel(dbQuote: DbLessonQuote & { teacher: DbTeacherPrisma, lessonRequest: DbLessonRequest & { student: DbStudent, address: DbAddress } }): LessonQuote {
-        const { createdAt, updatedAt, teacherId, lessonRequestId, teacher, lessonRequest, ...quoteProps } = dbQuote;
-        return new LessonQuote({
-            ...quoteProps,
-            teacher: Teacher.fromDb(teacher),
-            lessonRequest: this.transformDbLessonRequestToModel(lessonRequest),
-            createdAt: createdAt ?? undefined,
-            updatedAt: updatedAt ?? undefined,
         });
     }
 
@@ -103,15 +70,15 @@ class TeacherService {
      * Transform database lesson status to shared LessonStatus model
      */
     private transformDbLessonStatusToModel(dbStatus: DbLessonStatus | null): LessonStatus | undefined {
+        // TODO: Replace with LessonStatus.fromDb later
         if (!dbStatus) return undefined;
         const { createdAt, lessonId, ...statusProps } = dbStatus;
-        // Ensure the status value from DB is valid according to the shared enum
         const statusValue = Object.values(LessonStatusValue).includes(dbStatus.status as LessonStatusValue)
             ? dbStatus.status as LessonStatusValue
-            : LessonStatusValue.REQUESTED; // Or throw error if invalid status found
+            : LessonStatusValue.REQUESTED;
         return new LessonStatus({
             ...statusProps,
-            lessonId: lessonId ?? undefined, // Handle potential null lessonId
+            lessonId: lessonId ?? undefined,
             status: statusValue,
             createdAt: createdAt ?? undefined,
         });
@@ -121,24 +88,24 @@ class TeacherService {
      * Transform database lesson to shared Lesson model
      */
     private transformDbLessonToModel(dbLesson: DbLessonWithRelations): Lesson | null {
+        // TODO: Replace with Lesson.fromDb later
         const { createdAt, updatedAt, quoteId, currentStatusId, quote, currentStatus, ...lessonProps } = dbLesson;
 
-        // Quote should be non-null due to the include and DB constraints
-        const transformedQuote = this.transformDbLessonQuoteToModel(quote);
+        // Extract the necessary nested objects from the fetched dbLesson.quote
+        const dbQuoteData = quote;
+        const dbTeacherData = quote.teacher;
+        const dbLessonRequestData = quote.lessonRequest;
+        const dbTeacherRatesData = quote.teacher.teacherLessonHourlyRates; // Extract rates
+
+        // Pass the separate objects to LessonQuote.fromDb
+        // Note: LessonQuote.fromDb itself now calls Teacher.fromDb(dbTeacherData, dbTeacherRatesData)
+        const transformedQuote = LessonQuote.fromDb(dbQuoteData, dbTeacherData, dbLessonRequestData);
 
         const transformedStatus = this.transformDbLessonStatusToModel(currentStatus);
 
-        // If status is missing or invalid, we might have an issue. Log and provide default or throw.
         if (!transformedStatus) {
             console.error(`Lesson ${dbLesson.id} is missing or has invalid current status. Defaulting status.`);
-            // Provide a default status based on required fields.
-            // This situation likely points to data integrity issues.
-            const defaultStatus = new LessonStatus({
-                id: currentStatusId ?? `missing-status-${dbLesson.id}`,
-                lessonId: dbLesson.id,
-                status: LessonStatusValue.REQUESTED, // Default to a safe initial status
-                createdAt: new Date() // Use current time as fallback
-            });
+            const defaultStatus = new LessonStatus({ id: currentStatusId ?? `missing-status-${dbLesson.id}`, lessonId: dbLesson.id, status: LessonStatusValue.REQUESTED, createdAt: new Date() });
             return new Lesson({
                 ...lessonProps,
                 quote: transformedQuote,
@@ -148,7 +115,6 @@ class TeacherService {
                 updatedAt: updatedAt ?? undefined,
             });
         }
-
 
         return new Lesson({
             ...lessonProps,
@@ -169,15 +135,10 @@ class TeacherService {
     async create(teacherData: Prisma.TeacherCreateInput & { password: string }): Promise<Teacher> {
         try {
             const hashedPassword = await bcrypt.hash(teacherData.password, 10);
-            const dbTeacher = await this.prisma.teacher.create({
-                data: {
-                    ...teacherData,
-                    password: hashedPassword,
-                    authMethods: ['PASSWORD'],
-                    isActive: true
-                }
-            });
-            return Teacher.fromDb(dbTeacher);
+            // Fetch the created teacher *without* rates initially
+            const dbTeacher = await this.prisma.teacher.create({ data: { ...teacherData, password: hashedPassword, authMethods: ['PASSWORD'], isActive: true } });
+            // Pass the teacher object, but no rates (pass undefined or omit)
+            return Teacher.fromDb(dbTeacher); // Rates will be empty array by default
         } catch (error) {
             console.error('Error creating teacher:', error);
             if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -339,9 +300,13 @@ class TeacherService {
                 }
             },
             include: {
-                quote: { // Ensure quote is non-null for transformation
+                quote: {
                     include: {
-                        teacher: true,
+                        teacher: {
+                            include: {
+                                teacherLessonHourlyRates: true
+                            }
+                        },
                         lessonRequest: {
                             include: {
                                 student: true,
@@ -350,17 +315,12 @@ class TeacherService {
                         }
                     }
                 },
-                currentStatus: true // Ensure currentStatus is included
+                currentStatus: true
             },
             orderBy: { createdAt: 'desc' }
         });
 
-        // Type assertion needed because Prisma's generated type doesn't fully reflect the non-nullability from 'include'
-        const results = (dbLessons as DbLessonWithRelations[])
-            .map(dbLesson => this.transformDbLessonToModel(dbLesson))
-            .filter((lesson): lesson is Lesson => lesson !== null); // Filter out any null results from transformation failures
-
-        return results;
+        return dbLessons.map(dbLesson => Lesson.fromDb(dbLesson as DbLessonWithRelations)).filter(lesson => lesson !== null) as Lesson[];
     }
 
 

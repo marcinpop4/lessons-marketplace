@@ -1,6 +1,30 @@
 import { LessonQuote } from './LessonQuote.js';
 import { LessonStatus, LessonStatusValue } from './LessonStatus.js';
 import type { PrismaClient } from '@prisma/client';
+// Import necessary Prisma types
+import type {
+  Lesson as DbLesson,
+  LessonQuote as DbLessonQuote,
+  Teacher as DbTeacher,
+  LessonRequest as DbLessonRequest,
+  Student as DbStudent,
+  Address as DbAddress,
+  LessonStatus as DbLessonStatus,
+  TeacherLessonHourlyRate as DbTeacherLessonHourlyRate
+} from '@prisma/client';
+
+// Define the expected nested structure from Prisma include
+// This mirrors DbLessonWithRelations from TeacherService, consider sharing?
+type DbLessonWithNestedRelations = DbLesson & {
+  currentStatus: DbLessonStatus | null;
+  quote: (DbLessonQuote & {
+    teacher: DbTeacher & { teacherLessonHourlyRates?: DbTeacherLessonHourlyRate[] },
+    lessonRequest: (DbLessonRequest & {
+      student: DbStudent;
+      address: DbAddress;
+    })
+  });
+};
 
 /**
  * Properties required to create a Lesson instance.
@@ -57,6 +81,36 @@ export class Lesson {
 
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
+  }
+
+  /**
+   * Static factory method to create a Lesson instance from a Prisma object.
+   * Assumes the input includes nested quote (with teacher, lessonRequest, student, address) and currentStatus.
+   * @param dbLesson The plain object returned by Prisma with nested relations.
+   * @returns A new instance of the shared Lesson model.
+   */
+  public static fromDb(dbLesson: DbLessonWithNestedRelations): Lesson | null {
+    const { createdAt, updatedAt, quoteId, currentStatusId, quote, currentStatus, ...lessonProps } = dbLesson;
+
+    if (!quote || !currentStatus) {
+      console.error(`Lesson ${dbLesson.id} is missing required nested quote or currentStatus. Cannot transform.`);
+      return null; // Or throw an error
+    }
+
+    // Transform nested objects using their respective fromDb methods
+    // Note: LessonQuote.fromDb expects separate args, so we extract them from the nested quote object
+    const transformedQuote = LessonQuote.fromDb(quote, quote.teacher, quote.lessonRequest);
+    const transformedStatus = LessonStatus.fromDb(currentStatus);
+
+    // Construct the shared model instance
+    return new Lesson({
+      ...lessonProps, // id
+      quote: transformedQuote,
+      currentStatusId: transformedStatus.id, // Use ID from transformed status
+      currentStatus: transformedStatus,
+      createdAt: createdAt ?? undefined,
+      updatedAt: updatedAt ?? undefined,
+    });
   }
 
   /**

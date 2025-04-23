@@ -1,6 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { Student } from '../../shared/models/Student.js';
-import bcrypt from 'bcrypt';
+import * as bcrypt from 'bcrypt';
 import prisma from '../prisma.js';
 
 class StudentService {
@@ -9,9 +9,9 @@ class StudentService {
     /**
      * Create a new student
      * @param studentData Student data including password
-     * @returns Created student without password
+     * @returns Created shared Student model instance
      */
-    async create(studentData: Prisma.StudentCreateInput & { password: string }): Promise<Omit<Student, 'password'> | null> {
+    async create(studentData: Prisma.StudentCreateInput & { password: string }): Promise<Student | null> {
         try {
             // Hash password
             const hashedPassword = await bcrypt.hash(studentData.password, 10);
@@ -26,19 +26,8 @@ class StudentService {
                 }
             });
 
-            // Transform to domain model
-            const student = new Student({
-                id: dbStudent.id,
-                firstName: dbStudent.firstName,
-                lastName: dbStudent.lastName,
-                email: dbStudent.email,
-                phoneNumber: dbStudent.phoneNumber,
-                dateOfBirth: dbStudent.dateOfBirth,
-                isActive: dbStudent.isActive
-            });
-
-            // Return student without sensitive data
-            return student;
+            // Use Student.fromDb to transform and return
+            return Student.fromDb(dbStudent);
         } catch (error) {
             console.error('Error creating student:', error);
             // Check for Prisma unique constraint violation (P2002)
@@ -54,9 +43,9 @@ class StudentService {
     /**
      * Find a student by ID
      * @param id Student ID
-     * @returns Student without password or null if not found
+     * @returns Shared Student model instance or null if not found
      */
-    async findById(id: string): Promise<Omit<Student, 'password'> | null> {
+    async findById(id: string): Promise<Student | null> {
         try {
             const dbStudent = await this.prisma.student.findUnique({
                 where: { id }
@@ -66,19 +55,8 @@ class StudentService {
                 return null;
             }
 
-            // Transform to domain model
-            const student = new Student({
-                id: dbStudent.id,
-                firstName: dbStudent.firstName,
-                lastName: dbStudent.lastName,
-                email: dbStudent.email,
-                phoneNumber: dbStudent.phoneNumber,
-                dateOfBirth: dbStudent.dateOfBirth,
-                isActive: dbStudent.isActive
-            });
-
-            // Return student without sensitive data
-            return student;
+            // Use Student.fromDb to transform and return
+            return Student.fromDb(dbStudent);
         } catch (error) {
             console.error('Error finding student:', error);
             throw error;

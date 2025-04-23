@@ -3,6 +3,9 @@
  * Maps to the "TeacherLessonHourlyRate" table in the database
  */
 
+// Import Prisma type
+import type { TeacherLessonHourlyRate as DbTeacherLessonHourlyRate } from '@prisma/client';
+
 /**
  * Properties required to create a TeacherLessonHourlyRate instance.
  */
@@ -43,6 +46,23 @@ export class TeacherLessonHourlyRate {
     this.rateInCents = rateInCents;
     this.createdAt = createdAt;
     this.deactivatedAt = deactivatedAt;
+  }
+
+  /**
+   * Static factory method to create a TeacherLessonHourlyRate instance from a Prisma object.
+   * @param dbRate The plain object returned by Prisma.
+   * @returns A new instance of the shared TeacherLessonHourlyRate model.
+   */
+  public static fromDb(dbRate: DbTeacherLessonHourlyRate): TeacherLessonHourlyRate {
+    const { createdAt, updatedAt, ...rateProps } = dbRate;
+    // Construct the shared model instance
+    return new TeacherLessonHourlyRate({
+      ...rateProps, // Includes id, teacherId, type, rateInCents
+      // Pass optional fields explicitly, allowing constructor defaults if null/undefined
+      createdAt: createdAt ?? undefined,
+      deactivatedAt: dbRate.deactivatedAt ?? undefined
+      // Note: shared model doesn't have updatedAt in constructor props
+    });
   }
 
   /**
