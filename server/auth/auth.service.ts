@@ -1,7 +1,7 @@
 import bcryptjs from 'bcryptjs';
 import jwt, { Secret, SignOptions, JwtPayload } from 'jsonwebtoken';
 import prisma from '../prisma.js';
-import passwordAuthProvider from './passwordAuthProvider.js'; // Import the provider
+import passwordAuthService from './password.service.js'; // Renamed import
 import { Student } from '../../shared/models/Student.js'; // Import shared Student model
 import { Teacher } from '../../shared/models/Teacher.js'; // Import shared Teacher model
 // Assuming UserType enum is available via prisma instance or direct import
@@ -44,6 +44,7 @@ class AuthService {
 
   constructor() {
     this.providers = {} as Record<AuthMethod, AuthProvider>;
+    this.registerProvider('PASSWORD', passwordAuthService);
   }
 
   registerProvider(method: AuthMethod, provider: AuthProvider) {
@@ -163,7 +164,6 @@ class AuthService {
 }
 
 const authServiceInstance = new AuthService();
-authServiceInstance.registerProvider('PASSWORD', passwordAuthProvider);
 
 // Export the instance and helper methods if needed directly
 export const hashPassword = authServiceInstance.hashPassword.bind(authServiceInstance);

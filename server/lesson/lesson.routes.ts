@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { lessonController } from './lesson.controller.js';
-import { authMiddleware } from '../auth/authMiddleware.js';
-import { checkRole } from '../auth/roleMiddleware.js';
+import { authMiddleware } from '../auth/auth.middleware.js';
+import { checkRole } from '../auth/role.middleware.js';
 import { goalController } from '../goal/goal.controller.js';
 
 const router: Router = express.Router();

@@ -105,16 +105,10 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
 
     // Function to handle button click - Reverted logic
     const handleButtonClick = (transition: LessonStatusTransition) => {
-        // *** DEBUG LOG ***
-        console.log(`handleButtonClick called for Lesson ID: ${lesson.id}, Transition: ${transition}`);
 
         if (transition === LessonStatusTransition.DEFINE) {
-            // *** DEBUG LOG ***
-            console.log(`Navigating to /teacher/lessons/${lesson.id}`);
             navigate(`/teacher/lessons/${lesson.id}`);
         } else {
-            // *** DEBUG LOG ***
-            console.log(`Calling onUpdateStatus for Lesson ID: ${lesson.id}, Status: ${currentStatus}, Transition: ${transition}`);
             onUpdateStatus(lesson.id, currentStatus, transition);
         }
     };

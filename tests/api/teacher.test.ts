@@ -59,7 +59,6 @@ describe('API Integration: /api/v1/teachers using Seed Data', () => {
             const voiceRate = profileResponse.body.hourlyRates.find((rate: any) => rate.type === LessonType.VOICE);
             if (voiceRate) {
                 existingVoiceRateId = voiceRate.id;
-                console.log(`[Test Setup] Found existing VOICE rate ID: ${existingVoiceRateId} for de/reactivate tests.`);
             } else {
                 console.warn('[Test Setup Warning] Could not find existing VOICE rate ID for de/reactivate tests.');
                 // Don't throw here, let the specific tests handle missing rate if necessary
@@ -412,11 +411,9 @@ describe('API Integration: /api/v1/teachers using Seed Data', () => {
                 }
 
                 rateToModifyId = voiceRate.id;
-                console.log(`[Test Setup] Found existing VOICE rate ID: ${rateToModifyId} for de/reactivate tests.`);
 
                 // Ensure the rate is active before tests run
                 if (voiceRate && rateToModifyId && voiceRate.deactivatedAt !== null) { // Check if inactive
-                    console.log(`[Test Setup] Reactivating VOICE rate ${rateToModifyId} before tests.`);
                     await request(API_BASE_URL!)
                         .post(`/api/v1/teacher-lesson-rates/${rateToModifyId}/reactivate`)
                         .set('Authorization', seededTeacherAuthToken);

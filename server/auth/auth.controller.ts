@@ -40,20 +40,17 @@ export class AuthController {
 
             // Check for our specific custom errors first
             if (error instanceof DuplicateEmailError) {
-                console.log('Caught DuplicateEmailError, sending 409.');
                 res.status(error.status).json({ error: error.message });
                 return;
             }
             // Handle other operational AppErrors (like validation errors if they existed)
             if (error instanceof AppError && error.isOperational) {
-                console.log(`Caught operational AppError (${error.name}), sending ${error.status}.`);
                 res.status(error.status).json({ error: error.message });
                 return;
             }
 
             // Handle generic errors or non-operational AppErrors as 500
             if (!res.headersSent) {
-                console.log('Caught unexpected error or non-operational AppError, sending 500.');
                 const errorMessage = error instanceof Error ? error.message : 'Registration failed due to an unexpected error.';
                 res.status(500).json({ error: errorMessage });
             }

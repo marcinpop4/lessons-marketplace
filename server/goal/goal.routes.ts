@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { goalController } from './goal.controller.js';
-import { authMiddleware } from '../auth/authMiddleware.js';
-// import { checkRole } from '../auth/roleMiddleware.js'; // Import if role checks are needed later
+import { authMiddleware } from '../auth/auth.middleware.js';
+// import { checkRole } from '../auth/role.middleware.js'; // Import if role checks are needed later
 
 const router: Router = express.Router();
 
