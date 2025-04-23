@@ -10,6 +10,7 @@ interface GoalManagerProps {
     initialGoals: Goal[];
     lessonId: string;
     onGoalsChange: (goals: Goal[]) => void;
+    readOnly?: boolean;
 }
 
 const statusDisplayOrder: GoalStatusValue[] = [
@@ -43,7 +44,7 @@ const createGoalModelFromData = (goalData: any): Goal => {
     return new Goal({ ...goalData, currentStatus: currentStatusInstance });
 };
 
-const GoalManager: React.FC<GoalManagerProps> = ({ initialGoals, lessonId, onGoalsChange }) => {
+const GoalManager: React.FC<GoalManagerProps> = ({ initialGoals, lessonId, onGoalsChange, readOnly = false }) => {
     const [updatingGoalId, setUpdatingGoalId] = useState<string | null>(null);
     const [deletingGoalId, setDeletingGoalId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -106,9 +107,8 @@ const GoalManager: React.FC<GoalManagerProps> = ({ initialGoals, lessonId, onGoa
 
     return (
         <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Manage Goals</h2>
-
-            <AddGoalForm lessonId={lessonId} onGoalAdded={handleNewGoalAdded} />
+            {/* Remove the H2 heading from here */}
+            {/* <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Manage Goals</h2> */}
 
             {statusDisplayOrder.map(status => {
                 const goalsInSection = groupedGoals[status] || [];
@@ -130,6 +130,7 @@ const GoalManager: React.FC<GoalManagerProps> = ({ initialGoals, lessonId, onGoa
                                         isUpdating={updatingGoalId === goal.id}
                                         onDelete={handleDeleteGoal}
                                         isDeleting={deletingGoalId === goal.id}
+                                        readOnly={readOnly}
                                     />
                                 ))}
                             </div>

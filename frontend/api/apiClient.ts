@@ -11,7 +11,7 @@ import { buildApiUrl } from './buildApiUrl';
 const apiClient: AxiosInstance = axios.create({
     baseURL: '', // Using relative URLs to make requests go through nginx
     withCredentials: true, // Allow cookies
-    timeout: 10000, // 10 seconds timeout
+    timeout: 10000, // Revert to 10 seconds timeout
     headers: {
         'Content-Type': 'application/json',
     }

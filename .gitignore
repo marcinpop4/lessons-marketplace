@@ -33,6 +33,7 @@ storybook-static/
 .DS_Store
 .env
 .env.old
+.env.development
 
 # Logs
 npm-debug.log*

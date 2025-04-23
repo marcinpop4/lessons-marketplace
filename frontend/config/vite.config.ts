@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import fs from 'fs'
 import chalk from 'chalk';
+import url from 'url'; // Import the url module
 
 // --- Helper function to scrub sensitive data --- 
 const scrubSensitiveData = (obj: any, keysToScrub: string[] = ['password', 'email', 'token', 'authorization', 'apiKey', 'secret']): any => {
@@ -31,6 +32,39 @@ const scrubSensitiveData = (obj: any, keysToScrub: string[] = ['password', 'emai
   return scrubbedObj;
 };
 // --- End Helper function --- 
+
+// --- Helper function to scrub URL parameters ---
+const scrubUrlParams = (urlString: string | undefined, keysToScrub: string[] = ['password', 'email', 'token', 'authorization', 'apiKey', 'secret']): string => {
+  if (!urlString) return '';
+  try {
+    const parsedUrl = url.parse(urlString, true); // Parse URL and query string
+    if (parsedUrl.query) {
+      const scrubbedQuery: { [key: string]: any } = {};
+      for (const key in parsedUrl.query) {
+        if (Object.prototype.hasOwnProperty.call(parsedUrl.query, key)) {
+          if (keysToScrub.includes(key.toLowerCase())) {
+            scrubbedQuery[key] = '[SCRUBBED]';
+          } else {
+            // Keep non-sensitive params, ensuring arrays are preserved if needed
+            scrubbedQuery[key] = parsedUrl.query[key];
+          }
+        }
+      }
+      // Reconstruct URL with scrubbed query params
+      // Using url.format ensures proper handling of path, query, etc.
+      const formattedUrl = url.format({ ...parsedUrl, search: undefined, query: scrubbedQuery });
+      // Decode the URL for clearer logging, converting %5B to [ and %5D to ]
+      return decodeURIComponent(formattedUrl);
+    } else {
+      // No query parameters to scrub
+      return urlString;
+    }
+  } catch (e) {
+    console.warn('[VITE PROXY] Failed to parse/scrub URL parameters for logging:', urlString, e);
+    return urlString; // Return original URL on error
+  }
+};
+// --- End Helper function ---
 
 // Get absolute path to the project root directory
 const projectRoot = resolve(__dirname, '../..')
@@ -188,8 +222,11 @@ export default defineConfig(({ mode }) => {
                   const finalRequestBodyString = scrubbedRequestBodyString || '{}';
                   const finalResponseBodyString = scrubbedResponseBodyString || '{}';
 
-                  // Log with request and response body separated by -->
-                  console.log(chalk.yellow(`${proxyRes.statusCode}\t${req.method}\t${req.url}\t${finalRequestBodyString} ==>`), chalk.blue(`${finalResponseBodyString}`));
+                  // Scrub sensitive parameters from the URL before logging
+                  const scrubbedUrl = scrubUrlParams(req.url);
+
+                  // Log with request and response body separated by ==>
+                  console.log(chalk.yellow(`${proxyRes.statusCode}\t${req.method}\t${scrubbedUrl}\t${finalRequestBodyString} ==>`), chalk.blue(`${finalResponseBodyString}`));
                 });
               }
             });

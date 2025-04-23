@@ -1,6 +1,7 @@
 import apiClient from './apiClient';
 import { Goal } from '@shared/models/Goal';
 import { GoalStatusTransition } from '@shared/models/GoalStatus'; // Import transition enum
+import { GoalRecommendation } from '@shared/models/GoalRecommendation';
 
 /**
  * Fetch all goals for a specific lesson.
@@ -85,10 +86,17 @@ export const updateGoalStatus = async (goalId: string, transition: GoalStatusTra
  */
 export const generateGoalRecommendations = async (
     lessonId: string
-): Promise<Array<{ goal: { title: string; description: string; numberOfLessons: number } }>> => {
+): Promise<GoalRecommendation[]> => {
     try {
-        const response = await apiClient.post(`/api/v1/goals/recommendations/generate?lessonId=${lessonId}`);
-        return response.data;
+        // Add specific timeout config to this request
+        const response = await apiClient.post(
+            `/api/v1/goals/recommendations/generate?lessonId=${lessonId}`,
+            {},
+            { timeout: 30000 } // 30 second timeout for this specific request
+        );
+        // Assuming the API returns data conforming to GoalRecommendation[]
+        // TODO: Add validation or instantiation if necessary
+        return response.data as GoalRecommendation[];
     } catch (error) {
         console.error('Error generating goal recommendations:', error);
         throw error;

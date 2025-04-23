@@ -27,12 +27,11 @@ router.get('/lessons/:lessonId/goals', authMiddleware, goalController.getGoalsBy
 // POST /api/v1/goals/recommendations/generate
 router.post('/recommendations/generate', authMiddleware, goalController.generateRecommendations);
 
-// --- Lesson-Specific Goal Routes ---
-// Note: These are nested under lessons for clarity, e.g., /api/v1/lessons/:lessonId/goals
-
-// Get all goals for a specific lesson (requires authentication)
-// GET /api/v1/lessons/:lessonId/goals
-// We need a separate router instance for lesson-related routes to mount this correctly.
-// This will be handled in the main server file or a lesson-specific router.
+// === New Streaming Route ===
+router.get(
+    '/recommendations/stream', // Using GET for event stream
+    authMiddleware,
+    goalController.streamRecommendations // New controller method
+);
 
 export default router; 

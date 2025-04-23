@@ -1,28 +1,25 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Lesson } from '@shared/models/Lesson';
 import { Goal } from '@shared/models/Goal';
 import { LessonStatusValue, LessonStatusTransition } from '@shared/models/LessonStatus';
 import { getLessonById, updateLessonStatus } from '@frontend/api/lessonApi';
 import { getGoalsByLessonId, generateGoalRecommendations } from '@frontend/api/goalApi';
+import { GoalRecommendation } from '@shared/models/GoalRecommendation';
 import TeacherLessonDetailCard from '@frontend/components/TeacherLessonDetailCard';
 import GoalManager from '@frontend/components/GoalManager';
 import Button from '@frontend/components/shared/Button/Button';
 import { GoalStatusValue } from '@shared/models/GoalStatus';
-
-interface GoalRecommendation {
-    goal: {
-        title: string;
-        description: string;
-        numberOfLessons: number;
-    };
-}
+import AddGoalForm from '@frontend/components/AddGoalForm';
 
 interface FormData {
     title: string;
     description: string;
     estimatedLessonCount: number;
 }
+
+// Define the desired recommendation count as a constant
+const RECOMMENDATION_COUNT = 6; // Adjust this value as needed (backend caps at 10)
 
 const TeacherLessonDetailsPage: React.FC = () => {
     const { lessonId } = useParams<{ lessonId: string }>();
@@ -31,15 +28,28 @@ const TeacherLessonDetailsPage: React.FC = () => {
     const [lesson, setLesson] = useState<Lesson | null>(null);
     const [goals, setGoals] = useState<Goal[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState<boolean>(false);
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    const [recommendationError, setRecommendationError] = useState<string | null>(null);
     const [recommendations, setRecommendations] = useState<GoalRecommendation[]>([]);
-    const [selectedGoal, setSelectedGoal] = useState<GoalRecommendation | null>(null);
-    const [formData, setFormData] = useState<FormData>({
-        title: '',
-        description: '',
-        estimatedLessonCount: 1
-    });
+    const [selectedRecommendationData, setSelectedRecommendationData] = useState<FormData | null>(null);
+    const [isStreamingComplete, setIsStreamingComplete] = useState<boolean>(false);
+
+    // Ref to hold the EventSource instance
+    const eventSourceRef = useRef<EventSource | null>(null);
+
+    // --- Effect for cleaning up EventSource on unmount ---
+    useEffect(() => {
+        // Return cleanup function
+        return () => {
+            if (eventSourceRef.current) {
+                console.log('[SSE] Closing EventSource connection on component unmount.');
+                eventSourceRef.current.close();
+                eventSourceRef.current = null;
+            }
+        };
+    }, []); // Empty dependency array ensures this runs only on mount and unmount
 
     useEffect(() => {
         if (!lessonId) {
@@ -116,27 +126,115 @@ const TeacherLessonDetailsPage: React.FC = () => {
     };
 
     const handleGetRecommendations = async () => {
-        if (!lesson || !lessonId) return;
+        if (!lessonId || isGeneratingRecommendations) return; // Prevent multiple triggers
 
-        setIsLoading(true);
-        try {
-            const recommendations = await generateGoalRecommendations(lessonId);
-            setRecommendations(recommendations);
-        } catch (error) {
-            console.error('Error getting recommendations:', error);
-            setError(error instanceof Error ? error.message : 'Failed to get recommendations');
-        } finally {
-            setIsLoading(false);
+        if (eventSourceRef.current) {
+            eventSourceRef.current.close();
         }
+
+        setIsGeneratingRecommendations(true);
+        setIsStreamingComplete(false); // Reset streaming complete status
+        setRecommendationError(null);
+        setRecommendations([]);
+        setSelectedRecommendationData(null);
+
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+            console.error('[SSE] Auth token not found in localStorage.');
+            setRecommendationError('Authentication error: Cannot generate recommendations.');
+            setIsGeneratingRecommendations(false);
+            return;
+        }
+        const url = `/api/v1/goals/recommendations/stream?lessonId=${lessonId}&count=${RECOMMENDATION_COUNT}&token=${encodeURIComponent(token)}`;
+        console.log(`[SSE] Connecting to ${url}`);
+        const newEventSource = new EventSource(url /* { withCredentials: true } */);
+        eventSourceRef.current = newEventSource;
+
+        newEventSource.addEventListener('recommendation', (event) => {
+            try {
+                console.log('[SSE] Received recommendation event:', event.data);
+                const recommendation = JSON.parse(event.data) as GoalRecommendation; // Backend sends JSON
+                // IMPORTANT: Instantiate the class if frontend needs its methods.
+                // If just accessing properties, the parsed object might be sufficient.
+                // const recommendationInstance = new GoalRecommendation(parsedData); // Use if needed
+
+                setRecommendations((prev) => [...prev, recommendation]);
+            } catch (error) {
+                console.error('[SSE] Error parsing recommendation data:', error);
+                // Optionally update UI to show parsing error
+            }
+        });
+
+        newEventSource.addEventListener('end', (event) => {
+            console.log('[SSE] Received end event:', event.data);
+            setIsGeneratingRecommendations(false);
+            setIsStreamingComplete(true); // Set streaming complete status
+            if (eventSourceRef.current) {
+                eventSourceRef.current.close();
+                eventSourceRef.current = null;
+                console.log('[SSE] Connection closed by end event.');
+            }
+            try {
+                const endData = JSON.parse(event.data);
+                // Optionally display end message: `Stream finished: ${endData.count} recommendations.`
+            } catch (e) { /* Ignore parsing error for end event */ }
+        });
+
+        newEventSource.addEventListener('error', (event) => {
+            // This handles specific 'error' events sent by the server
+            // AND general connection errors (where event.data might be undefined)
+            console.error('[SSE] Received error event:', event);
+            let errorMessage = 'An unknown error occurred during recommendation generation.';
+            try {
+                // Check if it's a custom error event from the server
+                if ((event as MessageEvent).data) {
+                    const errorData = JSON.parse((event as MessageEvent).data);
+                    errorMessage = errorData.message || errorMessage;
+                } else if (newEventSource.readyState === EventSource.CLOSED) {
+                    // Check if the error is due to connection being closed
+                    // Might happen if server restarts or network issue
+                    errorMessage = 'Connection to server lost or closed unexpectedly.';
+                    // Avoid setting error if it was closed intentionally by 'end' event shortly before
+                    if (isGeneratingRecommendations) {
+                        setRecommendationError(errorMessage);
+                    }
+                } else {
+                    setRecommendationError(errorMessage);
+                }
+            } catch (e) {
+                // Ignore parsing error for the error event itself
+                setRecommendationError(errorMessage);
+            }
+
+            // Only set error if still in generating state (avoid race condition with 'end' event)
+            if (isGeneratingRecommendations) {
+                setRecommendationError(errorMessage);
+            }
+            setIsGeneratingRecommendations(false);
+            setIsStreamingComplete(true); // Also mark as complete on error
+            if (eventSourceRef.current) {
+                eventSourceRef.current.close();
+                eventSourceRef.current = null;
+                console.log('[SSE] Connection closed due to error event or network issue.');
+            }
+        });
     };
 
     const handleSelectRecommendation = (recommendation: GoalRecommendation) => {
-        setSelectedGoal(recommendation);
-        setFormData({
-            title: recommendation.goal.title,
-            description: recommendation.goal.description,
-            estimatedLessonCount: recommendation.goal.numberOfLessons
+        if (!recommendation) {
+            console.error("handleSelectRecommendation called with invalid recommendation object:", recommendation);
+            return;
+        }
+        setSelectedRecommendationData({
+            title: recommendation.title,
+            description: recommendation.description,
+            estimatedLessonCount: recommendation.estimatedLessonCount
         });
+    };
+
+    const handleGoalAdded = (newGoal: Goal) => {
+        setGoals(prevGoals => [...prevGoals, newGoal]);
+        setSelectedRecommendationData(null);
     };
 
     if (!lessonId) {
@@ -161,68 +259,64 @@ const TeacherLessonDetailsPage: React.FC = () => {
         return <div className="p-4">Lesson data could not be loaded. {error || ''}</div>;
     }
 
+    const isLessonDefined = lesson.currentStatus.status === LessonStatusValue.DEFINED;
+
     return (
         <div className="container mx-auto p-4 space-y-6">
             <h1 className="text-2xl font-bold mb-4">Lesson Details & Goals</h1>
 
             <TeacherLessonDetailCard lesson={lesson} />
 
-            <GoalManager
-                initialGoals={goals}
-                lessonId={lessonId}
-                onGoalsChange={handleGoalsChange}
-            />
+            {!isLessonDefined ? (
+                <>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mt-6 mb-4">Manage Goals</h2>
 
-            <div className="flex justify-end space-x-3 mt-6">
-                <Button variant="secondary" onClick={handleCancel} disabled={isSaving}>
-                    Cancel
-                </Button>
-                <Button
-                    variant="primary"
-                    onClick={handleSaveAndDefine}
-                    disabled={!goals.some(g => g.currentStatus?.status !== GoalStatusValue.ABANDONED) || isSaving}
-                >
-                    {isSaving ? 'Saving...' : 'Save and Define Lesson'}
-                </Button>
-            </div>
-            {error && isSaving && <p className="text-red-500 text-right mt-2">Save Error: {error}</p>}
+                    <AddGoalForm
+                        lessonId={lessonId}
+                        onGoalAdded={handleGoalAdded}
+                        onGenerateRecommendations={handleGetRecommendations}
+                        isGeneratingRecommendations={isGeneratingRecommendations}
+                        recommendationError={recommendationError}
+                        initialData={selectedRecommendationData}
+                        recommendations={recommendations}
+                        onSelectRecommendation={handleSelectRecommendation}
+                        desiredCount={RECOMMENDATION_COUNT}
+                        isStreaming={isGeneratingRecommendations && !isStreamingComplete}
+                    />
 
-            <div className="mt-4">
-                <Button
-                    onClick={handleGetRecommendations}
-                    disabled={isLoading}
-                    variant="secondary"
-                >
-                    {isLoading ? (
-                        <>
-                            Getting AI Recommendations...
-                        </>
-                    ) : (
-                        'Get AI Recommendations'
-                    )}
-                </Button>
-            </div>
+                    <GoalManager
+                        initialGoals={goals}
+                        lessonId={lessonId}
+                        onGoalsChange={handleGoalsChange}
+                    />
 
-            {recommendations.length > 0 && (
-                <div className="mt-4 space-y-4">
-                    <h3 className="text-lg font-semibold">AI Recommendations</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {recommendations.map((rec, index) => (
-                            <div
-                                key={index}
-                                className={`p-4 rounded-lg border cursor-pointer transition-all ${selectedGoal === rec
-                                    ? 'border-blue-500 bg-blue-50'
-                                    : 'border-gray-200 hover:border-blue-300'
-                                    }`}
-                                onClick={() => handleSelectRecommendation(rec)}
-                            >
-                                <h4 className="font-medium text-gray-900">{rec.goal.title}</h4>
-                                <p className="mt-2 text-sm text-gray-600">{rec.goal.description}</p>
-                                <p className="mt-2 text-sm text-gray-500">
-                                    Estimated lessons: {rec.goal.numberOfLessons}
-                                </p>
-                            </div>
-                        ))}
+                    <div className="flex justify-end space-x-3 mt-6">
+                        <Button variant="secondary" onClick={handleCancel} disabled={isSaving}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="primary"
+                            onClick={handleSaveAndDefine}
+                            disabled={!goals.some(g => g.currentStatus?.status !== GoalStatusValue.ABANDONED) || isSaving}
+                        >
+                            {isSaving ? 'Saving...' : 'Save and Define Lesson'}
+                        </Button>
+                    </div>
+                    {error && isSaving && <p className="text-red-500 text-right mt-2">Save Error: {error}</p>}
+                </>
+            ) : (
+                <div className="mt-6 p-4 border border-yellow-300 bg-yellow-50 rounded-md dark:bg-yellow-900/[.3] dark:border-yellow-700">
+                    <p className="text-yellow-800 dark:text-yellow-200">This lesson has already been defined. Goals can no longer be added or modified.</p>
+                    <GoalManager
+                        initialGoals={goals}
+                        lessonId={lessonId}
+                        onGoalsChange={() => { }}
+                        readOnly={true}
+                    />
+                    <div className="flex justify-end mt-4">
+                        <Button variant="secondary" onClick={handleCancel}>
+                            Back to Lessons
+                        </Button>
                     </div>
                 </div>
             )}

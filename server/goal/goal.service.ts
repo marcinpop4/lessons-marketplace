@@ -10,6 +10,11 @@ import { lessonService } from '../lesson/lesson.service.js';
 import { teacherService } from '../teacher/teacher.service.js';
 import prisma from '../prisma.js';
 import { LessonType } from '../../shared/models/LessonType.js';
+import { GoalRecommendation } from '../../shared/models/GoalRecommendation.js';
+import { Response } from 'express';
+
+// --- Configuration Constants ---
+const LOG_STREAMING_DETAILS = process.env.LOG_STREAMING_DETAILS === 'true' || false; // Default to false
 
 // Remove unused Prisma payload type definition
 // type LessonWithGoals = Prisma.LessonGetPayload<{ ... }>;
@@ -208,79 +213,132 @@ export const goalService = {
         }
     },
 
+    // === Private Helper Methods ===
+
+    /** Fetches the necessary context (lesson, student, goals) for generating recommendations. */
+    async _getRecommendationContext(lessonId: string) {
+        const currentLesson = await lessonService.getLessonById(lessonId);
+        if (!currentLesson) throw new NotFoundError(`Lesson ${lessonId} not found`);
+
+        const studentId = currentLesson.quote.lessonRequest.student.id;
+        const teacherId = currentLesson.quote.teacher.id;
+        const student = await studentService.findById(studentId);
+        if (!student) throw new NotFoundError(`Student ${studentId} not found`);
+
+        const allTeacherLessons = await teacherService.findLessonsByTeacherId(teacherId);
+        const pastLessons = allTeacherLessons
+            .filter(l => l.quote.lessonRequest.student.id === studentId && l.id !== lessonId)
+            .sort((a, b) => new Date(b.quote.lessonRequest.startTime).getTime() - new Date(a.quote.lessonRequest.startTime).getTime());
+        const currentLessonGoals = await this.getGoalsByLessonId(lessonId);
+
+        return { student, currentLesson, pastLessons, currentLessonGoals };
+    },
+
+    /** Prepares the system and user prompts for the OpenAI API call. */
+    _prepareOpenAiPrompts(context: Awaited<ReturnType<typeof this._getRecommendationContext>>, count: number) {
+        const { student, currentLesson, pastLessons, currentLessonGoals } = context;
+
+        // Construct the leaner promptData object with only specified fields
+        const promptData = {
+            student: {
+                firstName: student.firstName,
+                lastName: student.lastName,
+                dateOfBirth: student.dateOfBirth?.toISOString().split('T')[0] // Format as YYYY-MM-DD
+            },
+            currentLesson: {
+                type: currentLesson.quote.lessonRequest.type,
+                durationMinutes: currentLesson.quote.lessonRequest.durationMinutes,
+                startTime: currentLesson.quote.lessonRequest.startTime.toISOString(),
+                status: currentLesson.currentStatus.status,
+                goals: currentLessonGoals.map(g => ({
+                    title: g.title,
+                    description: g.description, // Keep description for context
+                    status: g.currentStatus.status
+                }))
+            },
+            pastLessons: pastLessons.map(l => ({
+                type: l.quote.lessonRequest.type,
+                durationMinutes: l.quote.lessonRequest.durationMinutes,
+                status: l.currentStatus?.status ?? 'UNKNOWN', // Handle potential null status
+                startTime: l.quote.lessonRequest.startTime.toISOString()
+            }))
+        };
+
+        const systemPrompt = {
+            role: "system",
+            content: `You are a helpful assistant that helps teachers come up with goals \
+for one-on-one lessons. Based on the student info, current lesson details \
+(including its existing goals), and past lesson history, suggest ${count} new potential goals. \
+Each goal should have a title, description, and estimated number of lessons to achieve it. \
+Classify the goals by difficulty level: "beginner", "intermediate", "advanced". \
+Format your response as a JSON array of objects with the structure: \
+{ goal: { title: string, description: string, estimatedLessonCount: number, difficultyLevel: string } } \
+Ensure that each object strictly follows the specified format, and do not include any additional explanation or commentary outside of the JSON array.`
+        } as const;
+
+        // Stringify the prompt data with indentation for readability in the code block
+        const jsonDataString = JSON.stringify(promptData, null, 2);
+
+        // Construct the user message content with preamble and Markdown code block using concatenation
+        const userMessageContent = "Here is the relevant information in JSON format:\n"
+            + "```json\n"
+            + jsonDataString + "\n"
+            + "```";
+
+        const userMessage = {
+            role: "user",
+            content: userMessageContent
+        } as const;
+
+        return { systemPrompt, userMessage };
+    },
+
+    /** Parses the raw OpenAI response string, validates, and returns GoalRecommendation instances. */
+    _parseAndValidateRecommendations(responseText: string | null | undefined): GoalRecommendation[] {
+        if (!responseText) {
+            throw new Error('No response content received from OpenAI.');
+        }
+        try {
+            const parsedResponse = JSON.parse(responseText);
+            if (!Array.isArray(parsedResponse)) {
+                console.error('OpenAI response is not an array:', parsedResponse);
+                throw new Error('Invalid format for goal recommendations from OpenAI: expected an array.');
+            }
+
+            const recommendations = parsedResponse.map(item => {
+                try {
+                    return new GoalRecommendation(item);
+                } catch (validationError) {
+                    console.error('Failed to instantiate GoalRecommendation from item:', item, validationError);
+                    return null; // Skip invalid items
+                }
+            });
+
+            // Filter out any nulls
+            const validRecommendations = recommendations.filter((rec): rec is GoalRecommendation => rec !== null);
+            return validRecommendations;
+
+        } catch (parseError) {
+            console.error('Error parsing OpenAI JSON response:', parseError);
+            console.error('Raw OpenAI response was:', responseText);
+            throw new Error('Failed to parse goal recommendations from OpenAI response');
+        }
+    },
+
     /**
-     * Generates AI-powered goal recommendations for a lesson
-     * @param lessonId The ID of the lesson to generate recommendations for
-     * @returns Array of goal recommendations
+     * Generates AI-powered goal recommendations for a lesson (Standard API Call)
      */
     async generateGoalRecommendations(
         lessonId: string
-    ): Promise<Array<{ goal: { title: string; description: string; numberOfLessons: number } }>> {
-        // 1. Get the current lesson details via lessonService
-        const currentLesson = await lessonService.getLessonById(lessonId);
-        if (!currentLesson) {
-            // Throw NotFoundError if lesson isn't found
-            throw new NotFoundError(`Lesson with ID ${lessonId} not found`);
-        }
-
-        // Get IDs needed for other services (now directly from the Lesson model)
-        const studentId = currentLesson.quote.lessonRequest.student.id;
-        const teacherId = currentLesson.quote.teacher.id;
-
-        // 2. Get student details via studentService
-        const student = await studentService.findById(studentId);
-        if (!student) {
-            throw new NotFoundError(`Student with ID ${studentId} not found`);
-        }
-
-        // 3. Get teacher's lessons via teacherService
-        const allTeacherLessons = await teacherService.findLessonsByTeacherId(teacherId);
-
-        // 4. Filter for this student's past lessons
-        const pastLessons = allTeacherLessons
-            .filter(l => l.quote.lessonRequest.student.id === studentId && l.id !== lessonId)
-            .sort((a, b) =>
-                new Date(b.quote.lessonRequest.startTime).getTime() -
-                new Date(a.quote.lessonRequest.startTime).getTime()
-            );
-
-        // 5. Get goals specifically for the *current* lesson
-        const currentLessonGoals = await this.getGoalsByLessonId(lessonId);
-
-        // 6. Prepare data for OpenAI prompt using shared models
-        const promptData = {
-            // Pass student model directly (password is stripped in Student.fromDb)
-            student: student,
-            currentLesson: {
-                // Spread properties from the currentLesson model instance
-                ...currentLesson,
-                // Explicitly add the separately fetched goals
-                goals: currentLessonGoals.map(g => ({
-                    title: g.title,
-                    description: g.description,
-                    status: g.currentStatus.status
-                }))
-                // Note: This includes the full nested quote object. If the prompt
-                // becomes too large or performs poorly, we may need to select fewer fields.
-            },
-            // Pass pastLessons array directly (password stripped in Lesson -> Quote -> Student.fromDb)
-            pastLessons: pastLessons
-        };
+    ): Promise<GoalRecommendation[]> {
+        const context = await this._getRecommendationContext(lessonId);
+        // Provide a default count for the non-streaming version
+        const { systemPrompt, userMessage } = this._prepareOpenAiPrompts(context, 5);
 
         // 7. Call OpenAI
         const openai = new OpenAI({
             apiKey: process.env.OPENAI_API_KEY
         });
-
-        const systemPrompt = {
-            role: "system",
-            content: `You are a helpful assistant that helps teachers come up with goals for one-on-one lessons. Based on the student info, current lesson details (including its existing goals), and past lesson history, suggest 5 new potential goals. Each goal should have a title, description, and estimated number of lessons to achieve it. Format your response as a JSON array of objects with the structure: { goal: { title: string, description: string, numberOfLessons: number } }`
-        } as const;
-
-        const userMessage = {
-            role: "user",
-            content: JSON.stringify(promptData) // Send the structured data from shared models
-        } as const;
 
         try {
             const completion = await openai.chat.completions.create({
@@ -297,17 +355,184 @@ export const goalService = {
                 throw new Error('No response from OpenAI');
             }
 
-            // Attempt to parse the JSON response
-            try {
-                return JSON.parse(response);
-            } catch (parseError) {
-                console.error('Error parsing OpenAI JSON response:', parseError);
-                console.error('Raw OpenAI response:', response);
-                throw new Error('Failed to parse goal recommendations from OpenAI response');
-            }
+            return this._parseAndValidateRecommendations(response);
         } catch (error) {
             console.error('Error generating goal recommendations:', error);
             throw new Error('Failed to generate goal recommendations');
+        }
+    },
+
+    // === New Streaming Service Method - V2 (Real-time Parsing) ===
+    async streamGoalRecommendations(lessonId: string, count: number, res: Response): Promise<void> {
+        console.log(`[SSE] streamGoalRecommendations started for lesson ${lessonId}, count = ${count} `);
+        let streamEnded = false;
+        let openAiStreamFinished = false;
+
+        res.on('close', () => {
+            console.log(`[SSE] Client disconnected for lesson ${lessonId}`);
+            streamEnded = true;
+        });
+
+        try {
+            // 1. Get data & Prepare prompts using helpers
+            const context = await this._getRecommendationContext(lessonId);
+            const { systemPrompt, userMessage } = this._prepareOpenAiPrompts(context, count);
+
+            // 2. Call OpenAI with stream: true
+            const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+            // Explicitly type parameters and ensure stream is true
+            const openAiParams: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
+                model: "gpt-4",
+                messages: [systemPrompt, userMessage],
+                temperature: 0.7,
+                max_tokens: 2000,
+                stream: true, // Explicitly true for type inference
+            };
+
+            // Always log the exact parameters object being sent (excluding API key)
+            // Remove log-specific modifications and pretty-printing
+            console.log(`[OpenAI] Calling chat.completions.create with params: ${JSON.stringify(openAiParams)}`);
+            // Note: Logging the full messages array content can significantly increase log size.
+
+            const stream = await openai.chat.completions.create(openAiParams);
+            // Now TypeScript knows `stream` is definitely an AsyncIterable
+
+            if (!streamEnded) {
+                res.write(`event: message\ndata: ${JSON.stringify({ status: 'AI stream started...' })} \n\n`);
+            }
+
+            // 3. Process stream chunk by chunk, parsing complete objects in real-time
+            let buffer = '';
+            let recommendationCount = 0;
+
+            for await (const chunk of stream) {
+                if (streamEnded) break;
+                const contentDelta = chunk.choices[0]?.delta?.content || '';
+                // Restore chunk logging - Conditionally log
+                if (LOG_STREAMING_DETAILS) {
+                    console.log(`[SSE Chunk][${Date.now()}] Delta: '${contentDelta}'`);
+                }
+                buffer += contentDelta;
+                // Conditionally log buffer state
+                // if (LOG_STREAMING_DETAILS) {
+                //     console.log(`[SSE Buffer] Current buffer: '${buffer}'`); // Debug log
+                // }
+
+                // Try to process complete objects from the buffer
+                let objectFound = true;
+                while (objectFound) {
+                    objectFound = false; // Assume no object found in this pass
+                    const objectStartIndex = buffer.indexOf('{');
+                    if (objectStartIndex === -1) {
+                        // No object start found, wait for more data
+                        break;
+                    }
+
+                    // Discard anything before the first potential object starts
+                    // (handles leading whitespace, commas, or array brackets)
+                    if (objectStartIndex > 0) {
+                        buffer = buffer.substring(objectStartIndex);
+                    }
+
+                    let braceLevel = 0;
+                    let objectEndIndex = -1;
+                    for (let i = 0; i < buffer.length; i++) {
+                        if (buffer[i] === '{') {
+                            braceLevel++;
+                        } else if (buffer[i] === '}') {
+                            braceLevel--;
+                            if (braceLevel === 0) {
+                                objectEndIndex = i;
+                                break; // Found the matching closing brace
+                            }
+                        } else if (braceLevel < 0) {
+                            // Should not happen with well-formed JSON, but reset defensively
+                            console.warn('[SSE] Resetting brace level due to unexpected negative value.');
+                            braceLevel = 0;
+                            break; // Stop scanning this potential object
+                        }
+                    }
+
+                    if (objectEndIndex !== -1) {
+                        // Potential complete object found
+                        const objectStr = buffer.substring(0, objectEndIndex + 1);
+                        try {
+                            const parsedObject = JSON.parse(objectStr);
+                            // Check for expected structure ({ goal: {...} })
+                            if (parsedObject && typeof parsedObject.goal === 'object') {
+                                const recommendation = new GoalRecommendation(parsedObject);
+                                recommendationCount++;
+                                if (!streamEnded) {
+                                    const beforeWriteTs = Date.now();
+                                    // Conditionally log pre/post write details
+                                    if (LOG_STREAMING_DETAILS) {
+                                        console.log(`[SSE][${beforeWriteTs}]PRE - WRITE recommendation #${recommendationCount}: ${recommendation.title} `);
+                                    }
+                                    res.write(`event: recommendation\ndata: ${JSON.stringify(recommendation)} \n\n`);
+                                    const afterWriteTs = Date.now();
+                                    // Conditionally log post-write details
+                                    if (LOG_STREAMING_DETAILS) {
+                                        console.log(`[SSE][${afterWriteTs}]POST - WRITE recommendation #${recommendationCount} (Write took ${afterWriteTs - beforeWriteTs}ms)`);
+                                    }
+                                }
+                                // Remove the successfully processed object from the buffer
+                                buffer = buffer.substring(objectEndIndex + 1).trimStart();
+                                // Remove potential leading comma after the object
+                                if (buffer.startsWith(',')) {
+                                    buffer = buffer.substring(1).trimStart();
+                                }
+                                objectFound = true; // Signal that we found and processed an object, loop again
+                            } else {
+                                // Parsed JSON but not the shape we expect, might be incomplete array wrapper? Wait.
+                                // console.log('[SSE] Parsed object, but no .goal property. Buffer:', buffer);
+                                break; // Wait for more data
+                            }
+                        } catch (e) {
+                            // JSON parse failed, likely incomplete object, wait for more data
+                            // console.log('[SSE] Incomplete JSON, waiting for more data. Buffer:', buffer);
+                            break; // Wait for more data
+                        }
+                    } else {
+                        // No closing brace found yet for the current starting brace
+                        // Wait for more data
+                        break;
+                    }
+                } // end while(objectFound)
+            } // end for await...of stream
+
+            openAiStreamFinished = true;
+            console.log(`[SSE] OpenAI stream finished processing loop for lesson ${lessonId}.Sent ${recommendationCount} recommendations.`);
+
+            // Final check on buffer - should ideally be empty or just whitespace/array end bracket
+            // Conditionally log remaining buffer warning
+            if (LOG_STREAMING_DETAILS && buffer.trim().length > 0 && buffer.trim() !== ']') {
+                console.warn(`[SSE] Final remaining buffer content: '${buffer}'`);
+            }
+
+            // 4. Send end event
+            if (!streamEnded) {
+                res.write(`event: end\ndata: ${JSON.stringify({ message: 'Stream finished successfully.', count: recommendationCount })} \n\n`);
+                console.log(`[SSE] Sent end event for lesson ${lessonId}`);
+            }
+
+        } catch (error) {
+            const processingError = error instanceof Error ? error : new Error(String(error));
+            console.error(`[SSE] Error during stream for lesson ${lessonId}: `, processingError);
+            if (!streamEnded && !res.writableEnded) {
+                try {
+                    res.write(`event: error\ndata: ${JSON.stringify({ message: processingError.message })} \n\n`);
+                } catch (writeError) {
+                    console.error("[SSE] Failed to write error event to stream:", writeError);
+                }
+            }
+        } finally {
+            // 7. Ensure connection is closed
+            if (!streamEnded && !res.writableEnded) {
+                res.end();
+                console.log(`[SSE] Connection ended via finally block for lesson ${lessonId}(OpenAI stream finished: ${openAiStreamFinished})`);
+            } else {
+                console.log(`[SSE] Connection already ended for lesson ${lessonId}(OpenAI stream finished: ${openAiStreamFinished}), not calling res.end() again.`);
+            }
         }
     }
 }; 
