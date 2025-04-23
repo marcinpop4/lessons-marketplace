@@ -267,59 +267,42 @@ const TeacherLessonDetailsPage: React.FC = () => {
 
             <TeacherLessonDetailCard lesson={lesson} />
 
-            {!isLessonDefined ? (
-                <>
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mt-6 mb-4">Manage Goals</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mt-6 mb-4">Manage Goals</h2>
 
-                    <AddGoalForm
-                        lessonId={lessonId}
-                        onGoalAdded={handleGoalAdded}
-                        onGenerateRecommendations={handleGetRecommendations}
-                        isGeneratingRecommendations={isGeneratingRecommendations}
-                        recommendationError={recommendationError}
-                        initialData={selectedRecommendationData}
-                        recommendations={recommendations}
-                        onSelectRecommendation={handleSelectRecommendation}
-                        desiredCount={RECOMMENDATION_COUNT}
-                        isStreaming={isGeneratingRecommendations && !isStreamingComplete}
-                    />
+            <AddGoalForm
+                lessonId={lessonId}
+                onGoalAdded={handleGoalAdded}
+                onGenerateRecommendations={handleGetRecommendations}
+                isGeneratingRecommendations={isGeneratingRecommendations}
+                recommendationError={recommendationError}
+                initialData={selectedRecommendationData}
+                recommendations={recommendations}
+                onSelectRecommendation={handleSelectRecommendation}
+                desiredCount={RECOMMENDATION_COUNT}
+                isStreaming={isGeneratingRecommendations && !isStreamingComplete}
+            />
 
-                    <GoalManager
-                        initialGoals={goals}
-                        lessonId={lessonId}
-                        onGoalsChange={handleGoalsChange}
-                    />
+            <GoalManager
+                initialGoals={goals}
+                lessonId={lessonId}
+                onGoalsChange={handleGoalsChange}
+            />
 
-                    <div className="flex justify-end space-x-3 mt-6">
-                        <Button variant="secondary" onClick={handleCancel} disabled={isSaving}>
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="primary"
-                            onClick={handleSaveAndDefine}
-                            disabled={!goals.some(g => g.currentStatus?.status !== GoalStatusValue.ABANDONED) || isSaving}
-                        >
-                            {isSaving ? 'Saving...' : 'Save and Define Lesson'}
-                        </Button>
-                    </div>
-                    {error && isSaving && <p className="text-red-500 text-right mt-2">Save Error: {error}</p>}
-                </>
-            ) : (
-                <div className="mt-6 p-4 border border-yellow-300 bg-yellow-50 rounded-md dark:bg-yellow-900/[.3] dark:border-yellow-700">
-                    <p className="text-yellow-800 dark:text-yellow-200">This lesson has already been defined. Goals can no longer be added or modified.</p>
-                    <GoalManager
-                        initialGoals={goals}
-                        lessonId={lessonId}
-                        onGoalsChange={() => { }}
-                        readOnly={true}
-                    />
-                    <div className="flex justify-end mt-4">
-                        <Button variant="secondary" onClick={handleCancel}>
-                            Back to Lessons
-                        </Button>
-                    </div>
-                </div>
-            )}
+            <div className="flex justify-end space-x-3 mt-6">
+                <Button variant="secondary" onClick={handleCancel} disabled={isSaving}>
+                    Cancel
+                </Button>
+                {!isLessonDefined && (
+                    <Button
+                        variant="primary"
+                        onClick={handleSaveAndDefine}
+                        disabled={!goals.some(g => g.currentStatus?.status !== GoalStatusValue.ABANDONED) || isSaving}
+                    >
+                        {isSaving ? 'Saving...' : 'Save and Define Lesson'}
+                    </Button>
+                )}
+            </div>
+            {error && isSaving && <p className="text-red-500 text-right mt-2">Save Error: {error}</p>}
         </div>
     );
 };

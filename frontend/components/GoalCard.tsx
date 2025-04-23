@@ -53,12 +53,11 @@ const NotesModal: React.FC<NotesModalProps> = ({ isOpen, onClose, onConfirm, goa
 };
 
 interface GoalCardProps {
-    goal: Goal; // Receives the full Goal object, including currentStatus object
+    goal: Goal;
     onUpdateStatus: (goalId: string, transition: GoalStatusTransition, context?: any) => void;
     isUpdating: boolean;
     onDelete: (goalId: string) => void;
     isDeleting: boolean;
-    readOnly?: boolean; // Add readOnly prop
 }
 
 // Helper function to truncate text
@@ -74,8 +73,7 @@ const GoalCard: React.FC<GoalCardProps> = ({
     onUpdateStatus,
     isUpdating,
     onDelete,
-    isDeleting,
-    readOnly = false // Default to false
+    isDeleting
 }) => {
     // --- State for Modal ---
     const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
@@ -177,8 +175,7 @@ const GoalCard: React.FC<GoalCardProps> = ({
                 )}
 
                 <div className="flex space-x-2 justify-end pt-2 border-t border-gray-200 dark:border-gray-700">
-                    {/* Only show action buttons if not readOnly */}
-                    {!readOnly && availableTransitions.map(transition => (
+                    {availableTransitions.map(transition => (
                         <Button
                             key={transition}
                             variant={getButtonVariant(transition)}
@@ -189,7 +186,7 @@ const GoalCard: React.FC<GoalCardProps> = ({
                             {formatTransition(transition)}
                         </Button>
                     ))}
-                    {!readOnly && canAbandon && (
+                    {canAbandon && (
                         <Button
                             variant="secondary"
                             size="sm"

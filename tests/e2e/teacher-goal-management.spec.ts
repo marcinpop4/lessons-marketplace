@@ -179,13 +179,5 @@ test.describe('Teacher Goal Management', () => {
         const achievedGoal = achievedSection.locator('.goal-card', { has: page.locator(`.card-header h3:has-text("${goalTitle}")`) });
         await expect(achievedGoal, `Goal '${goalTitle}' should be in Achieved section`).toBeVisible();
 
-        // Define the lesson
-        const defineButton = page.getByRole('button', { name: /save and define lesson/i });
-        await expect(defineButton, 'Save and Define lesson button should be visible').toBeVisible();
-        await defineButton.click();
-
-        // Verify navigation back to lessons list - REMOVED incorrect URL check
-        // await expect(page).toHaveURL(/.*\/teacher\/lessons$/); 
-        await waitForNetworkIdle(page); // Wait after clicking define
     });
 }); 

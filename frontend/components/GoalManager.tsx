@@ -10,7 +10,6 @@ interface GoalManagerProps {
     initialGoals: Goal[];
     lessonId: string;
     onGoalsChange: (goals: Goal[]) => void;
-    readOnly?: boolean;
 }
 
 const statusDisplayOrder: GoalStatusValue[] = [
@@ -44,7 +43,7 @@ const createGoalModelFromData = (goalData: any): Goal => {
     return new Goal({ ...goalData, currentStatus: currentStatusInstance });
 };
 
-const GoalManager: React.FC<GoalManagerProps> = ({ initialGoals, lessonId, onGoalsChange, readOnly = false }) => {
+const GoalManager: React.FC<GoalManagerProps> = ({ initialGoals, lessonId, onGoalsChange }) => {
     const [updatingGoalId, setUpdatingGoalId] = useState<string | null>(null);
     const [deletingGoalId, setDeletingGoalId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -130,7 +129,6 @@ const GoalManager: React.FC<GoalManagerProps> = ({ initialGoals, lessonId, onGoa
                                         isUpdating={updatingGoalId === goal.id}
                                         onDelete={handleDeleteGoal}
                                         isDeleting={deletingGoalId === goal.id}
-                                        readOnly={readOnly}
                                     />
                                 ))}
                             </div>
