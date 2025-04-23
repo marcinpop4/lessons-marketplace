@@ -13,9 +13,9 @@ import type {
   TeacherLessonHourlyRate as DbTeacherLessonHourlyRate
 } from '@prisma/client';
 
-// Define the expected nested structure from Prisma include
-// This mirrors DbLessonWithRelations from TeacherService, consider sharing?
-type DbLessonWithNestedRelations = DbLesson & {
+// Define the type for Prisma Lesson with required nested relations
+// Export this type so it can be imported by services
+export type DbLessonWithNestedRelations = DbLesson & {
   currentStatus: DbLessonStatus | null;
   quote: (DbLessonQuote & {
     teacher: DbTeacher & { teacherLessonHourlyRates?: DbTeacherLessonHourlyRate[] },

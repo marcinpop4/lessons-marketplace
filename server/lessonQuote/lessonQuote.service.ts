@@ -9,113 +9,89 @@ import { Student } from '../../shared/models/Student.js';
 import { Address } from '../../shared/models/Address.js';
 import { Prisma } from '@prisma/client';
 
+// Define Prisma types for includes required by fromDb methods used below
+// Type for Teacher with nested rates
+type DbTeacherWithRates = Prisma.TeacherGetPayload<{ include: { teacherLessonHourlyRates: true } }>;
+// Type for LessonRequest with nested student and address
+type DbLessonRequestWithRelations = Prisma.LessonRequestGetPayload<{ include: { student: true, address: true } }>;
+
 class LessonQuoteService {
     private readonly prisma = prisma;
 
     /**
      * Create a single lesson quote directly.
      * @param quoteData - Data for creating the quote
-     * @returns The created quote
+     * @returns The created LessonQuote shared model instance or null on error
      */
     async create(quoteData: {
         lessonRequestId: string;
         teacherId: string;
         costInCents: number;
         hourlyRateInCents: number;
-    }) {
+    }): Promise<LessonQuote | null> {
         try {
             // Create the quote
-            const quote = await this.prisma.lessonQuote.create({
+            const dbQuote = await this.prisma.lessonQuote.create({
                 data: {
                     lessonRequest: { connect: { id: quoteData.lessonRequestId } },
                     teacher: { connect: { id: quoteData.teacherId } },
                     costInCents: quoteData.costInCents,
                     hourlyRateInCents: quoteData.hourlyRateInCents
                 },
+                // Fetch relations needed for LessonQuote.fromDb
                 include: {
-                    teacher: true,
-                    lessonRequest: {
-                        include: {
-                            address: true,
-                            student: true
-                        }
-                    }
+                    teacher: { include: { teacherLessonHourlyRates: true } },
+                    lessonRequest: { include: { student: true, address: true } }
                 }
             });
 
-            return quote;
+            // Use factory method
+            // Type casting needed because Prisma's include doesn't perfectly narrow the type
+            return LessonQuote.fromDb(
+                dbQuote,
+                dbQuote.teacher as DbTeacherWithRates, // Use helper type cast
+                dbQuote.lessonRequest as DbLessonRequestWithRelations // Use helper type cast
+            );
+
         } catch (error) {
             console.error('Error creating quote:', error);
-            throw new Error(`Failed to create quote: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            // Return null or re-throw depending on desired error handling
+            // Returning null for consistency with other potential error paths
+            return null;
         }
     }
 
     /**
      * Get available teachers for a lesson type
      * @param lessonType - Type of lesson
-     * @returns Array of available teachers
+     * @returns Array of available teachers (shared models)
      */
     async getAvailableTeachers(lessonType: LessonType): Promise<Teacher[]> {
         const dbTeachers = await this.prisma.teacher.findMany({
             where: {
                 teacherLessonHourlyRates: {
-                    some: {
-                        type: lessonType,
-                        deactivatedAt: null
-                    }
+                    some: { type: lessonType, deactivatedAt: null }
                 }
             },
             include: {
-                teacherLessonHourlyRates: {
-                    where: {
-                        type: lessonType,
-                        deactivatedAt: null
-                    }
-                }
+                teacherLessonHourlyRates: { where: { type: lessonType, deactivatedAt: null } }
             },
             take: 5
         });
-
-        // Map database teachers to domain model
-        return dbTeachers.map(dbTeacher => {
-            const teacher = new Teacher({
-                id: dbTeacher.id,
-                firstName: dbTeacher.firstName,
-                lastName: dbTeacher.lastName,
-                email: dbTeacher.email,
-                phoneNumber: dbTeacher.phoneNumber,
-                dateOfBirth: dbTeacher.dateOfBirth
-            });
-
-            // Add hourly rates to teacher
-            dbTeacher.teacherLessonHourlyRates.forEach(rate => {
-                teacher.addHourlyRate(
-                    new TeacherLessonHourlyRate({
-                        id: rate.id,
-                        teacherId: rate.teacherId,
-                        type: rate.type,
-                        rateInCents: rate.rateInCents,
-                        deactivatedAt: rate.deactivatedAt ? new Date(rate.deactivatedAt) : undefined,
-                        createdAt: new Date(rate.createdAt)
-                    })
-                );
-            });
-
-            return teacher;
-        });
+        // Use Teacher.fromDb, Remove unnecessary cast for rates
+        return dbTeachers.map(dbTeacher => Teacher.fromDb(dbTeacher, dbTeacher.teacherLessonHourlyRates));
     }
 
     /**
      * Create quotes for a lesson request from available teachers
      * @param lessonRequestId - ID of the lesson request
      * @param lessonType - Type of lesson
-     * @returns Array of created quotes
+     * @returns Array of created LessonQuote shared models
      */
     async createQuotesForLessonRequest(
         lessonRequestId: string,
         lessonType: LessonType
     ): Promise<LessonQuote[]> {
-        // Get the lesson request with all necessary data
         const dbLessonRequest = await this.prisma.lessonRequest.findUnique({
             where: { id: lessonRequestId },
             include: {
@@ -128,168 +104,65 @@ class LessonQuoteService {
             throw new Error(`Lesson request with ID ${lessonRequestId} not found`);
         }
 
-        // Transform student data
-        const student = new Student({
-            id: dbLessonRequest.student.id,
-            firstName: dbLessonRequest.student.firstName,
-            lastName: dbLessonRequest.student.lastName,
-            email: dbLessonRequest.student.email,
-            phoneNumber: dbLessonRequest.student.phoneNumber,
-            dateOfBirth: new Date(dbLessonRequest.student.dateOfBirth)
-        });
+        // Use LessonRequest.fromDb - Remove unnecessary casts for student and address
+        // The include ensures dbLessonRequest.student and dbLessonRequest.address are not null and have the correct structure
+        const lessonRequest = LessonRequest.fromDb(
+            dbLessonRequest,
+            dbLessonRequest.student,
+            dbLessonRequest.address
+        );
 
-        // Transform address data
-        const address = new Address({
-            street: dbLessonRequest.address.street,
-            city: dbLessonRequest.address.city,
-            state: dbLessonRequest.address.state,
-            postalCode: dbLessonRequest.address.postalCode,
-            country: dbLessonRequest.address.country
-        });
-
-        // Create LessonRequest model
-        const lessonRequest = new LessonRequest({
-            id: dbLessonRequest.id,
-            type: dbLessonRequest.type as LessonType,
-            startTime: new Date(dbLessonRequest.startTime),
-            durationMinutes: dbLessonRequest.durationMinutes,
-            address: address,
-            student: student
-        });
-
-        // Get available teachers (limited to 5)
+        // Get available teachers (already returns Teacher[] instances)
         const availableTeachers = await this.getAvailableTeachers(lessonType);
 
         if (availableTeachers.length === 0) {
             return [];
         }
 
-        // Create quotes for each available teacher
-        const dbQuotes = await Promise.all(
-            availableTeachers.map(async (dbTeacher) => {
-                const teacherModel = new Teacher({
-                    id: dbTeacher.id,
-                    firstName: dbTeacher.firstName,
-                    lastName: dbTeacher.lastName,
-                    email: dbTeacher.email,
-                    phoneNumber: dbTeacher.phoneNumber,
-                    dateOfBirth: new Date(dbTeacher.dateOfBirth),
-                    hourlyRates: dbTeacher.hourlyRates.map(rate => new TeacherLessonHourlyRate({
-                        id: rate.id,
-                        teacherId: rate.teacherId,
-                        type: rate.type,
-                        rateInCents: rate.rateInCents,
-                        deactivatedAt: rate.deactivatedAt ? new Date(rate.deactivatedAt) : undefined,
-                        createdAt: new Date(rate.createdAt)
-                    }))
-                });
-
-                const hourlyRate = teacherModel.getHourlyRate(lessonRequest.type);
-                if (!hourlyRate) {
-                    console.error(`No hourly rate found for teacher ${teacherModel.id} for lesson type ${lessonRequest.type}`);
-                    return null;
-                }
-
-                // Calculate cost based on lesson duration and hourly rate
-                const costInCents = hourlyRate.calculateCostForDuration(lessonRequest.durationMinutes);
-
-                const quote = await this.prisma.lessonQuote.create({
+        // Create Prisma quote records
+        const creationPromises = availableTeachers.map(async (teacher) => {
+            const hourlyRate = teacher.getHourlyRate(lessonRequest.type);
+            if (!hourlyRate) {
+                console.error(`No active hourly rate found for teacher ${teacher.id} for lesson type ${lessonRequest.type}. Skipping quote.`);
+                return null; // Skip this teacher
+            }
+            const costInCents = hourlyRate.calculateCostForDuration(lessonRequest.durationMinutes);
+            try {
+                await this.prisma.lessonQuote.create({
                     data: {
                         lessonRequest: { connect: { id: lessonRequestId } },
-                        teacher: { connect: { id: teacherModel.id } },
+                        teacher: { connect: { id: teacher.id } },
                         costInCents,
                         hourlyRateInCents: hourlyRate.rateInCents,
-                    },
-                    include: {
-                        teacher: {
-                            include: {
-                                teacherLessonHourlyRates: true
-                            }
-                        },
-                        lessonRequest: {
-                            include: {
-                                student: true,
-                                address: true
-                            }
-                        }
                     }
                 });
-
-                return quote;
-            })
-        );
-
-        // Filter out any null results (teachers without rates)
-        const createdQuotes = (await dbQuotes).filter(quote => quote !== null);
-
-        if (!createdQuotes || createdQuotes.length === 0) {
-            return [];
-        }
-
-        // Convert database quotes to domain model
-        return createdQuotes.map(dbQuote => {
-            // dbQuote already contains nested lessonRequest and teacher with their relations
-
-            // Transform student data from nested structure
-            const studentModel = new Student({
-                id: dbQuote.lessonRequest.student.id,
-                firstName: dbQuote.lessonRequest.student.firstName,
-                lastName: dbQuote.lessonRequest.student.lastName,
-                email: dbQuote.lessonRequest.student.email,
-                phoneNumber: dbQuote.lessonRequest.student.phoneNumber,
-                dateOfBirth: dbQuote.lessonRequest.student.dateOfBirth
-            });
-
-            // Transform address data from nested structure
-            const addressModel = new Address({
-                id: dbQuote.lessonRequest.address.id, // Include ID if needed
-                street: dbQuote.lessonRequest.address.street,
-                city: dbQuote.lessonRequest.address.city,
-                state: dbQuote.lessonRequest.address.state,
-                postalCode: dbQuote.lessonRequest.address.postalCode,
-                country: dbQuote.lessonRequest.address.country,
-                createdAt: dbQuote.lessonRequest.address.createdAt, // Include timestamps if needed
-                updatedAt: dbQuote.lessonRequest.address.updatedAt,
-            });
-
-            // Create LessonRequest model from nested structure
-            const lessonRequestModel = new LessonRequest({
-                id: dbQuote.lessonRequest.id,
-                type: dbQuote.lessonRequest.type as LessonType,
-                startTime: new Date(dbQuote.lessonRequest.startTime),
-                durationMinutes: dbQuote.lessonRequest.durationMinutes,
-                address: addressModel,
-                student: studentModel
-            });
-
-            // Transform teacher data from nested structure
-            const teacherModel = new Teacher({
-                id: dbQuote.teacher.id,
-                firstName: dbQuote.teacher.firstName,
-                lastName: dbQuote.teacher.lastName,
-                email: dbQuote.teacher.email,
-                phoneNumber: dbQuote.teacher.phoneNumber,
-                dateOfBirth: new Date(dbQuote.teacher.dateOfBirth),
-                hourlyRates: dbQuote.teacher.teacherLessonHourlyRates.map(rate => new TeacherLessonHourlyRate({
-                    id: rate.id,
-                    teacherId: rate.teacherId,
-                    type: rate.type,
-                    rateInCents: rate.rateInCents,
-                    deactivatedAt: rate.deactivatedAt ? new Date(rate.deactivatedAt) : undefined,
-                    createdAt: new Date(rate.createdAt)
-                }))
-            });
-
-            return new LessonQuote({
-                id: dbQuote.id,
-                lessonRequest: lessonRequestModel,
-                teacher: teacherModel,
-                costInCents: dbQuote.costInCents,
-                hourlyRateInCents: dbQuote.hourlyRateInCents!, // Assuming not null based on logic
-                createdAt: new Date(dbQuote.createdAt),
-                updatedAt: new Date(dbQuote.updatedAt),
-            });
+                return teacher.id; // Indicate success
+            } catch (error) {
+                console.error(`Failed to create quote for teacher ${teacher.id}:`, error);
+                return null; // Indicate failure
+            }
         });
+
+        await Promise.all(creationPromises);
+
+        // Fetch all successfully created quotes for the request ID with includes needed for LessonQuote.fromDb
+        const dbQuotes = await this.prisma.lessonQuote.findMany({
+            where: { lessonRequestId: lessonRequestId },
+            include: {
+                teacher: { include: { teacherLessonHourlyRates: true } },
+                lessonRequest: { include: { student: true, address: true } }
+            }
+        });
+
+        // Use LessonQuote.fromDb to transform the results
+        // Keep casts using helper types here as nested structure is complex
+        return dbQuotes.map(dbQuote =>
+            LessonQuote.fromDb(
+                dbQuote,
+                dbQuote.teacher as DbTeacherWithRates, // Keep helper type cast
+                dbQuote.lessonRequest as DbLessonRequestWithRelations // Keep helper type cast
+            )
+        );
     }
 
     /**
@@ -316,89 +189,28 @@ class LessonQuoteService {
     /**
      * Get all quotes for a lesson request
      * @param lessonRequestId - ID of the lesson request
-     * @returns Array of quotes with teacher information
+     * @returns Array of LessonQuote shared model instances
      */
     async getQuotesByLessonRequest(lessonRequestId: string): Promise<LessonQuote[]> {
         const dbQuotes = await this.prisma.lessonQuote.findMany({
             where: { lessonRequestId },
             include: {
-                teacher: {
-                    include: {
-                        teacherLessonHourlyRates: true
-                    }
-                },
-                lessonRequest: {
-                    include: {
-                        student: true,
-                        address: true
-                    }
-                }
+                // Include relations needed by LessonQuote.fromDb
+                teacher: { include: { teacherLessonHourlyRates: true } },
+                lessonRequest: { include: { student: true, address: true } }
             },
             orderBy: { createdAt: 'desc' }
         });
 
-        // Convert database quotes to domain model
-        return dbQuotes.map(dbQuote => {
-            // Transform student data from nested structure
-            const studentModel = new Student({
-                id: dbQuote.lessonRequest.student.id,
-                firstName: dbQuote.lessonRequest.student.firstName,
-                lastName: dbQuote.lessonRequest.student.lastName,
-                email: dbQuote.lessonRequest.student.email,
-                phoneNumber: dbQuote.lessonRequest.student.phoneNumber,
-                dateOfBirth: new Date(dbQuote.lessonRequest.student.dateOfBirth)
-            });
-
-            // Transform address data from nested structure
-            const addressModel = new Address({
-                id: dbQuote.lessonRequest.address.id, // Include ID if needed
-                street: dbQuote.lessonRequest.address.street,
-                city: dbQuote.lessonRequest.address.city,
-                state: dbQuote.lessonRequest.address.state,
-                postalCode: dbQuote.lessonRequest.address.postalCode,
-                country: dbQuote.lessonRequest.address.country,
-                createdAt: dbQuote.lessonRequest.address.createdAt, // Include timestamps if needed
-                updatedAt: dbQuote.lessonRequest.address.updatedAt,
-            });
-
-            // Create LessonRequest model from nested structure
-            const lessonRequestModel = new LessonRequest({
-                id: dbQuote.lessonRequest.id,
-                type: dbQuote.lessonRequest.type as LessonType,
-                startTime: new Date(dbQuote.lessonRequest.startTime),
-                durationMinutes: dbQuote.lessonRequest.durationMinutes,
-                address: addressModel,
-                student: studentModel
-            });
-
-            // Transform teacher data from nested structure
-            const teacherModel = new Teacher({
-                id: dbQuote.teacher.id,
-                firstName: dbQuote.teacher.firstName,
-                lastName: dbQuote.teacher.lastName,
-                email: dbQuote.teacher.email,
-                phoneNumber: dbQuote.teacher.phoneNumber,
-                dateOfBirth: new Date(dbQuote.teacher.dateOfBirth),
-                hourlyRates: dbQuote.teacher.teacherLessonHourlyRates.map(rate => new TeacherLessonHourlyRate({
-                    id: rate.id,
-                    teacherId: rate.teacherId,
-                    type: rate.type,
-                    rateInCents: rate.rateInCents,
-                    deactivatedAt: rate.deactivatedAt ? new Date(rate.deactivatedAt) : undefined,
-                    createdAt: new Date(rate.createdAt)
-                }))
-            });
-
-            return new LessonQuote({
-                id: dbQuote.id,
-                lessonRequest: lessonRequestModel,
-                teacher: teacherModel,
-                costInCents: dbQuote.costInCents,
-                hourlyRateInCents: dbQuote.hourlyRateInCents!, // Assuming not null
-                createdAt: new Date(dbQuote.createdAt),
-                updatedAt: new Date(dbQuote.updatedAt),
-            });
-        });
+        // Use LessonQuote.fromDb to transform the results
+        // Add type casts for nested relations using helper types
+        return dbQuotes.map(dbQuote =>
+            LessonQuote.fromDb(
+                dbQuote,
+                dbQuote.teacher as DbTeacherWithRates, // Use helper type cast
+                dbQuote.lessonRequest as DbLessonRequestWithRelations // Use helper type cast
+            )
+        );
     }
 }
 

@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
-import { Goal, GoalStatus, GoalStatusTransition, GoalStatusValue, DbGoalWithStatus } from '../../shared/models/index.js';
+import { Goal, GoalStatus, GoalStatusTransition, GoalStatusValue, DbGoalWithStatus, Lesson } from '../../shared/models/index.js';
+import { DbLessonWithNestedRelations } from '../../shared/models/Lesson.js';
 import { randomUUID } from 'crypto';
 // import { AppError } from '../utils/AppError.js'; // Old import
 import { NotFoundError } from '../errors/NotFoundError.js';
@@ -11,54 +12,12 @@ import { teacherService } from '../teacher/teacher.service.js';
 import prisma from '../prisma.js';
 import { LessonType } from '../../shared/models/LessonType.js';
 
-// Type for Lesson with goals included
-type LessonWithGoals = Prisma.LessonGetPayload<{
-    include: {
-        quote: {
-            include: {
-                lessonRequest: {
-                    include: {
-                        student: true;
-                        address: true;
-                    };
-                };
-                teacher: true;
-            };
-        };
-        goals: {
-            include: {
-                currentStatus: true;
-            };
-        };
-    };
-}>;
+// Remove unused Prisma payload type definition
+// type LessonWithGoals = Prisma.LessonGetPayload<{ ... }>;
 
-// Types for API responses
-interface LessonResponse {
-    id: string;
-    quote: {
-        teacher: { id: string };
-        lessonRequest: {
-            student: { id: string };
-            type: LessonType;
-            startTime: string;
-            durationMinutes: number;
-        };
-    };
-    goals?: {
-        title: string;
-        description: string;
-        currentStatus?: {
-            status: GoalStatusValue;
-        };
-    }[];
-}
-
-interface StudentResponse {
-    firstName: string;
-    lastName: string;
-    dateOfBirth: string;
-}
+// Remove unused API response interfaces
+// interface LessonResponse { ... }
+// interface StudentResponse { ... }
 
 /**
  * Service layer for handling Goal-related operations.
@@ -258,65 +217,80 @@ export const goalService = {
     async generateGoalRecommendations(
         lessonId: string
     ): Promise<Array<{ goal: { title: string; description: string; numberOfLessons: number } }>> {
-        // Get the current lesson details through the lesson API
-        const lessonResponse = await fetch(`/api/v1/lessons/${lessonId}`);
-        if (!lessonResponse.ok) {
+        // 1. Get the current lesson details via lessonService
+        const currentLesson = await lessonService.getLessonById(lessonId);
+        if (!currentLesson) {
+            // Throw NotFoundError if lesson isn't found
             throw new NotFoundError(`Lesson with ID ${lessonId} not found`);
         }
-        const lesson = await lessonResponse.json() as LessonResponse;
 
-        const studentId = lesson.quote.lessonRequest.student.id;
-        const teacherId = lesson.quote.teacher.id;
+        // Get IDs needed for other services (now directly from the Lesson model)
+        const studentId = currentLesson.quote.lessonRequest.student.id;
+        const teacherId = currentLesson.quote.teacher.id;
 
-        // Get student details through the student API
-        const studentResponse = await fetch(`/api/v1/students/${studentId}`);
-        if (!studentResponse.ok) {
+        // 2. Get student details via studentService
+        const student = await studentService.findById(studentId);
+        if (!student) {
             throw new NotFoundError(`Student with ID ${studentId} not found`);
         }
-        const student = await studentResponse.json() as StudentResponse;
 
-        // Get teacher's lessons through the teacher API
-        const teacherLessonsResponse = await fetch(`/api/v1/teachers/${teacherId}/lessons`);
-        if (!teacherLessonsResponse.ok) {
-            throw new Error(`Failed to fetch teacher lessons`);
-        }
-        const allTeacherLessons = await teacherLessonsResponse.json() as LessonResponse[];
+        // 3. Get teacher's lessons via teacherService
+        const allTeacherLessons = await teacherService.findLessonsByTeacherId(teacherId);
 
-        // Filter lessons to get only this student's past lessons
+        // 4. Filter for this student's past lessons
         const pastLessons = allTeacherLessons
-            .filter((l: LessonResponse) =>
-                l.quote.lessonRequest.student.id === studentId &&
-                l.id !== lessonId
-            )
-            .sort((a: LessonResponse, b: LessonResponse) =>
+            .filter(l => l.quote.lessonRequest.student.id === studentId && l.id !== lessonId)
+            .sort((a, b) =>
                 new Date(b.quote.lessonRequest.startTime).getTime() -
                 new Date(a.quote.lessonRequest.startTime).getTime()
             );
 
+        // 5. Get goals specifically for the *current* lesson
+        const currentLessonGoals = await this.getGoalsByLessonId(lessonId);
+
+        // 6. Prepare data for OpenAI prompt using shared models
+        const promptData = {
+            // Pass student model directly (password is stripped in Student.fromDb)
+            student: student,
+            currentLesson: {
+                // Spread properties from the currentLesson model instance
+                ...currentLesson,
+                // Explicitly add the separately fetched goals
+                goals: currentLessonGoals.map(g => ({
+                    title: g.title,
+                    description: g.description,
+                    status: g.currentStatus.status
+                }))
+                // Note: This includes the full nested quote object. If the prompt
+                // becomes too large or performs poorly, we may need to select fewer fields.
+            },
+            // Pass pastLessons array directly (password stripped in Lesson -> Quote -> Student.fromDb)
+            pastLessons: pastLessons
+        };
+
+        // 7. Call OpenAI
         const openai = new OpenAI({
             apiKey: process.env.OPENAI_API_KEY
         });
 
-        const prompt = {
+        const systemPrompt = {
             role: "system",
-            content: `You are a helpful assistant that helps teachers come up with goals for one-on-one lessons. Based on the student info, current lesson details, and past lesson history, suggest 5 goals. Each goal should have a title, description, and estimated number of lessons to achieve it. Format your response as a JSON array of objects with the structure: { goal: { title: string, description: string, numberOfLessons: number } }`
+            content: `You are a helpful assistant that helps teachers come up with goals for one-on-one lessons. Based on the student info, current lesson details (including its existing goals), and past lesson history, suggest 5 new potential goals. Each goal should have a title, description, and estimated number of lessons to achieve it. Format your response as a JSON array of objects with the structure: { goal: { title: string, description: string, numberOfLessons: number } }`
         } as const;
 
         const userMessage = {
             role: "user",
-            content: JSON.stringify({
-                student,
-                currentLesson: lesson,
-                pastLessons
-            })
+            content: JSON.stringify(promptData) // Send the structured data from shared models
         } as const;
 
         try {
             const completion = await openai.chat.completions.create({
-                model: "gpt-4",
-                messages: [prompt, userMessage],
+                model: "gpt-4", // Consider newer/cheaper models if appropriate
+                messages: [systemPrompt, userMessage],
                 temperature: 0.7,
                 max_tokens: 2000,
+                // Ensure response format is JSON if available and desired
+                // response_format: { type: "json_object" }, // Uncomment if using compatible model
             });
 
             const response = completion.choices[0]?.message?.content;
@@ -324,7 +298,14 @@ export const goalService = {
                 throw new Error('No response from OpenAI');
             }
 
-            return JSON.parse(response);
+            // Attempt to parse the JSON response
+            try {
+                return JSON.parse(response);
+            } catch (parseError) {
+                console.error('Error parsing OpenAI JSON response:', parseError);
+                console.error('Raw OpenAI response:', response);
+                throw new Error('Failed to parse goal recommendations from OpenAI response');
+            }
         } catch (error) {
             console.error('Error generating goal recommendations:', error);
             throw new Error('Failed to generate goal recommendations');

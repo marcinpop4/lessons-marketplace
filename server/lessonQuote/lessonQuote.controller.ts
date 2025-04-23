@@ -131,10 +131,8 @@ export const lessonQuoteController = {
       // Use LessonService to create the lesson
       const createdLesson = await lessonService.create(quoteId);
 
-      // Transform the result before sending
-      const modelLesson = lessonController.transformToModel(createdLesson);
-
-      res.status(200).json(modelLesson);
+      // Send the Lesson model instance directly
+      res.status(200).json(createdLesson);
 
     } catch (error) {
       console.error('Error accepting quote:', error);

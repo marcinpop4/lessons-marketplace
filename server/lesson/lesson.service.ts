@@ -1,13 +1,21 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { LessonStatus, LessonStatusValue, LessonStatusTransition } from '../../shared/models/LessonStatus.js';
+import { Lesson, DbLessonWithNestedRelations } from '../../shared/models/Lesson.js';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../prisma.js';
 
-// Define the includes needed for the controller's transformToModel
-const lessonIncludeForTransform = {
+// Define the includes needed for transforming to a Lesson model via Lesson.fromDb
+const lessonIncludeForFromDb = {
+    // Include the relations required by DbLessonWithNestedRelations
+    currentStatus: true,
     quote: {
         include: {
-            teacher: true,
+            // Include relations required by LessonQuote.fromDb
+            teacher: {
+                include: {
+                    teacherLessonHourlyRates: true
+                }
+            },
             lessonRequest: {
                 include: {
                     student: true,
@@ -15,15 +23,12 @@ const lessonIncludeForTransform = {
                 }
             }
         }
-    },
-    // Include the lessonStatuses relation, ordered, to match transformToModel expectation
-    lessonStatuses: {
-        orderBy: {
-            createdAt: 'desc' as const
-        },
-        take: 1
     }
 };
+
+// Define the includes needed for the controller's transformToModel (if different and still used elsewhere)
+// For now, let's assume we primarily want the structure for Lesson.fromDb
+// const lessonIncludeForControllerTransform = { ... };
 
 class LessonService {
     private readonly prisma = prisma;
@@ -31,74 +36,66 @@ class LessonService {
     /**
      * Create a new lesson from a quote and set its initial status to REQUESTED
      * @param quoteId The ID of the quote to create a lesson from
-     * @returns The created lesson
-     * @throws Error if creation fails
+     * @returns The created Lesson shared model instance
+     * @throws Error if creation fails or lesson not found post-creation
      */
-    async create(quoteId: string) {
+    async create(quoteId: string): Promise<Lesson> { // Return non-nullable Lesson
         try {
-            // Use transaction to ensure both lesson and status are created
-            return await this.prisma.$transaction(async (tx) => {
-                // Fetch the quote with related data
+            // Run the transaction and get the lessonId back
+            const lessonId = await this.prisma.$transaction(async (tx) => {
                 const quote = await tx.lessonQuote.findUnique({
                     where: { id: quoteId },
-                    include: {
-                        teacher: true,
-                        lessonRequest: {
-                            include: {
-                                student: true,
-                                address: true
-                            }
-                        }
-                    }
+                    // No complex includes needed here, just check existence
                 });
 
                 if (!quote) {
+                    // Throw inside transaction to cause rollback
                     throw new Error(`Quote with ID ${quoteId} not found`);
                 }
 
-                // Generate lesson ID
-                const lessonId = uuidv4();
+                const currentLessonId = uuidv4();
 
-                // Create the lesson first (without status)
-                const lesson = await tx.lesson.create({
+                await tx.lesson.create({
                     data: {
-                        id: lessonId,
+                        id: currentLessonId,
                         quoteId: quote.id,
                     }
                 });
 
-                // Use the updateStatus method to set the initial status to REQUESTED
-                // Since we're in a transaction, we'll use the transaction context instead of prisma directly
-                const statusId = await this.updateStatusInternal(
+                // Set initial status, updateStatusInternal handles updating lesson.currentStatusId
+                await this.updateStatusInternal(
                     tx,
-                    lesson.id,
+                    currentLessonId,
                     LessonStatusValue.REQUESTED,
                     {}
                 );
 
-                // Return the lesson with all related data
-                const updatedLesson = await tx.lesson.findUnique({
-                    where: { id: lesson.id },
-                    include: {
-                        quote: {
-                            include: {
-                                teacher: true,
-                                lessonRequest: {
-                                    include: {
-                                        student: true,
-                                        address: true
-                                    }
-                                }
-                            }
-                        },
-                        lessonStatuses: true
-                    }
-                });
-
-                return updatedLesson;
+                // Return the lessonId from the successful transaction
+                return currentLessonId;
             });
+
+            // Fetch the created lesson AFTER the transaction using the returned ID
+            // Use findUniqueOrThrow to ensure it exists
+            const createdLessonData = await this.prisma.lesson.findUniqueOrThrow({
+                where: { id: lessonId },
+                include: lessonIncludeForFromDb // Include needed for Lesson.fromDb
+            });
+
+            // Instantiate the model
+            const lessonModel = Lesson.fromDb(createdLessonData as DbLessonWithNestedRelations);
+
+            // Check if model instantiation failed (e.g., fromDb returned null)
+            if (!lessonModel) {
+                console.error(`Failed to instantiate Lesson model from DB data for supposedly created lesson ID: ${lessonId}`);
+                throw new Error(`Data integrity issue: Failed to create Lesson model for ID ${lessonId}`);
+            }
+
+            return lessonModel;
+
         } catch (error) {
+            // Log the specific error during creation
             console.error(`Error creating lesson from quote ${quoteId}:`, error instanceof Error ? error.message : 'Unknown error');
+            // Re-throw the original error or a new one
             throw error;
         }
     }
@@ -116,7 +113,7 @@ class LessonService {
         lessonId: string,
         newStatusValue: LessonStatusValue,
         context: Record<string, unknown> = {}
-    ): Promise<void> {
+    ): Promise<string> {
         const newStatusId = uuidv4();
         await tx.lessonStatus.create({
             data: {
@@ -132,6 +129,9 @@ class LessonService {
             where: { id: lessonId },
             data: { currentStatusId: newStatusId }
         });
+
+        // Return the ID of the created status record
+        return newStatusId;
     }
 
     /**
@@ -150,18 +150,15 @@ class LessonService {
         transition: LessonStatusTransition,
         context: Record<string, unknown> = {},
         authenticatedUserId?: string // Optional user ID for authorization
-    ): Promise<any> {
+    ): Promise<Lesson | null> { // Return type remains nullable due to catch block
         try {
             return await this.prisma.$transaction(async (tx) => {
-                // Fetch the current lesson with its latest status
+                // Fetch the lesson, selecting the currentStatusId and quote for auth
                 const currentLesson = await tx.lesson.findUnique({
                     where: { id: lessonId },
-                    include: {
-                        quote: { select: { teacherId: true } }, // Need teacherId for auth check
-                        lessonStatuses: {
-                            orderBy: { createdAt: 'desc' },
-                            take: 1
-                        }
+                    select: {
+                        currentStatusId: true, // Select the ID field
+                        quote: { select: { teacherId: true } } // Still need quote for auth check
                     }
                 });
 
@@ -169,79 +166,104 @@ class LessonService {
                     throw new Error(`Lesson with ID ${lessonId} not found.`);
                 }
 
-                // Basic authorization: Check if the authenticated user is the teacher of this lesson
-                // Note: Add more robust authorization if students or other roles can perform actions
+                // Check if currentStatusId itself is missing
+                if (!currentLesson.currentStatusId) {
+                    // Throw the specific error message seen in logs
+                    throw new Error(`Lesson ${lessonId} is missing or has invalid status information.`);
+                }
+
+                // Basic authorization check
                 if (authenticatedUserId && currentLesson.quote?.teacherId !== authenticatedUserId) {
-                    throw new Error('Unauthorized: You are not the teacher for this lesson.'); // More specific error
+                    throw new Error('Unauthorized: You are not the teacher for this lesson.');
                 }
 
-                const currentStatusValue = currentLesson.lessonStatuses?.[0]?.status as LessonStatusValue;
-                if (!currentStatusValue) {
-                    throw new Error(`Could not determine current status for Lesson ID ${lessonId}.`);
-                }
+                // Fetch the current status record separately using the ID
+                const currentStatusRecord = await tx.lessonStatus.findUniqueOrThrow({
+                    where: { id: currentLesson.currentStatusId }
+                });
 
-                // Validate the requested transition
+                // Now get the status value from the fetched record
+                const currentStatusValue = currentStatusRecord.status as LessonStatusValue;
+
+                // Validate the requested transition using the explicitly fetched status
                 const newStatusValue = LessonStatus.getResultingStatus(currentStatusValue, transition);
                 if (!newStatusValue) {
                     throw new Error(`Invalid status transition '${transition}' for current status '${currentStatusValue}'.`);
                 }
 
-                // Proceed with updating the status internally using the VALIDATED newStatusValue
+                // Proceed with updating the status internally
                 await this.updateStatusInternal(tx, lessonId, newStatusValue, context);
 
-                // Fetch and return the fully updated lesson with necessary includes
-                const updatedLesson = await tx.lesson.findUnique({
+                // Fetch and return the fully updated lesson data using the standard include
+                const updatedLessonData = await tx.lesson.findUnique({
                     where: { id: lessonId },
-                    include: lessonIncludeForTransform // Use the defined include object
+                    include: lessonIncludeForFromDb // Use the include for fromDb for the final return
                 });
 
-                if (!updatedLesson) {
+                if (!updatedLessonData) {
+                    // This error handling remains important
                     throw new Error(`Failed to fetch updated lesson data for ID ${lessonId} after status update.`);
                 }
 
-                return updatedLesson;
+                // Instantiate and return the model
+                return Lesson.fromDb(updatedLessonData as DbLessonWithNestedRelations);
             });
         } catch (error) {
             console.error(`Error updating status for lesson ${lessonId} via transition ${transition}:`, error);
-            // Re-throw error with more specific message if possible
+            // If the specific error message is thrown, propagate it
+            if (error instanceof Error && error.message.includes('missing or has invalid status information')) {
+                throw new Error(error.message); // Re-throw specific error
+            }
+            // Otherwise, throw a generic error or handle differently
             throw new Error(`Failed to update lesson status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            // Or return null: return null;
         }
     }
 
     /**
-     * Get a lesson by ID with all related data needed for transformation
+     * Get a lesson by ID, returning the shared Lesson model instance.
      * @param lessonId The ID of the lesson to fetch
-     * @returns The lesson with transformation-required related data or null if not found
+     * @returns The shared Lesson model instance or null if not found
      */
-    async getLessonById(lessonId: string) {
+    async getLessonById(lessonId: string): Promise<Lesson | null> {
         try {
-            const lesson = await this.prisma.lesson.findUnique({
+            const lessonData = await this.prisma.lesson.findUnique({
                 where: { id: lessonId },
-                include: lessonIncludeForTransform // Use the shared include object
+                include: lessonIncludeForFromDb // Use the include for fromDb
             });
 
-            return lesson;
+            if (!lessonData) {
+                return null;
+            }
+
+            // Instantiate and return the model
+            return Lesson.fromDb(lessonData as DbLessonWithNestedRelations);
         } catch (error) {
             console.error(`Error fetching lesson ${lessonId}:`, error);
+            // Re-throw or return null based on desired error handling
             throw new Error(`Failed to fetch lesson: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 
     /**
-     * Get lessons by quote ID with all related data needed for transformation
+     * Get lessons by quote ID, returning shared Lesson model instances.
      * @param quoteId The ID of the quote
-     * @returns Array of lessons with transformation-required related data
+     * @returns Array of shared Lesson model instances
      */
-    async getLessonsByQuoteId(quoteId: string) {
+    async getLessonsByQuoteId(quoteId: string): Promise<Lesson[]> {
         try {
-            const lessons = await this.prisma.lesson.findMany({
+            const lessonsData = await this.prisma.lesson.findMany({
                 where: { quoteId },
-                include: lessonIncludeForTransform // Use the shared include object
+                include: lessonIncludeForFromDb // Use the include for fromDb
             });
 
-            return lessons;
+            // Instantiate models and filter out nulls
+            return lessonsData
+                .map(data => Lesson.fromDb(data as DbLessonWithNestedRelations))
+                .filter((lesson): lesson is Lesson => lesson !== null);
         } catch (error) {
             console.error(`Error fetching lessons for quote ${quoteId}:`, error);
+            // Re-throw or return empty array
             throw new Error(`Failed to fetch lessons by quote: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
@@ -252,5 +274,5 @@ class LessonService {
     // etc.
 }
 
-// Export a singleton instance
+// Export singleton instance
 export const lessonService = new LessonService(); 

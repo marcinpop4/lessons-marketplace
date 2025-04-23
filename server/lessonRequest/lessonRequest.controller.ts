@@ -1,10 +1,7 @@
 import type { Request, Response } from 'express';
 import { lessonRequestService } from './lessonRequest.service.js';
-import type { LessonRequest as PrismaLessonRequest } from '@prisma/client';
-import { LessonRequest } from '../../shared/models/LessonRequest.js';
-import { Address } from '../../shared/models/Address.js';
-import { Student } from '../../shared/models/Student.js';
 import { lessonQuoteService } from '../lessonQuote/lessonQuote.service.js';
+import { Address } from '../../shared/models/Address.js';
 
 export class LessonRequestController {
   constructor() {
@@ -12,40 +9,6 @@ export class LessonRequestController {
     this.createLessonRequest = this.createLessonRequest.bind(this);
     this.getLessonRequestById = this.getLessonRequestById.bind(this);
     this.getLessonRequestsByStudent = this.getLessonRequestsByStudent.bind(this);
-  }
-
-  /**
-   * Transform a Prisma LessonRequest into our shared model LessonRequest
-   */
-  private transformToModel(prismaRequest: any): LessonRequest {
-    const address = new Address({
-      id: prismaRequest.address.id,
-      street: prismaRequest.address.street,
-      city: prismaRequest.address.city,
-      state: prismaRequest.address.state,
-      postalCode: prismaRequest.address.postalCode,
-      country: prismaRequest.address.country
-    });
-
-    // Create Student model instance, excluding password
-    const student = new Student({
-      id: prismaRequest.student.id,
-      firstName: prismaRequest.student.firstName,
-      lastName: prismaRequest.student.lastName,
-      email: prismaRequest.student.email,
-      phoneNumber: prismaRequest.student.phoneNumber,
-      dateOfBirth: new Date(prismaRequest.student.dateOfBirth),
-      // Explicitly exclude password
-    });
-
-    return new LessonRequest({
-      id: prismaRequest.id,
-      type: prismaRequest.type,
-      startTime: new Date(prismaRequest.startTime),
-      durationMinutes: prismaRequest.durationMinutes,
-      address,
-      student // Use the sanitized Student model instance
-    });
   }
 
   /**
@@ -104,35 +67,32 @@ export class LessonRequestController {
       }
 
       // Use the addressObj directly from the body
-      const addressModel = new Address({
+      const addressDTO = {
         street: addressObj.street,
         city: addressObj.city,
         state: addressObj.state,
         postalCode: addressObj.postalCode,
         country: addressObj.country // Will be defaulted if was missing
-      });
+      };
 
-      // Create lesson request
+      // Create lesson request - service now returns LessonRequest model
       const lessonRequest = await lessonRequestService.createLessonRequest({
         type: type,
-        startTime: parsedStartTime, // Use parsed date
+        startTime: parsedStartTime,
         durationMinutes: parseInt(durationMinutes, 10),
-        addressObj: addressModel, // Pass the model instance
+        addressObj: addressDTO, // Pass the DTO object
         studentId: studentId
       });
 
-      // Transform to shared model
-      const modelLessonRequest = this.transformToModel(lessonRequest);
-
-      // --- Restore automatic quote creation ---
+      // Automatic quote creation
       const quotes = await lessonQuoteService.createQuotesForLessonRequest(
         lessonRequest.id,
         type
       );
 
-      // Return the created lesson request and the generated quotes
+      // Return the created lesson request model and the generated quotes
       res.status(201).json({
-        lessonRequest: modelLessonRequest,
+        lessonRequest: lessonRequest, // Return model directly
         quotes
       });
 
@@ -164,6 +124,7 @@ export class LessonRequestController {
         return;
       }
 
+      // Service now returns LessonRequest | null
       const lessonRequest = await lessonRequestService.getLessonRequestById(id);
 
       if (!lessonRequest) {
@@ -174,8 +135,8 @@ export class LessonRequestController {
         return;
       }
 
-      const modelLessonRequest = this.transformToModel(lessonRequest);
-      res.json(modelLessonRequest);
+      // Return model directly
+      res.json(lessonRequest);
     } catch (error) {
       console.error('Error fetching lesson request:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -197,9 +158,11 @@ export class LessonRequestController {
         return;
       }
 
+      // Service now returns LessonRequest[]
       const lessonRequests = await lessonRequestService.getLessonRequestsByStudent(studentId);
-      const modelLessonRequests = lessonRequests.map(request => this.transformToModel(request));
-      res.json(modelLessonRequests);
+
+      // Return models directly
+      res.json(lessonRequests);
     } catch (error) {
       console.error('Error fetching student lesson requests:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

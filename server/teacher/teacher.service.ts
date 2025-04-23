@@ -37,97 +37,6 @@ class TeacherService {
     private readonly prisma = prisma;
 
     /**
-    * Transform database student to shared Student model
-    */
-    private transformDbStudentToModel(dbStudent: DbStudent): Student {
-        // TODO: Remove this method and use Student.fromDb directly
-        return Student.fromDb(dbStudent);
-    }
-
-    /**
-     * Transform database address to shared Address model
-     */
-    private transformDbAddressToModel(dbAddress: DbAddress): Address {
-        // TODO: Remove this method and use Address.fromDb directly
-        return Address.fromDb(dbAddress);
-    }
-
-    /**
-    * Transform database teacher rate to shared TeacherLessonHourlyRate model
-    */
-    private transformDbTeacherRateToModel(dbRate: DbTeacherLessonHourlyRate): TeacherLessonHourlyRate {
-        // TODO: Replace with TeacherLessonHourlyRate.fromDb later
-        const { createdAt, updatedAt, teacherId, ...rateProps } = dbRate;
-        return new TeacherLessonHourlyRate({
-            ...rateProps,
-            teacherId: teacherId,
-            createdAt: dbRate.createdAt ?? undefined,
-            deactivatedAt: dbRate.deactivatedAt ?? undefined
-        });
-    }
-
-    /**
-     * Transform database lesson status to shared LessonStatus model
-     */
-    private transformDbLessonStatusToModel(dbStatus: DbLessonStatus | null): LessonStatus | undefined {
-        // TODO: Replace with LessonStatus.fromDb later
-        if (!dbStatus) return undefined;
-        const { createdAt, lessonId, ...statusProps } = dbStatus;
-        const statusValue = Object.values(LessonStatusValue).includes(dbStatus.status as LessonStatusValue)
-            ? dbStatus.status as LessonStatusValue
-            : LessonStatusValue.REQUESTED;
-        return new LessonStatus({
-            ...statusProps,
-            lessonId: lessonId ?? undefined,
-            status: statusValue,
-            createdAt: createdAt ?? undefined,
-        });
-    }
-
-    /**
-     * Transform database lesson to shared Lesson model
-     */
-    private transformDbLessonToModel(dbLesson: DbLessonWithRelations): Lesson | null {
-        // TODO: Replace with Lesson.fromDb later
-        const { createdAt, updatedAt, quoteId, currentStatusId, quote, currentStatus, ...lessonProps } = dbLesson;
-
-        // Extract the necessary nested objects from the fetched dbLesson.quote
-        const dbQuoteData = quote;
-        const dbTeacherData = quote.teacher;
-        const dbLessonRequestData = quote.lessonRequest;
-        const dbTeacherRatesData = quote.teacher.teacherLessonHourlyRates; // Extract rates
-
-        // Pass the separate objects to LessonQuote.fromDb
-        // Note: LessonQuote.fromDb itself now calls Teacher.fromDb(dbTeacherData, dbTeacherRatesData)
-        const transformedQuote = LessonQuote.fromDb(dbQuoteData, dbTeacherData, dbLessonRequestData);
-
-        const transformedStatus = this.transformDbLessonStatusToModel(currentStatus);
-
-        if (!transformedStatus) {
-            console.error(`Lesson ${dbLesson.id} is missing or has invalid current status. Defaulting status.`);
-            const defaultStatus = new LessonStatus({ id: currentStatusId ?? `missing-status-${dbLesson.id}`, lessonId: dbLesson.id, status: LessonStatusValue.REQUESTED, createdAt: new Date() });
-            return new Lesson({
-                ...lessonProps,
-                quote: transformedQuote,
-                currentStatusId: defaultStatus.id,
-                currentStatus: defaultStatus,
-                createdAt: createdAt ?? undefined,
-                updatedAt: updatedAt ?? undefined,
-            });
-        }
-
-        return new Lesson({
-            ...lessonProps,
-            quote: transformedQuote,
-            currentStatusId: transformedStatus.id,
-            currentStatus: transformedStatus,
-            createdAt: createdAt ?? undefined,
-            updatedAt: updatedAt ?? undefined,
-        });
-    }
-
-
-    /**
      * Create a new teacher
      * @param teacherData Teacher data including password
      * @returns Created teacher (shared model)
@@ -148,58 +57,63 @@ class TeacherService {
         }
     }
 
-    // --- Methods returning RAW data (keep if used internally or refactor later) ---
+    // --- Refactored Methods --- 
 
     /**
      * Find teachers filtered by lesson type and limit.
-     * Returns raw Prisma data. Consider refactoring if exposed via API.
+     * Returns shared Teacher model instances.
      */
-    async findTeachersByLessonTypeRaw(lessonType: LessonType, limit: number): Promise<DbTeacherWithRates[]> {
-        return this.prisma.teacher.findMany({
+    async findTeachersByLessonType(lessonType: LessonType, limit: number): Promise<Teacher[]> {
+        const dbTeachers = await this.prisma.teacher.findMany({
             where: {
                 teacherLessonHourlyRates: {
-                    some: {
-                        type: lessonType,
-                        deactivatedAt: null
-                    }
+                    some: { type: lessonType, deactivatedAt: null }
                 }
             },
             include: {
                 teacherLessonHourlyRates: {
-                    where: {
-                        type: lessonType,
-                        deactivatedAt: null
-                    }
+                    where: { type: lessonType, deactivatedAt: null }
                 }
             },
             take: limit
         });
+        // Use Teacher.fromDb - Cast rates as they are included
+        return dbTeachers.map(dbTeacher =>
+            Teacher.fromDb(dbTeacher, dbTeacher.teacherLessonHourlyRates as DbTeacherLessonHourlyRate[])
+        );
     }
 
     /**
      * Find a teacher by ID including all rates.
-     * Returns raw Prisma data. Consider refactoring if exposed via API.
+     * Returns shared Teacher model instance or null.
      */
-    async findTeacherWithRatesByIdRaw(teacherId: string): Promise<DbTeacherWithRates | null> {
-        return this.prisma.teacher.findUnique({
+    async findTeacherWithRatesById(teacherId: string): Promise<Teacher | null> {
+        const dbTeacher = await this.prisma.teacher.findUnique({
             where: { id: teacherId },
             include: {
                 teacherLessonHourlyRates: true // Includes all rates, active and inactive
             }
         });
+        if (!dbTeacher) {
+            return null;
+        }
+        // Use Teacher.fromDb - Cast rates as they are included
+        return Teacher.fromDb(dbTeacher, dbTeacher.teacherLessonHourlyRates as DbTeacherLessonHourlyRate[]);
     }
 
     /**
      * Create or update a lesson hourly rate for a teacher.
-     * Returns raw Prisma data. Consider refactoring to return shared model if needed by controller.
+     * Returns the created/updated shared TeacherLessonHourlyRate model instance.
      */
-    async upsertLessonRateRaw(teacherId: string, rateData: { lessonType: LessonType; rateInCents: number; id?: string }): Promise<DbTeacherLessonHourlyRate> {
+    async upsertLessonRate(teacherId: string, rateData: { lessonType: LessonType; rateInCents: number; id?: string }): Promise<TeacherLessonHourlyRate> {
         const { id, lessonType, rateInCents } = rateData;
 
         const teacherExists = await this.prisma.teacher.count({ where: { id: teacherId } });
         if (teacherExists === 0) {
             throw new Error('Teacher not found');
         }
+
+        let dbRate: DbTeacherLessonHourlyRate;
 
         if (id) {
             // Update existing rate
@@ -210,7 +124,7 @@ class TeacherService {
                 throw new Error('Lesson rate not found or does not belong to this teacher');
             }
             // When updating, ensure it's reactivated by setting deactivatedAt to null
-            return this.prisma.teacherLessonHourlyRate.update({
+            dbRate = await this.prisma.teacherLessonHourlyRate.update({
                 where: { id },
                 data: {
                     rateInCents: rateInCents,
@@ -226,33 +140,34 @@ class TeacherService {
             if (existingRate) {
                 // Instead of throwing, update the existing rate to reactivate and set the new price
                 console.warn(`Rate for ${lessonType} already exists for teacher ${teacherId}. Updating existing rate.`);
-                return this.prisma.teacherLessonHourlyRate.update({
+                dbRate = await this.prisma.teacherLessonHourlyRate.update({
                     where: { id: existingRate.id },
                     data: {
                         rateInCents: rateInCents,
                         deactivatedAt: null // Ensure it's active
                     }
                 });
-                // Original logic: throw new Error(`Teacher already has a rate for ${lessonType}. Use the edit functionality.`);
+            } else {
+                // Create a new rate if none exists
+                dbRate = await this.prisma.teacherLessonHourlyRate.create({
+                    data: {
+                        teacherId,
+                        type: lessonType,
+                        rateInCents
+                        // deactivatedAt defaults to null
+                    }
+                });
             }
-            // Create a new rate if none exists
-            return this.prisma.teacherLessonHourlyRate.create({
-                data: {
-                    teacherId,
-                    type: lessonType,
-                    rateInCents
-                    // deactivatedAt defaults to null
-                }
-            });
         }
+        // Use TeacherLessonHourlyRate.fromDb
+        return TeacherLessonHourlyRate.fromDb(dbRate);
     }
 
-
     /**
-     * Deactivate a lesson hourly rate.
-     * Returns raw Prisma data. Consider refactoring.
+     * Deactivate a lesson hourly rate for a teacher.
+     * Returns the deactivated shared TeacherLessonHourlyRate model instance.
      */
-    async deactivateLessonRateRaw(teacherId: string, rateId: string): Promise<DbTeacherLessonHourlyRate> {
+    async deactivateLessonRate(teacherId: string, rateId: string): Promise<TeacherLessonHourlyRate> {
         // Verify the rate exists and belongs to the teacher before updating
         const existingRate = await this.prisma.teacherLessonHourlyRate.findFirst({
             where: { id: rateId, teacherId }
@@ -261,17 +176,19 @@ class TeacherService {
             throw new Error('Lesson rate not found or does not belong to this teacher');
         }
         // Prevent deactivating if it's already deactivated? Or allow (idempotent)? Allowing is simpler.
-        return this.prisma.teacherLessonHourlyRate.update({
+        const dbRate = await this.prisma.teacherLessonHourlyRate.update({
             where: { id: rateId }, // Use the specific ID confirmed to belong to the teacher
             data: { deactivatedAt: new Date() }
         });
+        // Use TeacherLessonHourlyRate.fromDb
+        return TeacherLessonHourlyRate.fromDb(dbRate);
     }
 
     /**
-     * Reactivate a lesson hourly rate.
-     * Returns raw Prisma data. Consider refactoring.
+     * Reactivate a previously deactivated lesson hourly rate.
+     * Returns the reactivated shared TeacherLessonHourlyRate model instance.
      */
-    async reactivateLessonRateRaw(teacherId: string, rateId: string): Promise<DbTeacherLessonHourlyRate> {
+    async reactivateLessonRate(teacherId: string, rateId: string): Promise<TeacherLessonHourlyRate> {
         // Verify the rate exists and belongs to the teacher before updating
         const existingRate = await this.prisma.teacherLessonHourlyRate.findFirst({
             where: { id: rateId, teacherId }
@@ -279,13 +196,13 @@ class TeacherService {
         if (!existingRate) {
             throw new Error('Lesson rate not found or does not belong to this teacher');
         }
-        return this.prisma.teacherLessonHourlyRate.update({
+        const dbRate = await this.prisma.teacherLessonHourlyRate.update({
             where: { id: rateId }, // Use the specific ID
             data: { deactivatedAt: null } // Set deactivatedAt to null to reactivate
         });
+        // Use TeacherLessonHourlyRate.fromDb
+        return TeacherLessonHourlyRate.fromDb(dbRate);
     }
-
-    // --- Method returning TRANSFORMED data ---
 
     /**
      * Find all lessons for a teacher, optionally filtered by student.
@@ -322,7 +239,6 @@ class TeacherService {
 
         return dbLessons.map(dbLesson => Lesson.fromDb(dbLesson as DbLessonWithRelations)).filter(lesson => lesson !== null) as Lesson[];
     }
-
 
     /**
      * Get statistics for a teacher

@@ -14,7 +14,8 @@ interface TeacherLessonHourlyRateProps {
   teacherId: string;
   type: string; // TODO: Should use LessonType enum if possible
   rateInCents: number;
-  deactivatedAt?: Date | undefined; // Optional
+  // Allow null to represent an active rate explicitly, alongside undefined for cases where it might not be set
+  deactivatedAt?: Date | null | undefined;
   createdAt?: Date; // Optional, defaults to new Date()
 }
 
@@ -29,7 +30,8 @@ export class TeacherLessonHourlyRate {
   rateInCents: number; // Rate stored in cents (e.g., $45.50 = 4550 cents)
   createdAt: Date;
   updatedAt?: Date;
-  deactivatedAt?: Date | undefined; // Optional field
+  // Allow null to represent an active rate explicitly, alongside undefined
+  deactivatedAt?: Date | null | undefined;
 
   // Updated constructor using object destructuring
   constructor({
@@ -37,7 +39,8 @@ export class TeacherLessonHourlyRate {
     teacherId,
     type,
     rateInCents,
-    deactivatedAt = undefined, // Default value for optional prop
+    // Default to null, explicitly indicating an active rate
+    deactivatedAt = null,
     createdAt = new Date() // Default value for optional prop
   }: TeacherLessonHourlyRateProps) {
     this.id = id;
@@ -55,14 +58,21 @@ export class TeacherLessonHourlyRate {
    */
   public static fromDb(dbRate: DbTeacherLessonHourlyRate): TeacherLessonHourlyRate {
     const { createdAt, updatedAt, ...rateProps } = dbRate;
-    // Construct the shared model instance
-    return new TeacherLessonHourlyRate({
-      ...rateProps, // Includes id, teacherId, type, rateInCents
-      // Pass optional fields explicitly, allowing constructor defaults if null/undefined
-      createdAt: createdAt ?? undefined,
-      deactivatedAt: dbRate.deactivatedAt ?? undefined
-      // Note: shared model doesn't have updatedAt in constructor props
+
+    // Instantiate using constructor
+    const instance = new TeacherLessonHourlyRate({
+      ...rateProps,
+      createdAt: createdAt ?? undefined, // createdAt from DB can be null? Assuming not based on schema
+      // Directly pass the DB value (Date or null) as null is now allowed by the constructor/property type
+      deactivatedAt: dbRate.deactivatedAt
     });
+
+    // Assign updatedAt if it exists on the dbRate object
+    if (updatedAt) {
+      instance.updatedAt = updatedAt;
+    }
+
+    return instance;
   }
 
   /**
@@ -91,7 +101,8 @@ export class TeacherLessonHourlyRate {
    * @returns Boolean indicating if the rate is active
    */
   isActive(): boolean {
-    return this.deactivatedAt === undefined || this.deactivatedAt === null;
+    // Active if deactivatedAt is explicitly null (or undefined, though null is the expected 'active' state now)
+    return this.deactivatedAt === null || this.deactivatedAt === undefined;
   }
 
   /**

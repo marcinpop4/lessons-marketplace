@@ -50,27 +50,11 @@ export const teacherController = {
       }
 
       try {
-        // Use the service to fetch raw teacher data
-        const teachers = await teacherService.findTeachersByLessonTypeRaw(lessonType as LessonType, limitValue);
+        // Use the refactored service method (returns Teacher[])
+        const teachers = await teacherService.findTeachersByLessonType(lessonType as LessonType, limitValue);
 
-        // Transform the data within the controller
-        const transformedTeachers = teachers.map((teacher) => {
-          const lessonHourlyRates: Record<string, number> = {};
-          teacher.teacherLessonHourlyRates.forEach((rate) => {
-            lessonHourlyRates[rate.type] = rate.rateInCents;
-          });
-          return {
-            id: teacher.id,
-            firstName: teacher.firstName,
-            lastName: teacher.lastName,
-            email: teacher.email,
-            phoneNumber: teacher.phoneNumber,
-            dateOfBirth: teacher.dateOfBirth.toISOString(),
-            lessonHourlyRates
-          };
-        });
-
-        res.status(200).json(transformedTeachers);
+        // Return shared models directly
+        res.status(200).json(teachers);
       } catch (dbError) {
         console.error('Database error fetching teachers:', dbError);
         res.status(500).json({ message: 'Database error fetching teachers' });
@@ -92,34 +76,16 @@ export const teacherController = {
         return;
       }
 
-      // Use the service to fetch raw teacher data
-      const teacher = await teacherService.findTeacherWithRatesByIdRaw(teacherId);
+      // Use the refactored service method (returns Teacher | null)
+      const teacher = await teacherService.findTeacherWithRatesById(teacherId);
 
       if (!teacher) {
         res.status(404).json({ message: 'Teacher not found' });
         return;
       }
 
-      // Transform the data within the controller
-      const transformedTeacher = {
-        id: teacher.id,
-        firstName: teacher.firstName,
-        lastName: teacher.lastName,
-        email: teacher.email,
-        phoneNumber: teacher.phoneNumber,
-        dateOfBirth: teacher.dateOfBirth.toISOString(), // Keep ISO string for profile consistency
-        lessonRates: teacher.teacherLessonHourlyRates.map((rate) => ({
-          id: rate.id,
-          type: rate.type,
-          rateInCents: rate.rateInCents,
-          isActive: rate.deactivatedAt === null,
-          deactivatedAt: rate.deactivatedAt ? rate.deactivatedAt.toISOString() : null,
-          createdAt: rate.createdAt.toISOString(),
-          updatedAt: rate.updatedAt.toISOString()
-        }))
-      };
-
-      res.status(200).json(transformedTeacher);
+      // Return shared model directly
+      res.status(200).json(teacher);
     } catch (error) {
       console.error('Error fetching teacher profile:', error);
       res.status(500).json({ message: 'An error occurred while fetching teacher profile' });
@@ -152,20 +118,11 @@ export const teacherController = {
         return;
       }
 
-      // Use the service to upsert the rate
-      const updatedRate = await teacherService.upsertLessonRateRaw(teacherId, { lessonType, rateInCents, id });
+      // Use the refactored service method (returns TeacherLessonHourlyRate)
+      const updatedRate = await teacherService.upsertLessonRate(teacherId, { lessonType, rateInCents, id });
 
-      // Transform the result within the controller
-      res.status(200).json({
-        id: updatedRate.id,
-        teacherId: updatedRate.teacherId, // Include teacherId
-        type: updatedRate.type,
-        rateInCents: updatedRate.rateInCents,
-        isActive: updatedRate.deactivatedAt === null,
-        deactivatedAt: updatedRate.deactivatedAt ? updatedRate.deactivatedAt.toISOString() : null,
-        createdAt: updatedRate.createdAt.toISOString(),
-        updatedAt: updatedRate.updatedAt.toISOString()
-      });
+      // Return shared model directly
+      res.status(200).json(updatedRate);
 
     } catch (error) {
       console.error('Error creating/updating lesson rate:', error);
@@ -196,19 +153,11 @@ export const teacherController = {
         return;
       }
 
-      // Use the service to deactivate
-      const updatedRate = await teacherService.deactivateLessonRateRaw(teacherId, rateId);
+      // Use the refactored service method (returns TeacherLessonHourlyRate)
+      const updatedRate = await teacherService.deactivateLessonRate(teacherId, rateId);
 
-      // Transform the result within the controller
-      res.status(200).json({
-        id: updatedRate.id,
-        type: updatedRate.type,
-        rateInCents: updatedRate.rateInCents,
-        isActive: false,
-        deactivatedAt: updatedRate.deactivatedAt?.toISOString(),
-        createdAt: updatedRate.createdAt.toISOString(),
-        updatedAt: updatedRate.updatedAt.toISOString()
-      });
+      // Return shared model directly
+      res.status(200).json(updatedRate);
     } catch (error) {
       console.error('Error deactivating lesson rate:', error);
       if (error instanceof Error && error.message.includes('Lesson rate not found')) {
@@ -232,19 +181,11 @@ export const teacherController = {
         return;
       }
 
-      // Use the service to reactivate
-      const updatedRate = await teacherService.reactivateLessonRateRaw(teacherId, rateId);
+      // Use the refactored service method (returns TeacherLessonHourlyRate)
+      const updatedRate = await teacherService.reactivateLessonRate(teacherId, rateId);
 
-      // Transform the result within the controller
-      res.status(200).json({
-        id: updatedRate.id,
-        type: updatedRate.type,
-        rateInCents: updatedRate.rateInCents,
-        isActive: true,
-        deactivatedAt: null,
-        createdAt: updatedRate.createdAt.toISOString(),
-        updatedAt: updatedRate.updatedAt.toISOString()
-      });
+      // Return shared model directly
+      res.status(200).json(updatedRate);
     } catch (error) {
       console.error('Error reactivating lesson rate:', error);
       if (error instanceof Error && error.message.includes('Lesson rate not found')) {

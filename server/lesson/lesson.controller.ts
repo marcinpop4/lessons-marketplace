@@ -15,94 +15,6 @@ import { lessonService } from './lesson.service.js';
  */
 export const lessonController = {
   /**
-   * Transform a Prisma lesson object to a shared model instance
-   * @param prismaLesson - Prisma lesson object
-   * @returns Shared model instance
-   */
-  transformToModel(prismaLesson: any): Lesson {
-    if (!prismaLesson?.quote?.lessonRequest?.address ||
-      !prismaLesson?.quote?.teacher ||
-      !prismaLesson?.quote?.lessonRequest?.student ||
-      !prismaLesson.currentStatusId // Ensure status ID is present
-    ) {
-      console.error('Invalid lesson data structure received for transformToModel:', JSON.stringify(prismaLesson, null, 2));
-      throw new Error('Invalid lesson data structure for transformation');
-    }
-
-    const student = new Student({
-      id: prismaLesson.quote.lessonRequest.student.id,
-      firstName: prismaLesson.quote.lessonRequest.student.firstName,
-      lastName: prismaLesson.quote.lessonRequest.student.lastName,
-      email: prismaLesson.quote.lessonRequest.student.email,
-      phoneNumber: prismaLesson.quote.lessonRequest.student.phoneNumber,
-      dateOfBirth: new Date(prismaLesson.quote.lessonRequest.student.dateOfBirth)
-    });
-
-    const address = new Address({
-      street: prismaLesson.quote.lessonRequest.address.street,
-      city: prismaLesson.quote.lessonRequest.address.city,
-      state: prismaLesson.quote.lessonRequest.address.state,
-      postalCode: prismaLesson.quote.lessonRequest.address.postalCode,
-      country: prismaLesson.quote.lessonRequest.address.country
-    });
-
-    const lessonRequest = new LessonRequest({
-      id: prismaLesson.quote.lessonRequest.id,
-      type: prismaLesson.quote.lessonRequest.type,
-      startTime: new Date(prismaLesson.quote.lessonRequest.startTime),
-      durationMinutes: prismaLesson.quote.lessonRequest.durationMinutes,
-      address,
-      student
-    });
-
-    const teacher = new Teacher({
-      id: prismaLesson.quote.teacher.id,
-      firstName: prismaLesson.quote.teacher.firstName,
-      lastName: prismaLesson.quote.teacher.lastName,
-      email: prismaLesson.quote.teacher.email,
-      phoneNumber: prismaLesson.quote.teacher.phoneNumber,
-      dateOfBirth: new Date(prismaLesson.quote.teacher.dateOfBirth),
-      hourlyRates: prismaLesson.quote.teacher.hourlyRates // Assuming hourlyRates are included in the query
-    });
-
-    const lessonQuote = new LessonQuote({
-      id: prismaLesson.quote.id,
-      lessonRequest,
-      teacher,
-      costInCents: prismaLesson.quote.costInCents,
-      hourlyRateInCents: prismaLesson.quote.hourlyRateInCents,
-      createdAt: new Date(prismaLesson.quote.createdAt),
-      updatedAt: new Date(prismaLesson.quote.updatedAt)
-    });
-
-    // Get the latest status record from the included relation
-    const latestStatusRecord = prismaLesson.lessonStatuses?.[0];
-    if (!latestStatusRecord || !latestStatusRecord.status || !Object.values(LessonStatusValue).includes(latestStatusRecord.status as LessonStatusValue)) {
-      // This should ideally not happen if a lesson always has a status, but handle defensively
-      console.error(`Lesson ${prismaLesson.id} is missing valid status information. Status record:`, latestStatusRecord);
-      throw new Error(`Lesson ${prismaLesson.id} is missing or has invalid status information.`);
-    }
-
-    // Construct the LessonStatus object from the Prisma data
-    const currentLessonStatus = new LessonStatus({
-      id: latestStatusRecord.id,
-      lessonId: prismaLesson.id,
-      status: latestStatusRecord.status as LessonStatusValue,
-      context: latestStatusRecord.context || null,
-      createdAt: latestStatusRecord.createdAt ? new Date(latestStatusRecord.createdAt) : new Date()
-    });
-
-    return new Lesson({
-      id: prismaLesson.id,
-      quote: lessonQuote,
-      currentStatusId: currentLessonStatus.id, // Use the actual ID from the status record
-      currentStatus: currentLessonStatus, // Pass the full LessonStatus object
-      createdAt: prismaLesson.createdAt,
-      updatedAt: prismaLesson.updatedAt
-    });
-  },
-
-  /**
    * Create a new lesson
    * @route POST /api/lessons
    * @param req Request with quoteId in the body
@@ -118,14 +30,14 @@ export const lessonController = {
         return;
       }
 
-      // Create lesson using the service
+      // Create lesson using the service (returns Lesson model)
       const lesson = await lessonService.create(quoteId);
 
-      // Transform to shared model
-      const modelLesson = lessonController.transformToModel(lesson);
+      // Remove transformation
+      // const modelLesson = lessonController.transformToModel(lesson);
 
-      // Return the created lesson
-      res.status(201).json(modelLesson);
+      // Return the created lesson model directly
+      res.status(201).json(lesson);
     } catch (error) {
       console.error('Error creating lesson:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -149,7 +61,7 @@ export const lessonController = {
     try {
       const { id } = req.params;
 
-      // Use the service method
+      // Use the service method (returns Lesson | null)
       const lesson = await lessonService.getLessonById(id);
 
       if (!lesson) {
@@ -159,8 +71,11 @@ export const lessonController = {
         return;
       }
 
-      const modelLesson = lessonController.transformToModel(lesson);
-      res.status(200).json(modelLesson);
+      // Remove transformation
+      // const modelLesson = lessonController.transformToModel(lesson);
+
+      // Return the lesson model directly
+      res.status(200).json(lesson);
     } catch (error) {
       console.error('Error fetching lesson:', error);
       res.status(500).json({
@@ -179,11 +94,14 @@ export const lessonController = {
     try {
       const { quoteId } = req.params;
 
-      // Use the service method
+      // Use the service method (returns Lesson[])
       const lessons = await lessonService.getLessonsByQuoteId(quoteId);
 
-      const modelLessons = lessons.map(lesson => lessonController.transformToModel(lesson));
-      res.status(200).json(modelLessons);
+      // Remove transformation
+      // const modelLessons = lessons.map(lesson => lessonController.transformToModel(lesson));
+
+      // Return the lesson models directly
+      res.status(200).json(lessons);
     } catch (error) {
       console.error('Error fetching lessons by quote:', error);
       res.status(500).json({
@@ -217,17 +135,28 @@ export const lessonController = {
         return;
       }
 
-      // Call the service to update the status using transition
+      // Call the service to update the status using transition (returns Lesson | null)
       const updatedLesson = await lessonService.updateStatus(
         lessonId,
         transition as LessonStatusTransition,
-        context, // Pass optional context
-        authenticatedTeacherId // Pass teacher ID for validation
+        context,
+        authenticatedTeacherId
       );
 
-      // Transform and return
-      const modelLesson = lessonController.transformToModel(updatedLesson);
-      res.status(200).json(modelLesson);
+      // Add check for null return from service (e.g., if error handled by returning null)
+      if (!updatedLesson) {
+        // If service returns null, it implies an error handled within the service
+        // The specific error should have been logged by the service
+        // Return a generic 500, or adjust based on how service errors are handled
+        res.status(500).json({ error: 'Internal Server Error', message: 'Failed to update lesson status.' });
+        return;
+      }
+
+      // Remove transformation
+      // const modelLesson = lessonController.transformToModel(updatedLesson);
+
+      // Return the updated lesson model directly
+      res.status(200).json(updatedLesson);
     } catch (error) {
       console.error('Error updating lesson status:', error);
       // Handle specific errors (like lesson not found, invalid transition, unauthorized)
