@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import prisma from '../prisma.js'; // Import shared prisma instance
 import { studentService } from './student.service.js';
 
 /**
@@ -40,7 +39,7 @@ export const studentController = {
                 password // Pass plain text password to service
             };
 
-            const newStudent = await studentService.create(prisma, studentData);
+            const newStudent = await studentService.create(studentData);
 
             // Service returns null if creation fails, handle this (though it throws now)
             if (!newStudent) {
@@ -77,7 +76,7 @@ export const studentController = {
                 return;
             }
 
-            const student = await studentService.findById(prisma, id);
+            const student = await studentService.findById(id);
 
             if (!student) {
                 res.status(404).json({ message: 'Student not found.' });

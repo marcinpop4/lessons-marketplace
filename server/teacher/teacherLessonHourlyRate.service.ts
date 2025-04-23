@@ -1,16 +1,16 @@
 import { PrismaClient, TeacherLessonHourlyRate, LessonType } from '@prisma/client';
 import { Prisma } from '@prisma/client';
+import prisma from '../prisma.js';
 
 class TeacherLessonHourlyRateService {
 
     /**
      * Creates a new hourly rate for a teacher and lesson type.
-     * @param prisma Prisma client instance
      * @param rateData Data for the new rate, expecting teacherId for connection.
      * @returns The created rate object.
      * @throws Error if creation fails (e.g., unique constraint violation).
      */
-    async create(prisma: PrismaClient, rateData: { teacherId: string, type: LessonType, rateInCents: number }): Promise<TeacherLessonHourlyRate | null> {
+    async create(rateData: { teacherId: string, type: LessonType, rateInCents: number }): Promise<TeacherLessonHourlyRate | null> {
         try {
             const { teacherId, type, rateInCents } = rateData;
 
@@ -44,9 +44,9 @@ class TeacherLessonHourlyRateService {
     }
 
     // --- Potential future methods ---
-    // async findByTeacherAndType(prisma: PrismaClient, teacherId: string, type: LessonType): Promise<TeacherLessonHourlyRate | null> { ... }
-    // async updateRate(prisma: PrismaClient, id: string, rateInCents: number): Promise<TeacherLessonHourlyRate | null> { ... }
-    // async deactivateRate(prisma: PrismaClient, id: string): Promise<TeacherLessonHourlyRate | null> { ... }
+    // async findByTeacherAndType(teacherId: string, type: LessonType): Promise<TeacherLessonHourlyRate | null> { ... }
+    // async updateRate(id: string, rateInCents: number): Promise<TeacherLessonHourlyRate | null> { ... }
+    // async deactivateRate(id: string): Promise<TeacherLessonHourlyRate | null> { ... }
 }
 
 export const teacherLessonHourlyRateService = new TeacherLessonHourlyRateService();

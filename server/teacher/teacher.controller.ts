@@ -1,33 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
-import prisma from '../prisma.js';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, TeacherLessonHourlyRate as DbTeacherLessonHourlyRate } from '@prisma/client';
 import { LessonType } from '../../shared/models/LessonType.js';
-import { TeacherService } from './teacher.service.js';
-import { GoalStatusValue } from '../../shared/models/GoalStatus.js';
+import { teacherService } from './teacher.service.js';
+import { goalService } from '../goal/goal.service.js';
+import { Lesson } from '../../shared/models/Lesson.js';
 
-// Define interfaces to match Prisma models
-interface TeacherLessonHourlyRate {
-  id: string;
-  type: LessonType;
-  rateInCents: number;
-  teacherId: string;
-  deactivatedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface Teacher {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phoneNumber: string;
-  dateOfBirth: Date;
-  teacherLessonHourlyRates: TeacherLessonHourlyRate[];
-}
-
-// Placeholder service implementation
-const teacherService = new TeacherService();
+// Note: Interfaces for DB models are removed as we rely on Prisma types or shared models.
 
 /**
  * Controller for teacher-related operations
@@ -35,9 +13,6 @@ const teacherService = new TeacherService();
 export const teacherController = {
   /**
    * Get teachers filtered by lesson type and limit
-   * @param req Request - can include lessonType and limit query parameters
-   * @param res Response
-   * @param next NextFunction
    */
   getTeachers: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -75,41 +50,15 @@ export const teacherController = {
       }
 
       try {
-        // Execute the query
-        const teachers = await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => {
-          const query: any = {
-            where: {
-              teacherLessonHourlyRates: {
-                some: {
-                  type: lessonType as LessonType,
-                  deactivatedAt: null
-                }
-              }
-            },
-            include: {
-              teacherLessonHourlyRates: {
-                where: {
-                  type: lessonType as LessonType,
-                  deactivatedAt: null
-                }
-              }
-            },
-            take: limitValue
-          };
+        // Use the service to fetch raw teacher data
+        const teachers = await teacherService.findTeachersByLessonTypeRaw(lessonType as LessonType, limitValue);
 
-          return await tx.teacher.findMany(query);
-        });
-
-        // Transform the data to match the expected frontend format
-        const transformedTeachers = teachers.map((teacher: any) => {
-          // Create a map of lesson types to rates
+        // Transform the data within the controller
+        const transformedTeachers = teachers.map((teacher) => {
           const lessonHourlyRates: Record<string, number> = {};
-
-          // Populate the rates map
-          teacher.teacherLessonHourlyRates.forEach((rate: any) => {
+          teacher.teacherLessonHourlyRates.forEach((rate) => {
             lessonHourlyRates[rate.type] = rate.rateInCents;
           });
-
           return {
             id: teacher.id,
             firstName: teacher.firstName,
@@ -123,70 +72,48 @@ export const teacherController = {
 
         res.status(200).json(transformedTeachers);
       } catch (dbError) {
-        console.error('Database error:', dbError);
-        res.status(500).json({
-          message: 'Database error occurred while fetching teachers',
-          error: dbError instanceof Error ? dbError.message : 'Unknown database error'
-        });
+        console.error('Database error fetching teachers:', dbError);
+        res.status(500).json({ message: 'Database error fetching teachers' });
       }
     } catch (error) {
-      console.error('Error fetching teachers:', error);
-      res.status(500).json({
-        message: 'An error occurred while fetching teachers',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+      console.error('Error in getTeachers:', error);
+      res.status(500).json({ message: 'An error occurred while fetching teachers' });
     }
   },
 
   /**
    * Get a teacher's profile including all lesson rates (active and inactive)
-   * @param req Request - must include teacherId parameter
-   * @param res Response
-   * @param next NextFunction
    */
   getTeacherProfile: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      // Get the teacher ID from the authenticated user
       const teacherId = req.user?.id;
-
       if (!teacherId) {
         res.status(401).json({ message: 'Unauthorized' });
         return;
       }
 
-      const teacher = await prisma.teacher.findUnique({
-        where: { id: teacherId },
-        include: {
-          teacherLessonHourlyRates: true
-        }
-      });
+      // Use the service to fetch raw teacher data
+      const teacher = await teacherService.findTeacherWithRatesByIdRaw(teacherId);
 
       if (!teacher) {
         res.status(404).json({ message: 'Teacher not found' });
         return;
       }
 
-      // Transform the data to include active status
+      // Transform the data within the controller
       const transformedTeacher = {
         id: teacher.id,
         firstName: teacher.firstName,
         lastName: teacher.lastName,
         email: teacher.email,
         phoneNumber: teacher.phoneNumber,
-        dateOfBirth: teacher.dateOfBirth.toISOString(),
-        lessonRates: teacher.teacherLessonHourlyRates.map((rate: {
-          id: string;
-          type: string;
-          rateInCents: number;
-          deactivatedAt: Date | null;
-          createdAt: Date;
-          updatedAt: Date;
-        }) => ({
+        dateOfBirth: teacher.dateOfBirth.toISOString(), // Keep ISO string for profile consistency
+        lessonRates: teacher.teacherLessonHourlyRates.map((rate) => ({
           id: rate.id,
           type: rate.type,
           rateInCents: rate.rateInCents,
-          isActive: (rate as any).deactivatedAt === null,
-          deactivatedAt: (rate as any).deactivatedAt ? (rate as any).deactivatedAt.toISOString() : null,
+          isActive: rate.deactivatedAt === null,
+          deactivatedAt: rate.deactivatedAt ? rate.deactivatedAt.toISOString() : null,
           createdAt: rate.createdAt.toISOString(),
           updatedAt: rate.updatedAt.toISOString()
         }))
@@ -195,24 +122,16 @@ export const teacherController = {
       res.status(200).json(transformedTeacher);
     } catch (error) {
       console.error('Error fetching teacher profile:', error);
-      res.status(500).json({
-        message: 'An error occurred while fetching teacher profile',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+      res.status(500).json({ message: 'An error occurred while fetching teacher profile' });
     }
   },
 
   /**
    * Create or update a lesson hourly rate for a teacher
-   * @param req Request - must include lessonType and rateInCents in body
-   * @param res Response
-   * @param next NextFunction
    */
   createOrUpdateLessonRate: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      // Get the teacher ID from the authenticated user
       const teacherId = req.user?.id;
-
       if (!teacherId) {
         res.status(401).json({ message: 'Unauthorized' });
         return;
@@ -233,139 +152,54 @@ export const teacherController = {
         return;
       }
 
-      // Check if the teacher exists
-      const teacher = await prisma.teacher.findUnique({
-        where: { id: teacherId }
+      // Use the service to upsert the rate
+      const updatedRate = await teacherService.upsertLessonRateRaw(teacherId, { lessonType, rateInCents, id });
+
+      // Transform the result within the controller
+      res.status(200).json({
+        id: updatedRate.id,
+        teacherId: updatedRate.teacherId, // Include teacherId
+        type: updatedRate.type,
+        rateInCents: updatedRate.rateInCents,
+        isActive: updatedRate.deactivatedAt === null,
+        deactivatedAt: updatedRate.deactivatedAt ? updatedRate.deactivatedAt.toISOString() : null,
+        createdAt: updatedRate.createdAt.toISOString(),
+        updatedAt: updatedRate.updatedAt.toISOString()
       });
 
-      if (!teacher) {
-        res.status(404).json({ message: 'Teacher not found' });
-        return;
-      }
-
-      // If we have an ID, we're updating an existing rate
-      if (id) {
-        // Verify the rate exists and belongs to this teacher
-        const existingRate = await prisma.teacherLessonHourlyRate.findFirst({
-          where: {
-            id,
-            teacherId
-          }
-        });
-
-        if (!existingRate) {
-          res.status(404).json({ message: 'Lesson rate not found or does not belong to this teacher' });
-          return;
-        }
-
-        // Update the existing rate
-        const updatedRate = await prisma.teacherLessonHourlyRate.update({
-          where: { id },
-          data: {
-            rateInCents: rateInCents,
-            // We keep the lessonType the same, or could allow updates too
-            deactivatedAt: null // Ensure updated rate is active
-          }
-        });
-
-        // Return the updated rate, ensuring all expected fields are present
-        res.status(200).json({
-          id: updatedRate.id,
-          teacherId: teacherId, // Include teacherId from context
-          type: updatedRate.type, // Use the type from the updated record, not the request
-          rateInCents: updatedRate.rateInCents,
-          isActive: updatedRate.deactivatedAt === null, // Calculate isActive
-          deactivatedAt: updatedRate.deactivatedAt, // Include deactivatedAt (should be null)
-          createdAt: updatedRate.createdAt,
-          updatedAt: updatedRate.updatedAt
-        });
-
-      } else {
-        // Check if the rate already exists for this lesson type when creating new
-        const existingRate = await prisma.teacherLessonHourlyRate.findUnique({
-          where: {
-            teacherId_type: {
-              teacherId,
-              type: lessonType as LessonType
-            }
-          }
-        });
-
-        // If we're creating a new rate and the rate already exists
-        if (existingRate) {
-          res.status(409).json({
-            message: `You already have a rate for ${lessonType} lessons. Please edit the existing rate instead.`
-          });
-          return;
-        }
-
-        // Create a new hourly rate
-        const hourlyRate = await prisma.teacherLessonHourlyRate.create({
-          data: {
-            teacherId,
-            type: lessonType as LessonType,
-            rateInCents
-          }
-        });
-
-        res.status(200).json({
-          id: hourlyRate.id,
-          type: hourlyRate.type,
-          rateInCents: hourlyRate.rateInCents,
-          isActive: true,
-          deactivatedAt: null,
-          createdAt: hourlyRate.createdAt.toISOString(),
-          updatedAt: hourlyRate.updatedAt.toISOString()
-        });
-      }
     } catch (error) {
       console.error('Error creating/updating lesson rate:', error);
-      res.status(500).json({
-        message: 'An error occurred while creating/updating lesson rate',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+      if (error instanceof Error) {
+        if (error.message.includes('Teacher not found') || error.message.includes('Lesson rate not found')) {
+          res.status(404).json({ message: error.message });
+        } else if (error.message.includes('already has a rate')) {
+          res.status(409).json({ message: error.message });
+        } else {
+          res.status(500).json({ message: 'An error occurred' });
+        }
+      } else {
+        res.status(500).json({ message: 'An unknown error occurred' });
+      }
     }
   },
 
   /**
    * Deactivate a lesson hourly rate for a teacher
-   * @param req Request - must include lessonType in body
-   * @param res Response
-   * @param next NextFunction
    */
   deactivateLessonRate: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const teacherId = req.user?.id;
-      // Use lessonRateId from request body, aliased as rateId
       const { lessonRateId: rateId } = req.body;
 
-      if (!teacherId) {
-        res.status(401).json({ message: 'Unauthorized' });
+      if (!teacherId || !rateId) {
+        res.status(400).json({ message: 'Unauthorized or missing rate ID' });
         return;
       }
 
-      // Find the hourly rate
-      const hourlyRate = await prisma.teacherLessonHourlyRate.findUnique({
-        where: {
-          id: rateId
-        }
-      });
+      // Use the service to deactivate
+      const updatedRate = await teacherService.deactivateLessonRateRaw(teacherId, rateId);
 
-      if (!hourlyRate) {
-        res.status(404).json({ message: 'Lesson rate not found' });
-        return;
-      }
-
-      // Deactivate the hourly rate
-      const updatedRate = await prisma.teacherLessonHourlyRate.update({
-        where: {
-          id: rateId
-        },
-        data: {
-          deactivatedAt: new Date()
-        }
-      });
-
+      // Transform the result within the controller
       res.status(200).json({
         id: updatedRate.id,
         type: updatedRate.type,
@@ -377,52 +211,31 @@ export const teacherController = {
       });
     } catch (error) {
       console.error('Error deactivating lesson rate:', error);
-      res.status(500).json({
-        message: 'An error occurred while deactivating lesson rate',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+      if (error instanceof Error && error.message.includes('Lesson rate not found')) {
+        res.status(404).json({ message: error.message });
+      } else {
+        res.status(500).json({ message: 'An error occurred while deactivating lesson rate' });
+      }
     }
   },
 
   /**
    * Reactivate a previously deactivated lesson hourly rate
-   * @param req Request - must include lessonType in body
-   * @param res Response
-   * @param next NextFunction
    */
   reactivateLessonRate: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const teacherId = req.user?.id;
-      // Use lessonRateId from request body, aliased as rateId
       const { lessonRateId: rateId } = req.body;
 
-      if (!teacherId) {
-        res.status(401).json({ message: 'Unauthorized' });
+      if (!teacherId || !rateId) {
+        res.status(400).json({ message: 'Unauthorized or missing rate ID' });
         return;
       }
 
-      // Find the hourly rate
-      const hourlyRate = await prisma.teacherLessonHourlyRate.findUnique({
-        where: {
-          id: rateId
-        }
-      });
+      // Use the service to reactivate
+      const updatedRate = await teacherService.reactivateLessonRateRaw(teacherId, rateId);
 
-      if (!hourlyRate) {
-        res.status(404).json({ message: 'Lesson rate not found' });
-        return;
-      }
-
-      // Reactivate the hourly rate
-      const updatedRate = await prisma.teacherLessonHourlyRate.update({
-        where: {
-          id: rateId
-        },
-        data: {
-          deactivatedAt: null
-        }
-      });
-
+      // Transform the result within the controller
       res.status(200).json({
         id: updatedRate.id,
         type: updatedRate.type,
@@ -434,18 +247,18 @@ export const teacherController = {
       });
     } catch (error) {
       console.error('Error reactivating lesson rate:', error);
-      res.status(500).json({
-        message: 'An error occurred while reactivating lesson rate',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+      if (error instanceof Error && error.message.includes('Lesson rate not found')) {
+        res.status(404).json({ message: error.message });
+      } else {
+        res.status(500).json({ message: 'An error occurred while reactivating lesson rate' });
+      }
     }
   },
 
   /**
    * Get all lessons for a specific teacher.
    * Optionally filter by student ID.
-   * @param req Request - must include teacherId from authenticated user
-   * @param res Response
+   * Returns lessons based on shared models, augmented with goal counts.
    */
   getTeacherLessons: async (req: Request, res: Response): Promise<void> => {
     try {
@@ -453,71 +266,63 @@ export const teacherController = {
       const studentId = req.query.studentId as string | undefined;
       const authenticatedUserId = req.user?.id;
 
-      // Authorization: Ensure the authenticated user is requesting their own lessons
       if (!authenticatedUserId || authenticatedUserId !== requestedTeacherId) {
         res.status(403).json({ error: 'Forbidden: Can only access your own lessons' });
         return;
       }
 
-      // Fetch lessons for the authenticated teacher
-      const lessons = await prisma.lesson.findMany({
-        where: {
-          quote: {
-            teacherId: authenticatedUserId,
-            lessonRequest: studentId ? {
-              studentId
-            } : undefined
-          }
-        },
-        include: {
-          currentStatus: true,
-          quote: {
-            include: {
-              teacher: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                  email: true,
-                  phoneNumber: true,
-                  dateOfBirth: true
-                }
-              },
-              lessonRequest: {
-                include: {
-                  student: {
-                    select: {
-                      id: true,
-                      firstName: true,
-                      lastName: true,
-                      email: true,
-                      phoneNumber: true,
-                      dateOfBirth: true
-                    }
-                  },
-                  address: true
-                }
-              }
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
+      // Use the updated service method which returns shared Lesson models
+      const lessons: Lesson[] = await teacherService.findLessonsByTeacherId(authenticatedUserId, studentId);
 
-      // Transform lessons to include goal count
+      // Perform goal count within the controller using goalService
+      // Map over the shared Lesson models returned by the service
       const lessonsWithGoalCount = await Promise.all(lessons.map(async (lesson) => {
-        const goalCount = await prisma.goal.count({
-          where: { lessonId: lesson.id }
-        });
+        // Use goalService to get the count for the lesson ID
+        const goalCount = await goalService.getGoalCountByLessonId(lesson.id);
 
+        // Construct the response object.
+        // Since the service returns shared models (which exclude passwords),
+        // we can spread the lesson object and add the goalCount.
+        // We might need to manually serialize Dates to ISO strings if not done automatically by res.json
+        // and ensure the shared models are suitable for direct JSON serialization.
+        // A safer approach is to explicitly map properties.
         return {
-          ...lesson,
-          goalCount
+          id: lesson.id,
+          type: lesson.type,
+          startTime: lesson.startTime.toISOString(),
+          durationMinutes: lesson.durationMinutes,
+          costInCents: lesson.costInCents,
+          currentStatus: lesson.currentStatus.status, // Send only the status value
+          currentStatusId: lesson.currentStatusId, // Add currentStatusId
+          createdAt: lesson.createdAt?.toISOString(),
+          updatedAt: lesson.updatedAt?.toISOString(),
+          goalCount, // Add the fetched goal count
+          // Include relevant details from nested shared models (teacher, student, address)
+          // These are already sanitized (no passwords) by the service transformation
+          teacher: {
+            id: lesson.teacher.id,
+            firstName: lesson.teacher.firstName,
+            lastName: lesson.teacher.lastName,
+            email: lesson.teacher.email, // Consider if email should be exposed here
+            // Exclude phoneNumber, dateOfBirth? Define API contract clearly.
+          },
+          student: {
+            id: lesson.student.id,
+            firstName: lesson.student.firstName,
+            lastName: lesson.student.lastName,
+            // Exclude email, phoneNumber, dateOfBirth? Define API contract clearly.
+          },
+          address: {
+            street: lesson.address.street,
+            city: lesson.address.city,
+            postalCode: lesson.address.postalCode,
+            country: lesson.address.country,
+          }
+          // Explicitly DO NOT include lesson.quote or deeply nested objects unless needed
         };
       }));
 
+      // Send the transformed array as JSON
       res.status(200).json(lessonsWithGoalCount);
     } catch (error) {
       console.error('Error fetching teacher lessons:', error);
@@ -530,23 +335,19 @@ export const teacherController = {
 
   /**
    * Get statistics for a teacher
-   * @param req Request - must include teacherId from authenticated user
-   * @param res Response
-   * @param next NextFunction
    */
   getTeacherStats: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const teacherId = (req as any).user?.id; // Get ID from authenticated user
-
+      const teacherId = req.user?.id; // Get ID from authenticated user
       if (!teacherId) {
         res.status(401).json({ error: 'Unauthorized: Teacher ID not found in token.' });
         return;
       }
-
+      // This already uses the service correctly
       const stats = await teacherService.getTeacherStatistics(teacherId);
       res.status(200).json(stats);
     } catch (error) {
-      next(error);
+      next(error); // Use next for error handling middleware
     }
   }
 }; 

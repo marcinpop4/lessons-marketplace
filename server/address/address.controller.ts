@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import prisma from '../prisma.js';
 import { addressService } from './address.service.js';
 
 /**
@@ -15,9 +14,7 @@ export const addressController = {
     try {
       const { id } = req.params;
 
-      const address = await prisma.address.findUnique({
-        where: { id }
-      });
+      const address = await addressService.findById(id);
 
       if (!address) {
         res.status(404).json({
@@ -51,8 +48,7 @@ export const addressController = {
       }
 
       // Use the service to create the address
-      // We pass prisma here, consistent with other service calls
-      const newAddress = await addressService.create(prisma, {
+      const newAddress = await addressService.create({
         street,
         city,
         state,

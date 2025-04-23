@@ -17,7 +17,15 @@ router.get('/:goalId', authMiddleware, goalController.getGoalById);
 
 // Update the status of a specific goal (requires authentication)
 // PATCH /api/v1/goals/:goalId (body: { transition: GoalStatusTransition, context?: any })
-router.patch('/:goalId', authMiddleware, /* checkRole(...), */ goalController.updateGoalStatus);
+router.patch('/:goalId', authMiddleware, goalController.updateGoalStatus);
+
+// Get all goals for a specific lesson (requires authentication)
+// GET /api/v1/goals/lessons/:lessonId/goals
+router.get('/lessons/:lessonId/goals', authMiddleware, goalController.getGoalsByLessonId);
+
+// Generate AI recommendations for goals (requires authentication)
+// POST /api/v1/goals/recommendations/generate
+router.post('/recommendations/generate', authMiddleware, goalController.generateRecommendations);
 
 // --- Lesson-Specific Goal Routes ---
 // Note: These are nested under lessons for clarity, e.g., /api/v1/lessons/:lessonId/goals

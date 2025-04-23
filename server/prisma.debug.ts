@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import { PrismaClient } from '@prisma/client';
 import path from 'path';
+import prisma from './prisma.js';
 
 // Load environment variables
 dotenv.config();
@@ -29,7 +30,7 @@ if (process.env.DATABASE_URL) {
   console.log(`DATABASE_URL is set: ${maskedUrl}`);
 } else {
   console.log('DATABASE_URL is not set!');
-  
+
   // Check individual database config variables
   const dbVars = [
     'DB_HOST',
@@ -39,7 +40,7 @@ if (process.env.DATABASE_URL) {
     'POSTGRES_PASSWORD',
     'DB_SSL'
   ];
-  
+
   dbVars.forEach(varName => {
     const value = process.env[varName];
     if (varName === 'POSTGRES_PASSWORD' && value) {
@@ -72,7 +73,6 @@ if (fs.existsSync(schemaPath)) {
 
 // Try to connect to the database
 console.log('\nAttempting to connect to database...');
-const prisma = new PrismaClient();
 
 async function testConnection() {
   try {
@@ -86,4 +86,7 @@ async function testConnection() {
   }
 }
 
-testConnection(); 
+testConnection();
+
+// Use the singleton instance
+export default prisma; 

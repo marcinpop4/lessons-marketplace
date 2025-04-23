@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 // import { PrismaClient } from '@prisma/client'; // Remove unused
-import prisma from '../prisma.js';
 import { lessonQuoteService } from './lessonQuote.service.js';
 import { lessonService } from '../lesson/lesson.service.js'; // Import LessonService
+import { lessonRequestService } from '../lessonRequest/lessonRequest.service.js'; // Import LessonRequestService
 import { LessonType as SharedLessonType } from '@shared/models/LessonType.js'; // Alias for clarity
 import { lessonController } from '../lesson/lesson.controller.js'; // Import lessonController
 
@@ -28,22 +28,18 @@ export const lessonQuoteController = {
         return;
       }
 
-      // --- Check if Lesson Request exists --- //
-      const lessonRequest = await prisma.lessonRequest.findUnique({
-        where: { id: lessonRequestId },
-        select: { id: true, type: true } // Select only needed fields
-      });
+      // Check if Lesson Request exists using the service
+      const lessonRequest = await lessonRequestService.getLessonRequestById(lessonRequestId);
 
       if (!lessonRequest) {
         res.status(404).json({ message: `Lesson request with ID ${lessonRequestId} not found.` });
         return;
       }
-      // --- End Check --- //
 
-      // Pass lesson type to the service as well, casting Prisma enum to Shared enum
+      // Pass lesson type to the service
       const quotes = await lessonQuoteService.createQuotesForLessonRequest(
         lessonRequestId,
-        lessonRequest.type as SharedLessonType // Cast Prisma type to Shared type
+        lessonRequest.type as SharedLessonType // Use type from fetched request
       );
 
       // Respond with 200 OK as we are returning existing/newly created quotes
@@ -72,19 +68,15 @@ export const lessonQuoteController = {
         return;
       }
 
-      // --- Check if Lesson Request exists --- //
-      const lessonRequestExists = await prisma.lessonRequest.findUnique({
-        where: { id: lessonRequestId },
-        select: { id: true } // Only need to check existence
-      });
+      // Check if Lesson Request exists using the service
+      const lessonRequestExists = await lessonRequestService.getLessonRequestById(lessonRequestId);
 
       if (!lessonRequestExists) {
         res.status(404).json({ message: `Lesson request with ID ${lessonRequestId} not found.` });
         return;
       }
-      // --- End Check --- //
 
-      // Use the service
+      // Use the service to get quotes
       const quotes = await lessonQuoteService.getQuotesByLessonRequest(lessonRequestId);
       res.status(200).json(quotes);
     } catch (error) {
@@ -116,42 +108,33 @@ export const lessonQuoteController = {
     }
 
     try {
-      // --- Check if Quote exists and belongs to the user's request --- //
-      const quote = await prisma.lessonQuote.findUnique({
-        where: { id: quoteId },
-        include: {
-          lessonRequest: { select: { studentId: true } }, // Select only needed field
-          Lesson: { select: { id: true } } // Check if a lesson already exists
-        }
-      });
+      // Use the service to fetch the quote for checks
+      const quote = await lessonQuoteService.getQuoteForAcceptanceCheck(quoteId);
 
       if (!quote) {
         res.status(404).json({ error: `Quote with ID ${quoteId} not found.` });
         return;
       }
 
-      if (quote.lessonRequest.studentId !== userId) {
+      // Check ownership
+      if (quote.lessonRequest?.studentId !== userId) {
         res.status(403).json({ error: 'Forbidden: You can only accept quotes for your own lesson requests.' });
         return;
       }
 
       // Check if quote is already associated with a lesson
-      if (quote.Lesson) {
-        // Use 409 Conflict as it's a state conflict
+      if (quote.Lesson) { // Prisma includes relation as model name (Lesson)
         res.status(409).json({ error: 'Conflict: This quote has already been accepted and has an associated lesson.' });
         return;
       }
 
-      // --- End Checks --- //
-
-      // Use LessonService to create the lesson (handles transaction internally)
-      const createdLesson = await lessonService.create(prisma, quoteId);
+      // Use LessonService to create the lesson
+      const createdLesson = await lessonService.create(quoteId);
 
       // Transform the result before sending
       const modelLesson = lessonController.transformToModel(createdLesson);
 
-      // Return the transformed created lesson
-      res.status(200).json(modelLesson); // Use 200 OK as resource (Lesson) was implicitly created
+      res.status(200).json(modelLesson);
 
     } catch (error) {
       console.error('Error accepting quote:', error);

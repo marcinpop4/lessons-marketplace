@@ -1,8 +1,8 @@
 import prisma from '../prisma.js';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { addressService } from '../address/address.service.js';
-import { LessonType } from '@shared/models/LessonType.js';
-import { LessonStatus } from '@shared/models/LessonStatus.js';
+import { LessonType } from '../../shared/models/LessonType.js';
+import { LessonStatus } from '../../shared/models/LessonStatus.js';
 
 export interface AddressDTO {
   street: string;
@@ -21,6 +21,8 @@ export interface CreateLessonRequestDTO {
 }
 
 export class LessonRequestService {
+  private readonly prisma = prisma;
+
   /**
    * Create a new lesson request
    * @param data - Lesson request data
@@ -28,7 +30,7 @@ export class LessonRequestService {
    */
   async createLessonRequest(data: CreateLessonRequestDTO) {
     // Validate that the student exists first (outside transaction is fine)
-    const student = await prisma.student.findUnique({
+    const student = await this.prisma.student.findUnique({
       where: { id: data.studentId }
     });
     if (!student) {
@@ -37,15 +39,15 @@ export class LessonRequestService {
 
     try {
       // Use transaction for Address + LessonRequest creation
-      const lessonRequest = await prisma.$transaction(async (tx) => {
+      const lessonRequest = await this.prisma.$transaction(async (tx) => {
         // 1. Create Address using AddressService, passing the transaction client
-        const addressRecord = await addressService.create(tx as PrismaClient, {
+        const addressRecord = await addressService.create({
           street: data.addressObj.street,
           city: data.addressObj.city,
           state: data.addressObj.state,
           postalCode: data.addressObj.postalCode,
           country: data.addressObj.country
-        });
+        }, tx as PrismaClient);
 
         // Throw error if address creation failed within the service call (should not return null)
         if (!addressRecord) {
@@ -90,7 +92,7 @@ export class LessonRequestService {
    * @returns Lesson request or null if not found
    */
   async getLessonRequestById(id: string) {
-    return prisma.lessonRequest.findUnique({
+    return this.prisma.lessonRequest.findUnique({
       where: { id },
       include: {
         student: true,
@@ -110,7 +112,7 @@ export class LessonRequestService {
    * @returns Array of lesson requests
    */
   async getLessonRequestsByStudent(studentId: string) {
-    return prisma.lessonRequest.findMany({
+    return this.prisma.lessonRequest.findMany({
       where: { studentId },
       include: {
         address: true,
@@ -128,5 +130,5 @@ export class LessonRequestService {
   }
 }
 
-// Export a singleton instance
+// Export singleton instance
 export const lessonRequestService = new LessonRequestService(); 

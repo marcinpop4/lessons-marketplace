@@ -16,6 +16,12 @@ const updateGoalStatusSchema = z.object({
     context: z.any().optional(), // Allow any JSON structure for context
 });
 
+const generateRecommendationsSchema = z.object({
+    studentInfo: z.any(),
+    lessonInfo: z.any(),
+    pastLessons: z.array(z.any())
+});
+
 export const goalController = {
     /**
      * POST /goals - Create a new goal for a lesson
@@ -97,4 +103,22 @@ export const goalController = {
             next(error);
         }
     },
+
+    /**
+     * POST /goals/recommendations/generate - Generate AI-powered goal recommendations
+     */
+    async generateRecommendations(req: Request, res: Response, next: NextFunction) {
+        try {
+            const lessonId = req.query.lessonId as string;
+            if (!lessonId) {
+                res.status(400).json({ message: 'Lesson ID is required as a query parameter.' });
+                return;
+            }
+
+            const recommendations = await goalService.generateGoalRecommendations(lessonId);
+            res.status(200).json(recommendations);
+        } catch (error) {
+            next(error);
+        }
+    }
 }; 

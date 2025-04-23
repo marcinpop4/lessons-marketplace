@@ -1,0 +1,7 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+Only service classes, for example teacher.service.ts, get have access to Prisma, and manipulate the database directly. Service classes will get prisma objects and call static factories to instantiate shared models in shared/models
+Services should also respect domain design principles, manipulating their domains, and using service or APIs to get access to other domains when needed.

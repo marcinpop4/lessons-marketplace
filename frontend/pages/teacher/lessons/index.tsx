@@ -18,86 +18,94 @@ interface LessonDisplayData {
     goalCount: number;
 }
 
-// Helper function to instantiate models from raw API data
-const instantiateLessonFromData = (data: TeacherLessonApiResponseItem): LessonDisplayData | null => {
-    // Provide defaults for missing fields required by constructors, 
-    // as these are NOT fetched from the API anymore.
-    const studentData = {
-        id: data.quote.lessonRequest.student.id,
-        firstName: data.quote.lessonRequest.student.firstName,
-        lastName: data.quote.lessonRequest.student.lastName,
-        email: data.quote.lessonRequest.student.email,
-        phoneNumber: '', // Default value
-        dateOfBirth: new Date(0) // Default value
-    };
-    const teacherData = {
-        id: data.quote.teacher.id,
-        firstName: data.quote.teacher.firstName,
-        lastName: data.quote.teacher.lastName,
-        email: data.quote.teacher.email,
-        phoneNumber: '', // Default value
-        dateOfBirth: new Date(0), // Default value
-        hourlyRates: [] // Default value
-    };
+// Helper function to instantiate models from the FLATTENED API data
+// TODO: Update TeacherLessonApiResponseItem type if defined elsewhere (e.g., teacherApi.ts)
+// type TeacherLessonApiResponseItem = any; // Use 'any' for now, define properly later
 
-    const student = new Student(studentData);
-    const teacher = new Teacher(teacherData);
-    const address = new Address(data.quote.lessonRequest.address);
+const instantiateLessonFromData = (data: /*TeacherLessonApiResponseItem*/ any): LessonDisplayData | null => {
+    try {
+        // Instantiate directly nested models first
+        const student = new Student({
+            id: data.student.id,
+            firstName: data.student.firstName,
+            lastName: data.student.lastName,
+            // Provide defaults for fields not in the flattened API response
+            email: '',
+            phoneNumber: '',
+            dateOfBirth: new Date(0)
+        });
 
-    // Ensure LessonRequest type is correctly cast/handled
-    const lessonRequestType = data.quote.lessonRequest.type as LessonType;
-    if (!Object.values(LessonType).includes(lessonRequestType)) {
-        console.warn(`Invalid LessonType received: ${data.quote.lessonRequest.type}`);
-        // Handle invalid type, e.g., default or throw error
+        const teacher = new Teacher({
+            id: data.teacher.id,
+            firstName: data.teacher.firstName,
+            lastName: data.teacher.lastName,
+            email: data.teacher.email, // Email is included in the teacher object
+            // Provide defaults for fields not in the flattened API response
+            phoneNumber: '',
+            dateOfBirth: new Date(0)
+            // hourlyRates defaults in constructor
+        });
+
+        const address = new Address({
+            // Use properties from the flattened address object
+            street: data.address.street,
+            city: data.address.city,
+            postalCode: data.address.postalCode,
+            country: data.address.country,
+            // Provide defaults for fields not in the flattened API response (if Address constructor requires them)
+            id: '', // Assuming Address ID isn't critical here or provided
+            state: '' // Assuming state isn't critical here or provided
+        });
+
+        // Reconstruct LessonRequest using top-level and nested data
+        const lessonRequest = new LessonRequest({
+            // LessonRequest ID isn't directly available in the flattened structure.
+            // Using lesson ID as a placeholder, but this might not be correct semantically.
+            id: `req-for-${data.id}`, // Placeholder ID
+            type: data.type as LessonType, // Use top-level type
+            startTime: new Date(data.startTime), // Use top-level startTime
+            durationMinutes: data.durationMinutes, // Use top-level durationMinutes
+            address: address, // Use constructed address
+            student: student // Use constructed student
+        });
+
+        // Reconstruct LessonQuote using top-level and nested data
+        const lessonQuote = new LessonQuote({
+            // Quote ID isn't directly available. Using placeholder.
+            id: `quote-for-${data.id}`, // Placeholder ID
+            costInCents: data.costInCents, // Use top-level costInCents
+            // Provide default for missing hourlyRateInCents
+            hourlyRateInCents: 0, // Default to 0 as it's not in the flattened response
+            lessonRequest: lessonRequest, // Use constructed lessonRequest
+            teacher: teacher // Use constructed teacher
+        });
+
+        // Construct LessonStatus
+        const lessonStatus = new LessonStatus({
+            id: data.currentStatusId,
+            lessonId: data.id,
+            status: data.currentStatus as LessonStatusValue,
+            // context: null, // Assuming context is not provided
+            createdAt: new Date() // Defaulting createdAt as it's not in the flattened response
+        });
+
+        // Construct the final Lesson model
+        const lesson = new Lesson({
+            id: data.id,
+            quote: lessonQuote, // Use the reconstructed quote
+            currentStatusId: lessonStatus.id,
+            currentStatus: lessonStatus,
+            createdAt: data.createdAt ? new Date(data.createdAt) : undefined,
+            updatedAt: data.updatedAt ? new Date(data.updatedAt) : undefined
+        });
+
+        // Return the combined object for display
+        return { lesson, goalCount: data.goalCount };
+
+    } catch (instantiationError) {
+        console.error(`Error instantiating lesson data for ID ${data?.id}:`, instantiationError, "Data:", data);
+        return null; // Return null if any part of the instantiation fails
     }
-
-    const lessonRequest = new LessonRequest({
-        // Use only fields available in API response for lessonRequest base
-        id: data.quote.lessonRequest.id,
-        type: lessonRequestType,
-        startTime: new Date(data.quote.lessonRequest.startTime),
-        durationMinutes: data.quote.lessonRequest.durationMinutes,
-        // Pass instantiated objects
-        student: student,
-        address: address,
-    });
-
-    const lessonQuote = new LessonQuote({
-        // Use only fields available in API response for quote base
-        id: data.quote.id,
-        costInCents: data.quote.costInCents,
-        hourlyRateInCents: data.quote.hourlyRateInCents || 0,
-        // Pass instantiated objects
-        lessonRequest: lessonRequest,
-        teacher: teacher,
-        // Omit createdAt, use constructor default
-    });
-
-    // Get the full status object from the API data
-    const statusData = data.currentStatus;
-    if (!statusData || typeof statusData !== 'object' || !statusData.status || !Object.values(LessonStatusValue).includes(statusData.status as LessonStatusValue)) {
-        console.warn(`Lesson ${data.id} has missing or invalid status data from API:`, statusData, ". Skipping instantiation.");
-        return null; // Indicate failure to instantiate
-    }
-
-    // Construct the LessonStatus object
-    const lessonStatus = new LessonStatus({
-        id: statusData.id,
-        lessonId: data.id,
-        status: statusData.status as LessonStatusValue,
-        context: statusData.context || null, // Assuming context might be included
-        createdAt: statusData.createdAt ? new Date(statusData.createdAt) : new Date()
-    });
-
-    const lesson = new Lesson({
-        id: data.id,
-        quote: lessonQuote,
-        currentStatusId: lessonStatus.id, // Use ID from constructed status
-        currentStatus: lessonStatus // Pass the full LessonStatus object
-    });
-
-    // Return the combined object
-    return { lesson, goalCount: data.goalCount };
 };
 
 const TeacherLessonsPage: React.FC = () => {

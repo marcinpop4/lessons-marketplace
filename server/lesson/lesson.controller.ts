@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import prisma from '../prisma.js';
 import type { PrismaClient } from '@prisma/client';
 import { Lesson } from '../../shared/models/Lesson.js';
 import { LessonQuote } from '../../shared/models/LessonQuote.js';
@@ -120,7 +119,7 @@ export const lessonController = {
       }
 
       // Create lesson using the service
-      const lesson = await lessonService.create(prisma, quoteId);
+      const lesson = await lessonService.create(quoteId);
 
       // Transform to shared model
       const modelLesson = lessonController.transformToModel(lesson);
@@ -150,29 +149,8 @@ export const lessonController = {
     try {
       const { id } = req.params;
 
-      const lesson = await prisma.lesson.findUnique({
-        where: { id },
-        include: {
-          quote: {
-            include: {
-              teacher: true,
-              lessonRequest: {
-                include: {
-                  student: true,
-                  address: true
-                }
-              }
-            }
-          },
-          // Include the related LessonStatus records, ordered by createdAt descending, take 1
-          lessonStatuses: {
-            orderBy: {
-              createdAt: 'desc'
-            },
-            take: 1
-          }
-        }
-      });
+      // Use the service method
+      const lesson = await lessonService.getLessonById(id);
 
       if (!lesson) {
         res.status(404).json({
@@ -201,22 +179,8 @@ export const lessonController = {
     try {
       const { quoteId } = req.params;
 
-      const lessons = await prisma.lesson.findMany({
-        where: { quoteId },
-        include: {
-          quote: {
-            include: {
-              teacher: true,
-              lessonRequest: {
-                include: {
-                  student: true,
-                  address: true
-                }
-              }
-            }
-          }
-        }
-      });
+      // Use the service method
+      const lessons = await lessonService.getLessonsByQuoteId(quoteId);
 
       const modelLessons = lessons.map(lesson => lessonController.transformToModel(lesson));
       res.status(200).json(modelLessons);
@@ -255,7 +219,6 @@ export const lessonController = {
 
       // Call the service to update the status using transition
       const updatedLesson = await lessonService.updateStatus(
-        prisma, // Pass prisma client
         lessonId,
         transition as LessonStatusTransition,
         context, // Pass optional context

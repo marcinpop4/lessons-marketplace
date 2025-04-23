@@ -1,6 +1,7 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { LessonStatus, LessonStatusValue, LessonStatusTransition } from '../../shared/models/LessonStatus.js';
 import { v4 as uuidv4 } from 'uuid';
+import prisma from '../prisma.js';
 
 // Define the includes needed for the controller's transformToModel
 const lessonIncludeForTransform = {
@@ -25,18 +26,18 @@ const lessonIncludeForTransform = {
 };
 
 class LessonService {
+    private readonly prisma = prisma;
 
     /**
      * Create a new lesson from a quote and set its initial status to REQUESTED
-     * @param prisma Prisma client instance
      * @param quoteId The ID of the quote to create a lesson from
      * @returns The created lesson
      * @throws Error if creation fails
      */
-    async create(prisma: PrismaClient, quoteId: string) {
+    async create(quoteId: string) {
         try {
             // Use transaction to ensure both lesson and status are created
-            return await prisma.$transaction(async (tx) => {
+            return await this.prisma.$transaction(async (tx) => {
                 // Fetch the quote with related data
                 const quote = await tx.lessonQuote.findUnique({
                     where: { id: quoteId },
@@ -97,8 +98,8 @@ class LessonService {
                 return updatedLesson;
             });
         } catch (error) {
-            console.error(`Error creating lesson from quote ${quoteId}:`, error);
-            throw new Error(`Failed to create lesson: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            console.error(`Error creating lesson from quote ${quoteId}:`, error instanceof Error ? error.message : 'Unknown error');
+            throw error;
         }
     }
 
@@ -137,7 +138,6 @@ class LessonService {
      * Update the lesson's status by creating a new status record and updating the lesson's reference.
      * Handles the transaction internally.
      * **Validates the transition based on current status.**
-     * @param prisma Prisma client instance
      * @param lessonId The ID of the lesson to update
      * @param transition The requested status transition
      * @param context Additional context about the status change
@@ -146,14 +146,13 @@ class LessonService {
      * @throws Error if the update fails or transition is invalid
      */
     async updateStatus(
-        prisma: PrismaClient,
         lessonId: string,
         transition: LessonStatusTransition,
         context: Record<string, unknown> = {},
         authenticatedUserId?: string // Optional user ID for authorization
     ): Promise<any> {
         try {
-            return await prisma.$transaction(async (tx) => {
+            return await this.prisma.$transaction(async (tx) => {
                 // Fetch the current lesson with its latest status
                 const currentLesson = await tx.lesson.findUnique({
                     where: { id: lessonId },
@@ -206,6 +205,44 @@ class LessonService {
             console.error(`Error updating status for lesson ${lessonId} via transition ${transition}:`, error);
             // Re-throw error with more specific message if possible
             throw new Error(`Failed to update lesson status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Get a lesson by ID with all related data needed for transformation
+     * @param lessonId The ID of the lesson to fetch
+     * @returns The lesson with transformation-required related data or null if not found
+     */
+    async getLessonById(lessonId: string) {
+        try {
+            const lesson = await this.prisma.lesson.findUnique({
+                where: { id: lessonId },
+                include: lessonIncludeForTransform // Use the shared include object
+            });
+
+            return lesson;
+        } catch (error) {
+            console.error(`Error fetching lesson ${lessonId}:`, error);
+            throw new Error(`Failed to fetch lesson: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Get lessons by quote ID with all related data needed for transformation
+     * @param quoteId The ID of the quote
+     * @returns Array of lessons with transformation-required related data
+     */
+    async getLessonsByQuoteId(quoteId: string) {
+        try {
+            const lessons = await this.prisma.lesson.findMany({
+                where: { quoteId },
+                include: lessonIncludeForTransform // Use the shared include object
+            });
+
+            return lessons;
+        } catch (error) {
+            console.error(`Error fetching lessons for quote ${quoteId}:`, error);
+            throw new Error(`Failed to fetch lessons by quote: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 

@@ -175,7 +175,7 @@ async function main() {
     ];
     
     const teachers = await Promise.all(
-      teacherData.map(teacher => teacherService.create(prisma, { ...teacher, password: commonPassword })) 
+      teacherData.map(teacher => teacherService.create({ ...teacher, password: commonPassword })) 
     );
     console.log('Teachers created (via service):', teachers.length);
 
@@ -200,13 +200,13 @@ async function main() {
     ];
     
     const students = await Promise.all(
-      studentData.map(student => studentService.create(prisma, { ...student, password: commonPassword }))
+      studentData.map(student => studentService.create({ ...student, password: commonPassword }))
     );
     console.log('Students created (via service):', students.length);
 
     // Create Addresses using AddressService
     const addresses = await Promise.all(
-      sampleAddresses.map(addressData => addressService.create(prisma, addressData))
+      sampleAddresses.map(addressData => addressService.create(addressData))
     );
     console.log('Addresses created (via service):', addresses.length);
 
@@ -219,7 +219,7 @@ async function main() {
           const rateVariationInCents = Math.floor(Math.random() * 10) * 500;
           const rateInCents = baseRateInCents + rateVariationInCents;
           
-          return teacherLessonHourlyRateService.create(prisma, {
+          return teacherLessonHourlyRateService.create({
             teacherId: teacher.id, // Pass teacherId here as expected by the service
             type: lessonType,
             rateInCents: rateInCents,
@@ -275,7 +275,7 @@ async function main() {
         if (!hourlyRate) throw new Error(`No rate for Emily for ${request.type} on request ${i}`);
         const costInCents = Math.round((hourlyRate.rateInCents * request.durationMinutes) / 60);
         
-        const quote = await lessonQuoteService.create(prisma, { 
+        const quote = await lessonQuoteService.create({ 
             lessonRequestId: request.id,
             teacherId: emilyRichardson.id,
             costInCents,
@@ -299,7 +299,7 @@ async function main() {
             
             // 1. Create Lesson using the service (initial status is REQUESTED)
             // Note: lessonService.create uses a transaction internally
-            const createdLessonInitial = await lessonService.create(prisma, quote.id);
+            const createdLessonInitial = await lessonService.create(quote.id);
             if (!createdLessonInitial?.id) {
                  console.error(`Failed to create lesson for quote ${quote.id}`);
                  continue; // Skip if lesson creation failed
@@ -318,7 +318,6 @@ async function main() {
                     }
                     // Use lessonService.updateStatus which handles transactions
                     currentLessonState = await lessonService.updateStatus(
-                        prisma,
                         lessonId,
                         transition,
                         context,
@@ -340,12 +339,12 @@ async function main() {
     const extraQuoteForDefinedLesson = emilyQuotes[numBaseLessonRequests]; // Get the last quote reserved for this
     let goalFreeDefinedLesson = null;
     try {
-        const initialLesson = await lessonService.create(prisma, extraQuoteForDefinedLesson.id);
+        const initialLesson = await lessonService.create(extraQuoteForDefinedLesson.id);
         if (!initialLesson?.id) throw new Error('Failed to create initial goal-free lesson.');
         // Transition to ACCEPTED
-        const acceptedLesson = await lessonService.updateStatus(prisma, initialLesson.id, LessonStatusTransition.ACCEPT, {}, emilyRichardson.id);
+        const acceptedLesson = await lessonService.updateStatus(initialLesson.id, LessonStatusTransition.ACCEPT, {}, emilyRichardson.id);
         // Transition to DEFINED
-        goalFreeDefinedLesson = await lessonService.updateStatus(prisma, acceptedLesson.id, LessonStatusTransition.DEFINE, {}, emilyRichardson.id);
+        goalFreeDefinedLesson = await lessonService.updateStatus(acceptedLesson.id, LessonStatusTransition.DEFINE, {}, emilyRichardson.id);
         // Intentionally DO NOT add this lesson to createdLessonsData or process it for goals
     } catch (error) {
         console.error(`   ERROR creating special goal-free DEFINED lesson: ${error instanceof Error ? error.message : error}`);
@@ -417,11 +416,9 @@ async function main() {
 
   } catch (e) {
     console.error("Seeding failed:", e);
-    await prisma.$disconnect();
     process.exit(1);
   } finally {
     console.log('Seeding finished successfully.');
-    await prisma.$disconnect();
   }
 }
 

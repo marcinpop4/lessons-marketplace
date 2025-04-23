@@ -4,11 +4,25 @@ import { Lesson } from '@shared/models/Lesson';
 import { Goal } from '@shared/models/Goal';
 import { LessonStatusValue, LessonStatusTransition } from '@shared/models/LessonStatus';
 import { getLessonById, updateLessonStatus } from '@frontend/api/lessonApi';
-import { getGoalsByLessonId } from '@frontend/api/goalApi';
+import { getGoalsByLessonId, generateGoalRecommendations } from '@frontend/api/goalApi';
 import TeacherLessonDetailCard from '@frontend/components/TeacherLessonDetailCard';
 import GoalManager from '@frontend/components/GoalManager';
 import Button from '@frontend/components/shared/Button/Button';
 import { GoalStatusValue } from '@shared/models/GoalStatus';
+
+interface GoalRecommendation {
+    goal: {
+        title: string;
+        description: string;
+        numberOfLessons: number;
+    };
+}
+
+interface FormData {
+    title: string;
+    description: string;
+    estimatedLessonCount: number;
+}
 
 const TeacherLessonDetailsPage: React.FC = () => {
     const { lessonId } = useParams<{ lessonId: string }>();
@@ -19,6 +33,13 @@ const TeacherLessonDetailsPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    const [recommendations, setRecommendations] = useState<GoalRecommendation[]>([]);
+    const [selectedGoal, setSelectedGoal] = useState<GoalRecommendation | null>(null);
+    const [formData, setFormData] = useState<FormData>({
+        title: '',
+        description: '',
+        estimatedLessonCount: 1
+    });
 
     useEffect(() => {
         if (!lessonId) {
@@ -94,6 +115,30 @@ const TeacherLessonDetailsPage: React.FC = () => {
         navigate(-1);
     };
 
+    const handleGetRecommendations = async () => {
+        if (!lesson || !lessonId) return;
+
+        setIsLoading(true);
+        try {
+            const recommendations = await generateGoalRecommendations(lessonId);
+            setRecommendations(recommendations);
+        } catch (error) {
+            console.error('Error getting recommendations:', error);
+            setError(error instanceof Error ? error.message : 'Failed to get recommendations');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleSelectRecommendation = (recommendation: GoalRecommendation) => {
+        setSelectedGoal(recommendation);
+        setFormData({
+            title: recommendation.goal.title,
+            description: recommendation.goal.description,
+            estimatedLessonCount: recommendation.goal.numberOfLessons
+        });
+    };
+
     if (!lessonId) {
         return <div className="text-red-500 p-4">Error: Lesson ID is missing from URL.</div>;
     }
@@ -141,6 +186,46 @@ const TeacherLessonDetailsPage: React.FC = () => {
                 </Button>
             </div>
             {error && isSaving && <p className="text-red-500 text-right mt-2">Save Error: {error}</p>}
+
+            <div className="mt-4">
+                <Button
+                    onClick={handleGetRecommendations}
+                    disabled={isLoading}
+                    variant="secondary"
+                >
+                    {isLoading ? (
+                        <>
+                            Getting AI Recommendations...
+                        </>
+                    ) : (
+                        'Get AI Recommendations'
+                    )}
+                </Button>
+            </div>
+
+            {recommendations.length > 0 && (
+                <div className="mt-4 space-y-4">
+                    <h3 className="text-lg font-semibold">AI Recommendations</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {recommendations.map((rec, index) => (
+                            <div
+                                key={index}
+                                className={`p-4 rounded-lg border cursor-pointer transition-all ${selectedGoal === rec
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : 'border-gray-200 hover:border-blue-300'
+                                    }`}
+                                onClick={() => handleSelectRecommendation(rec)}
+                            >
+                                <h4 className="font-medium text-gray-900">{rec.goal.title}</h4>
+                                <p className="mt-2 text-sm text-gray-600">{rec.goal.description}</p>
+                                <p className="mt-2 text-sm text-gray-500">
+                                    Estimated lessons: {rec.goal.numberOfLessons}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

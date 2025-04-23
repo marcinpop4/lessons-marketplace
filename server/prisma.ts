@@ -3,23 +3,37 @@ import { PrismaClient, Prisma } from '@prisma/client'; // Import Prisma namespac
 // Import the database configuration
 import './config/database.js';
 
-// Determine if we're in debug mode based on log level
-const isDebugMode = process.env.NODE_ENV === 'development';
-const silencePrismaErrors = process.env.SILENCE_PRISMA_EXPECTED_ERRORS === 'true';
-
-// Define log levels based on environment
-let logLevels: Prisma.LogLevel[] = ['warn']; // Always include warnings
-if (!silencePrismaErrors) {
-  logLevels.push('error'); // Add errors unless specifically silenced
-}
-if (isDebugMode) {
-  // Add info in development (optional, could add 'query' here too if needed)
-  logLevels.push('info');
+// In development, we need to store the PrismaClient instance globally
+// to prevent creating multiple instances during hot reloading.
+// In production, the app runs without reloading, so we don't need this.
+declare global {
+  var prisma: PrismaClient | undefined;
 }
 
-// Create a singleton instance of PrismaClient
-const prisma = new PrismaClient({
-  log: logLevels,
-});
+// Configure logging based on environment
+const getLogLevels = (): Prisma.LogLevel[] => {
+  const levels: Prisma.LogLevel[] = ['warn']; // Always log warnings
+
+  if (process.env.SILENCE_PRISMA_EXPECTED_ERRORS !== 'true') {
+    levels.push('error');
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    levels.push('info');
+  }
+
+  return levels;
+};
+
+// In development: Reuse existing instance if one exists (stored in global)
+// In production: Always create a new instance (module loaded only once)
+const prisma = process.env.NODE_ENV === 'development'
+  ? global.prisma || new PrismaClient({ log: getLogLevels() })
+  : new PrismaClient({ log: getLogLevels() });
+
+// Store instance in global to prevent multiple instances in development
+if (process.env.NODE_ENV === 'development') {
+  global.prisma = prisma;
+}
 
 export default prisma; 

@@ -94,26 +94,18 @@ class PasswordAuthProvider implements AuthProvider {
     let user;
     try {
       if (userType === 'STUDENT') {
-        user = await studentService.create(prisma, {
-          email,
-          password,
-          firstName,
-          lastName,
-          phoneNumber,
-          dateOfBirth,
+        user = await studentService.create({
+          ...userData,
+          password: password
         });
 
         if (!user) {
           throw new Error('Student creation failed unexpectedly in service.');
         }
       } else if (userType === 'TEACHER') {
-        user = await teacherService.create(prisma, {
-          email,
-          password,
-          firstName,
-          lastName,
-          phoneNumber,
-          dateOfBirth,
+        user = await teacherService.create({
+          ...userData,
+          password: password
         });
 
         if (!user) {

@@ -78,6 +78,23 @@ export const updateGoalStatus = async (goalId: string, transition: GoalStatusTra
     }
 };
 
+/**
+ * Generate AI-powered goal recommendations for a lesson
+ * @param lessonId The ID of the lesson to generate recommendations for
+ * @returns A promise resolving to an array of goal recommendations
+ */
+export const generateGoalRecommendations = async (
+    lessonId: string
+): Promise<Array<{ goal: { title: string; description: string; numberOfLessons: number } }>> => {
+    try {
+        const response = await apiClient.post(`/api/v1/goals/recommendations/generate?lessonId=${lessonId}`);
+        return response.data;
+    } catch (error) {
+        console.error('Error generating goal recommendations:', error);
+        throw error;
+    }
+};
+
 // Note: If you need a generic updateStatus function for goals:
 // export const updateGoalStatus = async (goalId: string, transition: GoalStatusTransition, context?: any): Promise<Goal> => {
 //   try {

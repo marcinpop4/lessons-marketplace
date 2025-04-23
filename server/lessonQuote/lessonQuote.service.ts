@@ -7,29 +7,25 @@ import { LessonRequest } from '../../shared/models/LessonRequest.js';
 import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourlyRate.js';
 import { Student } from '../../shared/models/Student.js';
 import { Address } from '../../shared/models/Address.js';
+import { Prisma } from '@prisma/client';
 
 class LessonQuoteService {
+    private readonly prisma = prisma;
+
     /**
      * Create a single lesson quote directly.
-     * @param prismaClient - Prisma client instance
      * @param quoteData - Data for creating the quote
      * @returns The created quote
      */
-    async create(
-        prismaClient: PrismaClient,
-        quoteData: {
-            lessonRequestId: string;
-            teacherId: string;
-            costInCents: number;
-            hourlyRateInCents: number;
-        }
-    ) {
+    async create(quoteData: {
+        lessonRequestId: string;
+        teacherId: string;
+        costInCents: number;
+        hourlyRateInCents: number;
+    }) {
         try {
-            // Use the provided prisma client
-            const tx = prismaClient;
-
             // Create the quote
-            const quote = await tx.lessonQuote.create({
+            const quote = await this.prisma.lessonQuote.create({
                 data: {
                     lessonRequest: { connect: { id: quoteData.lessonRequestId } },
                     teacher: { connect: { id: quoteData.teacherId } },
@@ -60,7 +56,7 @@ class LessonQuoteService {
      * @returns Array of available teachers
      */
     async getAvailableTeachers(lessonType: LessonType): Promise<Teacher[]> {
-        const dbTeachers = await prisma.teacher.findMany({
+        const dbTeachers = await this.prisma.teacher.findMany({
             where: {
                 teacherLessonHourlyRates: {
                     some: {
@@ -120,7 +116,7 @@ class LessonQuoteService {
         lessonType: LessonType
     ): Promise<LessonQuote[]> {
         // Get the lesson request with all necessary data
-        const dbLessonRequest = await prisma.lessonRequest.findUnique({
+        const dbLessonRequest = await this.prisma.lessonRequest.findUnique({
             where: { id: lessonRequestId },
             include: {
                 student: true,
@@ -197,7 +193,7 @@ class LessonQuoteService {
                 // Calculate cost based on lesson duration and hourly rate
                 const costInCents = hourlyRate.calculateCostForDuration(lessonRequest.durationMinutes);
 
-                const quote = await prisma.lessonQuote.create({
+                const quote = await this.prisma.lessonQuote.create({
                     data: {
                         lessonRequest: { connect: { id: lessonRequestId } },
                         teacher: { connect: { id: teacherModel.id } },
@@ -297,12 +293,33 @@ class LessonQuoteService {
     }
 
     /**
+     * Get a specific lesson quote with minimal related data for acceptance checks.
+     * Returns raw Prisma data.
+     * @param quoteId - ID of the lesson quote
+     * @returns Lesson quote with nested lesson request student ID and lesson ID, or null
+     */
+    async getQuoteForAcceptanceCheck(quoteId: string): Promise<Prisma.LessonQuoteGetPayload<{ include: { lessonRequest: { select: { studentId: true } }, Lesson: { select: { id: true } } } }> | null> {
+        try {
+            return await this.prisma.lessonQuote.findUnique({
+                where: { id: quoteId },
+                include: {
+                    lessonRequest: { select: { studentId: true } }, // Select only needed field
+                    Lesson: { select: { id: true } } // Check if a lesson already exists
+                }
+            });
+        } catch (error) {
+            console.error(`Error fetching quote ${quoteId} for acceptance check:`, error);
+            throw new Error(`Failed to fetch quote: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
      * Get all quotes for a lesson request
      * @param lessonRequestId - ID of the lesson request
      * @returns Array of quotes with teacher information
      */
     async getQuotesByLessonRequest(lessonRequestId: string): Promise<LessonQuote[]> {
-        const dbQuotes = await prisma.lessonQuote.findMany({
+        const dbQuotes = await this.prisma.lessonQuote.findMany({
             where: { lessonRequestId },
             include: {
                 teacher: {
