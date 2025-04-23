@@ -26,8 +26,7 @@ import { lessonRequestService } from '../lessonRequest/lessonRequest.service.js'
 // Import the lesson quote service
 import { lessonQuoteService } from '../lessonQuote/lessonQuote.service.js'; 
 import { lessonService } from '../lesson/lesson.service.js'; 
-import { teacherLessonHourlyRateService } from '../teacher/teacherLessonHourlyRate.service.js'; 
-// Import Goal service
+import { teacherLessonHourlyRateService } from '../teacher-lesson-hourly-rate/teacherLessonHourlyRate.service.js';
 import { goalService } from '../goal/goal.service.js';
 
 // Initialize Prisma client (passed to services)
@@ -219,11 +218,12 @@ async function main() {
           const rateVariationInCents = Math.floor(Math.random() * 10) * 500;
           const rateInCents = baseRateInCents + rateVariationInCents;
           
-          return teacherLessonHourlyRateService.create({
-            teacherId: teacher.id, // Pass teacherId here as expected by the service
-            type: lessonType,
-            rateInCents: rateInCents,
-          });
+          // Use the new service method
+          return teacherLessonHourlyRateService.findOrCreateOrUpdate(
+            teacher.id, 
+            lessonType,
+            rateInCents
+          );
         })
       );
       teacherLessonHourlyRates.push(...teacherRates);

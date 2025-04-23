@@ -85,8 +85,6 @@ model TeacherLessonHourlyRate {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
   deactivatedAt DateTime?
-
-  @@unique([teacherId, type])
 }
 
 // Address model for storing physical locations

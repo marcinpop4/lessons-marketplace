@@ -1,4 +1,4 @@
-import { AppError } from './AppError.js';
+import { AppError } from './app.error.js';
 
 /**
  * Represents a 400 Bad Request error.
@@ -9,7 +9,7 @@ export class BadRequestError extends AppError {
      * @param message - The error message. Defaults to 'Bad request'.
      */
     constructor(message = 'Bad request') {
-        super(400, message);
+        super(message, 400);
         this.name = 'BadRequestError';
     }
 } 

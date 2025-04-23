@@ -3,8 +3,7 @@ import { Goal, GoalStatus, GoalStatusTransition, GoalStatusValue, DbGoalWithStat
 import { DbLessonWithNestedRelations } from '../../shared/models/Lesson.js';
 import { randomUUID } from 'crypto';
 // import { AppError } from '../utils/AppError.js'; // Old import
-import { NotFoundError } from '../errors/NotFoundError.js';
-import { BadRequestError } from '../errors/BadRequestError.js';
+import { NotFoundError, BadRequestError } from '../errors/index.js';
 import OpenAI from 'openai';
 import { studentService } from '../student/student.service.js';
 import { lessonService } from '../lesson/lesson.service.js';

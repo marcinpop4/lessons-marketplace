@@ -1,4 +1,4 @@
-import { AppError } from './AppError.js';
+import { AppError } from './app.error.js';
 
 /**
  * Represents a 404 Not Found error.
@@ -9,7 +9,7 @@ export class NotFoundError extends AppError {
      * @param message - The error message. Defaults to 'Resource not found'.
      */
     constructor(message = 'Resource not found') {
-        super(404, message);
+        super(message, 404);
         this.name = 'NotFoundError';
     }
 } 

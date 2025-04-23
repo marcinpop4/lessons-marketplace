@@ -1,7 +1,9 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { Student } from '../../shared/models/Student.js';
 import * as bcrypt from 'bcrypt';
-import prisma from '../prisma.js';
+import { DuplicateEmailError } from '../errors/index.js';
+
+const prisma = new PrismaClient();
 
 class StudentService {
     private readonly prisma = prisma;
@@ -29,13 +31,17 @@ class StudentService {
             // Use Student.fromDb to transform and return
             return Student.fromDb(dbStudent);
         } catch (error) {
-            console.error('Error creating student:', error);
             // Check for Prisma unique constraint violation (P2002)
             if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-                // Assuming the constraint violation is on the email field based on the test context
-                throw new Error(`Student with email ${studentData.email} already exists.`);
+                // Check if the error target includes 'email' (more robust)
+                const target = error.meta?.target as string[] | undefined;
+                if (target && target.includes('email')) {
+                    // Throw the specific custom error
+                    throw new DuplicateEmailError(studentData.email);
+                }
             }
-            // Re-throw other errors
+            // Log and re-throw other errors
+            console.error('Error creating student:', error);
             throw error;
         }
     }

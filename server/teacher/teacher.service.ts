@@ -12,6 +12,7 @@ import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourly
 import { LessonType } from '../../shared/models/LessonType.js';
 import * as bcrypt from 'bcrypt';
 import prisma from '../prisma.js';
+import { AppError, DuplicateEmailError } from '../errors/index.js'; // Import custom error
 
 
 // Define more specific Prisma types with includes for transformation
@@ -44,15 +45,20 @@ class TeacherService {
     async create(teacherData: Prisma.TeacherCreateInput & { password: string }): Promise<Teacher> {
         try {
             const hashedPassword = await bcrypt.hash(teacherData.password, 10);
-            // Fetch the created teacher *without* rates initially
             const dbTeacher = await this.prisma.teacher.create({ data: { ...teacherData, password: hashedPassword, authMethods: ['PASSWORD'], isActive: true } });
-            // Pass the teacher object, but no rates (pass undefined or omit)
-            return Teacher.fromDb(dbTeacher); // Rates will be empty array by default
+            return Teacher.fromDb(dbTeacher);
         } catch (error) {
-            console.error('Error creating teacher:', error);
+            // Check for Prisma unique constraint violation (P2002)
             if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-                throw new Error(`Teacher with email ${teacherData.email} already exists.`);
+                // Check if the error target includes 'email' (more robust)
+                const target = error.meta?.target as string[] | undefined;
+                if (target && target.includes('email')) {
+                    // Throw the specific custom error
+                    throw new DuplicateEmailError(teacherData.email);
+                }
             }
+            // Log and re-throw other errors
+            console.error('Error creating teacher:', error);
             throw error;
         }
     }
@@ -99,109 +105,6 @@ class TeacherService {
         }
         // Use Teacher.fromDb - Cast rates as they are included
         return Teacher.fromDb(dbTeacher, dbTeacher.teacherLessonHourlyRates as DbTeacherLessonHourlyRate[]);
-    }
-
-    /**
-     * Create or update a lesson hourly rate for a teacher.
-     * Returns the created/updated shared TeacherLessonHourlyRate model instance.
-     */
-    async upsertLessonRate(teacherId: string, rateData: { lessonType: LessonType; rateInCents: number; id?: string }): Promise<TeacherLessonHourlyRate> {
-        const { id, lessonType, rateInCents } = rateData;
-
-        const teacherExists = await this.prisma.teacher.count({ where: { id: teacherId } });
-        if (teacherExists === 0) {
-            throw new Error('Teacher not found');
-        }
-
-        let dbRate: DbTeacherLessonHourlyRate;
-
-        if (id) {
-            // Update existing rate
-            const existingRate = await this.prisma.teacherLessonHourlyRate.findFirst({
-                where: { id, teacherId }
-            });
-            if (!existingRate) {
-                throw new Error('Lesson rate not found or does not belong to this teacher');
-            }
-            // When updating, ensure it's reactivated by setting deactivatedAt to null
-            dbRate = await this.prisma.teacherLessonHourlyRate.update({
-                where: { id },
-                data: {
-                    rateInCents: rateInCents,
-                    deactivatedAt: null // Explicitly reactivate on update
-                }
-            });
-        } else {
-            // Create new rate
-            // Check if an active or inactive rate already exists for this type
-            const existingRate = await this.prisma.teacherLessonHourlyRate.findUnique({
-                where: { teacherId_type: { teacherId, type: lessonType } }
-            });
-            if (existingRate) {
-                // Instead of throwing, update the existing rate to reactivate and set the new price
-                console.warn(`Rate for ${lessonType} already exists for teacher ${teacherId}. Updating existing rate.`);
-                dbRate = await this.prisma.teacherLessonHourlyRate.update({
-                    where: { id: existingRate.id },
-                    data: {
-                        rateInCents: rateInCents,
-                        deactivatedAt: null // Ensure it's active
-                    }
-                });
-            } else {
-                // Create a new rate if none exists
-                dbRate = await this.prisma.teacherLessonHourlyRate.create({
-                    data: {
-                        teacherId,
-                        type: lessonType,
-                        rateInCents
-                        // deactivatedAt defaults to null
-                    }
-                });
-            }
-        }
-        // Use TeacherLessonHourlyRate.fromDb
-        return TeacherLessonHourlyRate.fromDb(dbRate);
-    }
-
-    /**
-     * Deactivate a lesson hourly rate for a teacher.
-     * Returns the deactivated shared TeacherLessonHourlyRate model instance.
-     */
-    async deactivateLessonRate(teacherId: string, rateId: string): Promise<TeacherLessonHourlyRate> {
-        // Verify the rate exists and belongs to the teacher before updating
-        const existingRate = await this.prisma.teacherLessonHourlyRate.findFirst({
-            where: { id: rateId, teacherId }
-        });
-        if (!existingRate) {
-            throw new Error('Lesson rate not found or does not belong to this teacher');
-        }
-        // Prevent deactivating if it's already deactivated? Or allow (idempotent)? Allowing is simpler.
-        const dbRate = await this.prisma.teacherLessonHourlyRate.update({
-            where: { id: rateId }, // Use the specific ID confirmed to belong to the teacher
-            data: { deactivatedAt: new Date() }
-        });
-        // Use TeacherLessonHourlyRate.fromDb
-        return TeacherLessonHourlyRate.fromDb(dbRate);
-    }
-
-    /**
-     * Reactivate a previously deactivated lesson hourly rate.
-     * Returns the reactivated shared TeacherLessonHourlyRate model instance.
-     */
-    async reactivateLessonRate(teacherId: string, rateId: string): Promise<TeacherLessonHourlyRate> {
-        // Verify the rate exists and belongs to the teacher before updating
-        const existingRate = await this.prisma.teacherLessonHourlyRate.findFirst({
-            where: { id: rateId, teacherId }
-        });
-        if (!existingRate) {
-            throw new Error('Lesson rate not found or does not belong to this teacher');
-        }
-        const dbRate = await this.prisma.teacherLessonHourlyRate.update({
-            where: { id: rateId }, // Use the specific ID
-            data: { deactivatedAt: null } // Set deactivatedAt to null to reactivate
-        });
-        // Use TeacherLessonHourlyRate.fromDb
-        return TeacherLessonHourlyRate.fromDb(dbRate);
     }
 
     /**

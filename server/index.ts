@@ -81,11 +81,13 @@ import lessonRequestRoutes from './lessonRequest/lessonRequest.routes.js';
 import teacherRoutes from './teacher/teacher.routes.js';
 import lessonRoutes from './lesson/lesson.routes.js';
 import authRoutes from './auth/auth.routes.js';
+import refreshTokenRoutes from './auth/refreshToken.route.js';
 import lessonQuoteRoutes from './lessonQuote/lessonQuote.routes.js';
 import addressRoutes from './address/address.routes.js';
 import healthRoutes from './health/health.routes.js';
 import studentRoutes from './student/student.routes.js';
 import goalRoutes from './goal/goal.routes.js';
+import teacherLessonHourlyRateRoutes from './teacher-lesson-hourly-rate/teacherLessonHourlyRate.router.js';
 
 // --- Express App Setup --- 
 const app: Express = express();
@@ -200,6 +202,7 @@ app.get('/api/health', async (req: Request, res: Response, next: NextFunction): 
 
 // API Routes
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/auth', refreshTokenRoutes);
 app.use('/api/v1/lesson-requests', lessonRequestRoutes);
 app.use('/api/v1/teachers', teacherRoutes);
 app.use('/api/v1/lessons', lessonRoutes);
@@ -208,6 +211,7 @@ app.use('/api/v1/addresses', addressRoutes);
 app.use('/api/v1/goals', goalRoutes);
 app.use('/api/v1/health', healthRoutes);
 app.use('/api/v1/students', studentRoutes);
+app.use('/api/v1/teacher-lesson-rates', teacherLessonHourlyRateRoutes);
 
 // Root Documentation Endpoint
 app.get('/', (req: Request, res: Response, next: NextFunction): void => {

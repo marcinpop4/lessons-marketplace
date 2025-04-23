@@ -1,13 +1,15 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, PrismaClient, UserType } from '@prisma/client';
 import prisma from '../prisma.js';
-import authService, { AuthProvider } from './authService.js';
+import authService, { AuthProvider } from './auth.service.js';
+import { refreshTokenService } from './refreshToken.service.js';
 import { studentService } from '../student/student.service.js';
 import { teacherService } from '../teacher/teacher.service.js';
+import { AppError } from '../errors/index.js';
 
 interface PasswordCredentials {
   email: string;
   password: string;
-  userType: 'STUDENT' | 'TEACHER';
+  userType: UserType;
 }
 
 interface RegisterUserData {
@@ -17,53 +19,57 @@ interface RegisterUserData {
   lastName: string;
   phoneNumber: string;
   dateOfBirth: Date;
-  userType: 'STUDENT' | 'TEACHER';
+  userType: UserType;
 }
 
+type AuthProviderResult = {
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    userType: UserType;
+  };
+  accessToken: string;
+  uniqueRefreshToken: string;
+};
+
 class PasswordAuthProvider implements AuthProvider {
-  async authenticate(credentials: PasswordCredentials) {
+  async authenticate(credentials: PasswordCredentials): Promise<AuthProviderResult> {
     const { email, password, userType } = credentials;
 
-    // Find the user based on userType
     let user;
-    if (userType === 'STUDENT') {
+    if (userType === UserType.STUDENT) {
       user = await prisma.student.findUnique({ where: { email } });
-    } else if (userType === 'TEACHER') {
+    } else if (userType === UserType.TEACHER) {
       user = await prisma.teacher.findUnique({ where: { email } });
     } else {
-      throw new Error('Invalid user type');
+      throw new Error(`Invalid user type provided`);
     }
 
-    // Check if user exists
     if (!user) {
-      throw new Error('User not found');
+      throw new Error('User not found or invalid credentials');
     }
-
-    // Check if password is set
     if (!user.password) {
       throw new Error('Password authentication not set up for this user');
     }
-
-    // Check if user's authMethods includes PASSWORD
     if (!user.authMethods.includes('PASSWORD')) {
       throw new Error('Password authentication not enabled for this user');
     }
 
-    // Verify password
     const isValidPassword = await authService.comparePassword(password, user.password);
     if (!isValidPassword) {
-      throw new Error('Invalid password');
+      throw new Error('Invalid password or invalid credentials');
     }
 
-    // Generate tokens
     const accessToken = authService.generateToken({
       id: user.id,
-      userType: userType === 'STUDENT' ? 'STUDENT' : 'TEACHER',
+      userType: userType,
     });
 
-    const refreshToken = await authService.generateRefreshToken(
+    const uniqueRefreshToken = await refreshTokenService.createRefreshToken(
       user.id,
-      userType === 'STUDENT' ? 'STUDENT' : 'TEACHER'
+      userType
     );
 
     return {
@@ -75,62 +81,45 @@ class PasswordAuthProvider implements AuthProvider {
         userType: userType,
       },
       accessToken,
-      refreshToken,
+      uniqueRefreshToken,
     };
   }
 
-  async register(userData: RegisterUserData) {
-    const {
-      email,
-      password,
-      firstName,
-      lastName,
-      phoneNumber,
-      dateOfBirth,
-      userType
-    } = userData;
+  async register(userData: RegisterUserData): Promise<AuthProviderResult> {
+    const { userType, password, ...restUserData } = userData;
 
-    // Create user based on userType
     let user;
     try {
-      if (userType === 'STUDENT') {
-        user = await studentService.create({
-          ...userData,
-          password: password
-        });
-
-        if (!user) {
-          throw new Error('Student creation failed unexpectedly in service.');
-        }
-      } else if (userType === 'TEACHER') {
-        user = await teacherService.create({
-          ...userData,
-          password: password
-        });
-
-        if (!user) {
-          throw new Error('Teacher creation failed unexpectedly in service.');
-        }
+      if (userType === UserType.STUDENT) {
+        user = await studentService.create({ ...restUserData, password });
+        if (!user) throw new Error('Student creation failed.');
+      } else if (userType === UserType.TEACHER) {
+        user = await teacherService.create({ ...restUserData, password });
+        if (!user) throw new Error('Teacher creation failed.');
       } else {
-        throw new Error('Invalid user type');
+        throw new Error(`Invalid user type provided`);
       }
-    } catch (error) {
-      console.error('Error during user creation in passwordAuthProvider:', error);
+    } catch (error: unknown) {
+      if (error instanceof AppError) {
+        console.error('AppError during user creation in passwordAuthProvider:', error);
+        throw error;
+      }
+
+      console.error('Unexpected error during user creation in passwordAuthProvider:', error);
       if (error instanceof Error) {
-        throw new Error(error.message);
+        throw new Error(`Registration failed internally: ${error.message}`);
       }
       throw new Error('An unexpected error occurred during registration.');
     }
 
-    // Generate tokens
     const accessToken = authService.generateToken({
       id: user.id,
-      userType: userType === 'STUDENT' ? 'STUDENT' : 'TEACHER',
+      userType: userType,
     });
 
-    const refreshToken = await authService.generateRefreshToken(
+    const uniqueRefreshToken = await refreshTokenService.createRefreshToken(
       user.id,
-      userType === 'STUDENT' ? 'STUDENT' : 'TEACHER'
+      userType
     );
 
     return {
@@ -142,7 +131,7 @@ class PasswordAuthProvider implements AuthProvider {
         userType: userType,
       },
       accessToken,
-      refreshToken,
+      uniqueRefreshToken,
     };
   }
 }
