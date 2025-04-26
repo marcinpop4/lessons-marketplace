@@ -13,6 +13,7 @@ import prisma from '../prisma.js';
 import { LessonType } from '../../shared/models/LessonType.js';
 import { GoalRecommendation } from '../../shared/models/GoalRecommendation.js';
 import { Response } from 'express';
+import { GoalMapper } from './goal.mapper.js';
 
 // --- Configuration Constants ---
 const LOG_STREAMING_DETAILS = process.env.LOG_STREAMING_DETAILS === 'true' || false; // Default to false
@@ -77,11 +78,7 @@ export const goalService = {
         });
 
         // Use the factory method on the fetched data
-        const goalModel = Goal.fromDb(createdGoalWithStatus as DbGoalWithStatus); // Cast needed here
-        if (!goalModel) {
-            // Handle cases where fromDb might return null
-            throw new Error(`Failed to construct Goal model from created DB data for goal ID: ${goalId}`);
-        }
+        const goalModel = GoalMapper.toModel(createdGoalWithStatus as DbGoalWithStatus);
 
         return goalModel;
     },
@@ -152,11 +149,7 @@ export const goalService = {
         });
 
         // Use the factory method on the fetched data
-        const goalModel = Goal.fromDb(updatedGoalWithStatus as DbGoalWithStatus); // Cast needed here
-        if (!goalModel) {
-            // Handle cases where fromDb might return null
-            throw new Error(`Failed to construct Goal model from updated DB data for goal ID: ${goalId}`);
-        }
+        const goalModel = GoalMapper.toModel(updatedGoalWithStatus as DbGoalWithStatus);
 
         return goalModel;
     },
@@ -175,7 +168,7 @@ export const goalService = {
         }
 
         // Use the factory method
-        return Goal.fromDb(goalData as DbGoalWithStatus); // Cast needed as Prisma types don't automatically narrow
+        return GoalMapper.toModel(goalData as DbGoalWithStatus);
     },
 
     /**
@@ -191,9 +184,7 @@ export const goalService = {
         });
 
         // Use the factory method and filter out nulls
-        return goalsData
-            .map(goalData => Goal.fromDb(goalData as DbGoalWithStatus)) // Cast needed
-            .filter((goal): goal is Goal => goal !== null); // Type guard to filter nulls and satisfy TS
+        return goalsData.map(goalData => GoalMapper.toModel(goalData as DbGoalWithStatus));
     },
 
     /**
@@ -250,7 +241,7 @@ export const goalService = {
                 type: currentLesson.quote.lessonRequest.type,
                 durationMinutes: currentLesson.quote.lessonRequest.durationMinutes,
                 startTime: currentLesson.quote.lessonRequest.startTime.toISOString(),
-                status: currentLesson.currentStatus.status,
+                status: currentLesson.currentStatus?.status || 'UNKNOWN',
                 goals: currentLessonGoals.map(g => ({
                     title: g.title,
                     description: g.description, // Keep description for context

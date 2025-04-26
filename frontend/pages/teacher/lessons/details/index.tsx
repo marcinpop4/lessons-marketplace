@@ -259,7 +259,7 @@ const TeacherLessonDetailsPage: React.FC = () => {
         return <div className="p-4">Lesson data could not be loaded. {error || ''}</div>;
     }
 
-    const isLessonDefined = lesson.currentStatus.status === LessonStatusValue.DEFINED;
+    const isLessonDefined = lesson.currentStatus?.status === LessonStatusValue.DEFINED;
 
     return (
         <div className="container mx-auto p-4 space-y-6">

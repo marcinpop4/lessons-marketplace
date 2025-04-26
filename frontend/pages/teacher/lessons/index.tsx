@@ -93,7 +93,6 @@ const instantiateLessonFromData = (data: /*TeacherLessonApiResponseItem*/ any): 
         const lesson = new Lesson({
             id: data.id,
             quote: lessonQuote, // Use the reconstructed quote
-            currentStatusId: lessonStatus.id,
             currentStatus: lessonStatus,
             createdAt: data.createdAt ? new Date(data.createdAt) : undefined,
             updatedAt: data.updatedAt ? new Date(data.updatedAt) : undefined
@@ -266,7 +265,7 @@ const TeacherLessonsPage: React.FC = () => {
                                     key={item.lesson.id}
                                     lesson={item.lesson}
                                     goalCount={item.goalCount}
-                                    currentStatus={item.lesson.currentStatus.status}
+                                    currentStatus={item.lesson.currentStatus?.status || LessonStatusValue.ACCEPTED}
                                     onUpdateStatus={handleUpdateStatus}
                                     isUpdating={updatingLessonId === item.lesson.id}
                                 />

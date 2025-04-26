@@ -1,8 +1,8 @@
-import { JsonValue } from '@prisma/client/runtime/library';
-import type { LessonStatus as DbLessonStatus } from '@prisma/client'; // Import Prisma type
+// Define a JSON value type
+type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
 
 /**
- * Possible status values for a lesson
+ * Possible status values for a lesson.
  */
 export enum LessonStatusValue {
     REQUESTED = 'REQUESTED',
@@ -14,7 +14,7 @@ export enum LessonStatusValue {
 }
 
 /**
- * Defines the possible transition actions that can be taken
+ * Defines the possible transition actions that can be taken on a lesson.
  */
 export enum LessonStatusTransition {
     ACCEPT = 'ACCEPT',
@@ -39,8 +39,8 @@ interface LessonStatusProps {
 }
 
 /**
- * Represents a status change for a lesson
- * Each status change is immutable and creates a new record
+ * Represents a status change for a lesson.
+ * Each status change is immutable and creates a new record.
  */
 export class LessonStatus {
     id: string;
@@ -49,13 +49,12 @@ export class LessonStatus {
     context: JsonValue | null;
     createdAt: Date;
 
-    // Updated constructor using object destructuring
     constructor({
         id,
         lessonId,
         status,
-        context = null, // Default value for optional prop
-        createdAt = new Date() // Default value for optional prop
+        context = null,
+        createdAt = new Date()
     }: LessonStatusProps) {
         this.id = id;
         this.lessonId = lessonId;
@@ -65,12 +64,32 @@ export class LessonStatus {
     }
 
     /**
-     * Create a new LessonStatus record
-     * @param id Unique identifier for the status record
-     * @param lessonId The ID of the lesson this status belongs to
-     * @param status The new status value
-     * @param context Additional context about the status change (optional)
-     * @returns A new LessonStatus instance
+     * Static factory method to create a LessonStatus instance from a database object.
+     * @param dbStatus The plain object returned by the database.
+     * @returns A new instance of the shared LessonStatus model.
+     */
+    public static fromDb(dbStatus: {
+        id: string;
+        lessonId: string;
+        status: string;
+        context?: JsonValue | null;
+        createdAt: Date;
+    }): LessonStatus {
+        // Validate that the status is a valid LessonStatusValue
+        const statusValue = LessonStatus.validateStatus(dbStatus.status);
+
+        // Create and return the shared model instance
+        return new LessonStatus({
+            id: dbStatus.id,
+            lessonId: dbStatus.lessonId,
+            status: statusValue,
+            context: dbStatus.context || null,
+            createdAt: dbStatus.createdAt
+        });
+    }
+
+    /**
+     * Create a new LessonStatus record.
      */
     static create(
         id: string,
@@ -78,12 +97,68 @@ export class LessonStatus {
         status: LessonStatusValue,
         context: JsonValue | null = null
     ): LessonStatus {
-        // Use the new constructor pattern
         return new LessonStatus({ id, lessonId, status, context });
     }
 
     /**
-     * Defines valid status transitions and their results
+     * Validates a status string and ensures it's a valid LessonStatusValue.
+     * Throws an error if the status is invalid.
+     * @param status Status string to validate
+     * @returns The validated LessonStatusValue enum value
+     */
+    static validateStatus(status: string): LessonStatusValue {
+        if (Object.values(LessonStatusValue).includes(status as LessonStatusValue)) {
+            return status as LessonStatusValue;
+        }
+
+        throw new Error(`Invalid lesson status value: ${status}`);
+    }
+
+    /**
+     * Parses context from JSON if needed and returns the context object.
+     * This is useful when working with raw database results.
+     * @returns The parsed context object
+     */
+    getContext(): JsonValue | null {
+        // Handle context if it's stored as a JSON string
+        if (this.context === null) {
+            return null;
+        }
+
+        // If already an object, return as is
+        if (typeof this.context === 'object') {
+            return this.context;
+        }
+
+        // If it's a string (JSON), try to parse it
+        if (typeof this.context === 'string') {
+            try {
+                return JSON.parse(this.context);
+            } catch (e) {
+                console.warn('Failed to parse LessonStatus context as JSON:', e);
+                return this.context; // Return as is if parsing fails
+            }
+        }
+
+        return this.context;
+    }
+
+    /**
+     * Gets a user-friendly display label for a given status value.
+     * @param status The status value enum.
+     * @returns A display-friendly string.
+     */
+    static getDisplayLabelForStatus(status: LessonStatusValue): string {
+        if (!status) return 'Unknown Status';
+        // Simple conversion: Replace underscores, capitalize words
+        return status
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(' ');
+    }
+
+    /**
+     * Defines valid status transitions and their results.
      */
     static readonly StatusTransitions = {
         [LessonStatusValue.REQUESTED]: {
@@ -108,10 +183,10 @@ export class LessonStatus {
     } as const;
 
     /**
-     * Gets the resulting status after a transition
-     * @param currentStatus The current status of the lesson
+     * Gets the resulting status after a transition.
+     * @param currentStatus The current status value
      * @param transition The requested transition
-     * @returns The resulting status if valid, undefined otherwise
+     * @returns The resulting status value if valid, undefined otherwise
      */
     static getResultingStatus(currentStatus: LessonStatusValue, transition: LessonStatusTransition): LessonStatusValue | undefined {
         const possibleTransitions = LessonStatus.StatusTransitions[currentStatus];
@@ -122,10 +197,10 @@ export class LessonStatus {
     }
 
     /**
-     * Validates if a transition from a current status to a new status is allowed.
-     * @param currentStatus The current status of the lesson.
-     * @param transition The requested transition.
-     * @returns True if the transition is valid, false otherwise.
+     * Validates if a transition is allowed from the current status.
+     * @param currentStatus The current status value
+     * @param transition The requested transition
+     * @returns True if the transition is valid, false otherwise
      */
     static isValidTransition(currentStatus: LessonStatusValue, transition: LessonStatusTransition): boolean {
         const possibleTransitions = LessonStatus.StatusTransitions[currentStatus];
@@ -133,57 +208,17 @@ export class LessonStatus {
     }
 
     /**
-     * Gets a user-friendly display label for a given status value.
-     * @param status The status value enum.
-     * @returns A display-friendly string.
-     */
-    static getDisplayLabelForStatus(status: LessonStatusValue): string {
-        if (!status) return 'Unknown Status';
-        // Simple conversion: Replace underscores, capitalize words
-        return status
-            .split('_')
-            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-            .join(' ');
-    }
-
-    /**
      * Gets a user-friendly display label for a given transition action.
-     * @param transition The transition enum value.
-     * @returns A display-friendly string.
+     * @param transition The transition enum value
+     * @returns A display-friendly string
      */
     static getDisplayLabelForTransition(transition: LessonStatusTransition): string {
         if (!transition) return 'Unknown Action';
-        // Simple conversion: Capitalize first letter, rest lowercase
         // Special case for DEFINE
         if (transition === LessonStatusTransition.DEFINE) {
             return 'Define Goals';
         }
+        // Simple conversion: Capitalize first letter, rest lowercase
         return transition.charAt(0).toUpperCase() + transition.slice(1).toLowerCase();
-    }
-
-    /**
-     * Static factory method to create a LessonStatus instance from a Prisma object.
-     * @param dbStatus The plain object returned by Prisma.
-     * @returns A new instance of the shared LessonStatus model.
-     */
-    public static fromDb(dbStatus: DbLessonStatus): LessonStatus {
-        const { createdAt, context, ...statusProps } = dbStatus;
-
-        // Validate status value against the shared enum
-        const statusValue = Object.values(LessonStatusValue).includes(dbStatus.status as LessonStatusValue)
-            ? dbStatus.status as LessonStatusValue
-            : LessonStatusValue.REQUESTED; // Default or throw? Defaulting for now.
-        if (statusValue !== dbStatus.status) {
-            console.warn(`Invalid status value '${dbStatus.status}' received from DB for status ID ${dbStatus.id}. Defaulting to ${statusValue}.`);
-        }
-
-        // Construct the shared model instance
-        return new LessonStatus({
-            ...statusProps, // Includes id, lessonId
-            status: statusValue,
-            // Handle context (assuming it's JSON in Prisma)
-            context: context ? JSON.parse(JSON.stringify(context)) : null, // Basic JSON handling
-            createdAt: createdAt ?? undefined
-        });
     }
 }

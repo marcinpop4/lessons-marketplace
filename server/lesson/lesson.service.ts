@@ -83,7 +83,7 @@ class LessonService {
             });
 
             // Use the mapper to instantiate the model
-            const lessonModel = LessonMapper.toModel(createdLessonData as DbLessonWithNestedRelations);
+            const lessonModel = LessonMapper.toModel(createdLessonData as unknown as DbLessonWithNestedRelations);
 
             // Check if model instantiation failed
             if (!lessonModel) {
@@ -207,7 +207,7 @@ class LessonService {
                 }
 
                 // Use mapper to instantiate and return the model
-                return LessonMapper.toModel(updatedLessonData as DbLessonWithNestedRelations);
+                return LessonMapper.toModel(updatedLessonData as unknown as DbLessonWithNestedRelations);
             });
         } catch (error) {
             console.error(`Error updating status for lesson ${lessonId} via transition ${transition}:`, error);
@@ -237,7 +237,7 @@ class LessonService {
             }
 
             // Use mapper to instantiate and return the model
-            return LessonMapper.toModel(lessonData as DbLessonWithNestedRelations);
+            return LessonMapper.toModel(lessonData as unknown as DbLessonWithNestedRelations);
         } catch (error) {
             console.error(`Error fetching lesson ${lessonId}:`, error);
             // Re-throw or return null based on desired error handling
@@ -259,7 +259,7 @@ class LessonService {
 
             // Use mapper to instantiate models and filter out nulls
             return lessonsData
-                .map(data => LessonMapper.toModel(data as DbLessonWithNestedRelations))
+                .map(data => LessonMapper.toModel(data as unknown as DbLessonWithNestedRelations))
                 .filter((lesson): lesson is Lesson => lesson !== null);
         } catch (error) {
             console.error(`Error fetching lessons for quote ${quoteId}:`, error);

@@ -1,7 +1,6 @@
 import { LessonType } from './LessonType.js';
 import { Student } from './Student.js';
 import { Address } from './Address.js';
-// Removed Prisma imports
 
 /**
  * Properties required to create a LessonRequest instance.

@@ -3,7 +3,7 @@ import { PrismaClient, Prisma, Teacher as DbTeacher, TeacherLessonHourlyRate as 
 import { Teacher } from '../../shared/models/Teacher.js';
 import { Student } from '../../shared/models/Student.js';
 import { Address } from '../../shared/models/Address.js';
-import { Lesson } from '../../shared/models/Lesson.js';
+import { Lesson, DbLessonWithNestedRelations } from '../../shared/models/Lesson.js';
 import { LessonQuote } from '../../shared/models/LessonQuote.js';
 import { LessonRequest } from '../../shared/models/LessonRequest.js';
 import { LessonStatus, LessonStatusValue } from '../../shared/models/LessonStatus.js';
@@ -19,19 +19,6 @@ import { LessonMapper } from '../lesson/lesson.mapper.js';
 // Define the type for the Prisma client or transaction client
 // Use Prisma.TransactionClient for the interactive transaction type
 type PrismaTransactionClient = Prisma.TransactionClient;
-
-// Define more specific Prisma types with includes for transformation
-type DbLessonWithRelations = Prisma.LessonGetPayload<{
-    include: {
-        currentStatus: true,
-        quote: {
-            include: {
-                teacher: { include: { teacherLessonHourlyRates: true } },
-                lessonRequest: { include: { student: true, address: true } }
-            }
-        }
-    }
-}>;
 
 // Keep DbTeacherWithRates for other raw methods if needed
 interface DbTeacherWithRates extends DbTeacher {
@@ -162,7 +149,7 @@ class TeacherService {
 
         // Use LessonMapper to transform and filter out nulls
         return dbLessons
-            .map(lesson => LessonMapper.toModel(lesson as DbLessonWithRelations))
+            .map(lesson => LessonMapper.toModel(lesson as unknown as DbLessonWithNestedRelations))
             .filter((lesson): lesson is Lesson => lesson !== null);
     }
 

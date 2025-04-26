@@ -1,20 +1,33 @@
 import { LessonStatus, LessonStatusValue } from '../../shared/models/LessonStatus.js';
-import { Prisma } from '@prisma/client';
-import { JsonValue } from '@prisma/client/runtime/library';
 
-// Define Prisma types for includes required by the mapper
-type DbLessonStatus = Prisma.LessonStatusGetPayload<{}>;
+// Define the JsonValue type locally, mirroring the Prisma definition
+type JsonValue =
+    | string
+    | number
+    | boolean
+    | null
+    | { [key: string]: JsonValue }
+    | JsonValue[];
+
+// Define database types locally instead of using Prisma
+type DbLessonStatus = {
+    id: string;
+    lessonId: string;
+    status: string;
+    context: any;
+    createdAt: Date;
+};
 
 /**
- * Maps between Prisma LessonStatus objects and shared LessonStatus models.
+ * Maps between database LessonStatus objects and shared LessonStatus models.
  */
 export class LessonStatusMapper {
     /**
-     * Maps a Prisma LessonStatus object to a shared LessonStatus model instance.
-     * @param dbStatus The LessonStatus object from Prisma.
+     * Maps a database LessonStatus object to a shared LessonStatus model instance.
+     * @param dbStatus The LessonStatus object from database.
      * @returns A new instance of the shared LessonStatus model.
      */
-    public static toModel(dbStatus: any): LessonStatus {
+    public static toModel(dbStatus: DbLessonStatus): LessonStatus {
         try {
             const { id, lessonId, status, context, createdAt } = dbStatus;
 

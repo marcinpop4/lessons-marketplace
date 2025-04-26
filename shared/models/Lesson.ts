@@ -1,149 +1,177 @@
-import { LessonQuote } from './LessonQuote.js';
 import { LessonStatus, LessonStatusValue } from './LessonStatus.js';
-import type { PrismaClient } from '@prisma/client';
-// Import necessary Prisma types
-import type {
-  Lesson as DbLesson,
-  LessonQuote as DbLessonQuote,
-  Teacher as DbTeacher,
-  LessonRequest as DbLessonRequest,
-  Student as DbStudent,
-  Address as DbAddress,
-  LessonStatus as DbLessonStatus,
-  TeacherLessonHourlyRate as DbTeacherLessonHourlyRate
-} from '@prisma/client';
-
-// Define the type for Prisma Lesson with required nested relations
-// Export this type so it can be imported by services
-export type DbLessonWithNestedRelations = DbLesson & {
-  currentStatus: DbLessonStatus | null;
-  quote: (DbLessonQuote & {
-    teacher: DbTeacher & { teacherLessonHourlyRates?: DbTeacherLessonHourlyRate[] },
-    lessonRequest: (DbLessonRequest & {
-      student: DbStudent;
-      address: DbAddress;
-    })
-  });
-};
+import { LessonQuote } from './LessonQuote.js';
+import { Goal } from './Goal.js';
+import { LessonType } from './LessonType.js';
+import { Teacher } from './Teacher.js';
+import { Student } from './Student.js';
+import { Address } from './Address.js';
 
 /**
- * Properties required to create a Lesson instance.
+ * Database representation of a Lesson with nested relations
  */
-interface LessonProps {
+export interface DbLessonWithNestedRelations {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  quoteId: string;
+  currentStatusId: string;
+  currentStatus: {
+    id: string;
+    lessonId: string;
+    status: string;
+    context: any;
+    createdAt: Date;
+  };
+  quote: {
+    id: string;
+    lessonRequestId: string;
+    teacherId: string;
+    hourlyRate: number;
+    status: string;
+    createdAt: Date;
+    updatedAt: Date;
+    teacher: any;
+    lessonRequest: any;
+  };
+}
+
+// Define interfaces for required properties of a Lesson
+export interface LessonProps {
   id: string;
   quote: LessonQuote;
-  currentStatusId: string;
-  currentStatus: LessonStatus;
+  currentStatus?: LessonStatus | null;
+  statuses?: LessonStatus[];
+  goals?: Goal[];
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 /**
- * Lesson model representing a confirmed music lesson
- * This is created after a student accepts a quote from a teacher
+ * Represents a booked music lesson
  */
-export class Lesson {
+export class Lesson implements LessonProps {
   id: string;
   quote: LessonQuote;
-  currentStatusId: string;
-  currentStatus: LessonStatus;
-  createdAt?: Date;
-  updatedAt?: Date;
+  currentStatus: LessonStatus | null;
+  statuses: LessonStatus[];
+  goals: Goal[];
+  createdAt: Date;
+  updatedAt: Date;
 
-  // Updated constructor using object destructuring
   constructor({
     id,
     quote,
-    currentStatusId,
-    currentStatus,
-    createdAt,
-    updatedAt,
+    currentStatus = null,
+    statuses = [],
+    goals = [],
+    createdAt = new Date(),
+    updatedAt = new Date()
   }: LessonProps) {
     this.id = id;
     this.quote = quote;
-    this.currentStatusId = currentStatusId;
-
-    // Add basic validation/handling for currentStatus
-    if (!currentStatus || !(currentStatus instanceof LessonStatus)) {
-      console.warn("Lesson constructor received invalid currentStatus prop", currentStatus);
-      // Attempt to create a default LessonStatus if invalid, though this might indicate a deeper issue
-      // It might be better to throw an error depending on desired strictness
-      this.currentStatus = new LessonStatus({
-        id: currentStatusId || 'unknown-status-id',
-        lessonId: id,
-        // Safely attempt to cast or default the status value
-        status: (currentStatus as any)?.status || LessonStatusValue.REQUESTED, // Default or attempt cast
-        createdAt: new Date()
-      });
-    } else {
-      this.currentStatus = currentStatus;
-    }
-
+    this.currentStatus = currentStatus;
+    this.statuses = statuses;
+    this.goals = goals;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }
 
   /**
-   * Get the lesson type from the quote
+   * Adds a status to the lesson's status history
+   * @param status The new status to add
    */
-  get type() {
-    return this.quote.lessonRequest.type;
+  addStatus(status: LessonStatus): void {
+    this.statuses.push(status);
+    this.currentStatus = status;
   }
 
   /**
-   * Get the start time from the quote
+   * Creates a scheduled lesson with initial status
+   * @param id Unique identifier for the lesson
+   * @param quote The lesson quote that was accepted
+   * @param statusId Unique ID for the initial status
+   * @returns A new Lesson instance
    */
-  get startTime() {
-    return this.quote.lessonRequest.startTime;
+  static createScheduled(id: string, quote: LessonQuote, statusId: string): Lesson {
+    const initialStatus = new LessonStatus({
+      id: statusId,
+      lessonId: id,
+      status: LessonStatusValue.ACCEPTED
+    });
+
+    return new Lesson({
+      id,
+      quote,
+      currentStatus: initialStatus,
+      statuses: [initialStatus],
+      goals: []
+    });
   }
 
   /**
-   * Get the duration in minutes from the quote
+   * Adds a goal to the lesson
+   * @param goal The goal to add
    */
-  get durationMinutes() {
-    return this.quote.lessonRequest.durationMinutes;
+  addGoal(goal: Goal): void {
+    this.goals.push(goal);
   }
 
   /**
-   * Get the address from the quote
+   * Gets the details of the teacher for this lesson
+   * @returns Teacher object
    */
-  get address() {
-    return this.quote.lessonRequest.address;
-  }
-
-  /**
-   * Get the teacher from the quote
-   */
-  get teacher() {
+  getTeacher() {
     return this.quote.teacher;
   }
 
   /**
-   * Get the student from the quote
+   * Gets the details of the student for this lesson
+   * @returns Student object
    */
-  get student() {
+  getStudent() {
     return this.quote.lessonRequest.student;
   }
 
   /**
-   * Get the cost in cents from the quote
+   * Gets the address for this lesson
+   * @returns Address object
    */
-  get costInCents() {
-    return this.quote.costInCents;
+  getAddress() {
+    return this.quote.lessonRequest.address;
   }
 
   /**
-   * Calculate the end time of the lesson based on start time and duration
+   * Gets the start time for this lesson
+   * @returns Date object representing the start time
    */
-  get endTime(): Date {
-    const end = new Date(this.startTime);
-    end.setMinutes(end.getMinutes() + this.durationMinutes);
-    return end;
+  getStartTime() {
+    return this.quote.lessonRequest.startTime;
+  }
+
+  /**
+   * Gets the end time for this lesson based on start time and duration
+   * @returns Date object representing the end time
+   */
+  getEndTime() {
+    const startTime = this.getStartTime();
+    const durationMinutes = this.quote.lessonRequest.durationMinutes;
+
+    const endTime = new Date(startTime);
+    endTime.setMinutes(endTime.getMinutes() + durationMinutes);
+
+    return endTime;
+  }
+
+  /**
+   * Gets the lesson type
+   * @returns LessonType enum value
+   */
+  getLessonType() {
+    return this.quote.lessonRequest.type;
   }
 
   /**
    * Format the cost as a currency string
-   * Note: This should only be used in client-side code for display purposes
    * @param locale The locale to use for formatting (defaults to en-US)
    * @param currency The currency code to use (defaults to USD)
    * @returns Formatted currency string
@@ -151,6 +179,4 @@ export class Lesson {
   getFormattedCost(locale = 'en-US', currency = 'USD'): string {
     return this.quote.getFormattedCost(locale, currency);
   }
-
-  // updateStatus method removed - logic moved to LessonService
 } 

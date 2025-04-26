@@ -109,7 +109,6 @@ export const getLessonById = async (id: string): Promise<Lesson> => {
     return new Lesson({
       id: data.id,
       quote: lessonQuote,
-      currentStatusId: lessonStatus.id, // Use the ID from the constructed LessonStatus object
       currentStatus: lessonStatus, // Pass the full LessonStatus object
     });
   } catch (error) {

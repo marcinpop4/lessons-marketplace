@@ -122,35 +122,35 @@ export const teacherController = {
         // A safer approach is to explicitly map properties.
         return {
           id: lesson.id,
-          type: lesson.type,
-          startTime: lesson.startTime.toISOString(),
-          durationMinutes: lesson.durationMinutes,
-          costInCents: lesson.costInCents,
-          currentStatus: lesson.currentStatus.status, // Send only the status value
-          currentStatusId: lesson.currentStatusId, // Add currentStatusId
+          type: lesson.quote.lessonRequest.type,
+          startTime: lesson.quote.lessonRequest.startTime.toISOString(),
+          durationMinutes: lesson.quote.lessonRequest.durationMinutes,
+          costInCents: lesson.quote.costInCents,
+          currentStatus: lesson.currentStatus?.status, // Send only the status value
+          currentStatusId: lesson.currentStatus?.id, // Use currentStatus?.id directly
           createdAt: lesson.createdAt?.toISOString(),
           updatedAt: lesson.updatedAt?.toISOString(),
           goalCount, // Add the fetched goal count
           // Include relevant details from nested shared models (teacher, student, address)
           // These are already sanitized (no passwords) by the service transformation
           teacher: {
-            id: lesson.teacher.id,
-            firstName: lesson.teacher.firstName,
-            lastName: lesson.teacher.lastName,
-            email: lesson.teacher.email, // Consider if email should be exposed here
+            id: lesson.quote.teacher.id,
+            firstName: lesson.quote.teacher.firstName,
+            lastName: lesson.quote.teacher.lastName,
+            email: lesson.quote.teacher.email, // Consider if email should be exposed here
             // Exclude phoneNumber, dateOfBirth? Define API contract clearly.
           },
           student: {
-            id: lesson.student.id,
-            firstName: lesson.student.firstName,
-            lastName: lesson.student.lastName,
+            id: lesson.quote.lessonRequest.student.id,
+            firstName: lesson.quote.lessonRequest.student.firstName,
+            lastName: lesson.quote.lessonRequest.student.lastName,
             // Exclude email, phoneNumber, dateOfBirth? Define API contract clearly.
           },
           address: {
-            street: lesson.address.street,
-            city: lesson.address.city,
-            postalCode: lesson.address.postalCode,
-            country: lesson.address.country,
+            street: lesson.quote.lessonRequest.address.street,
+            city: lesson.quote.lessonRequest.address.city,
+            postalCode: lesson.quote.lessonRequest.address.postalCode,
+            country: lesson.quote.lessonRequest.address.country,
           }
           // Explicitly DO NOT include lesson.quote or deeply nested objects unless needed
         };

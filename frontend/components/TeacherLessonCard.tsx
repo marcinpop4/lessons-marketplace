@@ -145,7 +145,7 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
             {/* Add Lesson Type */}
             <p className="text-sm text-gray-700 dark:text-gray-300">
                 <span className="font-semibold mr-1">Type:</span>
-                {lesson.type || 'N/A'}
+                {lesson.quote.lessonRequest.type || 'N/A'}
             </p>
             <p className="text-sm text-gray-700 dark:text-gray-300">
                 <span className="font-semibold mr-1">Address:</span>

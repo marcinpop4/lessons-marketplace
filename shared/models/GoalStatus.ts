@@ -1,5 +1,3 @@
-import { JsonValue } from '@prisma/client/runtime/library';
-
 /**
  * Possible status values for a goal associated with a lesson.
  */
@@ -18,6 +16,9 @@ export enum GoalStatusTransition {
     COMPLETE = 'COMPLETE',   // Mark the goal as achieved.
     ABANDON = 'ABANDON'      // Give up on the goal.
 }
+
+// Define a JSON value type to replace the Prisma one
+type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
 
 /**
  * Properties required to create a GoalStatus instance.
@@ -140,29 +141,5 @@ export class GoalStatus {
         if (!transition) return 'Unknown Action';
         // Simple conversion: Capitalize first letter, rest lowercase
         return transition.charAt(0).toUpperCase() + transition.slice(1).toLowerCase();
-    }
-
-    /**
-     * Creates a GoalStatus instance from a Prisma GoalStatus object.
-     * @param dbGoalStatus The GoalStatus object fetched from Prisma.
-     * @returns A GoalStatus instance.
-     */
-    static fromDb(dbGoalStatus: { id: string, goalId: string, status: string, context: JsonValue | null, createdAt: Date }): GoalStatus {
-        // Validate the status string against the enum
-        const statusValue = dbGoalStatus.status as GoalStatusValue;
-        if (!Object.values(GoalStatusValue).includes(statusValue)) {
-            console.error(`[GoalStatus.fromDb] Invalid status value received from DB: ${dbGoalStatus.status} for GoalStatus ID: ${dbGoalStatus.id}`);
-            // Decide on error handling: throw, return null, or use a default?
-            // Throwing an error is often safest for data integrity issues.
-            throw new Error(`Invalid status value '${dbGoalStatus.status}' encountered for GoalStatus ${dbGoalStatus.id}`);
-        }
-
-        return new GoalStatus({
-            id: dbGoalStatus.id,
-            goalId: dbGoalStatus.goalId,
-            status: statusValue,
-            context: dbGoalStatus.context, // Prisma's JsonValue maps correctly
-            createdAt: dbGoalStatus.createdAt
-        });
     }
 } 
