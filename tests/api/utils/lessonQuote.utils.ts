@@ -55,9 +55,9 @@ export const createTestLessonQuote = async (teacherToken: string, quoteData: Cre
  * 
  * @param studentToken - The Bearer token for the student.
  * @param quoteId - The ID of the lesson quote to accept.
- * @returns The created Lesson object.
+ * @returns The ID of the LessonRequest associated with the accepted quote.
  */
-export const acceptTestLessonQuote = async (studentToken: string, quoteId: string): Promise<Lesson> => {
+export const acceptTestLessonQuote = async (studentToken: string, quoteId: string): Promise<string> => {
     if (!studentToken.startsWith('Bearer ')) {
         studentToken = `Bearer ${studentToken}`;
     }
@@ -72,13 +72,17 @@ export const acceptTestLessonQuote = async (studentToken: string, quoteId: strin
         throw new Error(`Util failed to accept lesson quote ${quoteId}. Status: ${response.status}, Body: ${JSON.stringify(response.body)}`);
     }
 
-    // Assuming the response body is the created Lesson object
-    if (!response.body || !response.body.id || !response.body.quote) {
-        console.error('Lesson object missing or invalid from successful PATCH /lesson-quotes response:', response.body);
-        throw new Error('Lesson object missing or invalid from response body after accepting quote.');
+    // Validate the response body is the updated LessonQuote
+    const updatedQuote = response.body;
+    if (!updatedQuote || !updatedQuote.id ||
+        !updatedQuote.currentStatus || updatedQuote.currentStatus.status !== LessonQuoteStatusValue.ACCEPTED ||
+        !updatedQuote.lessonRequest || !updatedQuote.lessonRequest.id) {
+        console.error('Updated LessonQuote object missing or invalid from successful PATCH /lesson-quotes response:', response.body);
+        throw new Error('Updated LessonQuote object missing or invalid from response body after accepting quote.');
     }
 
-    return response.body as Lesson;
+    // Return the ID of the related lesson request
+    return updatedQuote.lessonRequest.id;
 };
 
 // --- Lower-level API Call Utilities ---

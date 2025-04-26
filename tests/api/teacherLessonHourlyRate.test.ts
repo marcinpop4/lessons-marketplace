@@ -31,7 +31,6 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
             testTeacherId = teacher.id;
             const token = await loginTestUser(teacher.email, password, UserType.TEACHER);
             testTeacherAuthToken = `Bearer ${token}`;
-            console.log(`[Rate Tests Setup] Created Teacher ID: ${testTeacherId}`);
         } catch (error) {
             console.error('[Rate Test Setup] Error in beforeAll:', error);
             throw error; // Fail fast if setup fails
@@ -76,13 +75,11 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
             expect(createdRate.currentStatus).toBeDefined();
             expect(createdRate.currentStatus?.status).toBe(TeacherLessonHourlyRateStatusValue.ACTIVE);
             createdRateId = createdRate.id; // Store ID for next test
-            console.log(`[Rate Test - POST /] Created rate ID via util: ${createdRateId}`);
         });
 
         it('should UPDATE by creating a NEW rate when price changes (new status ACTIVE)', async () => {
             if (!testTeacherAuthToken || !createdRateId) throw new Error('Auth token or created rate ID not available');
             const newRateAmount = testRateAmount + 1000;
-            console.log(`[Rate Test - POST /] Attempting to update rate type ${testRateType} for teacher ${testTeacherId} to ${newRateAmount} (original rate ID: ${createdRateId})`);
 
             // Use utility
             const updatedRate = await createTestTeacherRate(testTeacherAuthToken, testRateType, newRateAmount);
@@ -94,7 +91,6 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
             expect(updatedRate.teacherId).toBe(testTeacherId);
             expect(updatedRate.currentStatus).toBeDefined();
             expect(updatedRate.currentStatus?.status).toBe(TeacherLessonHourlyRateStatusValue.ACTIVE);
-            console.log(`[Rate Test - POST /] Update resulted in new rate ID via util: ${updatedRate.id}`);
         });
 
         it('should return 400 Bad Request if data is missing', async () => {
@@ -238,7 +234,6 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
             // 2. Create a *second* rate of the SAME type (DRUMS) using utility
             const secondRate = await createTestTeacherRate(testTeacherAuthToken, rateTypeToModify, 9000); // Different rate
             const secondRateId = secondRate.id;
-            console.log(`[Rate Status Conflict Test] Created second active rate via util, ID: ${secondRateId} for type ${rateTypeToModify}`);
 
             // 3. Attempt to ACTIVATE the original (now INACTIVE) rate (raw call to check error)
             const response = await request(API_BASE_URL!)

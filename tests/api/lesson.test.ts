@@ -54,9 +54,27 @@ describe('API Integration: /api/v1/lessons', () => {
             const quoteData = { lessonRequestId: lessonRequest.id, costInCents: 6000, hourlyRateInCents: 6000 };
             const quote = await createTestLessonQuote(teacherAuthToken!, quoteData);
             createdQuoteId = quote.id; // Store quote ID
+
             // Accept quote to create lesson
-            const lesson = await acceptTestLessonQuote(studentAuthToken!, quote.id);
-            createdLessonId = lesson.id;
+            // acceptTestLessonQuote now returns the lessonRequestId (string)
+            await acceptTestLessonQuote(studentAuthToken!, quote.id);
+
+            // Fetch the newly created Lesson using the quoteId
+            const fetchLessonResponse = await request(API_BASE_URL!)
+                .get('/api/v1/lessons')
+                .set('Authorization', `Bearer ${studentAuthToken}`) // Use student or teacher token
+                .query({ quoteId: createdQuoteId }); // Use the stored quoteId
+
+            if (fetchLessonResponse.status !== 200 || !Array.isArray(fetchLessonResponse.body) || fetchLessonResponse.body.length !== 1) {
+                console.error("Failed to fetch created lesson in lesson setup:", fetchLessonResponse.status, fetchLessonResponse.body);
+                throw new Error(`Failed to fetch lesson associated with quote ${createdQuoteId} in setup.`);
+            }
+            const createdLesson = fetchLessonResponse.body[0];
+            if (!createdLesson || !createdLesson.id) {
+                console.error("Fetched lesson object is invalid in setup:", createdLesson);
+                throw new Error('Fetched lesson object is invalid in setup.');
+            }
+            createdLessonId = createdLesson.id; // Assign the actual Lesson ID from the fetch response
 
         } catch (error) {
             console.error('[Lesson Test Setup Error]', error);
@@ -193,7 +211,7 @@ describe('API Integration: /api/v1/lessons', () => {
             // Use util with incorrect type (empty object) - relies on controller validation
             const response = await createLesson(studentAuthToken!, {} as any);
             expect(response.status).toBe(400);
-            expect(response.body.error).toContain('Missing required field: quoteId');
+            expect(response.body.error).toContain('Valid Quote ID is required.');
         });
 
         it('should return 404 if quoteId does not exist', async () => {
@@ -220,6 +238,10 @@ describe('API Integration: /api/v1/lessons', () => {
     // --- GET /lessons/:id --- 
     describe('GET /:id', () => {
         it('should return the lesson details for the associated student', async () => {
+            // Added non-null assertions because beforeAll should guarantee these are set
+            if (!studentAuthToken || !createdLessonId) {
+                throw new Error('Test setup incomplete: studentAuthToken or createdLessonId is missing.');
+            }
             // Use util
             const response = await getLessonById(studentAuthToken!, createdLessonId!); // Added non-null assertions
             expect(response.status).toBe(200);
@@ -228,6 +250,10 @@ describe('API Integration: /api/v1/lessons', () => {
         });
 
         it('should return the lesson details for the associated teacher', async () => {
+            // Added non-null assertions
+            if (!teacherAuthToken || !createdLessonId) {
+                throw new Error('Test setup incomplete: teacherAuthToken or createdLessonId is missing.');
+            }
             // Use util
             const response = await getLessonById(teacherAuthToken!, createdLessonId!); // Added non-null assertions
             expect(response.status).toBe(200);
@@ -269,8 +295,25 @@ describe('API Integration: /api/v1/lessons', () => {
             );
             const quoteData = { lessonRequestId: lessonRequestData.id, costInCents: 7000, hourlyRateInCents: 7000 };
             const quote = await createTestLessonQuote(teacherAuthToken!, quoteData);
-            const lesson = await acceptTestLessonQuote(studentAuthToken!, quote.id);
-            lessonToPatchId = lesson.id; // Lesson starts as ACCEPTED
+
+            // Accept quote
+            await acceptTestLessonQuote(studentAuthToken!, quote.id);
+
+            // Fetch the actual lesson created by accepting the quote
+            const fetchLessonResponse = await request(API_BASE_URL!)
+                .get('/api/v1/lessons')
+                .set('Authorization', `Bearer ${studentAuthToken}`)
+                .query({ quoteId: quote.id });
+
+            if (fetchLessonResponse.status !== 200 || !Array.isArray(fetchLessonResponse.body) || fetchLessonResponse.body.length !== 1) {
+                throw new Error(`Failed to fetch lesson for PATCH setup (Quote ID: ${quote.id}).`);
+            }
+            const createdLesson = fetchLessonResponse.body[0];
+            if (!createdLesson || !createdLesson.id) {
+                throw new Error('Fetched lesson object is invalid in PATCH setup.');
+            }
+            lessonToPatchId = createdLesson.id; // Assign the actual Lesson ID
+
         });
 
         it('should allow the teacher to update the lesson status (e.g., DEFINE)', async () => {
@@ -299,10 +342,26 @@ describe('API Integration: /api/v1/lessons', () => {
             const lessonRequestData = await createTestLessonRequest(studentAuthToken!, studentId!, LessonType.DRUMS);
             const quoteData = { lessonRequestId: lessonRequestData.id, costInCents: 7000, hourlyRateInCents: 7000 };
             const quote = await createTestLessonQuote(teacherAuthToken!, quoteData);
-            const lesson = await acceptTestLessonQuote(studentAuthToken!, quote.id);
-            const acceptedLessonId = lesson.id;
 
-            // Use util
+            // Accept the quote
+            await acceptTestLessonQuote(studentAuthToken!, quote.id);
+
+            // Fetch the actual lesson created
+            const fetchLessonResponse = await request(API_BASE_URL!)
+                .get('/api/v1/lessons')
+                .set('Authorization', `Bearer ${studentAuthToken}`)
+                .query({ quoteId: quote.id });
+
+            if (fetchLessonResponse.status !== 200 || !Array.isArray(fetchLessonResponse.body) || fetchLessonResponse.body.length !== 1) {
+                throw new Error(`Failed to fetch accepted lesson for invalid transition test (Quote ID: ${quote.id}).`);
+            }
+            const acceptedLesson = fetchLessonResponse.body[0];
+            if (!acceptedLesson || !acceptedLesson.id) {
+                throw new Error('Fetched accepted lesson object is invalid in test.');
+            }
+            const acceptedLessonId = acceptedLesson.id; // Use the actual Lesson ID
+
+            // Use util - Now this should receive the correct ID and proceed to transition validation
             const response = await updateLessonStatus(teacherAuthToken!, acceptedLessonId, { transition: LessonStatusTransition.COMPLETE });
             expect(response.status).toBe(400);
             expect(response.body.error).toContain('Invalid transition');
@@ -319,7 +378,7 @@ describe('API Integration: /api/v1/lessons', () => {
             // Use patchLessonRaw util
             const response = await patchLessonRaw(teacherAuthToken!, lessonToPatchId, {});
             expect(response.status).toBe(400);
-            expect(response.body.error).toContain('Missing required fields: lessonId or transition'); // Check specific Zod message if applicable
+            expect(response.body.error).toBe('Invalid transition value: undefined. Must be one of ACCEPT, DEFINE, REJECT, COMPLETE, VOID');
         });
 
         it('should return 401 if unauthenticated', async () => {

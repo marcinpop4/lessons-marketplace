@@ -9,7 +9,7 @@ import { Student } from '../../shared/models/Student.js';
 import { LessonStatusValue, LessonStatus, LessonStatusTransition } from '../../shared/models/LessonStatus.js';
 import { v4 as uuidv4 } from 'uuid';
 import { lessonService } from './lesson.service.js';
-import { AuthorizationError, BadRequestError, NotFoundError } from '../errors/index.js';
+import { AuthorizationError, BadRequestError, NotFoundError, AppError } from '../errors/index.js';
 
 // Define AuthenticatedRequest interface using Prisma UserType
 interface AuthenticatedRequest extends Request {
@@ -29,24 +29,20 @@ export const lessonController = {
    */
   getLessons: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { teacherId, quoteId } = req.query;
+      // Extract query params
+      const { teacherId, quoteId } = req.query as { teacherId?: string, quoteId?: string };
       const authenticatedUser = req.user;
 
-      // Validation: Ensure exactly one filter is provided
+      // --- Validation (Controller Level - Parameter Exclusivity) ---
       if ((!teacherId && !quoteId) || (teacherId && quoteId)) {
+        // This check determines *how* the service is called, so it stays here.
         throw new BadRequestError('Exactly one of teacherId or quoteId query parameter must be provided.');
       }
-      // Validation: Ensure provided params are strings
-      if (teacherId && typeof teacherId !== 'string') {
-        throw new BadRequestError('teacherId query parameter must be a string.');
-      }
-      if (quoteId && typeof quoteId !== 'string') {
-        throw new BadRequestError('quoteId query parameter must be a string.');
-      }
+      // --- End Validation ---
 
       // Authorization & Service Call
       if (!authenticatedUser?.id || !authenticatedUser?.userType) {
-        return next(new AuthorizationError('Authentication required.'));
+        throw new AuthorizationError('Authentication required.');
       }
       const userId = authenticatedUser.id;
       const userType = authenticatedUser.userType;
@@ -55,24 +51,24 @@ export const lessonController = {
       if (teacherId) {
         // Authorization for teacherId filter
         if (userType !== PrismaUserType.TEACHER) {
-          throw new AuthorizationError('Forbidden: Only teachers can filter by teacherId.');
+          throw new AuthorizationError('Only teachers can filter by teacherId.');
         }
         if (userId !== teacherId) {
-          throw new AuthorizationError('Forbidden: Teachers can only retrieve their own lessons.');
+          throw new AuthorizationError('Teachers can only retrieve their own lessons.');
         }
         // Call service (no requestingUserId needed as authorization done here)
         lessons = await lessonService.findLessons({ teacherId });
       } else if (quoteId) {
-        // Authorization for quoteId filter is handled within the service
+        // Call service - validation of quoteId format and requestingUserId happens in service
         lessons = await lessonService.findLessons({ quoteId, requestingUserId: userId });
       } else {
         // Should be caught by initial validation, but belts and braces
-        throw new BadRequestError('Missing required query parameter.');
+        throw new AppError('Internal controller error: Parameter logic failed.', 500);
       }
 
       res.status(200).json(lessons);
     } catch (error) {
-      next(error); // Pass errors (BadRequestError, AuthorizationError, etc.) to central handler
+      next(error); // Pass errors (AuthError/BadRequest from controller, BadRequest/NotFound/Auth from service) to central handler
     }
   },
 
@@ -84,16 +80,14 @@ export const lessonController = {
    */
   createLesson: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
+      // Extract quoteId directly from body
       const { quoteId } = req.body;
-      if (!quoteId) {
-        throw new BadRequestError('Missing required field: quoteId');
-      }
       // Authorization happens implicitly via authMiddleware enforcing login.
-      // Service handles quote validation (existence, not already used).
+      // Service handles quote validation (presence, format, existence, not already used).
       const lesson = await lessonService.create(quoteId);
       res.status(201).json(lesson);
     } catch (error) {
-      next(error); // Pass NotFoundError, ConflictError, etc. to central handler
+      next(error); // Pass BadRequestError, NotFoundError, ConflictError, etc. from service
     }
   },
 
@@ -104,23 +98,28 @@ export const lessonController = {
    */
   getLessonById: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
+      // Extract id directly
       const { id } = req.params;
       const authenticatedUser = req.user;
 
+      // Still check authenticated user from middleware
       if (!authenticatedUser?.id) {
-        return next(new AuthorizationError('Authentication required.'));
+        throw new AuthorizationError('Authentication required.');
       }
 
-      // Service now returns null if not found OR not authorized for this user
+      // Call service - validation and authorization check happens inside
       const lesson = await lessonService.getLessonById(id, authenticatedUser.id);
 
+      // Service returns null if not found OR user not authorized
       if (!lesson) {
         // Return 404 whether it doesn't exist or user can't access it
+        // Use standard error handler for consistency
+        // Throwing an error that the central handler can map to 404
         throw new NotFoundError(`Lesson with ID ${id} not found or access denied.`);
       }
       res.status(200).json(lesson);
     } catch (error) {
-      next(error); // Pass error (including NotFoundError) to central handler
+      next(error); // Pass error (AuthError from controller, BadRequest/AppError from service)
     }
   },
 
@@ -132,32 +131,28 @@ export const lessonController = {
    */
   updateLessonStatus: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
+      // Extract params and body data
       const { lessonId } = req.params;
       const { transition, context } = req.body;
       const authenticatedUserId = req.user?.id; // Added by authMiddleware
       const authenticatedUserType = req.user?.userType; // Added by authMiddleware
 
+      // Still check authenticated user from middleware
       if (!authenticatedUserId || !authenticatedUserType) {
-        return next(new AuthorizationError('Authentication required.'));
-      }
-      // Role check is handled by middleware, but confirm teacher ID matches for safety if needed
-      // For simplicity, assuming role check middleware is sufficient here.
-
-      // Validate required fields (transition is validated by service state machine)
-      if (!lessonId || !transition) {
-        throw new BadRequestError('Missing required fields: lessonId or transition.');
+        throw new AuthorizationError('Authentication required.');
       }
 
+      // Call service - validation of lessonId, transition, context, and userId happens inside
       const updatedLesson = await lessonService.updateStatus(
         lessonId,
-        transition as LessonStatusTransition, // Service validates transition enum
+        transition, // Pass raw value, service validates
         context,
-        authenticatedUserId // Pass user ID for potential deeper auth in service
+        authenticatedUserId
       );
 
       res.status(200).json(updatedLesson);
     } catch (error) {
-      next(error); // Pass error to central handler (NotFound, BadRequest, StateMachineError etc.)
+      next(error); // Pass error (Auth from controller, NotFound, BadRequest, AppError from service) to central handler
     }
   }
 }; 

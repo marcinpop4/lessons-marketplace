@@ -7,6 +7,9 @@ import { LessonRequest } from '../../shared/models/LessonRequest.js';
 import { Student } from '../../shared/models/Student.js';
 import { Address, AddressDTO } from '../../shared/models/Address.js';
 import { LessonRequestMapper } from './lessonRequest.mapper.js';
+// Import errors and validation utils
+import { BadRequestError, NotFoundError, AuthorizationError } from '../errors/index.js';
+import { isUuid } from '../utils/validation.utils.js';
 
 export interface LessonRequestDTO {
   type: LessonType;
@@ -26,12 +29,38 @@ export class LessonRequestService {
    * @returns Created LessonRequest shared model instance
    */
   async createLessonRequest(lessonRequestDTO: LessonRequestDTO): Promise<LessonRequest> {
+    // --- Validation ---
+    if (!lessonRequestDTO) {
+      throw new BadRequestError('Lesson request data is required.');
+    }
+    const { type, startTime, durationMinutes, addressDTO, studentId } = lessonRequestDTO;
+
+    // Basic field presence (AddressDTO validated by addressService)
+    if (!type || !startTime || !durationMinutes || !addressDTO || !studentId) {
+      throw new BadRequestError('Missing required fields: type, startTime, durationMinutes, addressDTO, studentId.');
+    }
+    // Type validation
+    if (!Object.values(LessonType).includes(type)) {
+      throw new BadRequestError(`Invalid lesson type: ${type}`);
+    }
+    if (!(startTime instanceof Date) || isNaN(startTime.getTime())) {
+      throw new BadRequestError('startTime must be a valid Date object.');
+    }
+    if (typeof durationMinutes !== 'number' || !Number.isInteger(durationMinutes) || durationMinutes <= 0) {
+      throw new BadRequestError('durationMinutes must be a positive integer.');
+    }
+    if (!isUuid(studentId)) {
+      throw new BadRequestError('Valid student ID is required.');
+    }
+    // addressDTO is validated within addressService.create
+    // --- End Validation ---
+
     // Validate that the student exists first (outside transaction is fine)
     const studentCheck = await this.prisma.student.findUnique({
       where: { id: lessonRequestDTO.studentId }
     });
     if (!studentCheck) {
-      throw new Error(`Student with ID ${lessonRequestDTO.studentId} not found`);
+      throw new NotFoundError(`Student with ID ${lessonRequestDTO.studentId} not found`);
     }
 
     try {
@@ -77,6 +106,12 @@ export class LessonRequestService {
    * @returns LessonRequest shared model instance or null if not found
    */
   async getLessonRequestById(id: string): Promise<LessonRequest | null> {
+    // --- Validation ---
+    if (!id || !isUuid(id)) {
+      throw new BadRequestError('Valid Lesson Request ID is required.');
+    }
+    // --- End Validation ---
+
     const dbLessonRequest = await this.prisma.lessonRequest.findUnique({
       where: { id },
       include: { // Keep includes needed by the mapper
@@ -99,6 +134,12 @@ export class LessonRequestService {
    * @returns Array of LessonRequest shared model instances
    */
   async getLessonRequestsByStudent(studentId: string): Promise<LessonRequest[]> {
+    // --- Validation ---
+    if (!studentId || !isUuid(studentId)) {
+      throw new BadRequestError('Valid Student ID is required.');
+    }
+    // --- End Validation ---
+
     const dbLessonRequests = await this.prisma.lessonRequest.findMany({
       where: { studentId },
       include: { // Keep includes needed by the mapper

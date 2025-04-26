@@ -23,14 +23,22 @@ const objectiveInclude = Prisma.validator<Prisma.ObjectiveInclude>()({
  * @returns A promise resolving to an array of Objective objects.
  */
 export const getObjectivesByStudentId = async (studentId: string): Promise<Objective[]> => {
-    const prismaObjectives = await prisma.objective.findMany({
+    // Define the expected type with the include
+    type ObjectiveWithStatus = Prisma.ObjectiveGetPayload<{ include: typeof objectiveInclude }>;
+
+    // Correctly include the relation in the findMany query
+    const prismaObjectives: ObjectiveWithStatus[] = await prisma.objective.findMany({
         where: { studentId: studentId },
-        include: objectiveInclude, // Include current status
+        include: objectiveInclude, // Include current status directly here
         orderBy: { createdAt: 'desc' },
     });
 
-    // Filter out objectives that might have inconsistent data (e.g., missing status)
-    const validObjectives = prismaObjectives.filter(o => o.currentStatus !== null) as (PrismaObjective & { currentStatus: NonNullable<PrismaObjective['currentStatus']> })[];
+    // Filter objectives where currentStatus is genuinely null (should be rare)
+    // No need for complex type assertion now
+    const validObjectives = prismaObjectives.filter(
+        (o): o is ObjectiveWithStatus & { currentStatus: NonNullable<ObjectiveWithStatus['currentStatus']> } =>
+            o.currentStatus !== null
+    );
 
     return mapPrismaObjectivesToObjectives(validObjectives);
 };

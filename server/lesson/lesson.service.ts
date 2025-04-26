@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import prisma from '../prisma.js';
 import { LessonMapper } from './lesson.mapper.js';
 import { BadRequestError, NotFoundError, AppError, AuthorizationError, ConflictError } from '../errors/index.js';
+import { isUuid } from '../utils/validation.utils.js';
 
 // Define the includes needed for transforming to a Lesson model via LessonMapper
 const lessonIncludeForMapper = {
@@ -50,6 +51,12 @@ export class LessonService {
      * @throws Error if creation fails otherwise.
      */
     async create(quoteId: string): Promise<Lesson> {
+        // --- Validation ---
+        if (!quoteId || !isUuid(quoteId)) {
+            throw new BadRequestError('Valid Quote ID is required.');
+        }
+        // --- End Validation ---
+
         try {
             const lessonId = await this.prisma.$transaction(async (tx) => {
                 // 1. Check if the quote exists
@@ -169,10 +176,25 @@ export class LessonService {
         context: Record<string, unknown> = {},
         authenticatedUserId?: string
     ): Promise<Lesson | null> {
-        // 1. Validate transition input type first
+        // --- Validation ---
+        if (!lessonId || !isUuid(lessonId)) {
+            throw new BadRequestError('Valid Lesson ID is required.');
+        }
+        // Validate transition input type and value
         if (typeof transition !== 'string' || !(transition in LessonStatusTransition)) {
             throw new BadRequestError(`Invalid transition value: ${transition}. Must be one of ${Object.keys(LessonStatusTransition).join(', ')}`);
         }
+        // Validate context (if provided)
+        if (context !== null && typeof context !== 'object') {
+            throw new BadRequestError('Invalid context format. Must be a JSON object or null.');
+        }
+        // Validate authenticated user presence
+        if (!authenticatedUserId) {
+            // This might indicate an auth middleware issue upstream, but service should check
+            throw new AuthorizationError('Authentication required to update lesson status.');
+        }
+        // --- End Validation ---
+
         const validTransition = transition as LessonStatusTransition; // Cast after validation
 
         try {
@@ -251,6 +273,24 @@ export class LessonService {
     async findLessons(options: FindLessonsOptions): Promise<Lesson[]> {
         const { teacherId, quoteId, requestingUserId } = options;
 
+        // --- Validation ---
+        // Exclusivity check (already done in controller, but good practice here too)
+        if ((!teacherId && !quoteId) || (teacherId && quoteId)) {
+            throw new BadRequestError('Exactly one of teacherId or quoteId query parameter must be provided.');
+        }
+        // ID format and presence checks
+        if (teacherId && (typeof teacherId !== 'string' || !isUuid(teacherId))) {
+            throw new BadRequestError('Invalid Teacher ID format provided.');
+        }
+        if (quoteId && (typeof quoteId !== 'string' || !isUuid(quoteId))) {
+            throw new BadRequestError('Invalid Quote ID format provided.');
+        }
+        // Check requestingUserId if filtering by quoteId
+        if (quoteId && !requestingUserId) {
+            throw new BadRequestError('Requesting user ID is required when filtering by quote ID.');
+        }
+        // --- End Validation ---
+
         let whereClause: Prisma.LessonWhereInput = {};
         let lessonsData: PrismaLesson[] = [];
 
@@ -263,10 +303,6 @@ export class LessonService {
                 orderBy: { createdAt: 'desc' } // Optional: Add default ordering
             });
         } else if (quoteId) {
-            if (!requestingUserId) {
-                // This should be caught earlier, but defense in depth
-                throw new BadRequestError('Requesting user ID is required when filtering by quote ID.');
-            }
             whereClause = { quoteId: quoteId };
             lessonsData = await this.prisma.lesson.findMany({
                 where: whereClause,
@@ -318,9 +354,15 @@ export class LessonService {
      * @throws {AuthorizationError} If the user is not authorized.
      */
     async getLessonById(lessonId: string, requestingUserId: string): Promise<Lesson | null> {
+        // --- Validation ---
+        if (!lessonId || !isUuid(lessonId)) {
+            throw new BadRequestError('Valid Lesson ID is required.');
+        }
         if (!requestingUserId) {
             throw new BadRequestError('Requesting user ID is required for authorization.');
         }
+        // --- End Validation ---
+
         try {
             const lessonData = await this.prisma.lesson.findUnique({
                 where: { id: lessonId },

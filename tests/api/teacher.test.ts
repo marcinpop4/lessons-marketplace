@@ -38,13 +38,6 @@ describe('API Integration: /api/v1/teachers', () => {
             const token = await loginTestUser(teacher.email, password, UserType.TEACHER);
             testTeacherAuthToken = `Bearer ${token}`;
 
-            console.log(`[Teacher Tests Setup] Created Teacher ID: ${testTeacherId}`);
-
-            // Note: If tests rely on specific *rates* existing (like VOICE/GUITAR for update/deactivate), 
-            // we need to create them here after the teacher is created, potentially using 
-            // a new utility function or direct API calls within this beforeAll.
-            // For now, assuming tests adapt or create rates as needed.
-
         } catch (error) {
             console.error('[Teacher Test Setup] Error in beforeAll:', error);
             throw error; // Fail fast if setup fails

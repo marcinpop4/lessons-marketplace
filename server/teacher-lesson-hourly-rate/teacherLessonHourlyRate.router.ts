@@ -15,8 +15,4 @@ router.post('/', teacherLessonHourlyRateController.createOrUpdate);
 // New route for updating status
 router.patch('/:rateId/status', teacherLessonHourlyRateController.updateStatus);
 
-// Remove old activate/deactivate routes
-// router.post('/:rateId/deactivate', teacherLessonHourlyRateController.deactivate);
-// router.post('/:rateId/reactivate', teacherLessonHourlyRateController.reactivate);
-
 export default router; 

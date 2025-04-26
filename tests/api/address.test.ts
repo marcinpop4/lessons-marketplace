@@ -187,12 +187,14 @@ describe('API Integration: /api/v1/addresses', () => {
             expect(response.body.message).toEqual(`Address with ID ${fakeId} not found.`);
         });
 
-        it('should return 404 Not Found for an invalid ID format when authenticated', async () => {
+        it('should return 400 Bad Request for an invalid ID format when authenticated', async () => {
             const invalidId = 'this-is-not-a-valid-uuid';
             // Use the utility function
             const response = await getAddressById(student1AccessToken, invalidId);
-            expect(response.status).toBe(404);
-            expect(response.body.message).toEqual(`Address with ID ${invalidId} not found.`);
+            // Expect 400 because the service now validates the ID format
+            expect(response.status).toBe(400);
+            // Expect the specific error message from the service's BadRequestError
+            expect(response.body.message).toEqual('Invalid address ID format.');
         });
     }); // End GET /:id describe
 

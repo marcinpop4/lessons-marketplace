@@ -81,18 +81,20 @@ describe('API Integration: /api/v1/lesson-requests', () => {
         });
 
         it('should create a new lesson request successfully (201)', async () => {
-            // Use raw util
+            // Use the raw utility function
             const response = await createLessonRequestRaw(student1Token, validRequestPayload);
 
             expect(response.status).toBe(201);
             expect(response.headers['content-type']).toMatch(/application\/json/);
-            expect(response.body.lessonRequest).toBeDefined();
-            expect(response.body.lessonRequest.id).toBeDefined();
-            expect(response.body.lessonRequest.student.id).toEqual(student1.id);
-            expect(response.body.lessonRequest.type).toEqual(validRequestPayload.type);
-            expect(response.body.lessonRequest.address).toBeDefined();
-            expect(response.body.lessonRequest.address.street).toEqual(validRequestPayload.addressObj.street);
-            // Add other assertions as needed...
+            // Check the response body directly
+            expect(response.body).toBeDefined();
+            expect(response.body.id).toBeDefined();
+            expect(response.body.student.id).toEqual(student1.id);
+            expect(response.body.type).toEqual(validRequestPayload.type);
+            expect(response.body.durationMinutes).toEqual(validRequestPayload.durationMinutes);
+            expect(new Date(response.body.startTime)).toEqual(new Date(validRequestPayload.startTime));
+            expect(response.body.address).toBeDefined();
+            expect(response.body.address.street).toEqual(validRequestPayload.addressObj.street);
         });
 
         it('should return 401 Unauthorized if no token is provided', async () => {
@@ -240,11 +242,13 @@ describe('API Integration: /api/v1/lesson-requests', () => {
             expect(response.status).toBe(404);
         });
 
-        it('should return 404 Not Found for an invalid ID format', async () => {
-            const invalidId = 'not-a-uuid';
+        it('should return 400 Bad Request for an invalid ID format', async () => {
+            const invalidId = 'not-a-real-uuid';
             // Use raw util
             const response = await getLessonRequestByIdRaw(student1Token, invalidId);
-            expect(response.status).toBe(404); // Or maybe 400 depending on server validation
+            // Expect 400 because service validation catches invalid UUID
+            expect(response.status).toBe(400);
+            expect(response.body.error).toContain('Valid Lesson Request ID is required.');
         });
 
     }); // End GET /:id describe

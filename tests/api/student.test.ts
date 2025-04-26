@@ -42,7 +42,7 @@ describe('API Integration: /api/v1/students', () => {
             // Validate the returned user object structure
             expect(createdStudent).toBeDefined();
             expect(createdStudent.id).toEqual(expect.any(String));
-            expect(createdStudent.email).toMatch(/test.student.\d+@example.com/); // Match pattern from util
+            expect(createdStudent.email).toMatch(/^test\.student\.\d+_[a-z0-9]{6}@example\.com$/);
             expect(createdStudent.firstName).toBeDefined();
             expect(createdStudent.lastName).toBeDefined();
             expect(createdStudent.phoneNumber).toBeDefined();

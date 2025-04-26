@@ -14,6 +14,7 @@ import { LessonType } from '../../shared/models/LessonType.js';
 import { GoalRecommendation } from '../../shared/models/GoalRecommendation.js';
 import { Response, Request } from 'express';
 import { GoalMapper } from './goal.mapper.js';
+import { isUuid } from '../utils/validation.utils.js';
 
 // --- Configuration Constants ---
 const LOG_STREAMING_DETAILS = process.env.LOG_STREAMING_DETAILS === 'true' || false; // Default to false
@@ -40,6 +41,25 @@ export const goalService = {
         description: string,
         estimatedLessonCount: number
     ): Promise<Goal> {
+        // --- Validation --- 
+        if (!requestingUserId) {
+            // This should ideally be caught by auth middleware, but good to double-check
+            throw new BadRequestError('Requesting User ID is required.');
+        }
+        if (!lessonId || !isUuid(lessonId)) {
+            throw new BadRequestError('Valid Lesson ID is required.');
+        }
+        if (!title || typeof title !== 'string' || title.trim().length === 0) {
+            throw new BadRequestError('Title is required and must be a non-empty string.');
+        }
+        if (!description || typeof description !== 'string' || description.trim().length === 0) {
+            throw new BadRequestError('Description is required and must be a non-empty string.');
+        }
+        if (typeof estimatedLessonCount !== 'number' || !Number.isInteger(estimatedLessonCount) || estimatedLessonCount <= 0) {
+            throw new BadRequestError('Estimated Lesson Count must be a positive integer.');
+        }
+        // --- End Validation ---
+
         // Check if the lesson exists and get teacher ID for authorization
         const lesson = await prisma.lesson.findUnique({
             where: { id: lessonId },
@@ -106,10 +126,22 @@ export const goalService = {
         transition: GoalStatusTransition | undefined,
         context: Prisma.JsonValue | null = null
     ): Promise<Goal> {
+        // --- Validation --- 
+        if (!requestingUserId) {
+            throw new BadRequestError('Requesting User ID is required.');
+        }
+        if (!goalId || !isUuid(goalId)) {
+            throw new BadRequestError('Valid Goal ID is required.');
+        }
         // Validate the transition input itself
         if (!transition || !Object.values(GoalStatusTransition).includes(transition)) {
             throw new BadRequestError('Invalid or missing transition value provided.');
         }
+        // Context validation (basic type check, more specific if needed)
+        if (context !== null && typeof context !== 'object') {
+            throw new BadRequestError('Invalid context format. Must be a JSON object or null.');
+        }
+        // --- End Validation ---
 
         // Fetch the goal, including lesson teacher ID for authorization check
         const goalData = await prisma.goal.findUnique({
@@ -195,12 +227,15 @@ export const goalService = {
      * @throws {AuthorizationError} If the user is not authorized to view the goal.
      */
     async getGoalById(goalId: string, userId: string): Promise<Goal | null> {
-        if (!goalId) {
-            throw new BadRequestError('Goal ID is required.');
+        // --- Validation ---
+        if (!goalId || !isUuid(goalId)) {
+            throw new BadRequestError('Valid Goal ID is required.');
         }
         if (!userId) {
+            // Should be caught by authMiddleware, but defensive check
             throw new BadRequestError('User ID is required for authorization.');
         }
+        // --- End Validation ---
 
         const goalData = await prisma.goal.findUnique({
             where: { id: goalId },
@@ -251,13 +286,15 @@ export const goalService = {
      * @throws {BadRequestError} If lessonId or userId is missing.
      */
     async getGoalsByLessonId(lessonId: string, userId: string): Promise<Goal[]> {
-        if (!lessonId) {
-            throw new BadRequestError('Lesson ID is required.');
+        // --- Validation ---
+        if (!lessonId || !isUuid(lessonId)) {
+            throw new BadRequestError('Valid Lesson ID is required.');
         }
         if (!userId) {
             // Should be caught by authMiddleware, but defensive check
             throw new BadRequestError('User ID is required for authorization.');
         }
+        // --- End Validation ---
 
         // Fetch the lesson and include related IDs needed for authorization
         const lesson = await prisma.lesson.findUnique({
@@ -324,6 +361,15 @@ export const goalService = {
 
     /** Fetches the necessary context (lesson, student, goals) for generating recommendations. */
     async _getRecommendationContext(lessonId: string, userId: string) {
+        // --- Validation (moved from generate/stream methods) ---
+        if (!lessonId || !isUuid(lessonId)) {
+            throw new BadRequestError('Valid Lesson ID is required.');
+        }
+        if (!userId) {
+            throw new BadRequestError('User ID is required for authorization.');
+        }
+        // --- End Validation ---
+
         const currentLesson = await lessonService.getLessonById(lessonId, userId);
         if (!currentLesson) throw new NotFoundError(`Lesson ${lessonId} not found or user ${userId} not authorized.`);
 
@@ -515,18 +561,32 @@ Ensure that each object strictly follows the specified format, and do not includ
     ): Promise<void> {
         console.log(`[SSE Service] Starting stream for lesson ${lessonId}, count ${count}, user ${userId}`);
 
-        if (!lessonId) {
-            throw new BadRequestError('Lesson ID is required.');
+        // --- Validation ---
+        if (!lessonId || !isUuid(lessonId)) {
+            // Need to handle error within stream context
+            this._streamError(res, 'Valid Lesson ID is required.');
+            return;
         }
         if (!userId) {
-            throw new BadRequestError('User ID is required for authorization.');
+            this._streamError(res, 'User ID is required for authorization.');
+            return;
         }
         if (!req) {
-            throw new Error("Request object is required for streaming.");
+            // This is an internal error, should not happen if called correctly
+            console.error("[SSE Service] Internal Error: Request object missing.");
+            this._streamError(res, 'Internal server error.');
+            return;
         }
         if (!res) {
-            throw new Error("Response object is required for streaming.");
+            console.error("[SSE Service] Internal Error: Response object missing.");
+            // Cannot send error back if res is missing
+            return;
         }
+        if (typeof count !== 'number' || !Number.isInteger(count) || count <= 0 || count > 10) {
+            this._streamError(res, 'Invalid count parameter. Must be an integer between 1 and 10.');
+            return;
+        }
+        // --- End Validation ---
 
         // Fetch lesson to verify teacher
         const lesson = await prisma.lesson.findUnique({
@@ -670,6 +730,24 @@ Ensure that each object strictly follows the specified format, and do not includ
             // Ensure stream is ended even if error occurs during setup or OpenAI call
             const errorMessage = error instanceof Error ? error.message : 'Failed to stream recommendations.';
             safeEndStream('error', { message: errorMessage });
+        }
+    },
+
+    /** Helper to write SSE error events */
+    _streamError(res: Response, message: string, status: number = 400): void {
+        try {
+            console.error(`[SSE Service Error] ${message}`);
+            // Although we set status, SSE doesn't use HTTP status codes after connection
+            // We send the error details in the event data
+            res.write(`event: error
+data: ${JSON.stringify({ status, message })}
+
+`);
+            res.end();
+        } catch (writeError) {
+            console.error("[SSE Service] Failed to write error event to SSE stream:", writeError);
+            // Attempt to end response anyway if possible
+            try { res.end(); } catch { /* Ignore */ }
         }
     },
 }; 

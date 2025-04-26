@@ -48,12 +48,14 @@ export const createTestLessonRequest = async (
         .set('Authorization', `Bearer ${studentToken}`)
         .send(requestData);
 
-    if (response.status !== 201 || !response.body.lessonRequest) {
+    // Check for success and if the response body is the lesson request object directly
+    if (response.status !== 201 || !response.body || !response.body.id) { // Check for body and an ID property
         console.error('Create Test Lesson Request failed:', response.status, response.body);
         throw new Error(`Util failed to create lesson request. Status: ${response.status}, Body: ${JSON.stringify(response.body)}`);
     }
 
-    return response.body.lessonRequest as LessonRequest;
+    // Return the response body directly as LessonRequest
+    return response.body as LessonRequest;
 };
 
 // --- Lower-level API Call Utilities ---

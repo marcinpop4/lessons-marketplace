@@ -66,9 +66,28 @@ describe('API Integration: /api/v1/goals', () => {
                 hourlyRateInCents: 5000,
             });
 
-            // 5. Accept Quote to Create Lesson (Student) - Pass raw token
-            const lesson = await acceptTestLessonQuote(studentAuthToken, lessonQuote.id);
-            testLessonId = lesson.id;
+            // 5. Accept Quote (Student) - This creates the Lesson implicitly
+            // The acceptTestLessonQuote function now returns the lessonRequestId (string)
+            // We don't need to assign its result directly if we fetch by quoteId
+            await acceptTestLessonQuote(studentAuthToken, lessonQuote.id);
+
+            // 6. Fetch the newly created Lesson using the quoteId
+            const fetchLessonResponse = await request(API_BASE_URL!)
+                .get('/api/v1/lessons')
+                .set('Authorization', `Bearer ${studentAuthToken}`) // Use student or teacher token
+                .query({ quoteId: lessonQuote.id });
+
+            if (fetchLessonResponse.status !== 200 || !Array.isArray(fetchLessonResponse.body) || fetchLessonResponse.body.length !== 1) {
+                console.error("Failed to fetch created lesson in goal setup:", fetchLessonResponse.status, fetchLessonResponse.body);
+                throw new Error(`Failed to fetch lesson associated with quote ${lessonQuote.id} in setup.`);
+            }
+
+            const createdLesson = fetchLessonResponse.body[0];
+            if (!createdLesson || !createdLesson.id) {
+                console.error("Fetched lesson object is invalid:", createdLesson);
+                throw new Error('Fetched lesson object is invalid in setup.');
+            }
+            testLessonId = createdLesson.id; // Assign the actual Lesson ID
 
             // Goal will be created within the POST test
 
@@ -118,48 +137,71 @@ describe('API Integration: /api/v1/goals', () => {
         });
 
         it('should return 400 Bad Request if lessonId is missing', async () => {
-            const { lessonId, ...invalidData } = goalData;
-            const response = await createGoal(teacherAuthToken, invalidData as any);
+            if (!teacherAuthToken) throw new Error('Teacher token needed');
+            const goalData = { title: 'Test', description: 'Desc', estimatedLessonCount: 3 }; // Missing lessonId
+            // Use direct request call
+            const response = await request(API_BASE_URL!)
+                .post('/api/v1/goals')
+                .set('Authorization', `Bearer ${teacherAuthToken}`)
+                .send(goalData);
             expect(response.status).toBe(400);
-            // Revert to expecting specific error message
-            expect(response.body.error).toContain('lessonId'); // Or check specific message if Zod provides it consistently
+            // Expect error message from service validation
+            expect(response.body.error).toBe('Valid Lesson ID is required.');
         });
 
         it('should return 400 Bad Request if description is missing', async () => {
-            const { description, ...invalidData } = goalData;
-            const response = await createGoal(teacherAuthToken, invalidData as any);
+            if (!teacherAuthToken) throw new Error('Teacher token needed');
+            const goalData = { lessonId: testLessonId, title: 'Test', estimatedLessonCount: 3 }; // Missing description
+            // Use direct request call
+            const response = await request(API_BASE_URL!)
+                .post('/api/v1/goals')
+                .set('Authorization', `Bearer ${teacherAuthToken}`)
+                .send(goalData);
             expect(response.status).toBe(400);
-            // Revert to expecting specific error message
-            expect(response.body.error).toContain('description');
+            // Expect error message from service validation
+            expect(response.body.error).toBe('Description is required and must be a non-empty string.');
         });
 
         it('should return 400 Bad Request if title is missing', async () => {
-            const { title, ...invalidData } = goalData;
-            const response = await createGoal(teacherAuthToken, invalidData as any);
+            if (!teacherAuthToken) throw new Error('Teacher token needed');
+            const goalData = { lessonId: testLessonId, description: 'Desc', estimatedLessonCount: 3 }; // Missing title
+            // Use direct request call
+            const response = await request(API_BASE_URL!)
+                .post('/api/v1/goals')
+                .set('Authorization', `Bearer ${teacherAuthToken}`)
+                .send(goalData);
             expect(response.status).toBe(400);
-            // Revert to expecting specific error message
-            expect(response.body.error).toContain('title');
+            // Expect error message from service validation
+            expect(response.body.error).toBe('Title is required and must be a non-empty string.');
         });
 
         it('should return 400 Bad Request if estimatedLessonCount is missing or invalid', async () => {
-            const { estimatedLessonCount, ...missingEstimate } = goalData;
-            // Missing
-            let response = await createGoal(teacherAuthToken, missingEstimate as any);
-            expect(response.status).toBe(400);
-            // Revert to expecting specific error message
-            expect(response.body.error).toContain('estimatedLessonCount');
+            if (!teacherAuthToken) throw new Error('Teacher token needed');
+            const baseGoalData = { lessonId: testLessonId, title: 'Test', description: 'Desc' };
 
-            // Invalid (zero)
-            response = await createGoal(teacherAuthToken, { ...goalData, estimatedLessonCount: 0 });
+            // Missing count - Use direct request call
+            let response = await request(API_BASE_URL!)
+                .post('/api/v1/goals')
+                .set('Authorization', `Bearer ${teacherAuthToken}`)
+                .send(baseGoalData);
             expect(response.status).toBe(400);
-            // Revert to expecting specific error message
-            expect(response.body.error).toContain('Number must be greater than 0');
+            expect(response.body.error).toBe('Estimated Lesson Count must be a positive integer.');
 
-            // Invalid (string)
-            response = await createGoal(teacherAuthToken, { ...goalData, estimatedLessonCount: 'abc' } as any);
+            // Invalid (zero) - Use direct request call
+            response = await request(API_BASE_URL!)
+                .post('/api/v1/goals')
+                .set('Authorization', `Bearer ${teacherAuthToken}`)
+                .send({ ...baseGoalData, estimatedLessonCount: 0 });
             expect(response.status).toBe(400);
-            // Revert to expecting specific error message
-            expect(response.body.error).toContain('Expected number, received string');
+            expect(response.body.error).toBe('Estimated Lesson Count must be a positive integer.');
+
+            // Invalid (string) - Use direct request call
+            response = await request(API_BASE_URL!)
+                .post('/api/v1/goals')
+                .set('Authorization', `Bearer ${teacherAuthToken}`)
+                .send({ ...baseGoalData, estimatedLessonCount: 'five' });
+            expect(response.status).toBe(400);
+            expect(response.body.error).toBe('Estimated Lesson Count must be a positive integer.');
         });
 
         it('should return 404 Not Found if lessonId does not exist', async () => {
@@ -175,10 +217,23 @@ describe('API Integration: /api/v1/goals', () => {
             const otherTeacherToken = await loginTestUser(otherTeacher.email, otherPassword, UserType.TEACHER);
             const otherLessonRequest = await createTestLessonRequest(studentAuthToken, studentId, LessonType.VOICE);
             const otherQuote = await createTestLessonQuote(otherTeacherToken, { lessonRequestId: otherLessonRequest.id, costInCents: 4000, hourlyRateInCents: 4000 });
-            const otherLesson = await acceptTestLessonQuote(studentAuthToken, otherQuote.id);
+
+            // Accept quote to create lesson
+            await acceptTestLessonQuote(studentAuthToken, otherQuote.id);
+
+            // Fetch the actual lesson created
+            const fetchLessonResponse = await request(API_BASE_URL!)
+                .get('/api/v1/lessons')
+                .set('Authorization', `Bearer ${studentAuthToken}`)
+                .query({ quoteId: otherQuote.id });
+
+            if (fetchLessonResponse.status !== 200 || !Array.isArray(fetchLessonResponse.body) || fetchLessonResponse.body.length !== 1) {
+                throw new Error(`Failed to fetch other lesson associated with quote ${otherQuote.id} in test.`);
+            }
+            const otherLesson = fetchLessonResponse.body[0]; // Contains the other lesson object with its ID
 
             // 2. Try creating goal for other lesson using original teacher token
-            const response = await createGoal(teacherAuthToken, { ...goalData, lessonId: otherLesson.id });
+            const response = await createGoal(teacherAuthToken, { ...goalData, lessonId: otherLesson.id }); // Use the fetched lesson ID
             expect(response.status).toBe(403);
             expect(response.body.error).toContain('User is not authorized to create goals for this lesson.');
         });
@@ -213,17 +268,14 @@ describe('API Integration: /api/v1/goals', () => {
         });
 
         it('should return 400 Bad Request if lessonId query parameter is missing', async () => {
-            // Note: The util `getGoalsByLessonId` *requires* lessonId, so this specific scenario
-            // is implicitly prevented by the utility function signature. We test the endpoint directly
-            // only if needed, but usually, testing the *behavior* (like getting 403/404) is sufficient.
-            // If direct endpoint testing without params is desired, we can add a specific util or call `request` directly.
-            // For now, we'll assume the util enforces the requirement.
-            // Example of direct test if needed:
+            if (!studentAuthToken) throw new Error('Student token needed');
+            // Use direct request call without query param
             const response = await request(API_BASE_URL!)
-                .get('/api/v1/goals') // No query param
+                .get(`/api/v1/goals`)
                 .set('Authorization', `Bearer ${studentAuthToken}`);
             expect(response.status).toBe(400);
-            expect(response.body.error).toContain('Lesson ID query parameter is required and must be a string.');
+            // Expect error message from service validation
+            expect(response.body.error).toBe('Valid Lesson ID is required.');
         });
 
         it('should return 403 Forbidden if requested by an unrelated user', async () => {
@@ -241,9 +293,22 @@ describe('API Integration: /api/v1/goals', () => {
             // Create a new lesson that won't have goals associated by default
             const newLessonRequest = await createTestLessonRequest(studentAuthToken, studentId, LessonType.VOICE);
             const newQuote = await createTestLessonQuote(teacherAuthToken, { lessonRequestId: newLessonRequest.id, costInCents: 6000, hourlyRateInCents: 6000 });
-            const newLesson = await acceptTestLessonQuote(studentAuthToken, newQuote.id);
 
-            const response = await getGoalsByLessonId(studentAuthToken, newLesson.id);
+            // Accept quote to create lesson
+            await acceptTestLessonQuote(studentAuthToken, newQuote.id);
+
+            // Fetch the actual lesson created
+            const fetchLessonResponse = await request(API_BASE_URL!)
+                .get('/api/v1/lessons')
+                .set('Authorization', `Bearer ${studentAuthToken}`)
+                .query({ quoteId: newQuote.id });
+
+            if (fetchLessonResponse.status !== 200 || !Array.isArray(fetchLessonResponse.body) || fetchLessonResponse.body.length !== 1) {
+                throw new Error(`Failed to fetch new lesson associated with quote ${newQuote.id} in test.`);
+            }
+            const newLesson = fetchLessonResponse.body[0]; // Contains the new lesson object with its ID
+
+            const response = await getGoalsByLessonId(studentAuthToken, newLesson.id); // Use the fetched lesson ID
             expect(response.status).toBe(200);
             expect(response.body).toEqual([]);
         });
@@ -305,11 +370,12 @@ describe('API Integration: /api/v1/goals', () => {
         });
 
         it('should return 400 Bad Request for an invalid goal ID format', async () => {
-            const invalidGoalId = 'not-a-uuid';
-            const response = await getGoalById(studentAuthToken, invalidGoalId);
+            if (!studentAuthToken) throw new Error('Student token needed');
+            const invalidId = 'not-a-uuid';
+            // Use standard utility - service validates ID format
+            const response = await getGoalById(studentAuthToken, invalidId);
             expect(response.status).toBe(400);
-            // Revert to expecting specific error message (from Zod schema)
-            expect(response.body.error).toContain('Invalid Goal ID format in URL path.');
+            expect(response.body.error).toBe('Valid Goal ID is required.');
         });
 
         it('should return 403 Forbidden if requested by an unrelated user', async () => {
@@ -367,15 +433,17 @@ describe('API Integration: /api/v1/goals', () => {
         });
 
         it('should return 400 Bad Request if transition is missing or invalid value', async () => {
-            // Missing - Use patchGoalRaw
-            let response = await patchGoalRaw(teacherAuthToken, goalForPatchTestId, {}); // Send empty object
+            if (!teacherAuthToken) throw new Error('Teacher token needed');
+            if (!goalForPatchTestId) throw new Error('Goal ID for patch test missing');
+            // Missing transition - Use patchGoalRaw
+            let response = await patchGoalRaw(teacherAuthToken, goalForPatchTestId, {});
             expect(response.status).toBe(400);
-            expect(response.body.error).toContain('transition');
+            expect(response.body.error).toBe('Invalid or missing transition value provided.');
 
-            // Invalid value - Use patchGoalRaw
-            response = await patchGoalRaw(teacherAuthToken, goalForPatchTestId, { transition: 'INVALID_STATUS' }); // Send invalid transition string
+            // Invalid transition value - Use patchGoalRaw
+            response = await patchGoalRaw(teacherAuthToken, goalForPatchTestId, { transition: 'INVALID_STATUS' });
             expect(response.status).toBe(400);
-            expect(response.body.error).toContain('Invalid enum value');
+            expect(response.body.error).toBe('Invalid or missing transition value provided.');
         });
 
         it('should return 401 Unauthorized if no token is provided', async () => {
@@ -407,11 +475,12 @@ describe('API Integration: /api/v1/goals', () => {
         });
 
         it('should return 400 Bad Request for an invalid goal ID format', async () => {
-            const invalidGoalId = 'not-a-uuid';
-            const response = await updateGoalStatus(teacherAuthToken, invalidGoalId, GoalStatusTransition.START);
+            if (!teacherAuthToken) throw new Error('Teacher token needed');
+            const invalidId = 'not-a-uuid';
+            // Use standard utility - service validates ID format
+            const response = await updateGoalStatus(teacherAuthToken, invalidId, GoalStatusTransition.START);
             expect(response.status).toBe(400);
-            // Revert to expecting specific error message (from Zod schema)
-            expect(response.body.error).toContain('Invalid Goal ID format in URL path.');
+            expect(response.body.error).toBe('Valid Goal ID is required.');
         });
     });
 }); 

@@ -1,8 +1,10 @@
 import type { Request, Response, NextFunction } from 'express';
 import { lessonRequestService } from './lessonRequest.service.js';
 import { AddressDTO } from '../../shared/models/Address.js';
+import { LessonType } from '../../shared/models/LessonType.js'; // Import LessonType enum
 import { UserType } from '../../shared/models/UserType.js';
-import { AuthorizationError } from '../errors/index.js';
+// Import all required errors from the central index file
+import { AuthorizationError, BadRequestError, NotFoundError } from '../errors/index.js';
 
 // Add user property to Request type
 interface AuthenticatedRequest extends Request {
@@ -24,92 +26,67 @@ export class LessonRequestController {
   /**
    * Create a new lesson request
    * @route POST /api/lesson-requests
-   * @param req - Express request
+   * @param req - Express request (AuthenticatedRequest)
    * @param res - Express response
+   * @param next - Express next function
    */
-  async createLessonRequest(req: Request, res: Response): Promise<void> {
+  async createLessonRequest(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      // Extract data and user
       const { type, startTime, durationMinutes, addressObj, studentId } = req.body;
-      const authenticatedUserId = req.user?.id; // Get ID from token (added by authMiddleware)
+      const authenticatedUser = req.user;
 
-      // --- Authorization Check --- 
-      if (!authenticatedUserId || studentId !== authenticatedUserId) {
-        res.status(403).json({ error: 'Forbidden', message: 'You can only create lesson requests for yourself.' });
-        return;
+      // --- Authorization Check (Controller Level - user must match studentId) ---
+      if (!authenticatedUser?.id || studentId !== authenticatedUser.id) {
+        // Use next for consistent error handling
+        return next(new AuthorizationError('Forbidden: You can only create lesson requests for yourself.'));
       }
       // --- End Authorization Check --- 
 
-      // --- Validation: Basic Fields & addressObj Existence --- 
-      if (!type || !startTime || !durationMinutes || !studentId || !addressObj) {
-        res.status(400).json({
-          error: 'Missing required fields',
-          message: 'Please provide type, startTime, durationMinutes, studentId, and addressObj'
-        });
-        return;
+      // --- Data Preparation ---
+      // Basic check if addressObj exists before accessing properties
+      if (!addressObj) {
+        // Service will catch specific missing fields, but this prevents runtime errors here
+        return next(new BadRequestError('addressObj is required.'));
       }
-      // --- End Basic Validation --- 
+      // Default country BEFORE passing to service (as service expects complete AddressDTO)
+      const country = addressObj.country || 'USA';
 
-      // --- Validation: Address Properties --- 
-      if (!addressObj.street || !addressObj.city || !addressObj.state || !addressObj.postalCode) {
-        res.status(400).json({
-          error: 'Missing required address fields',
-          message: 'Address object must include street, city, state, and postalCode'
-        });
-        return;
-      }
-      // --- End Address Validation --- 
-
-      // --- Default country if missing (AFTER checking addressObj exists) --- 
-      if (!addressObj.country) {
-        console.log('Country missing in request, defaulting to USA.');
-        addressObj.country = "USA"; // Mutate the object safely now
-      }
-      // --- End Default country --- 
-
-      // Convert string dates to Date objects
+      // Convert string date to Date object
       const parsedStartTime = new Date(startTime);
-      if (isNaN(parsedStartTime.getTime())) {
-        res.status(400).json({
-          error: 'Invalid date format',
-          message: 'startTime must be a valid date string'
-        });
-        return;
-      }
+      // Service will validate the date object itself
 
-      // Create the address DTO object explicitly using the imported type
+      // Prepare Address DTO for the service
       const addressDTO: AddressDTO = {
         street: addressObj.street,
         city: addressObj.city,
         state: addressObj.state,
         postalCode: addressObj.postalCode,
-        country: addressObj.country // Will be defaulted if was missing
+        country: country
       };
 
-      // Create lesson request - service now returns LessonRequest model
+      // Validate durationMinutes is a number before parseInt
+      const parsedDuration = parseInt(durationMinutes, 10);
+      if (isNaN(parsedDuration)) {
+        // Service checks for positive integer, but catch NaN here
+        return next(new BadRequestError('durationMinutes must be a valid number.'));
+      }
+
+      // --- Call Service --- 
+      // Service now handles validation of types, formats, existence (student), etc.
       const lessonRequest = await lessonRequestService.createLessonRequest({
-        type: type,
+        type: type as LessonType, // Cast type if necessary, service validates enum
         startTime: parsedStartTime,
-        durationMinutes: parseInt(durationMinutes, 10),
+        durationMinutes: parsedDuration,
         addressDTO: addressDTO,
         studentId: studentId
       });
 
-      // Return the created lesson request model
-      res.status(201).json({
-        lessonRequest: lessonRequest // Return model directly
-      });
+      // Service returns model or throws error
+      res.status(201).json(lessonRequest);
 
     } catch (error) {
-      console.error('Error creating lesson request:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      // Handle specific errors
-      if (errorMessage.includes('not found')) {
-        res.status(404).json({ error: errorMessage });
-        return;
-      }
-
-      res.status(500).json({ error: 'Internal server error', message: errorMessage });
+      next(error); // Pass all errors (Auth, NotFound, BadRequest) to central handler
     }
   }
 
@@ -122,29 +99,23 @@ export class LessonRequestController {
    */
   async getLessonRequestById(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      // Extract params and user
       const { id } = req.params;
       const authenticatedUser = req.user; // Get user from token
-
-      if (!id) {
-        res.status(400).json({ error: 'Lesson request ID is required' });
-        return;
-      }
 
       // --- Authentication Check (already done by middleware) --- 
       if (!authenticatedUser) {
         // This case should ideally be handled by authMiddleware, but defensive check is okay
-        res.status(401).json({ error: 'Unauthorized', message: 'Authentication required.' });
-        return;
+        // Use next for consistent error handling
+        return next(new AuthorizationError('Authentication required.'));
       }
 
+      // Call service - validation of ID format happens inside
       const lessonRequest = await lessonRequestService.getLessonRequestById(id);
 
       if (!lessonRequest) {
-        res.status(404).json({
-          error: 'Lesson request not found',
-          message: `No lesson request found with ID ${id}`
-        });
-        return;
+        // Use standard NotFoundError via next
+        return next(new NotFoundError(`No lesson request found with ID ${id}`));
       }
 
       // --- Authorization Check: Ownership for Students --- 
@@ -173,33 +144,38 @@ export class LessonRequestController {
    * @param req - Express request
    * @param res - Express response
    */
-  async getLessonRequestsByStudent(req: Request, res: Response): Promise<void> {
+  async getLessonRequestsByStudent(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       // Get studentId from query parameter
-      const { studentId } = req.query;
-      const authenticatedUserId = req.user?.id; // Get ID from token
+      const { studentId } = req.query as { studentId?: string }; // Type assertion for query param
+      const authenticatedUser = req.user; // Get user info from token
 
-      // Validation: Check if studentId query parameter is provided
-      if (!studentId || typeof studentId !== 'string') {
-        res.status(400).json({ error: 'Missing or invalid studentId query parameter' });
-        return;
+      // --- Validation: Check if studentId is provided ---
+      if (!studentId) {
+        return next(new BadRequestError('Missing or invalid studentId query parameter'));
+      }
+      // --- End Validation ---
+
+      if (!authenticatedUser?.id) {
+        // Should be caught by middleware, but defensive check
+        return next(new AuthorizationError('Authentication required.'));
       }
 
-      // Authorization Check: Ensure the requested studentId matches the authenticated user
-      if (!authenticatedUserId || studentId !== authenticatedUserId) {
-        res.status(403).json({ error: 'Forbidden', message: 'You can only view your own lesson requests.' });
-        return;
+      // --- Authorization: Ensure student is requesting their own data ---
+      if (authenticatedUser.userType === UserType.STUDENT && authenticatedUser.id !== studentId) {
+        return next(new AuthorizationError('Forbidden: You can only view your own lesson requests.'));
       }
+      // --- End Authorization ---
 
+      // Call service - validation of studentId format happens inside
       // Service now returns LessonRequest[]
       const lessonRequests = await lessonRequestService.getLessonRequestsByStudent(studentId);
 
       // Return models directly
       res.json(lessonRequests);
     } catch (error) {
-      console.error('Error fetching student lesson requests:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      res.status(500).json({ error: 'Internal server error', message: errorMessage });
+      // Use next(error) for consistent central error handling
+      next(error);
     }
   }
 }

@@ -1,34 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
 import { goalService } from './goal.service.js';
-import { GoalStatusTransition } from '../../shared/models/GoalStatus.js';
-import { z } from 'zod';
-import { BadRequestError } from '../errors/index.js';
-// Import the Prisma-generated UserType
+// GoalStatusTransition needed for type casting if required, but zod schema removed
+// import { GoalStatusTransition } from '../../shared/models/GoalStatus.js';
+// Zod removed as validation moves to service
+// import { z } from 'zod';
+// Errors are handled by central error handler or service
+// import { BadRequestError } from '../errors/index.js';
 import { UserType as PrismaUserType } from '@prisma/client';
 
-// Input validation schemas using Zod
-const createGoalSchema = z.object({
-    lessonId: z.string().uuid(),
-    title: z.string().min(1),
-    description: z.string().min(1),
-    estimatedLessonCount: z.number().int().positive(),
-});
-
-const updateGoalStatusSchema = z.object({
-    transition: z.nativeEnum(GoalStatusTransition),
-    context: z.any().optional(), // Allow any JSON structure for context
-});
-
-const generateRecommendationsSchema = z.object({
-    studentInfo: z.any(),
-    lessonInfo: z.any(),
-    pastLessons: z.array(z.any())
-});
-
-// Define param validation schema
-const goalIdParamSchema = z.object({
-    goalId: z.string().uuid({ message: 'Invalid Goal ID format in URL path.' })
-});
+// Zod Schemas Removed
+// const createGoalSchema = z.object({ ... });
+// const updateGoalStatusSchema = z.object({ ... });
+// const generateRecommendationsSchema = z.object({ ... });
+// const goalIdParamSchema = z.object({ ... });
 
 // Define AuthenticatedRequest interface using PrismaUserType
 interface AuthenticatedRequest extends Request {
@@ -44,25 +28,27 @@ export const goalController = {
      */
     async createGoal(req: AuthenticatedRequest, res: Response, next: NextFunction) {
         try {
-            // Extract user ID or throw if missing (should be added by authMiddleware)
             const authenticatedUser = req.user;
             if (!authenticatedUser?.id) {
+                // Still good practice to check for user from auth middleware
                 throw new Error('Authenticated user ID not found. Middleware issue?');
             }
             const userId = authenticatedUser.id;
 
-            const validatedData = createGoalSchema.parse(req.body);
-            // Pass userId to the service method
+            // Extract data directly from body
+            const { lessonId, title, description, estimatedLessonCount } = req.body;
+
+            // Call service - validation happens inside
             const goal = await goalService.createGoal(
-                userId, // Pass requesting user's ID
-                validatedData.lessonId,
-                validatedData.title,
-                validatedData.description,
-                validatedData.estimatedLessonCount
+                userId,
+                lessonId, // Pass raw value
+                title, // Pass raw value
+                description, // Pass raw value
+                estimatedLessonCount // Pass raw value
             );
             res.status(201).json(goal);
         } catch (error) {
-            next(error); // Pass errors to the central error handler
+            next(error); // Pass errors (including BadRequestError from service) to the central error handler
         }
     },
 
@@ -71,27 +57,28 @@ export const goalController = {
      */
     async updateGoalStatus(req: AuthenticatedRequest, res: Response, next: NextFunction) {
         try {
-            // Validate goalId param first
-            const { goalId } = goalIdParamSchema.parse(req.params);
+            // Extract goalId directly
+            const { goalId } = req.params;
 
-            // Extract user ID or throw if missing
             const authenticatedUser = req.user;
             if (!authenticatedUser?.id) {
                 throw new Error('Authenticated user ID not found. Middleware issue?');
             }
             const userId = authenticatedUser.id;
 
-            const validatedData = updateGoalStatusSchema.parse(req.body);
-            // Pass userId to the service method
+            // Extract transition and context directly
+            const { transition, context } = req.body;
+
+            // Call service - validation happens inside
             const goal = await goalService.updateGoalStatus(
-                userId, // Pass requesting user's ID
-                goalId,
-                validatedData.transition,
-                validatedData.context ?? null // Pass context or null
+                userId,
+                goalId, // Pass raw value
+                transition, // Pass raw value
+                context ?? null // Pass context or null
             );
             res.status(200).json(goal);
         } catch (error) {
-            next(error);
+            next(error); // Pass errors (including BadRequestError) to central handler
         }
     },
 
@@ -100,22 +87,21 @@ export const goalController = {
      */
     async getGoalById(req: AuthenticatedRequest, res: Response, next: NextFunction) {
         try {
-            // Validate goalId param first
-            const { goalId } = goalIdParamSchema.parse(req.params);
+            // Extract goalId directly
+            const { goalId } = req.params;
 
-            // Extract user ID
             const authenticatedUser = req.user;
             if (!authenticatedUser?.id) {
                 throw new Error('Authenticated user ID not found. Middleware issue?');
             }
             const userId = authenticatedUser.id;
 
-            // Authorization check done in service
+            // Call service - ID validation and authorization happens inside
             const goal = await goalService.getGoalById(goalId, userId);
-            // Service throws NotFoundError or AuthorizationError
+            // Service throws NotFoundError or AuthorizationError if needed
             res.status(200).json(goal);
         } catch (error) {
-            next(error);
+            next(error); // Pass errors (NotFound, Auth, BadIdFormat) to central handler
         }
     },
 
@@ -125,23 +111,22 @@ export const goalController = {
      */
     async getGoalsByLessonId(req: AuthenticatedRequest, res: Response, next: NextFunction) {
         try {
+            // Extract lessonId directly
             const { lessonId } = req.query;
             const authenticatedUser = req.user;
 
-            if (!lessonId || typeof lessonId !== 'string') {
-                throw new BadRequestError('Lesson ID query parameter is required and must be a string.');
-            }
-
+            // Validate user presence
             if (!authenticatedUser?.id) {
                 throw new Error('Authenticated user ID not found. Middleware issue?');
             }
             const userId = authenticatedUser.id;
 
-            // Call service, passing lessonId and userId for authorization
-            const goals = await goalService.getGoalsByLessonId(lessonId, userId);
+            // Call service - lessonId validation and authorization happens inside
+            // Cast lessonId to string as query params can be string | string[] | ParsedQs | ParsedQs[]
+            const goals = await goalService.getGoalsByLessonId(String(lessonId), userId);
             res.status(200).json(goals);
         } catch (error) {
-            next(error); // Pass errors (including potential AuthorizationError from service) to central handler
+            next(error); // Pass errors (NotFound, Auth, BadIdFormat) to central handler
         }
     },
 
@@ -150,25 +135,25 @@ export const goalController = {
      */
     async generateRecommendations(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
         try {
+            // Extract lessonId directly
             const { lessonId } = req.query;
             const authenticatedUser = req.user;
             if (!authenticatedUser?.id) {
                 throw new Error('Authenticated user ID not found. Middleware issue?');
             }
-            if (typeof lessonId !== 'string') {
-                throw new BadRequestError('Lesson ID query parameter is required');
-            }
-            // Pass userId to service for potential authorization checks
-            const recommendations = await goalService.generateGoalRecommendations(lessonId, authenticatedUser.id);
+            const userId = authenticatedUser.id;
+
+            // Call service - lessonId validation and authorization happens inside
+            const recommendations = await goalService.generateGoalRecommendations(String(lessonId), userId);
             res.status(200).json(recommendations);
         } catch (error) {
-            next(error);
+            next(error); // Pass errors (NotFound, Auth, BadIdFormat, OpenAI errors) to central handler
         }
     },
 
     // === New Streaming Method ===
     async streamRecommendations(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
-        // Set headers for SSE
+        // Set headers for SSE - MUST happen before any async work or potential errors
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
@@ -176,45 +161,50 @@ export const goalController = {
 
         try {
             const authenticatedUser = req.user;
+            // User ID check - required for service call
             if (!authenticatedUser?.id) {
-                console.error("[SSE] Authenticated user ID not found in streamRecommendations.");
-                res.write(`event: error\ndata: ${JSON.stringify({ message: 'Authentication error' })}\n\n`);
-                res.end();
+                // Throwing here won't work well with SSE, log and end
+                console.error("[SSE Controller] Authenticated user ID not found.");
+                goalService._streamError(res, 'Authentication required.', 401); // Use helper
                 return;
             }
+            const userId = authenticatedUser.id;
 
-            const { lessonId } = req.query;
-            if (typeof lessonId !== 'string') {
-                res.write(`event: error\ndata: ${JSON.stringify({ message: 'Lesson ID query parameter is required' })}\n\n`);
-                res.end();
-                return;
-            }
+            // Extract lessonId and count
+            const { lessonId, count: countQuery } = req.query;
 
+            // Parse count - Default/Max handled in service now, just need basic parse
             const DEFAULT_COUNT = 5;
-            const MAX_COUNT = 10;
             let count = DEFAULT_COUNT;
-            if (req.query.count && typeof req.query.count === 'string') {
-                const parsedCount = parseInt(req.query.count, 10);
-                if (!isNaN(parsedCount) && parsedCount > 0) {
-                    count = Math.min(parsedCount, MAX_COUNT); // Use parsed count, capped at max
-                } else {
-                    console.warn(`[SSE] Invalid count query parameter received: '${req.query.count}'. Using default ${DEFAULT_COUNT}.`);
+            if (countQuery && typeof countQuery === 'string') {
+                const parsedCount = parseInt(countQuery, 10);
+                // Basic check for number, range check is in service
+                if (!isNaN(parsedCount)) {
+                    count = parsedCount;
                 }
-            } else {
-                console.log(`[SSE] No count query parameter received. Using default ${DEFAULT_COUNT}.`);
             }
 
-            await goalService.streamGoalRecommendations(lessonId, count, req, res, authenticatedUser.id);
+            // Call the service method - validation (IDs, count range) happens inside
+            // It will handle writing errors/data to the response stream
+            await goalService.streamGoalRecommendations(String(lessonId), count, req, res, userId);
+
+            // NOTE: Do NOT call res.end() here. The service method is responsible
+            // for managing the stream lifecycle and ending the response.
 
         } catch (error) {
-            console.error("Error in streamRecommendations controller:", error);
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error during streaming.';
-            try {
-                res.write(`event: error\ndata: ${JSON.stringify({ message: errorMessage })}\n\n`);
-            } catch (writeError) {
-                console.error("Failed to write error event to SSE stream:", writeError);
+            // Catch errors that might occur *before* the service takes over the stream,
+            // or if the service itself throws synchronously before starting the stream.
+            console.error("Error in streamRecommendations controller (pre-service stream):", error);
+            // Use the service's helper to ensure consistent SSE error format
+            const message = error instanceof Error ? error.message : 'Unknown error setting up stream.';
+            // Check if headers already sent (likely if flushHeaders succeeded)
+            if (!res.headersSent) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ message }));
+            } else {
+                // Headers sent, attempt to use SSE error format if service helper available
+                goalService._streamError(res, message, 500);
             }
-            res.end();
         }
     },
 }; // End of goalController export

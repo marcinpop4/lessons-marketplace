@@ -12,7 +12,9 @@ if (!API_BASE_URL) {
 
 // Helper function to create a student 
 export const createTestStudent = async () => {
-    const uniqueEmail = `test.student.${Date.now()}@example.com`; // Simplified email
+    // Add random suffix to timestamp for better uniqueness
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const uniqueEmail = `test.student.${Date.now()}_${randomSuffix}@example.com`;
     const password = 'testPasswordStudent123';
     const studentData = {
         firstName: 'TestUtil',
@@ -36,7 +38,9 @@ export const createTestStudent = async () => {
 
 // Helper function to create a teacher
 export const createTestTeacher = async () => {
-    const uniqueEmail = `test.teacher.${Date.now()}@example.com`; // Simplified email
+    // Add random suffix to timestamp for better uniqueness
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const uniqueEmail = `test.teacher.${Date.now()}_${randomSuffix}@example.com`;
     const password = 'testPasswordTeacher123';
     const teacherData = {
         firstName: 'TestUtil',
