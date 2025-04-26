@@ -1,9 +1,10 @@
 // server/auth/auth.controller.ts
 import { Request, Response, NextFunction } from 'express';
-import authService from './auth.service.js';
+import authService, { AuthMethod } from './auth.service.js';
 import { refreshTokenService } from './refreshToken.service.js';
 import { cookieOptions, REFRESH_TOKEN_COOKIE_NAME } from './auth.constants.js';
-import { UserType } from '@prisma/client';
+import { UserType as PrismaUserType } from '@prisma/client';
+import { UserType } from '../../shared/models/UserType.js';
 import { AppError, DuplicateEmailError } from '../errors/index.js'; // Import custom errors
 
 export class AuthController {
@@ -18,18 +19,27 @@ export class AuthController {
                 res.status(400).json({ error: 'Missing required fields' });
                 return;
             }
-            let userTypeEnum: UserType;
-            if (userType === 'STUDENT') userTypeEnum = UserType.STUDENT;
-            else if (userType === 'TEACHER') userTypeEnum = UserType.TEACHER;
-            else {
+
+            if (userType !== 'STUDENT' && userType !== 'TEACHER') {
                 res.status(400).json({ error: 'Invalid userType' });
                 return;
             }
 
-            // 2. Call AuthService register (which uses PasswordAuthProvider)
-            // Pass plain password, provider/services handle hashing
-            const registrationData = { email, password, firstName, lastName, phoneNumber, dateOfBirth: new Date(dateOfBirth), userType: userTypeEnum };
-            const { user, accessToken, uniqueRefreshToken } = await authService.register('PASSWORD', registrationData);
+            // 2. Call AuthService register with the new structure
+            const registrationData = {
+                email,
+                firstName,
+                lastName,
+                phoneNumber,
+                dateOfBirth: new Date(dateOfBirth),
+                userType: userType as UserType,
+                auth: {
+                    method: 'PASSWORD' as AuthMethod,
+                    password
+                }
+            };
+
+            const { user, accessToken, uniqueRefreshToken } = await authService.register(registrationData);
 
             // 3. Response
             res.cookie(REFRESH_TOKEN_COOKIE_NAME, uniqueRefreshToken, cookieOptions); // Set cookie with token from provider
@@ -67,17 +77,15 @@ export class AuthController {
                 res.status(400).json({ error: 'Email, password, and userType are required' });
                 return;
             }
-            let userTypeEnum: UserType;
-            if (userType === 'STUDENT') userTypeEnum = UserType.STUDENT;
-            else if (userType === 'TEACHER') userTypeEnum = UserType.TEACHER;
-            else {
+
+            if (userType !== 'STUDENT' && userType !== 'TEACHER') {
                 res.status(400).json({ error: 'Invalid userType' });
                 return;
             }
 
-            // 2. Call AuthService authenticate (which uses PasswordAuthProvider)
-            const credentials = { email, password, userType: userTypeEnum };
-            const { user, accessToken, uniqueRefreshToken } = await authService.authenticate('PASSWORD', credentials);
+            // 2. Call AuthService authenticate (which will check for PASSWORD auth method)
+            const credentials = { email, password, userType: userType as UserType };
+            const { user, accessToken, uniqueRefreshToken } = await authService.authenticate(credentials);
 
             // 3. Response
             res.cookie(REFRESH_TOKEN_COOKIE_NAME, uniqueRefreshToken, cookieOptions); // Set cookie with token from provider

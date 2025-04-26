@@ -1,7 +1,8 @@
 // server/auth/refreshToken.service.ts
 import prisma from '../prisma.js';
 import crypto from 'crypto';
-import { UserType } from '@prisma/client';
+import { UserType as PrismaUserType } from '@prisma/client';
+import { UserType } from '../../shared/models/UserType.js';
 
 const REFRESH_TOKEN_EXPIRES_IN_DAYS = 7;
 
@@ -35,7 +36,7 @@ export class RefreshTokenService {
      * @param token - The refresh token string to validate.
      * @returns The stored token object if valid and found, otherwise null.
      */
-    async findValidToken(token: string): Promise<{ userId: string; userType: UserType; id: string } | null> {
+    async findValidToken(token: string): Promise<{ userId: string; userType: PrismaUserType; id: string } | null> {
         const storedToken = await prisma.refreshToken.findFirst({
             where: {
                 token: token,

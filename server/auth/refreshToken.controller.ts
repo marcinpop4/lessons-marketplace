@@ -1,9 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { refreshTokenService } from './refreshToken.service.js';
 import authService from './auth.service.js';
-import prisma from '../prisma.js'; // Temporary: Ideally fetch user via a UserService/AuthService
 import { cookieOptions, REFRESH_TOKEN_COOKIE_NAME } from './auth.constants.js';
-import { UserType } from '@prisma/client'; // Assuming UserType enum exists
+import { UserType } from '../../shared/models/UserType.js';
 
 export class RefreshTokenController {
     async refreshAccessToken(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -26,21 +25,11 @@ export class RefreshTokenController {
                 return;
             }
 
-            // 3. Token is valid, get user info (Temporary direct prisma access)
+            // 3. Token is valid, get user info using AuthService
             const { userId, userType } = storedToken;
-            let user: { id: string; email: string; firstName: string; lastName: string } | null = null;
 
-            if (userType === UserType.STUDENT) { // Use enum member
-                user = await prisma.student.findUnique({
-                    where: { id: userId },
-                    select: { id: true, email: true, firstName: true, lastName: true } // Select only needed fields
-                });
-            } else if (userType === UserType.TEACHER) { // Use enum member
-                user = await prisma.teacher.findUnique({
-                    where: { id: userId },
-                    select: { id: true, email: true, firstName: true, lastName: true } // Select only needed fields
-                });
-            }
+            // Use authService to fetch user info instead of direct Prisma access
+            const user = await authService.getUserByIdAndType(userId, userType as UserType);
 
             if (!user) {
                 // User associated with token not found (data inconsistency?)
@@ -54,7 +43,7 @@ export class RefreshTokenController {
             // 4. Generate NEW access token using AuthService
             const accessToken = authService.generateToken({
                 id: user.id,
-                userType: userType, // Use userType from the validated token
+                userType: userType as UserType, // Use userType from the validated token with cast
             });
 
             // 5. Return user info and new access token

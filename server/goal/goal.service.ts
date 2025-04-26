@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
-import { Goal, GoalStatus, GoalStatusTransition, GoalStatusValue, DbGoalWithStatus, Lesson } from '../../shared/models/index.js';
-import { DbLessonWithNestedRelations } from '../../shared/models/Lesson.js';
+import { Goal, DbGoalWithStatus } from '../../shared/models/Goal.js';
+import { GoalStatus, GoalStatusTransition, GoalStatusValue } from '../../shared/models/GoalStatus.js';
+import { Lesson, DbLessonWithNestedRelations } from '../../shared/models/Lesson.js';
 import { randomUUID } from 'crypto';
 // import { AppError } from '../utils/AppError.js'; // Old import
 import { NotFoundError, BadRequestError } from '../errors/index.js';

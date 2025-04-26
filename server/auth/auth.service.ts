@@ -1,16 +1,57 @@
-import bcryptjs from 'bcryptjs';
 import jwt, { Secret, SignOptions, JwtPayload } from 'jsonwebtoken';
-import prisma from '../prisma.js';
-import passwordAuthService from './password.service.js'; // Renamed import
-import { Student } from '../../shared/models/Student.js'; // Import shared Student model
-import { Teacher } from '../../shared/models/Teacher.js'; // Import shared Teacher model
-// Assuming UserType enum is available via prisma instance or direct import
-// If the UserType lint error persists, we might need to use string literals 'STUDENT' | 'TEACHER' here.
-import { UserType } from '@prisma/client';
+import prisma from '../prisma.js'; // Required only for transaction in register method
+import { Student } from '../../shared/models/Student.js';
+import { Teacher } from '../../shared/models/Teacher.js';
+import { studentService } from '../student/student.service.js';
+import { teacherService } from '../teacher/teacher.service.js';
+import { refreshTokenService } from './refreshToken.service.js';
+import { passwordService } from './password.service.js'; // Import the new PasswordService
+import { AppError, DuplicateEmailError } from '../errors/index.js';
+import { UserType as SharedUserType } from '../../shared/models/UserType.js';
+import { AuthMethodType as SharedAuthMethodType } from '../../shared/models/AuthMethodType.js';
+import { authMethodService } from './auth-method.service.js'; // Import the new auth method service
+import { UserType as PrismaUserType, Teacher as DbTeacher, Student as DbStudent, Prisma } from '@prisma/client';
 
 // Use string literals that match Prisma's enums
 export type AuthMethod = 'PASSWORD' | 'GOOGLE' | 'FACEBOOK';
-// export type UserType = 'STUDENT' | 'TEACHER'; // Use Prisma's type if available
+
+// --- Define DTOs and Result Types Here --- 
+interface RegisterUserDTO {
+  email: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+  dateOfBirth: Date;
+  userType: SharedUserType;
+  auth: {
+    method: AuthMethod;
+    // Method-specific credentials
+    password?: string; // Required for PASSWORD method
+    // Future auth methods would add their specific fields here
+  };
+}
+
+interface PasswordCredentials {
+  email: string;
+  password: string;
+  userType: SharedUserType;
+}
+
+type AuthProviderResult = {
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    phoneNumber: string;
+    dateOfBirth: Date;
+    isActive?: boolean;
+    userType: SharedUserType;
+  };
+  accessToken: string;
+  uniqueRefreshToken: string;
+};
+// --- End DTOs and Result Types ---
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -22,85 +63,204 @@ if (!JWT_EXPIRES_IN) {
   throw new Error("JWT_EXPIRES_IN environment variable is required");
 }
 
-// Assertion to satisfy TypeScript since we've already checked that these are defined
 const secretKey: string = JWT_SECRET;
 const expiresIn: string = JWT_EXPIRES_IN;
 
-// Interface for the expected structure of the JWT payload
 interface TokenPayload extends JwtPayload {
   id: string;
-  userType: UserType;
+  userType: SharedUserType;
 }
 
-// Interface for auth providers
-export interface AuthProvider {
-  authenticate(credentials: any): Promise<{ user: any; accessToken: string; uniqueRefreshToken: string }>;
-  register(userData: any): Promise<{ user: any; accessToken: string; uniqueRefreshToken: string }>;
-}
-
-// Base authentication service that will work with different providers
 class AuthService {
-  private providers: Record<AuthMethod, AuthProvider>;
 
   constructor() {
-    this.providers = {} as Record<AuthMethod, AuthProvider>;
-    this.registerProvider('PASSWORD', passwordAuthService);
+    // Constructor empty
   }
 
-  registerProvider(method: AuthMethod, provider: AuthProvider) {
-    this.providers[method] = provider;
-  }
+  // Note: This authenticate method now uses service methods instead of direct Prisma access
+  async authenticate(credentials: PasswordCredentials): Promise<AuthProviderResult> {
+    const { email, password, userType } = credentials;
 
-  async authenticate(method: AuthMethod, credentials: any) {
-    const provider = this.providers[method];
-    if (!provider) {
-      throw new Error(`Authentication method ${method} not supported`);
+    // 1. Find user profile by email and type using service methods
+    let userProfile: DbTeacher | DbStudent | null = null;
+    const prismaUserType = userType as PrismaUserType;
+    if (userType === SharedUserType.STUDENT) {
+      userProfile = await studentService.findByEmail(email);
+    } else if (userType === SharedUserType.TEACHER) {
+      userProfile = await teacherService.findByEmail(email);
+    } else {
+      throw new Error(`Invalid user type for authentication: ${userType}`);
     }
 
-    return provider.authenticate(credentials);
-  }
-
-  async register(method: AuthMethod, userData: any) {
-    const provider = this.providers[method];
-    if (!provider) {
-      throw new Error(`Authentication method ${method} not supported`);
+    if (!userProfile) {
+      throw new Error('Authentication failed: User not found.');
     }
 
-    return provider.register(userData);
+    // 2. Check if user has PASSWORD auth method enabled
+    try {
+      const hasPasswordAuth = await authMethodService.hasAuthMethod(
+        userProfile.id,
+        userType,
+        SharedAuthMethodType.PASSWORD
+      );
+
+      if (!hasPasswordAuth) {
+        throw new Error('Authentication failed: Password authentication not enabled for this user.');
+      }
+
+      // 3. Verify password using PasswordService
+      const isValidPassword = await passwordService.verifyPassword(userProfile.id, userType, password);
+      if (!isValidPassword) {
+        throw new Error('Authentication failed: Invalid credentials.');
+      }
+
+      // 4. Generate Tokens
+      const accessToken = this.generateToken({ id: userProfile.id, userType: userType });
+      const uniqueRefreshToken = await refreshTokenService.createRefreshToken(userProfile.id, userType);
+
+      // 5. Return result
+      return {
+        user: {
+          id: userProfile.id,
+          email: userProfile.email,
+          firstName: userProfile.firstName,
+          lastName: userProfile.lastName,
+          phoneNumber: userProfile.phoneNumber,
+          dateOfBirth: userProfile.dateOfBirth,
+          isActive: 'isActive' in userProfile ? userProfile.isActive : undefined,
+          userType: userType,
+        },
+        accessToken,
+        uniqueRefreshToken,
+      };
+    } catch (error) {
+      // Add more specific error handling as needed
+      throw error;
+    }
   }
 
-  // Hash password
-  async hashPassword(password: string): Promise<string> {
-    const saltRounds = 10;
-    return bcryptjs.hash(password, saltRounds);
+  async register(registerUserDTO: RegisterUserDTO): Promise<AuthProviderResult> {
+    const { auth, userType, ...profileData } = registerUserDTO;
+
+    // Validate that appropriate auth data is provided
+    if (auth.method === 'PASSWORD' && !auth.password) {
+      throw new Error('Password is required for PASSWORD authentication method');
+    }
+
+    try {
+      // Use transaction to ensure atomicity
+      const createdUserRecord = await prisma.$transaction(async (tx) => {
+        let userRecord: Student | Teacher | null = null;
+
+        // 1. Create User Profile using the service, passing the transaction client 'tx'
+        if (userType === SharedUserType.STUDENT) {
+          userRecord = await studentService.create(profileData, tx);
+        } else if (userType === SharedUserType.TEACHER) {
+          userRecord = await teacherService.create(profileData, tx);
+        } else {
+          throw new Error(`Invalid user type provided for registration: ${userType}`);
+        }
+
+        if (!userRecord) {
+          throw new Error('User profile creation failed within transaction.');
+        }
+
+        // 2. Create auth method entries based on the specified method
+        if (auth.method === 'PASSWORD') {
+          // Create Password Credential
+          await passwordService.createPasswordCredential(
+            userRecord.id,
+            userType,
+            auth.password!,
+            tx
+          );
+
+          // Create UserAuthMethod entry using AuthMethodService instead of direct Prisma access
+          await authMethodService.addAuthMethod(
+            {
+              userId: userRecord.id,
+              userType: userType,
+              method: SharedAuthMethodType.PASSWORD
+            },
+            tx
+          );
+        }
+        // Future auth methods would be handled here with additional else-if blocks
+
+        // Return the user record created by the user service (already mapped to shared model)
+        return userRecord;
+      });
+
+      // Transaction successful, createdUserRecord holds the shared model (Student or Teacher)
+      if (!createdUserRecord) {
+        // Should not happen if transaction doesn't throw
+        throw new Error('Transaction completed but user record is missing.');
+      }
+
+      // 3. Generate Tokens (outside transaction)
+      const accessToken = this.generateToken({
+        id: createdUserRecord.id,
+        userType: userType,
+      });
+      const uniqueRefreshToken = await refreshTokenService.createRefreshToken(
+        createdUserRecord.id,
+        userType
+      );
+
+      // 4. Return result using data from the shared model record
+      return {
+        user: {
+          id: createdUserRecord.id,
+          email: createdUserRecord.email,
+          firstName: createdUserRecord.firstName,
+          lastName: createdUserRecord.lastName,
+          phoneNumber: createdUserRecord.phoneNumber,
+          dateOfBirth: createdUserRecord.dateOfBirth,
+          isActive: 'isActive' in createdUserRecord ? createdUserRecord.isActive : undefined,
+          userType: userType,
+        },
+        accessToken,
+        uniqueRefreshToken,
+      };
+
+    } catch (error: unknown) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        // Simplified P2002 handling - assume email duplicate from user services or credential duplicate from password service
+        if (error.message.includes('PasswordCredential')) { // Check if error message indicates credential table
+          throw new AppError('Password credential already exists for this user.', 409);
+        } else {
+          throw new DuplicateEmailError(registerUserDTO.email);
+        }
+      }
+      if (error instanceof AppError && error.isOperational) {
+        throw error;
+      }
+      console.error('Unexpected error during registration transaction:', error);
+      if (error instanceof Error) {
+        throw new Error(`Registration failed transactionally: ${error.message}`);
+      }
+      throw new Error('An unexpected error occurred during registration.');
+    }
   }
 
-  // Compare password with hash
-  async comparePassword(password: string, hash: string): Promise<boolean> {
-    return bcryptjs.compare(password, hash);
-  }
-
-  // Generate JWT Access Token
-  generateToken(payload: { id: string; userType: UserType }): string {
+  // Generate JWT Access Token (Keep)
+  generateToken(payload: { id: string; userType: SharedUserType }): string {
     const options: SignOptions = {
       expiresIn: expiresIn as any
     };
     return jwt.sign(payload, secretKey, options);
   }
 
-  // Verify JWT Access Token
+  // Verify JWT Access Token (Keep)
   verifyToken(token: string): TokenPayload {
     try {
       const decoded = jwt.verify(token, secretKey) as TokenPayload;
-
       if (!decoded || typeof decoded !== 'object' || !decoded.id || !decoded.userType) {
         throw new Error('Invalid token payload structure');
       }
-
-      if (decoded.userType !== 'STUDENT' && decoded.userType !== 'TEACHER') {
+      if (decoded.userType !== SharedUserType.STUDENT && decoded.userType !== SharedUserType.TEACHER) {
         throw new Error('Invalid userType in token');
       }
-
       return decoded;
     } catch (error: any) {
       console.error("JWT Verification Error:", error.message || error);
@@ -109,64 +269,23 @@ class AuthService {
   }
 
   // Fetches user and returns shared model instance
-  async getUserByIdAndType(id: string, userType: UserType): Promise<Student | Teacher | null> {
-    // Update selectFields to include all properties needed by shared model constructors
-    const selectFields = {
-      id: true,
-      email: true,
-      firstName: true,
-      lastName: true,
-      phoneNumber: true, // Added
-      dateOfBirth: true, // Added
-      // Add any other fields required by StudentProps/TeacherProps
-    };
-    // Adjust type definition for userData based on actual selected fields and their nullability
-    let userData: {
-      id: string;
-      email: string;
-      firstName: string;
-      lastName: string;
-      phoneNumber: string | null; // Assuming it can be null
-      dateOfBirth: Date | null;   // Assuming it can be null
-    } | null = null;
-
+  async getUserByIdAndType(id: string, userType: SharedUserType): Promise<Student | Teacher | null> {
     try {
-      // Use Prisma UserType enum if possible, otherwise strings
-      // If UserType import fails, replace UserType.STUDENT with 'STUDENT', etc.
-      if (userType === UserType.STUDENT) {
-        userData = await prisma.student.findUnique({ where: { id }, select: selectFields });
-        if (userData) {
-          // Ensure nulls are handled if constructors don't expect them
-          // Or adjust constructors to handle potential nulls from DB
-          // Using 'as any' for now to bypass strict type checking, assuming constructors are compatible.
-          // TODO: Refine type compatibility between Prisma result and Shared Model Props.
-          return new Student(userData as any);
-        }
-      } else if (userType === UserType.TEACHER) {
-        userData = await prisma.teacher.findUnique({ where: { id }, select: selectFields });
-        if (userData) {
-          // Ensure nulls are handled if constructors don't expect them
-          // Using 'as any' for now to bypass strict type checking, assuming constructors are compatible.
-          // TODO: Refine type compatibility between Prisma result and Shared Model Props.
-          return new Teacher(userData as any);
-        }
+      if (userType === SharedUserType.STUDENT) {
+        return studentService.findById(id);
+      } else if (userType === SharedUserType.TEACHER) {
+        return teacherService.findById(id);
       } else {
         console.warn(`getUserByIdAndType called with invalid userType: ${userType}`);
         return null;
       }
-      // If user not found for the specified type
-      return null;
     } catch (error) {
-      console.error(`Database error fetching user ${id} (${userType}):`, error);
+      console.error(`Error fetching user ${id} (${userType}):`, error);
       throw new Error('Failed to fetch user data');
     }
   }
 }
 
 const authServiceInstance = new AuthService();
-
-// Export the instance and helper methods if needed directly
-export const hashPassword = authServiceInstance.hashPassword.bind(authServiceInstance);
-export const comparePassword = authServiceInstance.comparePassword.bind(authServiceInstance);
 
 export default authServiceInstance; 

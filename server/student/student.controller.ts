@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { studentService } from './student.service.js';
+import authService, { AuthMethod } from '../auth/auth.service.js';
+import { UserType } from '../../shared/models/UserType.js';
 
 /**
  * Controller for student-related operations.
@@ -7,7 +9,7 @@ import { studentService } from './student.service.js';
 export const studentController = {
     /**
      * Create a new student.
-     * Handles request validation and calls the student service.
+     * Handles request validation and calls the auth service to register a student.
      * @param req Request object, body should contain student data + password.
      * @param res Response object.
      */
@@ -30,24 +32,24 @@ export const studentController = {
                 return;
             }
 
-            const studentData = {
+            // Prepare registration data for auth service
+            const registrationData = {
                 email,
                 firstName,
                 lastName,
                 phoneNumber,
                 dateOfBirth: dob, // Use the validated Date object
-                password // Pass plain text password to service
+                userType: UserType.STUDENT,
+                auth: {
+                    method: 'PASSWORD' as AuthMethod,
+                    password
+                }
             };
 
-            const newStudent = await studentService.create(studentData);
+            // Use auth service to register the student
+            const { user } = await authService.register(registrationData);
 
-            // Service returns null if creation fails, handle this (though it throws now)
-            if (!newStudent) {
-                res.status(500).json({ message: 'Student creation failed unexpectedly.' });
-                return;
-            }
-
-            res.status(201).json(newStudent);
+            res.status(201).json(user);
 
         } catch (error) {
             console.error('Error in studentController.createStudent:', error);

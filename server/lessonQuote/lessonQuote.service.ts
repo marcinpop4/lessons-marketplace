@@ -8,8 +8,11 @@ import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourly
 import { Student } from '../../shared/models/Student.js';
 import { Address } from '../../shared/models/Address.js';
 import { Prisma } from '@prisma/client';
+import { LessonQuoteMapper } from './lessonQuote.mapper.js';
+import { TeacherMapper } from '../teacher/teacher.mapper.js';
+import { LessonRequestMapper } from '../lessonRequest/lessonRequest.mapper.js';
 
-// Define Prisma types for includes required by fromDb methods used below
+// Define Prisma types for includes required by mapper methods
 // Type for Teacher with nested rates
 type DbTeacherWithRates = Prisma.TeacherGetPayload<{ include: { teacherLessonHourlyRates: true } }>;
 // Type for LessonRequest with nested student and address
@@ -38,20 +41,15 @@ class LessonQuoteService {
                     costInCents: quoteData.costInCents,
                     hourlyRateInCents: quoteData.hourlyRateInCents
                 },
-                // Fetch relations needed for LessonQuote.fromDb
+                // Fetch relations needed for mapping
                 include: {
                     teacher: { include: { teacherLessonHourlyRates: true } },
                     lessonRequest: { include: { student: true, address: true } }
                 }
             });
 
-            // Use factory method
-            // Type casting needed because Prisma's include doesn't perfectly narrow the type
-            return LessonQuote.fromDb(
-                dbQuote,
-                dbQuote.teacher as DbTeacherWithRates, // Use helper type cast
-                dbQuote.lessonRequest as DbLessonRequestWithRelations // Use helper type cast
-            );
+            // Use mapper instead of static method
+            return LessonQuoteMapper.toModel(dbQuote);
 
         } catch (error) {
             console.error('Error creating quote:', error);
@@ -78,8 +76,11 @@ class LessonQuoteService {
             },
             take: 5
         });
-        // Use Teacher.fromDb, Remove unnecessary cast for rates
-        return dbTeachers.map(dbTeacher => Teacher.fromDb(dbTeacher, dbTeacher.teacherLessonHourlyRates));
+
+        // Use TeacherMapper instead of static method
+        return dbTeachers.map(dbTeacher =>
+            TeacherMapper.toModel(dbTeacher, dbTeacher.teacherLessonHourlyRates)
+        );
     }
 
     /**
@@ -104,15 +105,10 @@ class LessonQuoteService {
             throw new Error(`Lesson request with ID ${lessonRequestId} not found`);
         }
 
-        // Use LessonRequest.fromDb - Remove unnecessary casts for student and address
-        // The include ensures dbLessonRequest.student and dbLessonRequest.address are not null and have the correct structure
-        const lessonRequest = LessonRequest.fromDb(
-            dbLessonRequest,
-            dbLessonRequest.student,
-            dbLessonRequest.address
-        );
+        // Use LessonRequestMapper instead of static method
+        const lessonRequest = LessonRequestMapper.toModel(dbLessonRequest);
 
-        // Get available teachers (already returns Teacher[] instances)
+        // Get available teachers
         const availableTeachers = await this.getAvailableTeachers(lessonType);
 
         if (availableTeachers.length === 0) {
@@ -145,7 +141,7 @@ class LessonQuoteService {
 
         await Promise.all(creationPromises);
 
-        // Fetch all successfully created quotes for the request ID with includes needed for LessonQuote.fromDb
+        // Fetch all successfully created quotes for the request ID with includes needed for mapping
         const dbQuotes = await this.prisma.lessonQuote.findMany({
             where: { lessonRequestId: lessonRequestId },
             include: {
@@ -154,15 +150,8 @@ class LessonQuoteService {
             }
         });
 
-        // Use LessonQuote.fromDb to transform the results
-        // Keep casts using helper types here as nested structure is complex
-        return dbQuotes.map(dbQuote =>
-            LessonQuote.fromDb(
-                dbQuote,
-                dbQuote.teacher as DbTeacherWithRates, // Keep helper type cast
-                dbQuote.lessonRequest as DbLessonRequestWithRelations // Keep helper type cast
-            )
-        );
+        // Use LessonQuoteMapper to transform the results
+        return dbQuotes.map(dbQuote => LessonQuoteMapper.toModel(dbQuote));
     }
 
     /**
@@ -195,21 +184,16 @@ class LessonQuoteService {
         const dbQuotes = await this.prisma.lessonQuote.findMany({
             where: { lessonRequestId },
             include: {
-                // Include relations needed by LessonQuote.fromDb
+                // Include relations needed for mapping
                 teacher: { include: { teacherLessonHourlyRates: true } },
                 lessonRequest: { include: { student: true, address: true } }
             },
             orderBy: { createdAt: 'desc' }
         });
 
-        // Use LessonQuote.fromDb to transform the results
-        // Add type casts for nested relations using helper types
+        // Use LessonQuoteMapper to transform the results
         return dbQuotes.map(dbQuote =>
-            LessonQuote.fromDb(
-                dbQuote,
-                dbQuote.teacher as DbTeacherWithRates, // Use helper type cast
-                dbQuote.lessonRequest as DbLessonRequestWithRelations // Use helper type cast
-            )
+            LessonQuoteMapper.toModel(dbQuote)
         );
     }
 }

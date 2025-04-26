@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma, Teacher as DbTeacherPrisma, TeacherLessonHourlyRate as DbTeacherLessonHourlyRate, Lesson as DbLesson, Student as DbStudent, Address as DbAddress, LessonRequest as DbLessonRequestPrisma, LessonQuote as DbLessonQuote, LessonStatus as DbLessonStatus, Goal as DbGoal } from '@prisma/client';
+import { PrismaClient, Prisma, Teacher as DbTeacher, TeacherLessonHourlyRate as DbTeacherLessonHourlyRate, Lesson as DbLesson, Student as DbStudent, Address as DbAddress, LessonRequest as DbLessonRequestPrisma, LessonQuote as DbLessonQuote, LessonStatus as DbLessonStatus, Goal as DbGoal, AuthMethod, UserType } from '@prisma/client';
 // Import shared models
 import { Teacher } from '../../shared/models/Teacher.js';
 import { Student } from '../../shared/models/Student.js';
@@ -10,55 +10,75 @@ import { LessonStatus, LessonStatusValue } from '../../shared/models/LessonStatu
 import { Goal } from '../../shared/models/Goal.js'; // Goal might be needed for stats or future methods
 import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourlyRate.js';
 import { LessonType } from '../../shared/models/LessonType.js';
-import * as bcrypt from 'bcrypt';
 import prisma from '../prisma.js';
 import { AppError, DuplicateEmailError } from '../errors/index.js'; // Import custom error
+import { TeacherMapper } from './teacher.mapper.js';
+import { TeacherLessonHourlyRateMapper } from '../teacher-lesson-hourly-rate/teacher-lesson-hourly-rate.mapper.js';
+import { LessonMapper } from '../lesson/lesson.mapper.js';
 
+// Define the type for the Prisma client or transaction client
+// Use Prisma.TransactionClient for the interactive transaction type
+type PrismaTransactionClient = Prisma.TransactionClient;
 
 // Define more specific Prisma types with includes for transformation
-type DbLessonWithRelations = DbLesson & {
-    currentStatus: DbLessonStatus | null;
-    // Update quote type to reflect full nesting needed for LessonQuote.fromDb
-    quote: (DbLessonQuote & {
-        teacher: DbTeacherPrisma & { teacherLessonHourlyRates?: DbTeacherLessonHourlyRate[] },
-        lessonRequest: (DbLessonRequestPrisma & {
-            student: DbStudent;
-            address: DbAddress;
-        })
-    });
-};
+type DbLessonWithRelations = Prisma.LessonGetPayload<{
+    include: {
+        currentStatus: true,
+        quote: {
+            include: {
+                teacher: { include: { teacherLessonHourlyRates: true } },
+                lessonRequest: { include: { student: true, address: true } }
+            }
+        }
+    }
+}>;
 
 // Keep DbTeacherWithRates for other raw methods if needed
-interface DbTeacherWithRates extends DbTeacherPrisma {
+interface DbTeacherWithRates extends DbTeacher {
     teacherLessonHourlyRates: DbTeacherLessonHourlyRate[];
 }
 
+// DTO for creating a new teacher (no password)
+interface TeacherCreateDTO {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneNumber: string;
+    dateOfBirth: Date;
+}
 
 class TeacherService {
     private readonly prisma = prisma;
 
     /**
-     * Create a new teacher
-     * @param teacherData Teacher data including password
+     * Create a new teacher profile (no password handling).
+     * Optionally accepts a transactional Prisma client.
+     * @param teacherCreateDTO Teacher profile data
+     * @param client Optional Prisma client (transactional or default).
      * @returns Created teacher (shared model)
      */
-    async create(teacherData: Prisma.TeacherCreateInput & { password: string }): Promise<Teacher> {
+    async create(
+        teacherCreateDTO: TeacherCreateDTO,
+        client: PrismaTransactionClient | PrismaClient = this.prisma // Accept optional client
+    ): Promise<Teacher | null> {
         try {
-            const hashedPassword = await bcrypt.hash(teacherData.password, 10);
-            const dbTeacher = await this.prisma.teacher.create({ data: { ...teacherData, password: hashedPassword, authMethods: ['PASSWORD'], isActive: true } });
-            return Teacher.fromDb(dbTeacher);
+            // Use the provided client (tx or default prisma)
+            const dbTeacher = await client.teacher.create({
+                data: {
+                    ...teacherCreateDTO, // Save only profile data
+                }
+            });
+
+            // Use TeacherMapper to transform the result
+            return TeacherMapper.toModel(dbTeacher);
         } catch (error) {
-            // Check for Prisma unique constraint violation (P2002)
             if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-                // Check if the error target includes 'email' (more robust)
                 const target = error.meta?.target as string[] | undefined;
                 if (target && target.includes('email')) {
-                    // Throw the specific custom error
-                    throw new DuplicateEmailError(teacherData.email);
+                    throw new DuplicateEmailError(teacherCreateDTO.email);
                 }
             }
-            // Log and re-throw other errors
-            console.error('Error creating teacher:', error);
+            console.error('Error creating teacher profile:', error);
             throw error;
         }
     }
@@ -83,9 +103,9 @@ class TeacherService {
             },
             take: limit
         });
-        // Use Teacher.fromDb - Cast rates as they are included
+        // FIXED: Use TeacherMapper.toModel
         return dbTeachers.map(dbTeacher =>
-            Teacher.fromDb(dbTeacher, dbTeacher.teacherLessonHourlyRates as DbTeacherLessonHourlyRate[])
+            TeacherMapper.toModel(dbTeacher, dbTeacher.teacherLessonHourlyRates)
         );
     }
 
@@ -103,8 +123,8 @@ class TeacherService {
         if (!dbTeacher) {
             return null;
         }
-        // Use Teacher.fromDb - Cast rates as they are included
-        return Teacher.fromDb(dbTeacher, dbTeacher.teacherLessonHourlyRates as DbTeacherLessonHourlyRate[]);
+        // FIXED: Use TeacherMapper.toModel
+        return TeacherMapper.toModel(dbTeacher, dbTeacher.teacherLessonHourlyRates);
     }
 
     /**
@@ -140,7 +160,10 @@ class TeacherService {
             orderBy: { createdAt: 'desc' }
         });
 
-        return dbLessons.map(dbLesson => Lesson.fromDb(dbLesson as DbLessonWithRelations)).filter(lesson => lesson !== null) as Lesson[];
+        // Use LessonMapper to transform and filter out nulls
+        return dbLessons
+            .map(lesson => LessonMapper.toModel(lesson as DbLessonWithRelations))
+            .filter((lesson): lesson is Lesson => lesson !== null);
     }
 
     /**
@@ -216,6 +239,43 @@ class TeacherService {
         return stats;
     }
 
+    /**
+     * Find a teacher by ID
+     * @param id The ID of the teacher to find
+     * @returns The teacher if found, null otherwise
+     */
+    async findById(id: string): Promise<Teacher | null> {
+        try {
+            const teacherDb = await this.prisma.teacher.findUnique({
+                where: { id },
+            });
+
+            if (!teacherDb) {
+                return null;
+            }
+
+            return TeacherMapper.toModel(teacherDb);
+        } catch (error) {
+            console.error('Error finding teacher:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Find a teacher by email.
+     * @param email Teacher email
+     * @returns Prisma Teacher database model or null if not found
+     */
+    async findByEmail(email: string): Promise<DbTeacher | null> {
+        try {
+            return this.prisma.teacher.findUnique({
+                where: { email }
+            });
+        } catch (error) {
+            console.error('Error finding teacher by email:', error);
+            throw error;
+        }
+    }
 }
 
 // Export singleton instance

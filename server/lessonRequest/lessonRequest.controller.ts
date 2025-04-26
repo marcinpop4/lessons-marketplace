@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { lessonRequestService } from './lessonRequest.service.js';
 import { lessonQuoteService } from '../lessonQuote/lessonQuote.service.js';
-import { Address } from '../../shared/models/Address.js';
+import { AddressDTO } from '../../shared/models/Address.js';
 
 export class LessonRequestController {
   constructor() {
@@ -66,8 +66,8 @@ export class LessonRequestController {
         return;
       }
 
-      // Use the addressObj directly from the body
-      const addressDTO = {
+      // Create the address DTO object explicitly using the imported type
+      const addressDTO: AddressDTO = {
         street: addressObj.street,
         city: addressObj.city,
         state: addressObj.state,
@@ -80,7 +80,7 @@ export class LessonRequestController {
         type: type,
         startTime: parsedStartTime,
         durationMinutes: parseInt(durationMinutes, 10),
-        addressObj: addressDTO, // Pass the DTO object
+        addressDTO: addressDTO, // Fix the property name to match the expected type
         studentId: studentId
       });
 

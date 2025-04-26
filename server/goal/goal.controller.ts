@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { goalService } from './goal.service.js';
-import { GoalStatusTransition } from '../../shared/models/index.js';
+import { GoalStatusTransition } from '../../shared/models/GoalStatus.js';
 import { z } from 'zod';
 import { BadRequestError } from '../errors/index.js';
 

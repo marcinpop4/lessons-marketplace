@@ -1,6 +1,7 @@
 import { TeacherLessonHourlyRate as PrismaTeacherLessonHourlyRate, LessonType, Prisma } from '@prisma/client';
 import prisma from '../prisma.js';
 import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourlyRate.js';
+import { TeacherLessonHourlyRateMapper } from './teacher-lesson-hourly-rate.mapper.js';
 
 // Define simple error messages for service layer exceptions
 const Errors = {
@@ -72,7 +73,7 @@ class TeacherLessonHourlyRateService {
                 // timeout: 10000, 
             });
 
-            return TeacherLessonHourlyRate.fromDb(resultRate);
+            return TeacherLessonHourlyRateMapper.toModel(resultRate);
 
         } catch (error) {
             console.error('[Service Error] findOrCreateOrUpdate:', error);
@@ -119,7 +120,7 @@ class TeacherLessonHourlyRateService {
                 data: { deactivatedAt: new Date() }
             });
 
-            return TeacherLessonHourlyRate.fromDb(updatedRate);
+            return TeacherLessonHourlyRateMapper.toModel(updatedRate);
         } catch (error) {
             console.error('[Service Error] deactivate:', error);
             if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -175,7 +176,7 @@ class TeacherLessonHourlyRateService {
                 });
             });
 
-            return TeacherLessonHourlyRate.fromDb(reactivatedRate);
+            return TeacherLessonHourlyRateMapper.toModel(reactivatedRate);
         } catch (error) {
             console.error('[Service Error] reactivate:', error);
             if (error instanceof Prisma.PrismaClientKnownRequestError) {

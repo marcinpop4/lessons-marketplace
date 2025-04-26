@@ -1,6 +1,7 @@
 import { LessonRequest } from './LessonRequest.js';
 import { Teacher } from './Teacher.js';
 import { centsToDisplayDollars } from '../types/CurrencyTypes.js';
+import { LessonType } from './LessonType.js';
 // Import necessary Prisma types using Db prefix consistently
 import type {
   LessonQuote as DbLessonQuote,
@@ -11,15 +12,17 @@ import type {
   TeacherLessonHourlyRate as DbTeacherLessonHourlyRate
 } from '@prisma/client';
 
-// Interface for constructor properties
+/**
+ * Properties required to create a LessonQuote instance.
+ */
 interface LessonQuoteProps {
   id: string;
   lessonRequest: LessonRequest;
   teacher: Teacher;
   costInCents: number;
   hourlyRateInCents: number;
-  createdAt?: Date; // Optional, defaults to new Date()
-  updatedAt?: Date; // ADDED optional updatedAt
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 /**
@@ -32,8 +35,8 @@ export class LessonQuote {
   teacher: Teacher;
   costInCents: number;
   hourlyRateInCents: number;
-  createdAt: Date;
-  updatedAt?: Date; // ADDED optional property
+  createdAt?: Date;
+  updatedAt?: Date;
 
   // Updated constructor using object destructuring
   constructor({
@@ -42,8 +45,8 @@ export class LessonQuote {
     teacher,
     costInCents,
     hourlyRateInCents,
-    createdAt = new Date(), // Default value for optional prop
-    updatedAt, // ADDED parameter
+    createdAt,
+    updatedAt,
   }: LessonQuoteProps) {
     this.id = id;
     this.lessonRequest = lessonRequest;
@@ -51,11 +54,15 @@ export class LessonQuote {
     this.costInCents = costInCents;
     this.hourlyRateInCents = hourlyRateInCents;
     this.createdAt = createdAt;
-    this.updatedAt = updatedAt; // ADDED assignment
+    this.updatedAt = updatedAt;
   }
 
   /**
-   * Static factory method to create a LessonQuote instance from Prisma objects.
+   * Static factory method to create a LessonQuote instance from a Prisma object.
+   * This method is kept for backward compatibility but should not be used in new code.
+   * Use LessonQuoteMapper.toModel() instead.
+   * 
+   * @deprecated Use LessonQuoteMapper.toModel() instead.
    * @param dbQuote The plain LessonQuote object returned by Prisma.
    * @param dbTeacher The plain Teacher object returned by Prisma (potentially with rates).
    * @param dbLessonRequest The plain LessonRequest object returned by Prisma (with student and address).
@@ -67,28 +74,12 @@ export class LessonQuote {
     dbTeacher: DbTeacher & { teacherLessonHourlyRates?: DbTeacherLessonHourlyRate[] },
     dbLessonRequest: DbLessonRequest & { student: DbStudent, address: DbAddress }
   ): LessonQuote {
-    const { id, costInCents, hourlyRateInCents, createdAt, updatedAt } = dbQuote;
+    // THIS METHOD IS DEPRECATED AND SHOULD NOT BE USED
+    // It is only kept for backwards compatibility
+    // Use LessonQuoteMapper.toModel() instead
+    console.warn('LessonQuote.fromDb is deprecated. Use LessonQuoteMapper.toModel instead.');
 
-    const dbStudentData = dbLessonRequest.student;
-    const dbAddressData = dbLessonRequest.address;
-
-    // Extract rates from dbTeacher object
-    const dbTeacherRatesData = dbTeacher.teacherLessonHourlyRates;
-
-    // Pass dbTeacher and its rates separately to Teacher.fromDb
-    const teacherModel = Teacher.fromDb(dbTeacher, dbTeacherRatesData);
-    const lessonRequestModel = LessonRequest.fromDb(dbLessonRequest, dbStudentData, dbAddressData);
-
-    // Construct the shared model instance
-    return new LessonQuote({
-      id: id,
-      lessonRequest: lessonRequestModel,
-      teacher: teacherModel,
-      costInCents: costInCents,
-      hourlyRateInCents: hourlyRateInCents ?? 0,
-      createdAt: createdAt ?? undefined,
-      updatedAt: updatedAt ?? undefined
-    });
+    throw new Error('This method is deprecated. Use LessonQuoteMapper.toModel instead.');
   }
 
   /**

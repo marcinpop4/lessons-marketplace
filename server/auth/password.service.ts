@@ -1,139 +1,131 @@
-import { Prisma, PrismaClient, UserType } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
+// Import shared models using direct paths
+import { PasswordCredential } from '../../shared/models/PasswordCredential.js';
+import { UserType } from '../../shared/models/UserType.js';
 import prisma from '../prisma.js';
-import authService, { AuthProvider } from './auth.service.js'; // <-- Keep this import for now, might need adjustment later if auth.service itself changes
-import { refreshTokenService } from './refreshToken.service.js';
-import { studentService } from '../student/student.service.js';
-import { teacherService } from '../teacher/teacher.service.js';
-import { AppError } from '../errors/index.js';
+import bcryptjs from 'bcryptjs';
+import { PasswordCredentialMapper } from './password-credential.mapper.js'; // Import the mapper
 
-interface PasswordCredentials {
-    email: string;
-    password: string;
-    userType: UserType;
-}
 
-interface RegisterUserData {
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-    phoneNumber: string;
-    dateOfBirth: Date;
-    userType: UserType;
-}
+// Define the type for the Prisma client or transaction client
+type PrismaTransactionClient = Omit<
+    PrismaClient, // Simplify: Omit from the base PrismaClient type
+    '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>;
 
-type AuthProviderResult = {
-    user: {
-        id: string;
-        email: string;
-        firstName: string;
-        lastName: string;
-        userType: UserType;
-    };
-    accessToken: string;
-    uniqueRefreshToken: string;
-};
+/**
+ * IMPORTANT: This service requires the PasswordCredential table to exist in the database.
+ * Any linter errors for passwordCredential not existing WILL PERSIST until prisma generate is run.
+ */
+class PasswordService {
+    private readonly prisma = prisma;
+    private readonly saltRounds = 10;
 
-class PasswordAuthService implements AuthProvider { // Renamed class
-    async authenticate(credentials: PasswordCredentials): Promise<AuthProviderResult> {
-        const { email, password, userType } = credentials;
-
-        let user;
-        if (userType === UserType.STUDENT) {
-            user = await prisma.student.findUnique({ where: { email } });
-        } else if (userType === UserType.TEACHER) {
-            user = await prisma.teacher.findUnique({ where: { email } });
-        } else {
-            throw new Error(`Invalid user type provided`);
-        }
-
-        if (!user) {
-            throw new Error('User not found or invalid credentials');
-        }
-        if (!user.password) {
-            throw new Error('Password authentication not set up for this user');
-        }
-        if (!user.authMethods.includes('PASSWORD')) {
-            throw new Error('Password authentication not enabled for this user');
-        }
-
-        const isValidPassword = await authService.comparePassword(password, user.password);
-        if (!isValidPassword) {
-            throw new Error('Invalid password or invalid credentials');
-        }
-
-        const accessToken = authService.generateToken({
-            id: user.id,
-            userType: userType,
-        });
-
-        const uniqueRefreshToken = await refreshTokenService.createRefreshToken(
-            user.id,
-            userType
-        );
-
-        return {
-            user: {
-                id: user.id,
-                email: user.email,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                userType: userType,
-            },
-            accessToken,
-            uniqueRefreshToken,
-        };
+    /**
+     * Hashes a plain-text password.
+     * @param password The plain-text password.
+     * @returns The hashed password string.
+     */
+    private async hashPassword(password: string): Promise<string> {
+        return bcryptjs.hash(password, this.saltRounds);
     }
 
-    async register(userData: RegisterUserData): Promise<AuthProviderResult> {
-        const { userType, password, ...restUserData } = userData;
+    /**
+     * Compares a plain-text password with a stored hash.
+     * @param password The plain-text password.
+     * @param hash The stored hashed password.
+     * @returns True if the password matches the hash, false otherwise.
+     */
+    private async comparePassword(password: string, hash: string): Promise<boolean> {
+        return bcryptjs.compare(password, hash);
+    }
 
-        let user;
+    /**
+     * Creates a new password credential record for a user.
+     * Uses shared model types for input and output.
+     * @param userId The ID of the Student or Teacher.
+     * @param userType The type of the user (STUDENT or TEACHER) (from shared enum).
+     * @param plainPassword The plain-text password to hash and store.
+     * @param client Optional Prisma client (transactional or default).
+     * @returns The created PasswordCredential object as a shared model.
+     */
+    async createPasswordCredential(
+        userId: string,
+        userType: UserType, // Use shared UserType
+        plainPassword: string,
+        client: PrismaTransactionClient | PrismaClient = this.prisma
+    ): Promise<PasswordCredential> { // Return shared model
+        const hashedPassword = await this.hashPassword(plainPassword);
         try {
-            if (userType === UserType.STUDENT) {
-                user = await studentService.create({ ...restUserData, password });
-                if (!user) throw new Error('Student creation failed.');
-            } else if (userType === UserType.TEACHER) {
-                user = await teacherService.create({ ...restUserData, password });
-                if (!user) throw new Error('Teacher creation failed.');
-            } else {
-                throw new Error(`Invalid user type provided`);
-            }
-        } catch (error: unknown) {
-            if (error instanceof AppError) {
-                console.error('AppError during user creation in passwordAuthProvider:', error);
-                throw error;
-            }
-
-            console.error('Unexpected error during user creation in passwordAuthProvider:', error);
-            if (error instanceof Error) {
-                throw new Error(`Registration failed internally: ${error.message}`);
-            }
-            throw new Error('An unexpected error occurred during registration.');
+            // Use the provided client (tx or default prisma)
+            // Type errors on 'passwordCredential' are expected until prisma generate is run.
+            const dbCredential = await client.passwordCredential.create({
+                data: {
+                    userId,
+                    userType, // Pass shared enum value directly
+                    hashedPassword,
+                },
+            });
+            // Map the result from Prisma to the shared model
+            return PasswordCredentialMapper.toModel(dbCredential);
+        } catch (error) {
+            // Handle potential unique constraint errors if needed
+            console.error(`Error creating password credential for ${userType} ${userId}:`, error);
+            throw new Error('Failed to create password credential.');
         }
+    }
 
-        const accessToken = authService.generateToken({
-            id: user.id,
-            userType: userType,
+    /**
+     * Finds a password credential record for a specific user.
+     * Uses shared model types for input and output.
+     * @param userId The ID of the Student or Teacher.
+     * @param userType The type of the user (from shared enum).
+     * @param client Optional Prisma client (transactional or default).
+     * @returns The PasswordCredential object as a shared model or null if not found.
+     */
+    async findCredential(
+        userId: string,
+        userType: UserType, // Use shared UserType
+        client: PrismaTransactionClient | PrismaClient = this.prisma
+    ): Promise<PasswordCredential | null> { // Return shared model or null
+        // Use the provided client (tx or default prisma)
+        // Type errors on 'passwordCredential' are expected until prisma generate is run.
+        const dbCredential = await client.passwordCredential.findUnique({
+            where: {
+                userId_userType: { userId, userType }, // Pass shared enum value directly
+            },
         });
 
-        const uniqueRefreshToken = await refreshTokenService.createRefreshToken(
-            user.id,
-            userType
-        );
+        if (!dbCredential) {
+            return null;
+        }
+        // Map the result from Prisma to the shared model
+        return PasswordCredentialMapper.toModel(dbCredential);
+    }
 
-        return {
-            user: {
-                id: user.id,
-                email: user.email,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                userType: userType,
-            },
-            accessToken,
-            uniqueRefreshToken,
-        };
+    /**
+     * Verifies a plain-text password against the stored credential for a user.
+     * Uses shared model types for input.
+     * @param userId The ID of the Student or Teacher.
+     * @param userType The type of the user (from shared enum).
+     * @param plainPassword The plain-text password to verify.
+     * @param client Optional Prisma client (transactional or default).
+     * @returns True if the password is valid, false otherwise.
+     */
+    async verifyPassword(
+        userId: string,
+        userType: UserType, // Use shared UserType
+        plainPassword: string,
+        client: PrismaTransactionClient | PrismaClient = this.prisma
+    ): Promise<boolean> {
+        // Use the provided client (tx or default prisma)
+        const credential = await this.findCredential(userId, userType, client); // Already returns shared model or null
+        if (!credential) {
+            return false; // No credential found for this user
+        }
+        // Compare using the hashedPassword from the shared model
+        return this.comparePassword(plainPassword, credential.hashedPassword);
     }
 }
 
-export default new PasswordAuthService(); // Updated export 
+export const passwordService = new PasswordService();

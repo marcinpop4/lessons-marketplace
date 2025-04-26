@@ -10,6 +10,7 @@ export enum LessonType {
 
 /**
  * Format a lesson type for display by capitalizing first letter and lowercasing the rest
+ * 
  * @param type The lesson type to format
  * @returns Formatted lesson type string
  */

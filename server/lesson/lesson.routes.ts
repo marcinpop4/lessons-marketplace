@@ -3,6 +3,7 @@ import { lessonController } from './lesson.controller.js';
 import { authMiddleware } from '../auth/auth.middleware.js';
 import { checkRole } from '../auth/role.middleware.js';
 import { goalController } from '../goal/goal.controller.js';
+import { UserType } from '../../shared/models/UserType.js';
 
 const router: Router = express.Router();
 
@@ -21,6 +22,6 @@ router.get('/:lessonId/goals', authMiddleware, goalController.getGoalsByLessonId
 router.get('/:id', authMiddleware, lessonController.getLessonById);
 
 // Update lesson status (Teacher only)
-router.patch('/:lessonId', authMiddleware, checkRole(['TEACHER']), lessonController.updateLessonStatus);
+router.patch('/:lessonId', authMiddleware, checkRole([UserType.TEACHER]), lessonController.updateLessonStatus);
 
 export default router; 

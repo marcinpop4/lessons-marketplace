@@ -34,11 +34,7 @@ model Teacher {
   email       String   @unique
   phoneNumber String
   dateOfBirth DateTime
-  password    String?  // Optional to allow for different auth methods
   isActive    Boolean  @default(true)
-  
-  // Authentication related fields
-  authMethods AuthMethod[] @default([])
   
   // Relations
   lessonQuotes             LessonQuote[]
@@ -55,12 +51,8 @@ model Student {
   email       String   @unique
   phoneNumber String
   dateOfBirth DateTime
-  password    String?  // Optional to allow for different auth methods
   isActive    Boolean  @default(true)
   
-  // Authentication related fields
-  authMethods AuthMethod[] @default([])
-
   // Relations
   lessonRequests LessonRequest[]
   createdAt      DateTime       @default(now())
@@ -215,4 +207,45 @@ model GoalStatus {
 
   @@index([goalId])
   @@index([status])
+}
+
+// --- Password Credential Model --- 
+model PasswordCredential {
+  id             String   @id @default(uuid())
+  hashedPassword String
+
+  // Relation Field (polymorphic link to Student or Teacher)
+  userId         String
+  userType       UserType // STUDENT or TEACHER
+
+  // Timestamps
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Unique constraint to ensure one password per user account
+  @@unique([userId, userType])
+  // Optional: Index for faster lookups during authentication
+  @@index([userId, userType])
+}
+
+// This table tracks which authentication methods are enabled for each user
+model UserAuthMethod {
+  id        String   @id @default(uuid())
+  userId    String
+  userType  UserType
+  method    AuthMethodType
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, userType, method])
+  @@index([userId, userType])
+}
+
+// Add this enum if it doesn't already exist
+enum AuthMethodType {
+  PASSWORD
+  GOOGLE
+  FACEBOOK
+  // Add other methods as needed
 }

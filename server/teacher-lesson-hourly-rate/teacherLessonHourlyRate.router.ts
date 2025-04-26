@@ -1,21 +1,18 @@
-import express, { Router } from 'express';
-import { teacherLessonHourlyRateController } from './teacherLessonHourlyRate.controller.js';
+import express from 'express';
 import { authMiddleware } from '../auth/auth.middleware.js';
 import { checkRole } from '../auth/role.middleware.js';
+import { teacherLessonHourlyRateController } from './teacherLessonHourlyRate.controller.js';
+import { UserType } from '../../shared/models/UserType.js';
 
-const router: Router = express.Router();
+const router = express.Router();
 
-// All routes in this file require TEACHER role
+// All routes require teacher authentication
 router.use(authMiddleware);
-router.use(checkRole(['TEACHER']));
+router.use(checkRole([UserType.TEACHER]));
 
-// POST /api/v1/teacher-lesson-rates - Create or update a lesson rate
+// Routes
 router.post('/', teacherLessonHourlyRateController.createOrUpdate);
-
-// POST /api/v1/teacher-lesson-rates/:rateId/deactivate - Deactivate a lesson rate
 router.post('/:rateId/deactivate', teacherLessonHourlyRateController.deactivate);
-
-// POST /api/v1/teacher-lesson-rates/:rateId/reactivate - Reactivate a lesson rate
 router.post('/:rateId/reactivate', teacherLessonHourlyRateController.reactivate);
 
 export default router; 

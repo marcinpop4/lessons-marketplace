@@ -2,6 +2,7 @@ import express, { Router } from 'express';
 import { teacherController } from './teacher.controller.js';
 import { authMiddleware } from '../auth/auth.middleware.js';
 import { checkRole } from '../auth/role.middleware.js';
+import { UserType } from '../../shared/models/UserType.js';
 
 const router: Router = express.Router();
 
@@ -11,10 +12,10 @@ router.get('/', teacherController.getTeachers);
 
 // Protected routes - Teacher only
 // GET /api/teachers/profile - Get the authenticated teacher's profile
-router.get('/profile', authMiddleware, checkRole(['TEACHER']), teacherController.getTeacherProfile);
+router.get('/profile', authMiddleware, checkRole([UserType.TEACHER]), teacherController.getTeacherProfile);
 
 // GET /api/teachers/stats - Get teacher statistics
-router.get('/stats', authMiddleware, checkRole(['TEACHER']), teacherController.getTeacherStats);
+router.get('/stats', authMiddleware, checkRole([UserType.TEACHER]), teacherController.getTeacherStats);
 
 // GET /api/teachers/:teacherId/lessons - Get all lessons for a specific teacher
 // Requires authentication, authorization handled in controller/service

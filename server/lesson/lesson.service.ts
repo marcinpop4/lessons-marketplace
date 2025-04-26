@@ -3,14 +3,15 @@ import { LessonStatus, LessonStatusValue, LessonStatusTransition } from '../../s
 import { Lesson, DbLessonWithNestedRelations } from '../../shared/models/Lesson.js';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../prisma.js';
+import { LessonMapper } from './lesson.mapper.js';
 
-// Define the includes needed for transforming to a Lesson model via Lesson.fromDb
-const lessonIncludeForFromDb = {
+// Define the includes needed for transforming to a Lesson model via LessonMapper
+const lessonIncludeForMapper = {
     // Include the relations required by DbLessonWithNestedRelations
     currentStatus: true,
     quote: {
         include: {
-            // Include relations required by LessonQuote.fromDb
+            // Include relations required by LessonQuote mapper
             teacher: {
                 include: {
                     teacherLessonHourlyRates: true
@@ -27,7 +28,7 @@ const lessonIncludeForFromDb = {
 };
 
 // Define the includes needed for the controller's transformToModel (if different and still used elsewhere)
-// For now, let's assume we primarily want the structure for Lesson.fromDb
+// For now, let's assume we primarily want the structure for LessonMapper
 // const lessonIncludeForControllerTransform = { ... };
 
 class LessonService {
@@ -78,13 +79,13 @@ class LessonService {
             // Use findUniqueOrThrow to ensure it exists
             const createdLessonData = await this.prisma.lesson.findUniqueOrThrow({
                 where: { id: lessonId },
-                include: lessonIncludeForFromDb // Include needed for Lesson.fromDb
+                include: lessonIncludeForMapper // Include needed for mapping
             });
 
-            // Instantiate the model
-            const lessonModel = Lesson.fromDb(createdLessonData as DbLessonWithNestedRelations);
+            // Use the mapper to instantiate the model
+            const lessonModel = LessonMapper.toModel(createdLessonData as DbLessonWithNestedRelations);
 
-            // Check if model instantiation failed (e.g., fromDb returned null)
+            // Check if model instantiation failed
             if (!lessonModel) {
                 console.error(`Failed to instantiate Lesson model from DB data for supposedly created lesson ID: ${lessonId}`);
                 throw new Error(`Data integrity issue: Failed to create Lesson model for ID ${lessonId}`);
@@ -197,7 +198,7 @@ class LessonService {
                 // Fetch and return the fully updated lesson data using the standard include
                 const updatedLessonData = await tx.lesson.findUnique({
                     where: { id: lessonId },
-                    include: lessonIncludeForFromDb // Use the include for fromDb for the final return
+                    include: lessonIncludeForMapper // Use the include for mapping
                 });
 
                 if (!updatedLessonData) {
@@ -205,8 +206,8 @@ class LessonService {
                     throw new Error(`Failed to fetch updated lesson data for ID ${lessonId} after status update.`);
                 }
 
-                // Instantiate and return the model
-                return Lesson.fromDb(updatedLessonData as DbLessonWithNestedRelations);
+                // Use mapper to instantiate and return the model
+                return LessonMapper.toModel(updatedLessonData as DbLessonWithNestedRelations);
             });
         } catch (error) {
             console.error(`Error updating status for lesson ${lessonId} via transition ${transition}:`, error);
@@ -216,7 +217,6 @@ class LessonService {
             }
             // Otherwise, throw a generic error or handle differently
             throw new Error(`Failed to update lesson status: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            // Or return null: return null;
         }
     }
 
@@ -229,15 +229,15 @@ class LessonService {
         try {
             const lessonData = await this.prisma.lesson.findUnique({
                 where: { id: lessonId },
-                include: lessonIncludeForFromDb // Use the include for fromDb
+                include: lessonIncludeForMapper // Use the include for mapping
             });
 
             if (!lessonData) {
                 return null;
             }
 
-            // Instantiate and return the model
-            return Lesson.fromDb(lessonData as DbLessonWithNestedRelations);
+            // Use mapper to instantiate and return the model
+            return LessonMapper.toModel(lessonData as DbLessonWithNestedRelations);
         } catch (error) {
             console.error(`Error fetching lesson ${lessonId}:`, error);
             // Re-throw or return null based on desired error handling
@@ -254,12 +254,12 @@ class LessonService {
         try {
             const lessonsData = await this.prisma.lesson.findMany({
                 where: { quoteId },
-                include: lessonIncludeForFromDb // Use the include for fromDb
+                include: lessonIncludeForMapper // Use the include for mapping
             });
 
-            // Instantiate models and filter out nulls
+            // Use mapper to instantiate models and filter out nulls
             return lessonsData
-                .map(data => Lesson.fromDb(data as DbLessonWithNestedRelations))
+                .map(data => LessonMapper.toModel(data as DbLessonWithNestedRelations))
                 .filter((lesson): lesson is Lesson => lesson !== null);
         } catch (error) {
             console.error(`Error fetching lessons for quote ${quoteId}:`, error);

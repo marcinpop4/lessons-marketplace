@@ -43,7 +43,7 @@
     "prisma:deploy": "prisma migrate deploy --schema=server/prisma/schema.prisma",
     "prisma:generate": "prisma generate --schema=server/prisma/schema.prisma",
     "prisma:migrate": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate deploy --schema=server/prisma/schema.prisma",
-    "prisma:seed": "dotenv -e env/.env.${NODE_ENV} -- tsx server/prisma/seed.js",
+    "prisma:seed": "dotenv -e env/.env.${NODE_ENV} -- tsx server/prisma/seed.ts",
     "prisma:studio": "dotenv -e env/.env.${NODE_ENV} -- prisma studio --schema=server/prisma/schema.prisma",
     "swagger:server": "tsx api-docs/serve-swagger.ts",
     "test:api": "jest --config tests/api/jest.config.js",

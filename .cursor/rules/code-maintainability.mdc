@@ -13,3 +13,4 @@ alwaysApply: true
 - Limit function and file length to improve readability.
 - Add comments for complex logic, but prefer self-documenting code.
 - Maintain consistent formatting and code style throughout the project. 
+- when creating variables, opt for the variable that is reflective of the class name. For example prefer `create(addressDTO: addressDTO)` to `create(addressData: addressDTO)`

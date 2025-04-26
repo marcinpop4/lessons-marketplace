@@ -1,7 +1,9 @@
 import { Person } from './Person.js';
 import { TeacherLessonHourlyRate } from './TeacherLessonHourlyRate.js';
-// Import Prisma types
-import type { Teacher as DbTeacher, TeacherLessonHourlyRate as DbTeacherLessonHourlyRate } from '@prisma/client';
+import { LessonType } from './LessonType.js'; // Import LessonType if needed for methods
+
+// REMOVE Prisma imports
+// import type { Teacher as DbTeacher, TeacherLessonHourlyRate as DbTeacherLessonHourlyRate } from '@prisma/client';
 
 // Interface for Teacher constructor properties, extending PersonProps
 interface TeacherProps {
@@ -12,6 +14,9 @@ interface TeacherProps {
   phoneNumber: string;
   dateOfBirth: Date;
   hourlyRates?: TeacherLessonHourlyRate[]; // Optional, defaults to []
+  // Add createdAt/updatedAt if they should be part of the shared model
+  // createdAt?: Date;
+  // updatedAt?: Date;
 }
 
 /**
@@ -21,6 +26,9 @@ interface TeacherProps {
 export class Teacher extends Person {
   // Collection of hourly rates by lesson type
   hourlyRates: TeacherLessonHourlyRate[];
+  // Add createdAt/updatedAt properties if defined in TeacherProps
+  // createdAt?: Date;
+  // updatedAt?: Date;
 
   // Updated constructor using object destructuring
   constructor({
@@ -30,35 +38,22 @@ export class Teacher extends Person {
     email,
     phoneNumber,
     dateOfBirth,
-    hourlyRates = [] // Default value for optional prop
+    hourlyRates = [], // Default value for optional prop
+    // createdAt,
+    // updatedAt
   }: TeacherProps) {
     // Call super with the relevant part of the object
     super({ id, firstName, lastName, email, phoneNumber, dateOfBirth });
     this.hourlyRates = hourlyRates;
+    // Assign createdAt/updatedAt if needed
+    // this.createdAt = createdAt;
+    // this.updatedAt = updatedAt;
   }
 
-  /**
-   * Static factory method to create a Teacher instance from Prisma objects.
-   * Handles transformation, sanitization, and nested hourly rates.
-   * @param dbTeacher The plain Teacher object returned by Prisma.
-   * @param dbRates Optional array of plain TeacherLessonHourlyRate objects from Prisma.
-   * @returns A new instance of the shared Teacher model.
-   */
-  public static fromDb(
-    dbTeacher: DbTeacher,
-    dbRates?: DbTeacherLessonHourlyRate[] // Separate optional arg for rates
-  ): Teacher {
-    const { password, isActive, authMethods, createdAt, updatedAt, ...teacherProps } = dbTeacher;
-    teacherProps.dateOfBirth = new Date(teacherProps.dateOfBirth);
-
-    // Transform hourly rates using the new static factory method
-    const transformedRates = dbRates
-      ? dbRates.map(dbRate => TeacherLessonHourlyRate.fromDb(dbRate))
-      : [];
-
-    // Construct the shared model instance
-    return new Teacher({ ...teacherProps, hourlyRates: transformedRates });
-  }
+  // REMOVE fromDb static method
+  // public static fromDb(...) {
+  //   ...
+  // }
 
   /**
    * Adds a new hourly rate for a specific lesson type
@@ -78,7 +73,7 @@ export class Teacher extends Person {
    * @param lessonType The type of lesson
    * @returns The hourly rate object or undefined if not set
    */
-  getHourlyRate(lessonType: string): TeacherLessonHourlyRate | undefined {
+  getHourlyRate(lessonType: LessonType): TeacherLessonHourlyRate | undefined {
     return this.hourlyRates.find(rate => rate.type === lessonType && rate.isActive());
   }
 
@@ -103,7 +98,7 @@ export class Teacher extends Person {
    * @param lessonType The type of lesson to deactivate
    * @returns True if the rate was found and deactivated, false otherwise
    */
-  deactivateHourlyRate(lessonType: string): boolean {
+  deactivateHourlyRate(lessonType: LessonType): boolean {
     const rate = this.hourlyRates.find(rate => rate.type === lessonType);
     if (rate) {
       rate.deactivatedAt = new Date();
@@ -117,10 +112,10 @@ export class Teacher extends Person {
    * @param lessonType The type of lesson to reactivate
    * @returns True if the rate was found and reactivated, false otherwise
    */
-  reactivateHourlyRate(lessonType: string): boolean {
+  reactivateHourlyRate(lessonType: LessonType): boolean {
     const rate = this.hourlyRates.find(rate => rate.type === lessonType);
     if (rate) {
-      rate.deactivatedAt = undefined;
+      rate.deactivatedAt = undefined; // Or set to null if that's the preferred 'active' state
       return true;
     }
     return false;
@@ -131,7 +126,7 @@ export class Teacher extends Person {
    * @param lessonType The type of lesson
    * @returns The rate amount in cents or undefined if not set
    */
-  getRateInCents(lessonType: string): number | undefined {
+  getRateInCents(lessonType: LessonType): number | undefined {
     const rate = this.getHourlyRate(lessonType);
     return rate?.rateInCents;
   }
@@ -141,7 +136,7 @@ export class Teacher extends Person {
    * @param lessonType The type of lesson
    * @returns The rate amount in dollars or undefined if not set
    */
-  getRateInDollars(lessonType: string): number | undefined {
+  getRateInDollars(lessonType: LessonType): number | undefined {
     const rateInCents = this.getRateInCents(lessonType);
     return rateInCents !== undefined ? rateInCents / 100 : undefined;
   }

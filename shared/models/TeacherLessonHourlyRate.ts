@@ -3,8 +3,9 @@
  * Maps to the "TeacherLessonHourlyRate" table in the database
  */
 
-// Import Prisma type
-import type { TeacherLessonHourlyRate as DbTeacherLessonHourlyRate } from '@prisma/client';
+// Remove Prisma type import
+// import type { TeacherLessonHourlyRate as DbTeacherLessonHourlyRate } from '@prisma/client';
+import { LessonType } from './LessonType.js'; // Keep shared enum import if needed (e.g., for type property)
 
 /**
  * Properties required to create a TeacherLessonHourlyRate instance.
@@ -12,11 +13,12 @@ import type { TeacherLessonHourlyRate as DbTeacherLessonHourlyRate } from '@pris
 interface TeacherLessonHourlyRateProps {
   id: string;
   teacherId: string;
-  type: string; // TODO: Should use LessonType enum if possible
+  type: LessonType; // Use shared enum directly
   rateInCents: number;
   // Allow null to represent an active rate explicitly, alongside undefined for cases where it might not be set
   deactivatedAt?: Date | null | undefined;
   createdAt?: Date; // Optional, defaults to new Date()
+  updatedAt?: Date; // Add updatedAt if it should be part of the model
 }
 
 /**
@@ -26,10 +28,10 @@ interface TeacherLessonHourlyRateProps {
 export class TeacherLessonHourlyRate {
   id: string;
   teacherId: string;
-  type: string; // Maps to "type" column, using string to avoid import issues, will be one of LessonType enum values
+  type: LessonType; // Use shared enum
   rateInCents: number; // Rate stored in cents (e.g., $45.50 = 4550 cents)
   createdAt: Date;
-  updatedAt?: Date;
+  updatedAt?: Date; // Include if managed by the model/mapper
   // Allow null to represent an active rate explicitly, alongside undefined
   deactivatedAt?: Date | null | undefined;
 
@@ -41,7 +43,8 @@ export class TeacherLessonHourlyRate {
     rateInCents,
     // Default to null, explicitly indicating an active rate
     deactivatedAt = null,
-    createdAt = new Date() // Default value for optional prop
+    createdAt = new Date(), // Default value for optional prop
+    updatedAt // Add updatedAt to constructor if needed
   }: TeacherLessonHourlyRateProps) {
     this.id = id;
     this.teacherId = teacherId;
@@ -49,30 +52,7 @@ export class TeacherLessonHourlyRate {
     this.rateInCents = rateInCents;
     this.createdAt = createdAt;
     this.deactivatedAt = deactivatedAt;
-  }
-
-  /**
-   * Static factory method to create a TeacherLessonHourlyRate instance from a Prisma object.
-   * @param dbRate The plain object returned by Prisma.
-   * @returns A new instance of the shared TeacherLessonHourlyRate model.
-   */
-  public static fromDb(dbRate: DbTeacherLessonHourlyRate): TeacherLessonHourlyRate {
-    const { createdAt, updatedAt, ...rateProps } = dbRate;
-
-    // Instantiate using constructor
-    const instance = new TeacherLessonHourlyRate({
-      ...rateProps,
-      createdAt: createdAt ?? undefined, // createdAt from DB can be null? Assuming not based on schema
-      // Directly pass the DB value (Date or null) as null is now allowed by the constructor/property type
-      deactivatedAt: dbRate.deactivatedAt
-    });
-
-    // Assign updatedAt if it exists on the dbRate object
-    if (updatedAt) {
-      instance.updatedAt = updatedAt;
-    }
-
-    return instance;
+    this.updatedAt = updatedAt; // Assign if included
   }
 
   /**

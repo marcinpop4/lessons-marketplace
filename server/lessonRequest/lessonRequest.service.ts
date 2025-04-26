@@ -5,86 +5,63 @@ import { LessonType } from '../../shared/models/LessonType.js';
 import { LessonStatus } from '../../shared/models/LessonStatus.js';
 import { LessonRequest } from '../../shared/models/LessonRequest.js';
 import { Student } from '../../shared/models/Student.js';
-import { Address } from '../../shared/models/Address.js';
-import type { LessonRequest as DbLessonRequestPrisma, Student as DbStudentPrisma, Address as DbAddressPrisma } from '@prisma/client';
+import { Address, AddressDTO } from '../../shared/models/Address.js';
+import { LessonRequestMapper } from './lessonRequest.mapper.js';
 
-export interface AddressDTO {
-  street: string;
-  city: string;
-  state: string;
-  postalCode: string;
-  country: string;
-}
-
-export interface CreateLessonRequestDTO {
+export interface LessonRequestDTO {
   type: LessonType;
   startTime: Date;
   durationMinutes: number;
-  addressObj: AddressDTO; // Now required
+  addressDTO: AddressDTO; // Use imported AddressDTO
   studentId: string;
 }
 
-// Define Prisma types for includes required by LessonRequest.fromDb
-type DbLessonRequestWithStudentAndAddress = Prisma.LessonRequestGetPayload<{ include: { student: true, address: true } }>;
 
 export class LessonRequestService {
   private readonly prisma = prisma;
 
   /**
    * Create a new lesson request
-   * @param data - Lesson request data
+   * @param data - Lesson request data DTO
    * @returns Created LessonRequest shared model instance
    */
-  async createLessonRequest(data: CreateLessonRequestDTO): Promise<LessonRequest> {
+  async createLessonRequest(lessonRequestDTO: LessonRequestDTO): Promise<LessonRequest> {
     // Validate that the student exists first (outside transaction is fine)
-    const student = await this.prisma.student.findUnique({
-      where: { id: data.studentId }
+    const studentCheck = await this.prisma.student.findUnique({
+      where: { id: lessonRequestDTO.studentId }
     });
-    if (!student) {
-      throw new Error(`Student with ID ${data.studentId} not found`);
+    if (!studentCheck) {
+      throw new Error(`Student with ID ${lessonRequestDTO.studentId} not found`);
     }
 
     try {
       const dbLessonRequest = await this.prisma.$transaction(async (tx) => {
-        // 1. Create Address using AddressService
-        const addressRecord = await addressService.create({
-          street: data.addressObj.street,
-          city: data.addressObj.city,
-          state: data.addressObj.state,
-          postalCode: data.addressObj.postalCode,
-          country: data.addressObj.country
-        });
+        // 1. Create Address using AddressService, passing the DTO directly
+        const addressRecord = await addressService.create(lessonRequestDTO.addressDTO);
 
-        // Throw error if address creation failed (service returns null now)
         if (!addressRecord || !addressRecord.id) {
           throw new Error('Address creation failed during the transaction or returned null/no ID.');
         }
 
-        // Create the lesson request including student and address
+        // 2. Create the lesson request linking to the new address
         const newLessonRequest = await tx.lessonRequest.create({
           data: {
-            type: data.type,
-            startTime: data.startTime,
-            durationMinutes: data.durationMinutes,
+            type: lessonRequestDTO.type,
+            startTime: lessonRequestDTO.startTime,
+            durationMinutes: lessonRequestDTO.durationMinutes,
             addressId: addressRecord.id,
-            studentId: data.studentId,
+            studentId: lessonRequestDTO.studentId,
           },
-          include: {
-            student: true, // Include student details
-            address: true // Include the newly created address details
+          include: { // Keep includes needed by the mapper
+            student: true,
+            address: true
           }
         });
-        // Return the Prisma object with relations
         return newLessonRequest;
       });
 
-      // Use LessonRequest.fromDb to transform the result
-      // Cast needed for nested relations
-      const lessonRequestModel = LessonRequest.fromDb(
-        dbLessonRequest as DbLessonRequestWithStudentAndAddress, // Use helper type
-        dbLessonRequest.student as DbStudentPrisma,
-        dbLessonRequest.address as DbAddressPrisma
-      );
+      // Use LessonRequestMapper to transform the result
+      const lessonRequestModel = LessonRequestMapper.toModel(dbLessonRequest);
 
       return lessonRequestModel;
 
@@ -102,11 +79,9 @@ export class LessonRequestService {
   async getLessonRequestById(id: string): Promise<LessonRequest | null> {
     const dbLessonRequest = await this.prisma.lessonRequest.findUnique({
       where: { id },
-      include: {
-        student: true, // Needed for fromDb
-        address: true  // Needed for fromDb
-        // Note: Quotes are not needed for LessonRequest model itself
-        // lessonQuotes: { include: { teacher: true } }
+      include: { // Keep includes needed by the mapper
+        student: true,
+        address: true
       }
     });
 
@@ -114,13 +89,8 @@ export class LessonRequestService {
       return null;
     }
 
-    // Use LessonRequest.fromDb
-    // Cast needed for nested relations
-    return LessonRequest.fromDb(
-      dbLessonRequest as DbLessonRequestWithStudentAndAddress,
-      dbLessonRequest.student as DbStudentPrisma,
-      dbLessonRequest.address as DbAddressPrisma
-    );
+    // Use LessonRequestMapper
+    return LessonRequestMapper.toModel(dbLessonRequest);
   }
 
   /**
@@ -131,24 +101,18 @@ export class LessonRequestService {
   async getLessonRequestsByStudent(studentId: string): Promise<LessonRequest[]> {
     const dbLessonRequests = await this.prisma.lessonRequest.findMany({
       where: { studentId },
-      include: {
-        student: true, // Needed for fromDb
-        address: true, // Needed for fromDb
-        // Note: Quotes/Lesson not needed for LessonRequest model itself
-        // lessonQuotes: { include: { teacher: true, Lesson: true } }
+      include: { // Keep includes needed by the mapper
+        student: true,
+        address: true,
       },
       orderBy: {
         createdAt: 'desc'
       }
     });
 
-    // Use LessonRequest.fromDb and filter out potential nulls if fromDb could return null (it doesn't currently)
+    // Use LessonRequestMapper
     return dbLessonRequests.map(dbReq =>
-      LessonRequest.fromDb(
-        dbReq as DbLessonRequestWithStudentAndAddress,
-        dbReq.student as DbStudentPrisma,
-        dbReq.address as DbAddressPrisma
-      )
+      LessonRequestMapper.toModel(dbReq)
     );
   }
 }
