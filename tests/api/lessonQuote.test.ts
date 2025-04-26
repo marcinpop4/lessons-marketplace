@@ -5,14 +5,28 @@ import { Lesson } from '@shared/models/Lesson';
 import { Address } from '@shared/models/Address';
 import { Student } from '@shared/models/Student';
 import { Teacher } from '@shared/models/Teacher';
-import { LessonType } from '@prisma/client'; // Enum for request payload
+import { LessonType } from '@shared/models/LessonType';
 import { v4 as uuidv4 } from 'uuid';
 import { LessonStatusValue } from '@shared/models/LessonStatus';
+// Import status value enum for patching
+import { LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus';
+import { UserType } from '@shared/models/UserType';
 
-// Seeded user credentials
-const SEEDED_STUDENT_EMAIL = 'ethan.parker@example.com';
-const SEEDED_TEACHER_EMAIL = 'emily.richardson@musicschool.com'; // Needed for role test
-const SEEDED_PASSWORD = '1234';
+// Import test utilities
+import { createTestStudent, createTestTeacher, loginTestUser } from './utils/user.utils';
+import { createTestLessonRequest } from './utils/lessonRequest.utils';
+// Import the new lesson quote utilities AND keep the test helpers
+import {
+    createTestLessonQuote,
+    acceptTestLessonQuote,
+    createQuote,
+    createQuoteUnauthenticated,
+    getQuotesByLessonRequestId,
+    getQuotesByLessonRequestIdUnauthenticated,
+    updateQuoteStatus,
+    updateQuoteStatusUnauthenticated,
+    patchQuoteRaw,
+} from './utils/lessonQuote.utils';
 
 const API_BASE_URL = process.env.VITE_API_BASE_URL;
 
@@ -22,256 +36,261 @@ if (!API_BASE_URL) {
 
 describe('API Integration: /api/v1/lesson-quotes', () => {
     let studentAuthToken: string | null = null;
-    let teacherAuthToken: string | null = null; // For role testing
+    let teacherAuthToken: string | null = null;
+    let teacherId: string | null = null;
     let studentId: string | null = null;
     let createdLessonRequestId: string | null = null;
-    let createdQuotes: LessonQuote[] = []; // Move declaration here
+    let createdQuoteId: string | null = null; // Store ID of the quote created by teacher
+    let createdLessonId: string | null = null; // Store ID of lesson created by accepting quote
 
-    // Test data
-    const lessonRequestAddress = {
-        street: '55 Quote Test Ln',
-        city: 'Quoteburg',
-        state: 'QT',
-        postalCode: '54321',
-        country: 'Quoteland'
-    };
-
-    // Setup: Login as student, create a lesson request
+    // Setup: Uses higher-level helpers, which is fine
     beforeAll(async () => {
         try {
-            // 1. Login as Student
-            let loginResponse = await request(API_BASE_URL!)
-                .post('/api/v1/auth/login')
-                .send({ email: SEEDED_STUDENT_EMAIL, password: SEEDED_PASSWORD, userType: 'STUDENT' });
+            // 1. Create and Login Student
+            const { user: student, password: studentPassword } = await createTestStudent();
+            studentId = student.id;
+            studentAuthToken = await loginTestUser(student.email, studentPassword, UserType.STUDENT);
 
-            if (loginResponse.status !== 200 || !loginResponse.body.accessToken || !loginResponse.body.user?.id) {
-                throw new Error(`Failed Student login: ${loginResponse.body.error || 'Login endpoint failed'}`);
-            }
-            studentAuthToken = `Bearer ${loginResponse.body.accessToken}`;
-            studentId = loginResponse.body.user.id;
+            // 2. Create and Login Teacher
+            const { user: teacher, password: teacherPassword } = await createTestTeacher();
+            teacherId = teacher.id;
+            teacherAuthToken = await loginTestUser(teacher.email, teacherPassword, UserType.TEACHER);
 
-            // 2. Login as Teacher (for role tests)
-            loginResponse = await request(API_BASE_URL!)
-                .post('/api/v1/auth/login')
-                .send({ email: SEEDED_TEACHER_EMAIL, password: SEEDED_PASSWORD, userType: 'TEACHER' });
-            if (loginResponse.status !== 200 || !loginResponse.body.accessToken) {
-                throw new Error(`Failed Teacher login: ${loginResponse.body.error || 'Login endpoint failed'}`);
-            }
-            teacherAuthToken = `Bearer ${loginResponse.body.accessToken}`;
-
-
-            // 3. Create a Lesson Request using the student token
+            // 3. Create a Lesson Request using the student token and util
             const futureDate = new Date();
             futureDate.setDate(futureDate.getDate() + 10);
             futureDate.setHours(11, 0, 0, 0);
-            const lessonRequestData = {
-                studentId: studentId,
-                addressObj: lessonRequestAddress,
-                type: LessonType.GUITAR,
-                startTime: futureDate.toISOString(),
-                durationMinutes: 60
-            };
-
-            const createReqResponse = await request(API_BASE_URL!)
-                .post('/api/v1/lesson-requests')
-                .set('Authorization', studentAuthToken)
-                .send(lessonRequestData);
-
-            if (createReqResponse.status !== 201 || !createReqResponse.body.lessonRequest?.id) {
-                throw new Error(`Failed to create lesson request in setup: ${createReqResponse.body.error || 'Create request endpoint failed'}`);
-            }
-            createdLessonRequestId = createReqResponse.body.lessonRequest.id;
+            const lessonRequest = await createTestLessonRequest(
+                studentAuthToken as string,
+                studentId as string,
+                LessonType.GUITAR,
+                futureDate,
+                60
+            );
+            createdLessonRequestId = lessonRequest.id;
 
         } catch (error) {
             console.error('[Test Setup] Error in beforeAll for lessonQuote.test.ts:', error);
             throw error; // Fail fast
         }
-    }, 45000); // Timeout for multiple logins + request creation
+    }, 45000); // Keep timeout as setup involves multiple creations/logins
 
-    // --- Tests will go here --- //
+    describe('POST /', () => {
+        const validQuotePayload = {
+            lessonRequestId: '', // Will be set dynamically
+            costInCents: 5000,
+            hourlyRateInCents: 5000
+        };
 
-    describe('GET /request/:lessonRequestId', () => {
-        it('should return 401 Unauthorized if no token is provided', async () => {
-            if (!createdLessonRequestId) throw new Error('Lesson Request ID not available');
-            const response = await request(API_BASE_URL!)
-                .get(`/api/v1/lesson-quotes/request/${createdLessonRequestId}`);
-            expect(response.status).toBe(401);
-        });
-
-        it('should return quotes for the newly created lesson request', async () => {
-            if (!studentAuthToken || !createdLessonRequestId) throw new Error('Auth token or Lesson Request ID not available');
-
-            // Wait a tiny bit to ensure async quote creation (if any) might complete
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            const response = await request(API_BASE_URL!)
-                .get(`/api/v1/lesson-quotes/request/${createdLessonRequestId}`)
-                .set('Authorization', studentAuthToken);
-
-            expect(response.status).toBe(200);
-            expect(response.body).toBeInstanceOf(Array);
-            // Check that quotes were actually generated by the POST /lesson-requests endpoint
-            expect(response.body.length).toBeGreaterThan(0);
-            // Validate first quote structure (optional, but good practice)
-            const quote: LessonQuote = response.body[0];
-            expect(quote.id).toBeDefined();
-            expect(quote.lessonRequest?.id).toEqual(createdLessonRequestId);
-            expect(quote.teacher?.id).toBeDefined();
-        });
-
-        it('should return 404 Not Found for a non-existent lesson request ID', async () => {
-            if (!studentAuthToken) throw new Error('Auth token not available');
-            const fakeRequestId = uuidv4();
-            const response = await request(API_BASE_URL!)
-                .get(`/api/v1/lesson-quotes/request/${fakeRequestId}`)
-                .set('Authorization', studentAuthToken);
-            expect(response.status).toBe(404); // Assuming the controller handles this
-        });
-    });
-
-    describe('POST /create-quotes', () => {
-        it('should return 401 Unauthorized if no token is provided', async () => {
-            const response = await request(API_BASE_URL!)
-                .post('/api/v1/lesson-quotes/create-quotes')
-                .send({ lessonRequestId: createdLessonRequestId });
-            expect(response.status).toBe(401);
-        });
-
-        it('should return 403 Forbidden if requested by a non-STUDENT role (e.g., TEACHER)', async () => {
-            if (!teacherAuthToken || !createdLessonRequestId) throw new Error('Teacher token or Lesson Request ID not available');
-            const response = await request(API_BASE_URL!)
-                .post('/api/v1/lesson-quotes/create-quotes')
-                .set('Authorization', teacherAuthToken)
-                .send({ lessonRequestId: createdLessonRequestId });
-            expect(response.status).toBe(403);
-        });
-
-        it('should create quotes for the lesson request and return them (200 OK)', async () => {
-            if (!studentAuthToken || !createdLessonRequestId) throw new Error('Student token or Lesson Request ID not available');
-            const response = await request(API_BASE_URL!)
-                .post('/api/v1/lesson-quotes/create-quotes')
-                .set('Authorization', studentAuthToken)
-                .send({ lessonRequestId: createdLessonRequestId });
-
-            expect(response.status).toBe(200); // Controller likely returns 200
-            expect(response.body).toBeInstanceOf(Array);
-            expect(response.body.length).toBeGreaterThan(0); // Seed data should have teachers for GUITAR
-
-            // Basic validation of the first quote
-            const quote: LessonQuote = response.body[0];
-            expect(quote.id).toBeDefined();
-            expect(quote.lessonRequest?.id).toEqual(createdLessonRequestId);
-            expect(quote.teacher?.id).toBeDefined();
-            expect(quote.costInCents).toBeGreaterThan(0);
-            expect(quote.hourlyRateInCents).toBeGreaterThan(0);
-            expect(quote.createdAt).toBeDefined();
-            expect(quote.updatedAt).toBeDefined();
-
-            // Check for nested teacher details (password should be removed by service/controller)
-            expect(quote.teacher).toBeDefined();
-            expect(quote.teacher?.id).toEqual(quote.teacher?.id);
-            expect(quote.teacher).not.toHaveProperty('passwordHash');
-
-            createdQuotes = response.body;
-        }, 20000);
-
-        it('should return 400 Bad Request if lessonRequestId is missing', async () => {
-            if (!studentAuthToken) throw new Error('Student token not available');
-            const response = await request(API_BASE_URL!)
-                .post('/api/v1/lesson-quotes/create-quotes')
-                .set('Authorization', studentAuthToken)
-                .send({}); // Missing lessonRequestId
-            expect(response.status).toBe(400);
-        });
-
-        it('should return 404 Not Found if lesson request ID does not exist', async () => {
-            if (!studentAuthToken) throw new Error('Student token not available');
-            const fakeRequestId = uuidv4();
-            const response = await request(API_BASE_URL!)
-                .post('/api/v1/lesson-quotes/create-quotes')
-                .set('Authorization', studentAuthToken)
-                .send({ lessonRequestId: fakeRequestId });
-            expect(response.status).toBe(404); // Controller should check if request exists
-        });
-    });
-
-    describe('POST /:quoteId/accept', () => {
-        let quoteToAccept: LessonQuote | null = null;
-
-        beforeAll(() => {
-            if (createdQuotes.length > 0) {
-                quoteToAccept = createdQuotes[0];
+        beforeEach(() => {
+            // Ensure the dynamic ID is set before each test in this suite
+            if (createdLessonRequestId) {
+                validQuotePayload.lessonRequestId = createdLessonRequestId;
             }
         });
 
         it('should return 401 Unauthorized if no token is provided', async () => {
-            if (!quoteToAccept) return;
-            const response = await request(API_BASE_URL!)
-                .post(`/api/v1/lesson-quotes/${quoteToAccept.id}/accept`);
+            // Use util
+            const response = await createQuoteUnauthenticated(validQuotePayload);
             expect(response.status).toBe(401);
         });
 
-        it('should return 403 Forbidden if requested by a non-STUDENT role', async () => {
-            if (!teacherAuthToken || !quoteToAccept) return;
-            const response = await request(API_BASE_URL!)
-                .post(`/api/v1/lesson-quotes/${quoteToAccept.id}/accept`)
-                .set('Authorization', teacherAuthToken);
+        it('should return 403 Forbidden if requested by a non-TEACHER role (e.g., STUDENT)', async () => {
+            if (!studentAuthToken) throw new Error('Student token not available');
+            // Use util
+            const response = await createQuote(studentAuthToken, validQuotePayload);
             expect(response.status).toBe(403);
         });
 
-        it('should accept the quote and create a lesson (200 OK)', async () => {
-            if (!studentAuthToken || !quoteToAccept) return;
+        it('should create a quote for the lesson request using utility (201 Created)', async () => {
+            if (!teacherAuthToken || !createdLessonRequestId) throw new Error('Teacher token or Lesson Request ID not available');
 
-            const response = await request(API_BASE_URL!)
-                .post(`/api/v1/lesson-quotes/${quoteToAccept.id}/accept`)
-                .set('Authorization', studentAuthToken);
+            // Use the lower-level util for the core request
+            const response = await createQuote(teacherAuthToken, validQuotePayload);
+
+            // Assertions on the response
+            expect(response.status).toBe(201);
+            const quote: LessonQuote = response.body;
+            expect(quote.id).toBeDefined();
+            expect(quote.lessonRequest?.id).toEqual(createdLessonRequestId);
+            expect(quote.teacher?.id).toEqual(teacherId);
+            expect(quote.costInCents).toEqual(validQuotePayload.costInCents);
+            expect(quote.hourlyRateInCents).toEqual(validQuotePayload.hourlyRateInCents);
+            expect(quote.createdAt).toBeDefined();
+            expect(quote.updatedAt).toBeDefined();
+            expect(quote.currentStatus?.status).toEqual(LessonQuoteStatusValue.CREATED);
+            expect(quote.teacher).toBeDefined();
+            expect(quote.teacher?.id).toEqual(teacherId);
+            expect(quote.teacher).not.toHaveProperty('passwordHash');
+
+            createdQuoteId = quote.id; // Store for later tests
+        }, 20000);
+
+        it('should return 400 Bad Request if lessonRequestId is missing', async () => {
+            if (!teacherAuthToken) throw new Error('Teacher token not available');
+            const { lessonRequestId, ...invalidPayload } = validQuotePayload;
+            // Use util with invalid payload
+            const response = await createQuote(teacherAuthToken, invalidPayload as any);
+            expect(response.status).toBe(400);
+        });
+
+        // Add tests for missing costInCents, hourlyRateInCents...
+        it('should return 400 Bad Request if costInCents is missing', async () => {
+            if (!teacherAuthToken) throw new Error('Teacher token not available');
+            const { costInCents, ...invalidPayload } = validQuotePayload;
+            const response = await createQuote(teacherAuthToken, invalidPayload as any);
+            expect(response.status).toBe(400);
+        });
+
+        it('should return 400 Bad Request if hourlyRateInCents is missing', async () => {
+            if (!teacherAuthToken) throw new Error('Teacher token not available');
+            const { hourlyRateInCents, ...invalidPayload } = validQuotePayload;
+            const response = await createQuote(teacherAuthToken, invalidPayload as any);
+            expect(response.status).toBe(400);
+        });
+
+        it('should return 404 Not Found if lesson request ID does not exist', async () => {
+            if (!teacherAuthToken) throw new Error('Teacher token not available');
+            const fakeRequestId = uuidv4();
+            // Use util
+            const response = await createQuote(teacherAuthToken, { ...validQuotePayload, lessonRequestId: fakeRequestId });
+            expect(response.status).toBe(404);
+        });
+    });
+
+    describe('GET /', () => {
+        // Ensure a quote exists before these tests run
+        beforeAll(async () => {
+            if (!createdQuoteId && teacherAuthToken && createdLessonRequestId) {
+                await createTestLessonQuote(teacherAuthToken, {
+                    lessonRequestId: createdLessonRequestId,
+                    costInCents: 5000,
+                    hourlyRateInCents: 5000
+                });
+                // Re-fetch the quote ID if it wasn't set correctly in the POST test
+                const quotesResponse = await getQuotesByLessonRequestId(teacherAuthToken, createdLessonRequestId);
+                if (quotesResponse.body.length > 0) {
+                    createdQuoteId = quotesResponse.body[0].id;
+                } else {
+                    throw new Error("Failed to create prerequisite quote for GET tests");
+                }
+            }
+        });
+
+        it('should return 401 Unauthorized if no token is provided', async () => {
+            if (!createdLessonRequestId) throw new Error('Lesson Request ID not available');
+            // Use util
+            const response = await getQuotesByLessonRequestIdUnauthenticated(createdLessonRequestId);
+            expect(response.status).toBe(401);
+        });
+
+        it('should return quotes for the specific lesson request when queried by STUDENT', async () => {
+            if (!studentAuthToken || !createdLessonRequestId || !createdQuoteId) throw new Error('Auth token, Lesson Request ID, or Quote ID not available');
+            // Use util
+            const response = await getQuotesByLessonRequestId(studentAuthToken, createdLessonRequestId);
 
             expect(response.status).toBe(200);
-            const createdLesson = response.body as Lesson; // Assuming response body is the lesson
+            expect(response.body).toBeInstanceOf(Array);
+            expect(response.body.length).toBeGreaterThan(0);
+            const foundQuote = response.body.find((q: LessonQuote) => q.id === createdQuoteId);
+            expect(foundQuote).toBeDefined();
+            expect(foundQuote.lessonRequest?.id).toEqual(createdLessonRequestId);
+            expect(foundQuote.teacher?.id).toEqual(teacherId);
+        });
 
-            // Check the lesson structure and initial status
+        it('should return quotes for the specific lesson request when queried by TEACHER', async () => {
+            if (!teacherAuthToken || !createdLessonRequestId || !createdQuoteId) throw new Error('Auth token, Lesson Request ID, or Quote ID not available');
+            // Use util
+            const response = await getQuotesByLessonRequestId(teacherAuthToken, createdLessonRequestId);
+
+            expect(response.status).toBe(200);
+            expect(response.body).toBeInstanceOf(Array);
+            expect(response.body.length).toBeGreaterThan(0);
+            const foundQuote = response.body.find((q: LessonQuote) => q.id === createdQuoteId);
+            expect(foundQuote).toBeDefined();
+        });
+
+        it('should return 400 Bad Request if lessonRequestId query parameter is missing', async () => {
+            if (!studentAuthToken) throw new Error('Auth token not available');
+            // Keep direct request: Testing specific lack of query param
+            const response = await request(API_BASE_URL!)
+                .get(`/api/v1/lesson-quotes`) // No query
+                .set('Authorization', `Bearer ${studentAuthToken}`);
+            expect(response.status).toBe(400);
+        });
+
+        it('should return 404 Not Found for a non-existent lesson request ID in query param', async () => {
+            if (!studentAuthToken) throw new Error('Auth token not available');
+            const fakeRequestId = uuidv4();
+            // Use util
+            const response = await getQuotesByLessonRequestId(studentAuthToken, fakeRequestId);
+            expect(response.status).toBe(404);
+        });
+    });
+
+    describe('PATCH /:quoteId', () => {
+        // Ensure a quote exists before these tests run
+        beforeAll(async () => {
+            if (!createdQuoteId && teacherAuthToken && createdLessonRequestId) {
+                // Create quote if it wasn't created in POST test
+                const quote = await createTestLessonQuote(teacherAuthToken, {
+                    lessonRequestId: createdLessonRequestId,
+                    costInCents: 5000,
+                    hourlyRateInCents: 5000
+                });
+                createdQuoteId = quote.id;
+            }
+        });
+
+        it('should return 401 Unauthorized if no token is provided', async () => {
+            if (!createdQuoteId) throw new Error('Quote ID not available');
+            // Use util
+            const response = await updateQuoteStatusUnauthenticated(createdQuoteId, { status: LessonQuoteStatusValue.ACCEPTED });
+            expect(response.status).toBe(401);
+        });
+
+        it('should allow STUDENT to accept the quote using utility (200 OK), creating a lesson', async () => {
+            if (!studentAuthToken || !createdQuoteId) throw new Error('Student token or Quote ID not available');
+
+            // Use the higher-level helper as it encapsulates the acceptance logic + lesson creation check
+            const createdLesson = await acceptTestLessonQuote(studentAuthToken, createdQuoteId);
+
             expect(createdLesson).toBeDefined();
             expect(createdLesson.id).toBeDefined();
-            expect(createdLesson.quote?.id).toEqual(quoteToAccept.id);
-            // Check the status *value* within the currentStatus object
-            expect(createdLesson.currentStatus?.status).toEqual(LessonStatusValue.REQUESTED);
-            expect(createdLesson.createdAt).toBeDefined();
-            expect(createdLesson.updatedAt).toBeDefined();
+            expect(createdLesson.quote?.id).toEqual(createdQuoteId);
+            expect(createdLesson.currentStatus?.status).toEqual(LessonStatusValue.ACCEPTED);
 
-            // Should include nested quote, request, student, teacher etc.
-            expect(createdLesson.quote).toBeDefined();
-            expect(createdLesson.quote?.id).toEqual(quoteToAccept.id);
-            expect(createdLesson.quote?.lessonRequest).toBeDefined();
-            expect(createdLesson.quote?.lessonRequest?.id).toEqual(createdLessonRequestId);
-            expect(createdLesson.quote?.teacher).toBeDefined();
-            expect(createdLesson.quote?.lessonRequest?.student).toBeDefined();
+            createdLessonId = createdLesson.id; // Store for potential future test
+        });
 
-            // Passwords should be removed
-            expect(createdLesson.quote?.teacher).not.toHaveProperty('passwordHash');
-            expect(createdLesson.quote?.lessonRequest?.student).not.toHaveProperty('passwordHash');
+        it('should return 400 Bad Request if status is missing or invalid', async () => {
+            if (!studentAuthToken || !createdQuoteId) throw new Error('Student token or Quote ID not available');
+            // Use raw patch util
+            const response = await patchQuoteRaw(studentAuthToken, createdQuoteId, { status: 'INVALID_STATUS' }); // Invalid status
+            expect(response.status).toBe(400);
+
+            // Test missing status
+            const responseMissing = await patchQuoteRaw(studentAuthToken, createdQuoteId, {}); // Missing status
+            expect(responseMissing.status).toBe(400);
         });
 
         it('should return 404 Not Found for a non-existent quote ID', async () => {
-            if (!studentAuthToken) return;
+            if (!studentAuthToken) throw new Error('Student token not available');
             const fakeQuoteId = uuidv4();
-            const response = await request(API_BASE_URL!)
-                .post(`/api/v1/lesson-quotes/${fakeQuoteId}/accept`)
-                .set('Authorization', studentAuthToken);
+            // Use util
+            const response = await updateQuoteStatus(studentAuthToken, fakeQuoteId, { status: LessonQuoteStatusValue.ACCEPTED });
             expect(response.status).toBe(404);
         });
 
-        it('should return 409 Conflict (or similar) if accepting a quote already associated with a lesson', async () => {
-            if (!studentAuthToken || !quoteToAccept) return;
+        it('should return 409 Conflict if STUDENT tries accepting an already accepted quote', async () => {
+            if (!studentAuthToken || !createdQuoteId) throw new Error('Student token or Quote ID not available');
+            // Ensure the quote is accepted first (it should be from the previous test)
+            expect(createdLessonId).toBeDefined(); // Check that a lesson was created
 
-            const response = await request(API_BASE_URL!)
-                .post(`/api/v1/lesson-quotes/${quoteToAccept.id}/accept`)
-                .set('Authorization', studentAuthToken);
-
-            // Expecting a conflict or bad request type error
-            expect(response.status).toBeGreaterThanOrEqual(400);
-            expect(response.status).toBeLessThan(500);
-            // Specific status code depends on controller implementation (e.g., 409 Conflict or 400 Bad Request)
-            expect(response.body.error).toBeDefined();
+            // Use the lower-level util to attempt acceptance again
+            const response = await updateQuoteStatus(studentAuthToken, createdQuoteId, { status: LessonQuoteStatusValue.ACCEPTED });
+            // Expect 409 Conflict from the API
+            expect(response.status).toBe(409);
         });
     });
 }); 

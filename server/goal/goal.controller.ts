@@ -3,6 +3,8 @@ import { goalService } from './goal.service.js';
 import { GoalStatusTransition } from '../../shared/models/GoalStatus.js';
 import { z } from 'zod';
 import { BadRequestError } from '../errors/index.js';
+// Import the Prisma-generated UserType
+import { UserType as PrismaUserType } from '@prisma/client';
 
 // Input validation schemas using Zod
 const createGoalSchema = z.object({
@@ -23,14 +25,36 @@ const generateRecommendationsSchema = z.object({
     pastLessons: z.array(z.any())
 });
 
+// Define param validation schema
+const goalIdParamSchema = z.object({
+    goalId: z.string().uuid({ message: 'Invalid Goal ID format in URL path.' })
+});
+
+// Define AuthenticatedRequest interface using PrismaUserType
+interface AuthenticatedRequest extends Request {
+    user?: {
+        id: string;
+        userType: PrismaUserType; // Use Prisma's UserType
+    };
+}
+
 export const goalController = {
     /**
      * POST /goals - Create a new goal for a lesson
      */
-    async createGoal(req: Request, res: Response, next: NextFunction) {
+    async createGoal(req: AuthenticatedRequest, res: Response, next: NextFunction) {
         try {
+            // Extract user ID or throw if missing (should be added by authMiddleware)
+            const authenticatedUser = req.user;
+            if (!authenticatedUser?.id) {
+                throw new Error('Authenticated user ID not found. Middleware issue?');
+            }
+            const userId = authenticatedUser.id;
+
             const validatedData = createGoalSchema.parse(req.body);
+            // Pass userId to the service method
             const goal = await goalService.createGoal(
+                userId, // Pass requesting user's ID
                 validatedData.lessonId,
                 validatedData.title,
                 validatedData.description,
@@ -45,16 +69,22 @@ export const goalController = {
     /**
      * PATCH /goals/:goalId - Update the status of a goal
      */
-    async updateGoalStatus(req: Request, res: Response, next: NextFunction) {
+    async updateGoalStatus(req: AuthenticatedRequest, res: Response, next: NextFunction) {
         try {
-            const goalId = req.params.goalId;
-            if (!goalId) {
-                res.status(400).json({ message: 'Goal ID is required in the URL path.' });
-                return;
+            // Validate goalId param first
+            const { goalId } = goalIdParamSchema.parse(req.params);
+
+            // Extract user ID or throw if missing
+            const authenticatedUser = req.user;
+            if (!authenticatedUser?.id) {
+                throw new Error('Authenticated user ID not found. Middleware issue?');
             }
+            const userId = authenticatedUser.id;
 
             const validatedData = updateGoalStatusSchema.parse(req.body);
+            // Pass userId to the service method
             const goal = await goalService.updateGoalStatus(
+                userId, // Pass requesting user's ID
                 goalId,
                 validatedData.transition,
                 validatedData.context ?? null // Pass context or null
@@ -68,19 +98,21 @@ export const goalController = {
     /**
      * GET /goals/:goalId - Get a specific goal by ID
      */
-    async getGoalById(req: Request, res: Response, next: NextFunction) {
+    async getGoalById(req: AuthenticatedRequest, res: Response, next: NextFunction) {
         try {
-            const goalId = req.params.goalId;
-            if (!goalId) {
-                res.status(400).json({ message: 'Goal ID is required in the URL path.' });
-                return;
-            }
+            // Validate goalId param first
+            const { goalId } = goalIdParamSchema.parse(req.params);
 
-            const goal = await goalService.getGoalById(goalId);
-            if (!goal) {
-                res.status(404).json({ message: `Goal with ID ${goalId} not found.` });
-                return;
+            // Extract user ID
+            const authenticatedUser = req.user;
+            if (!authenticatedUser?.id) {
+                throw new Error('Authenticated user ID not found. Middleware issue?');
             }
+            const userId = authenticatedUser.id;
+
+            // Authorization check done in service
+            const goal = await goalService.getGoalById(goalId, userId);
+            // Service throws NotFoundError or AuthorizationError
             res.status(200).json(goal);
         } catch (error) {
             next(error);
@@ -88,33 +120,46 @@ export const goalController = {
     },
 
     /**
-     * GET /lessons/:lessonId/goals - Get all goals for a specific lesson
+     * GET /goals?lessonId=... - Get all goals for a specific lesson
+     * Requires authentication. Authorization (student/teacher owns lesson) is handled in service.
      */
-    async getGoalsByLessonId(req: Request, res: Response, next: NextFunction) {
+    async getGoalsByLessonId(req: AuthenticatedRequest, res: Response, next: NextFunction) {
         try {
-            const lessonId = req.params.lessonId;
-            if (!lessonId) {
-                res.status(400).json({ message: 'Lesson ID is required in the URL path.' });
-                return;
+            const { lessonId } = req.query;
+            const authenticatedUser = req.user;
+
+            if (!lessonId || typeof lessonId !== 'string') {
+                throw new BadRequestError('Lesson ID query parameter is required and must be a string.');
             }
 
-            const goals = await goalService.getGoalsByLessonId(lessonId);
+            if (!authenticatedUser?.id) {
+                throw new Error('Authenticated user ID not found. Middleware issue?');
+            }
+            const userId = authenticatedUser.id;
+
+            // Call service, passing lessonId and userId for authorization
+            const goals = await goalService.getGoalsByLessonId(lessonId, userId);
             res.status(200).json(goals);
         } catch (error) {
-            next(error);
+            next(error); // Pass errors (including potential AuthorizationError from service) to central handler
         }
     },
 
     /**
      * POST /goals/recommendations/generate - Generate AI-powered goal recommendations
      */
-    async generateRecommendations(req: Request, res: Response, next: NextFunction): Promise<void> {
+    async generateRecommendations(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
         try {
             const { lessonId } = req.query;
+            const authenticatedUser = req.user;
+            if (!authenticatedUser?.id) {
+                throw new Error('Authenticated user ID not found. Middleware issue?');
+            }
             if (typeof lessonId !== 'string') {
                 throw new BadRequestError('Lesson ID query parameter is required');
             }
-            const recommendations = await goalService.generateGoalRecommendations(lessonId);
+            // Pass userId to service for potential authorization checks
+            const recommendations = await goalService.generateGoalRecommendations(lessonId, authenticatedUser.id);
             res.status(200).json(recommendations);
         } catch (error) {
             next(error);
@@ -122,7 +167,7 @@ export const goalController = {
     },
 
     // === New Streaming Method ===
-    async streamRecommendations(req: Request, res: Response, next: NextFunction): Promise<void> {
+    async streamRecommendations(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
         // Set headers for SSE
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
@@ -130,7 +175,14 @@ export const goalController = {
         res.flushHeaders(); // Flush the headers to establish the connection
 
         try {
-            // Extract and validate lessonId
+            const authenticatedUser = req.user;
+            if (!authenticatedUser?.id) {
+                console.error("[SSE] Authenticated user ID not found in streamRecommendations.");
+                res.write(`event: error\ndata: ${JSON.stringify({ message: 'Authentication error' })}\n\n`);
+                res.end();
+                return;
+            }
+
             const { lessonId } = req.query;
             if (typeof lessonId !== 'string') {
                 res.write(`event: error\ndata: ${JSON.stringify({ message: 'Lesson ID query parameter is required' })}\n\n`);
@@ -138,7 +190,6 @@ export const goalController = {
                 return;
             }
 
-            // Extract and validate count (default to 5, max 10 for safety)
             const DEFAULT_COUNT = 5;
             const MAX_COUNT = 10;
             let count = DEFAULT_COUNT;
@@ -153,15 +204,10 @@ export const goalController = {
                 console.log(`[SSE] No count query parameter received. Using default ${DEFAULT_COUNT}.`);
             }
 
-            // Call the service method, passing lessonId, count, and response object
-            await goalService.streamGoalRecommendations(lessonId, count, res);
-
-            // Service method will call res.end() when done or on error
+            await goalService.streamGoalRecommendations(lessonId, count, req, res, authenticatedUser.id);
 
         } catch (error) {
-            // If error happens before/during service call setup (but after headers flushed)
             console.error("Error in streamRecommendations controller:", error);
-            // Send an error event and close connection
             const errorMessage = error instanceof Error ? error.message : 'Unknown error during streaming.';
             try {
                 res.write(`event: error\ndata: ${JSON.stringify({ message: errorMessage })}\n\n`);
@@ -169,7 +215,6 @@ export const goalController = {
                 console.error("Failed to write error event to SSE stream:", writeError);
             }
             res.end();
-            // Note: Cannot call next(error) after headers are sent.
         }
-    }
-}; 
+    },
+}; // End of goalController export

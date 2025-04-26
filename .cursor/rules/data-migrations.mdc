@@ -1,20 +1,47 @@
 ---
-description: 
+description: creating and running migrations
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
+# Data Migrations
 
-# Your rule content
+## Goal
+Ensure database schema changes and associated data transformations are handled safely, reliably, and traceably using Prisma's migration tooling.
 
-Use Prisma's built-in migration tools: Always use prisma:create-migration to generate migrations properly through Prisma, rather than writing migrations manually.
-Proper rollback handling: If migrations fail, use prisma:resolve-rolled-back to properly mark migrations as rolled back in the prisma_migrations table.
-Data backfilling through SQL: When data needs to be transformed during schema changes, include SQL statements in the migration for backfilling rather than relying on separate scripts.
-Never manipulate prisma_migrations directly in code: While manual intervention in the prisma_migrations table might occasionally be necessary (as we experienced), this should never be codified in migrations or scripts.
-Schema changes come first: Change the Prisma schema, then generate migrations using the proper tooling rather than working backward.
-The proper migration workflow should be:
-Update the Prisma schema
-Run pnpm prisma:create-migration to generate the migration file
-Add any necessary data-transformation SQL to the migration file
-Apply the migration with pnpm prisma:migrate
-If issues occur, use pnpm prisma:resolve-rolled-back to properly handle rollbacks
-This approach ensures proper tracking of migrations and maintains database integrity while following Prisma's recommended practices.
+## Guiding Principles
+- **Prisma Tooling First:** Always use Prisma's built-in migration commands. Do not write migration files manually.
+- **Schema First:** Define schema changes in `schema.prisma` *before* generating migrations.
+- **SQL for Data Migrations:** Any data backfilling or transformation required *as part of a schema migration* MUST be implemented using raw SQL within the generated migration file. Never use application code or external scripts for data changes within a migration step.
+- **No Direct Manipulation:** Avoid direct manual manipulation of the `_prisma_migrations` table unless absolutely necessary for recovery, and never codify such manipulation in scripts or application logic.
+
+## Workflow
+
+Follow this precise workflow for all schema changes:
+
+1.  **Update Schema:** Modify the `server/prisma/schema.prisma` file with the desired changes.
+2.  **Generate Migration File:** Run the following command from the workspace root, replacing `<name>` with a descriptive name for the migration (e.g., `add_lesson_quote_status`):
+    ```bash
+    NODE_ENV=development pnpm prisma:create-migration --name <name>
+    ```
+    *   **Use `--create-only` Flag:** If you need to add SQL commands for data backfilling or transformation based on the schema change, append the `--create-only` flag to the command above. This prevents Prisma from attempting to execute the migration immediately.
+        ```bash
+        NODE_ENV=development pnpm prisma:create-migration --create-only --name <name>
+        ```
+3.  **(If `--create-only` was used) Add SQL:** Open the newly generated migration file (located in `server/prisma/migrations/<timestamp>_<name>/migration.sql`) and add the necessary raw SQL `UPDATE`, `INSERT`, or other data manipulation statements *after* the Prisma-generated schema changes. **Ensure this SQL is idempotent where possible.**
+4.  **Apply Migration:** Run the migration against the database:
+    ```bash
+    NODE_ENV=development pnpm prisma:migrate
+    ```
+    *(Note: Adjust `NODE_ENV` to `test` or `production` as appropriate when running against different environments).*
+5.  **Handle Failed Migrations (If Necessary):** If a migration fails (e.g., during `prisma:migrate`), investigate and fix the underlying issue (often in the `migration.sql` file if custom SQL was added). Once fixed, you need to resolve the migration's status in Prisma's history:
+    *   **To mark as applied (if fixed and ready to proceed):** Use the `prisma:resolve-applied` script, passing the migration name *without* a preceding `--`.
+        ```bash
+        NODE_ENV=development pnpm run prisma:resolve-applied <migration_name>
+        ```
+    *   **To mark as rolled back (if abandoning the change or need to unblock other migrations):** Use the `prisma:resolve-rolled-back` script, passing the migration name *without* a preceding `--`.
+        ```bash
+        NODE_ENV=development pnpm run prisma:resolve-rolled-back <migration_name>
+        ```
+    Replace `<migration_name>` with the full name of the failed migration folder (e.g., `<timestamp>_<name>`). After resolving, you can attempt `prisma:migrate` again if necessary.
+
+This refined workflow emphasizes the correct commands, the specific use case for `--create-only`, the SQL-only requirement for data transformations within migrations, and the correct syntax for resolving failed migrations using the `package.json` scripts.

@@ -1,0 +1,100 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Import Conventions
+
+This document clarifies how to write import statements across different parts of the application (`server/`, `frontend/`, `shared/`, `tests/`) to ensure consistency and compatibility with our tooling (TypeScript compiler, Vite, Jest).
+
+## Guiding Principle Update
+
+**Import paths in TypeScript (`.ts`, `.tsx`) files generally omit the file extension, EXCEPT for relative imports within directories compiled for Node.js ESM (`server/`, `shared/`), which MUST include the `.js` extension.**
+
+Rely on the respective build/run tools and their configurations (`tsconfig.json`, `vite.config.ts`, `jest.config.js`) for module resolution (especially for aliases and node modules), but respect Node.js ESM requirements for server-side and shared library relative imports.
+
+## Specific Areas
+
+### 1. Server (`server/**/*.ts`)
+
+-   **Local Imports (within `server/`):** Use relative paths **AND include** the `.js` extension.
+    ```typescript
+    // Correct:
+    import { userService } from './user.service.js';
+    import { authMiddleware } from '../auth/auth.middleware.js';
+    ```
+-   **Shared Imports (from `@shared/`):** Use the configured path alias (`@shared/`) **without** the extension.
+    ```typescript
+    // Correct:
+    import { Lesson } from '@shared/models/Lesson';
+    ```
+-   **Node Modules:** Import from `node_modules` as usual (no extension).
+    ```typescript
+    import express from 'express';
+    ```
+-   **Reasoning:** Compiled server code runs in Node.js using ESM, which requires explicit `.js` extensions for relative imports. Aliases and node modules are resolved differently.
+
+### 2. Shared (`shared/**/*.ts`)
+
+-   **Local Imports (within `shared/`):** Use relative paths **AND include** the `.js` extension.
+    ```typescript
+    // Correct (e.g., inside shared/models/Lesson.ts):
+    import { LessonStatus } from './LessonStatus.js';
+    import { CurrencyCode } from '../types/Currency.js';
+
+    // Incorrect:
+    // import { LessonStatus } from './LessonStatus';
+    ```
+-   **Node Modules:** Import from `node_modules` as usual (no extension).
+    ```typescript
+    // Example if needed (though shared should minimize dependencies):
+    // import { v4 as uuidv4 } from 'uuid';
+    ```
+-   **Reasoning:** The `shared` code is compiled and used by the server (Node.js ESM), therefore relative imports within it must adhere to the explicit `.js` extension rule for compatibility.
+
+### 3. Frontend (`frontend/**/*.ts`, `frontend/**/*.tsx`)
+
+-   **Local Imports (within `frontend/`):** Use relative paths **without** the extension.
+    ```typescript
+    // Correct:
+    import { useAuthStore } from './stores/authStore';
+    import { LoginButton } from '../components/LoginButton';
+    ```
+-   **Shared Imports (from `@shared/`):** Use the configured path alias (`@shared/`) **without** the extension.
+    ```typescript
+    // Correct:
+    import { Lesson } from '@shared/models/Lesson';
+    ```
+-   **Node Modules:** Import from `node_modules` as usual (no extension).
+    ```typescript
+    import React from 'react';
+    ```
+-   **Reasoning:** Vite handles module resolution for the frontend and does not require extensions.
+
+### 4. Tests (`tests/**/*.ts`)
+
+-   **Imports of Source Code (`server/`, `shared/`, `frontend/`):** 
+    - Imports *from* `server/` using relative paths need `.js`.
+    - Imports *from* `shared/` using relative paths need `.js`.
+    - Imports *from* `shared/` using the `@shared/` alias need *no* extension.
+    - Imports *from* `frontend/` using relative paths need *no* extension.
+    ```typescript
+    // Correct:
+
+    import { Lesson } from '@shared/models/Lesson';    
+    ```
+-   **Imports of Test Utilities (within `tests/`):** Use relative paths **without** the extension.
+    ```typescript
+    // Correct (e.g., from within tests/api/lesson.test.ts):
+    import { createTestStudent } from './utils/user.utils';
+    ```
+-   **Node Modules:** Import from `node_modules` as usual (no extension).
+    ```typescript
+    // Examples:
+    import request from 'supertest';
+    import { v4 as uuidv4 } from 'uuid'; 
+    import { describe, it, expect, beforeAll } from '@jest/globals'; // Example Jest import
+    ```
+-   **Reasoning:** Jest (with `ts-jest`) uses `tsconfig.test.json`. It resolves test utilities and aliases without extensions. However, when importing compiled `.js` files from `server` or `shared` via relative paths, the `.js` is needed due to the underlying Node ESM runtime environment.
+
+# ... (summary table and final sentence) ...

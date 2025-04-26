@@ -26,6 +26,44 @@ enum AuthMethod {
   // Add more methods as needed
 }
 
+// --- Objective Models ---
+
+// Represents objectives set by students
+model Objective {
+  id            String   @id @default(uuid())
+  studentId     String
+  student       Student  @relation(fields: [studentId], references: [id])
+  lessonType    LessonType // Link to the lesson type
+  title         String
+  description   String
+  targetDate    DateTime // Target completion date for the objective
+  currentStatusId String?  @unique // Link to the current status record (Must be unique, but optional on Objective itself)
+  currentStatus   ObjectiveStatus? @relation("CurrentStatus", fields: [currentStatusId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  statuses      ObjectiveStatus[] // Relation to status history
+
+  @@index([studentId])
+  @@index([lessonType])
+}
+
+// Represents the status history of an objective
+model ObjectiveStatus {
+  id          String   @id @default(uuid())
+  objectiveId String
+  objective   Objective @relation(fields: [objectiveId], references: [id])
+  status      String   // e.g., CREATED, IN_PROGRESS, ACHIEVED, ABANDONED
+  context     Json?    // Optional context for the status change
+  createdAt   DateTime @default(now())
+
+  // Relation field for the current status link on Objective
+  currentObjective Objective? @relation("CurrentStatus")
+
+  @@index([objectiveId])
+  @@index([status])
+}
+
 // Teacher model for instructors
 model Teacher {
   id          String   @id @default(uuid())
@@ -55,6 +93,7 @@ model Student {
   
   // Relations
   lessonRequests LessonRequest[]
+  objectives     Objective[] // Add relation to objectives
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 }
@@ -76,7 +115,27 @@ model TeacherLessonHourlyRate {
   rateInCents   Int
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
-  deactivatedAt DateTime?
+
+  // Add Status Relations
+  currentStatusId String?  @unique 
+  currentStatus   TeacherLessonHourlyRateStatus? @relation("CurrentRateStatus", fields: [currentStatusId], references: [id])
+  statuses        TeacherLessonHourlyRateStatus[] // History
+}
+
+// New Status model for TeacherLessonHourlyRate
+model TeacherLessonHourlyRateStatus {
+  id        String   @id @default(uuid())
+  rateId    String
+  rate      TeacherLessonHourlyRate @relation(fields: [rateId], references: [id], onDelete: Cascade) // Link back to the rate
+  status    String   // ACTIVE, INACTIVE
+  context   Json?    // Optional context
+  createdAt DateTime @default(now())
+
+  // Relation field for the current status link on TeacherLessonHourlyRate
+  currentRate TeacherLessonHourlyRate? @relation("CurrentRateStatus")
+
+  @@index([rateId])
+  @@index([status])
 }
 
 // Address model for storing physical locations
@@ -126,12 +185,34 @@ model LessonQuote {
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
+  // Relations
   lessonRequest     LessonRequest @relation(fields: [lessonRequestId], references: [id])
   teacher           Teacher       @relation(fields: [teacherId], references: [id])
   Lesson            Lesson?       // Relation to the Lesson if quote is accepted
+  
+  // Status Relation Fields
+  currentStatusId String?           @unique
+  currentStatus   LessonQuoteStatus? @relation("CurrentQuoteStatus", fields: [currentStatusId], references: [id])
+  statuses        LessonQuoteStatus[] // History
 
   @@index([lessonRequestId])
   @@index([teacherId])
+}
+
+// Status model for LessonQuote
+model LessonQuoteStatus {
+  id            String   @id @default(uuid())
+  lessonQuoteId String   
+  lessonQuote   LessonQuote @relation(fields: [lessonQuoteId], references: [id])
+  status        String   // e.g., CREATED, ACCEPTED, REJECTED
+  context       Json?    // Optional context 
+  createdAt     DateTime @default(now())
+
+  // Relation field for the current status link on LessonQuote
+  currentLessonQuote LessonQuote? @relation("CurrentQuoteStatus")
+
+  @@index([lessonQuoteId])
+  @@index([status])
 }
 
 // Lesson model representing a confirmed music lesson

@@ -10,6 +10,9 @@ import compression from 'compression';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
+import { AppError } from './errors/index'; // Import base error
+// Import ZodError
+import { ZodError } from 'zod';
 
 // --- Debugging --- 
 // Moved debug logging setup earlier
@@ -88,6 +91,7 @@ import healthRoutes from './health/health.routes.js';
 import studentRoutes from './student/student.routes.js';
 import goalRoutes from './goal/goal.routes.js';
 import teacherLessonHourlyRateRoutes from './teacher-lesson-hourly-rate/teacherLessonHourlyRate.router.js';
+import objectiveRouter from './objective/objective.router.js';
 
 // --- Express App Setup --- 
 const app: Express = express();
@@ -202,7 +206,7 @@ app.get('/api/health', async (req: Request, res: Response, next: NextFunction): 
 
 // API Routes
 app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/auth', refreshTokenRoutes);
+app.use('/api/v1/refresh-token', refreshTokenRoutes);
 app.use('/api/v1/lesson-requests', lessonRequestRoutes);
 app.use('/api/v1/teachers', teacherRoutes);
 app.use('/api/v1/lessons', lessonRoutes);
@@ -212,23 +216,7 @@ app.use('/api/v1/goals', goalRoutes);
 app.use('/api/v1/health', healthRoutes);
 app.use('/api/v1/students', studentRoutes);
 app.use('/api/v1/teacher-lesson-rates', teacherLessonHourlyRateRoutes);
-
-// Root Documentation Endpoint
-app.get('/', (req: Request, res: Response, next: NextFunction): void => {
-  res.status(200).json({
-    message: 'Lessons Marketplace API Server',
-    endpoints: {
-      '/api/health': 'Check server health',
-      '/api/v1/auth': 'Authentication endpoints (v1)',
-      '/api/v1/lesson-requests': 'Lesson request endpoints (v1)',
-      '/api/v1/teachers': 'Teacher endpoints (v1)',
-      '/api/v1/lessons': 'Lesson endpoints (v1)',
-      '/api/v1/lesson-quotes': 'Lesson quotes endpoints (v1)',
-      '/api/v1/addresses': 'Address endpoints (v1)',
-      '/api/v1/students': 'Student endpoints (v1)'
-    }
-  });
-});
+app.use('/api/v1/objectives', objectiveRouter);
 
 // --- Error Handling --- 
 app.use((err: Error | any, req: Request, res: Response, next: NextFunction) => {
@@ -238,27 +226,55 @@ app.use((err: Error | any, req: Request, res: Response, next: NextFunction) => {
   console.error('Request URL:', req.originalUrl);
   console.error('Request Method:', req.method);
 
+  let statusCode = 500; // Default to 500
+  let errorMessage = 'Something went wrong!';
+  let errorDetails = undefined; // For Zod errors
+  let errorStack = undefined;
+
   // Log different properties depending on the error type
-  if (err instanceof Error) {
+  if (err instanceof ZodError) {
+    // Handle Zod validation errors
+    statusCode = 400; // Bad Request
+    // Use the first Zod issue to create a more specific main error message
+    const firstIssue = err.errors[0];
+    errorMessage = `Validation failed: ${firstIssue.message} at path [${firstIssue.path.join('.')}]`;
+    errorDetails = err.errors; // Extract detailed issues from ZodError
+    console.error('Zod Validation Error:', JSON.stringify(errorDetails, null, 2));
+    // No stack needed for typical validation errors
+  } else if (err instanceof Error) {
     console.error('Error Name:', err.name);
     console.error('Error Message:', err.message);
     console.error('Error Stack:', err.stack);
+    errorMessage = err.message; // Use the error's message
+    errorStack = err.stack;
+
+    // Check if it's an instance of our custom AppError or its subclasses
+    if ('status' in err && typeof (err as any).status === 'number') {
+      statusCode = (err as any).status;
+      console.error(`Error has status property: ${statusCode}`);
+    } else if (err instanceof AppError) {
+      statusCode = err.status;
+      console.error(`Error is instance of AppError, status: ${statusCode}`);
+    } else {
+      console.error('Error is a generic Error, defaulting to 500.');
+    }
   } else {
     // Log non-Error objects as best as possible
     console.error('Caught non-Error object:', err);
   }
 
-  // Ensure response status is set, even if error occurred before setting status
+  // Ensure response status is set
   if (!res.headersSent) {
-    res.status(err.status || 500).json({
-      error: err.message || 'Something went wrong!',
-      // Optionally include stack in development
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    res.status(statusCode).json({
+      error: errorMessage,
+      // Include Zod details if present
+      details: errorDetails,
+      // Optionally include stack in development for non-Zod errors
+      stack: process.env.NODE_ENV === 'development' && !errorDetails ? errorStack : undefined
     });
   } else {
-    // If headers were already sent, we can only close the connection
     console.error('[GLOBAL ERROR HANDLER] Headers already sent, cannot send JSON error response.');
-    next(err); // Delegate to default Express error handler if possible
+    next(err);
   }
 });
 

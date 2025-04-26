@@ -1,7 +1,16 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { studentService } from './student.service.js';
 import authService, { AuthMethod } from '../auth/auth.service.js';
 import { UserType } from '../../shared/models/UserType.js';
+import { AuthorizationError } from '../errors/index.js';
+
+// Define AuthenticatedRequest interface (or import if central)
+interface AuthenticatedRequest extends Request {
+    user?: {
+        id: string;
+        userType: UserType; // Use shared UserType
+    };
+}
 
 /**
  * Controller for student-related operations.
@@ -20,6 +29,13 @@ export const studentController = {
             // Basic validation
             if (!email || !password || !firstName || !lastName || !phoneNumber || !dateOfBirth) {
                 res.status(400).json({ message: 'Missing required fields for student creation.' });
+                return;
+            }
+
+            // Phone number format validation (simple example: allows digits, hyphens, spaces, parentheses, +)
+            const phoneRegex = /^[\d\s\(\)\-\+]+$/;
+            if (typeof phoneNumber !== 'string' || !phoneRegex.test(phoneNumber)) {
+                res.status(400).json({ message: 'Invalid phone number format.' });
                 return;
             }
 
@@ -68,31 +84,46 @@ export const studentController = {
      * Get student details by ID.
      * @param req Request object containing student ID in params.
      * @param res Response object.
+     * @param next Next function for error handling.
      */
-    async getStudentById(req: Request, res: Response): Promise<void> {
+    async getStudentById(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
         try {
-            const { id } = req.params;
+            const { id: requestedStudentId } = req.params; // Rename for clarity
+            const authenticatedUser = req.user; // Get authenticated user info
 
-            if (!id) {
+            // Basic validation (already required by authMiddleware)
+            if (!authenticatedUser) {
+                // Should not happen if authMiddleware runs first, but defensive
+                return next(new Error('Internal error: User data missing after authentication.'));
+            }
+
+            if (!requestedStudentId) {
                 res.status(400).json({ message: 'Student ID is required.' });
                 return;
             }
 
-            const student = await studentService.findById(id);
+            // Fetch student data
+            const student = await studentService.findById(requestedStudentId);
 
             if (!student) {
                 res.status(404).json({ message: 'Student not found.' });
                 return;
             }
 
+            // --- Authorization Check: Resource Ownership --- 
+            // If the authenticated user is a STUDENT, they can only get their own profile.
+            if (authenticatedUser.userType === UserType.STUDENT && authenticatedUser.id !== requestedStudentId) {
+                // Throwing an error will be caught and handled by the error middleware (usually returning 403)
+                return next(new AuthorizationError('Forbidden: Students can only retrieve their own profile.'));
+            }
+            // Teachers are allowed based on the checkRole middleware in the routes file.
+            // --- End Authorization Check --- 
+
             res.status(200).json(student);
         } catch (error) {
             console.error('Error in studentController.getStudentById:', error);
-            if (error instanceof Error) {
-                res.status(400).json({ message: `Bad Request: ${error.message}` });
-            } else {
-                res.status(500).json({ message: 'Internal server error while fetching student.' });
-            }
+            // Pass error to the central error handler
+            next(error);
         }
     }
 }; 

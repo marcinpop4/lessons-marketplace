@@ -5,6 +5,8 @@ import { lessonService } from '../lesson/lesson.service.js'; // Import LessonSer
 import { lessonRequestService } from '../lessonRequest/lessonRequest.service.js'; // Import LessonRequestService
 import { LessonType as SharedLessonType } from '@shared/models/LessonType.js'; // Alias for clarity
 import { lessonController } from '../lesson/lesson.controller.js'; // Import lessonController
+import { LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus.js';
+import { UserType } from '@shared/models/UserType.js'; // Import UserType enum
 
 // const prismaClient = new PrismaClient(); // Remove unused
 
@@ -13,72 +15,106 @@ import { lessonController } from '../lesson/lesson.controller.js'; // Import les
  */
 export const lessonQuoteController = {
   /**
-   * Create quotes for a lesson request
-   * Requires STUDENT role.
-   * @param req Request with lessonRequestId in the body
+   * POST /
+   * Create a single quote for a lesson request.
+   * Requires TEACHER role.
+   * @param req Request with { lessonRequestId, costInCents, hourlyRateInCents } in the body
    * @param res Response
    */
-  createLessonQuotes: async (req: Request, res: Response): Promise<void> => {
+  createLessonQuote: async (req: Request, res: Response): Promise<void> => {
     try {
-      const { lessonRequestId } = req.body;
-      // No lessonType needed here, service should derive it from request
+      const { lessonRequestId, costInCents, hourlyRateInCents } = req.body;
+      const teacherId = req.user?.id; // Get teacher ID from authenticated user
 
-      if (!lessonRequestId) {
-        res.status(400).json({ message: 'Missing required field: lessonRequestId.' });
+      if (!lessonRequestId || !costInCents || !hourlyRateInCents) {
+        res.status(400).json({ message: 'Missing required fields: lessonRequestId, costInCents, hourlyRateInCents.' });
+        return;
+      }
+      if (!teacherId) {
+        res.status(401).json({ error: 'Unauthorized - Teacher ID not found on request' });
         return;
       }
 
-      // Check if Lesson Request exists using the service
+      // Check if Lesson Request exists
       const lessonRequest = await lessonRequestService.getLessonRequestById(lessonRequestId);
-
       if (!lessonRequest) {
         res.status(404).json({ message: `Lesson request with ID ${lessonRequestId} not found.` });
         return;
       }
 
-      // Pass lesson type to the service
-      const quotes = await lessonQuoteService.createQuotesForLessonRequest(
-        lessonRequestId,
-        lessonRequest.type as SharedLessonType // Use type from fetched request
-      );
+      // TODO: Consider adding check: Prevent teacher from quoting their own request if applicable
+      // TODO: Consider adding check: Prevent multiple quotes by same teacher for same request?
 
-      // Respond with 200 OK as we are returning existing/newly created quotes
-      res.status(200).json(quotes);
-    } catch (error) {
-      console.error('Error creating lesson quotes:', error);
-      res.status(500).json({
-        message: 'An error occurred while creating lesson quotes',
-        error: error instanceof Error ? error.message : 'Unknown error'
+      // Call the service to create a *single* quote
+      const quote = await lessonQuoteService.create({
+        lessonRequestId,
+        teacherId,
+        costInCents,
+        hourlyRateInCents,
       });
+
+      if (!quote) {
+        // Handle potential null return from service if creation failed gracefully
+        res.status(500).json({ message: 'Failed to create lesson quote in service.' });
+        return;
+      }
+
+      res.status(201).json(quote); // Return the single created quote with 201 Created
+    } catch (error) {
+      console.error('Error creating lesson quote:', error);
+      // Handle potential Prisma constraint errors (e.g., unique quote per teacher/request)
+      if (error instanceof Error && (error as any).code === 'P2002') {
+        res.status(409).json({ message: 'Conflict: A quote from this teacher for this request may already exist.' });
+      } else {
+        res.status(500).json({
+          message: 'An error occurred while creating the lesson quote',
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
     }
   },
 
   /**
-   * Get quotes for a lesson request
-   * Requires authentication.
-   * @param req Request with lessonRequestId as a route parameter
+   * GET /
+   * Get quotes, filtered by query parameters (lessonRequestId is required).
+   * Requires STUDENT or TEACHER role.
+   * @param req Request with lessonRequestId as a query parameter
    * @param res Response
    */
-  getLessonQuotesByRequestId: async (req: Request, res: Response): Promise<void> => {
+  getLessonQuotes: async (req: Request, res: Response): Promise<void> => {
     try {
-      const { lessonRequestId } = req.params;
+      const { lessonRequestId } = req.query;
+      const userId = req.user?.id;
+      const userType = req.user?.userType;
 
-      if (!lessonRequestId) {
-        res.status(400).json({ error: 'Lesson request ID is required' });
+      if (!lessonRequestId || typeof lessonRequestId !== 'string') {
+        res.status(400).json({ error: 'lessonRequestId query parameter is required' });
+        return;
+      }
+      if (!userId || !userType) {
+        res.status(401).json({ error: 'Unauthorized - User details not found on request' });
         return;
       }
 
-      // Check if Lesson Request exists using the service
-      const lessonRequestExists = await lessonRequestService.getLessonRequestById(lessonRequestId);
-
-      if (!lessonRequestExists) {
+      // Check if the lesson request exists *and* if the user is authorized to view its quotes
+      const lessonRequest = await lessonRequestService.getLessonRequestById(lessonRequestId);
+      if (!lessonRequest) {
         res.status(404).json({ message: `Lesson request with ID ${lessonRequestId} not found.` });
         return;
       }
 
-      // Use the service to get quotes
+      // Authorization check: Student must own the request, Teacher can view any request (for now)
+      // TODO: Refine Teacher authorization - should they only see quotes they created for this request?
+      if (userType === UserType.STUDENT && lessonRequest.student?.id !== userId) {
+        res.status(403).json({ error: 'Forbidden: You can only view quotes for your own lesson requests.' });
+        return;
+      }
+
+      // Fetch quotes using the service
+      // TODO: Service might need userId/userType for filtering in the future
       const quotes = await lessonQuoteService.getQuotesByLessonRequest(lessonRequestId);
       res.status(200).json(quotes);
+
     } catch (error) {
       console.error('Error fetching lesson quotes:', error);
       res.status(500).json({ error: 'Failed to fetch lesson quotes' });
@@ -86,58 +122,84 @@ export const lessonQuoteController = {
   },
 
   /**
-   * Accept a lesson quote and create a corresponding lesson.
-   * Requires STUDENT role.
-   * @param req Request with quoteId as a route parameter
+   * PATCH /:quoteId
+   * Update a lesson quote status (e.g., accept, reject, withdraw).
+   * Requires STUDENT or TEACHER role.
+   * Expects body: { status: LessonQuoteStatusValue, context?: any }
+   * @param req Request with quoteId as route param and status/context in body
    * @param res Response
    */
-  acceptQuote: async (req: Request, res: Response): Promise<void> => {
+  updateLessonQuoteStatus: async (req: Request, res: Response): Promise<void> => {
     const { quoteId } = req.params;
+    const { status, context } = req.body;
     const userId = req.user?.id;
-    // We already check role in middleware, so userType check isn't strictly needed here
-    // const userType = req.user?.userType;
+    const userType = req.user?.userType;
 
+    // Basic validation
     if (!quoteId) {
       res.status(400).json({ error: 'Missing quoteId parameter' });
       return;
     }
-    if (!userId) {
-      // This case should ideally be caught by authMiddleware, but good practice to check
-      res.status(401).json({ error: 'Unauthorized - User ID not found on request' });
+    if (!status || !Object.values(LessonQuoteStatusValue).includes(status)) {
+      res.status(400).json({ error: `Invalid or missing status in request body. Must be one of: ${Object.values(LessonQuoteStatusValue).join(', ')}` });
+      return;
+    }
+    if (!userId || !userType) {
+      res.status(401).json({ error: 'Unauthorized - User details not found on request' });
       return;
     }
 
     try {
-      // Use the service to fetch the quote for checks
-      const quote = await lessonQuoteService.getQuoteForAcceptanceCheck(quoteId);
+      // Fetch the quote and related data for authorization and logic
+      // TODO: Service method might need more includes (e.g., teacherId on quote)
+      const quoteForCheck = await lessonQuoteService.getQuoteForAcceptanceCheck(quoteId);
 
-      if (!quote) {
+      if (!quoteForCheck) {
         res.status(404).json({ error: `Quote with ID ${quoteId} not found.` });
         return;
       }
 
-      // Check ownership
-      if (quote.lessonRequest?.studentId !== userId) {
-        res.status(403).json({ error: 'Forbidden: You can only accept quotes for your own lesson requests.' });
+      // Authorization: Student must own the request, Teacher must own the quote
+      const isStudentOwner = userType === UserType.STUDENT && quoteForCheck.lessonRequest?.studentId === userId;
+      // Assuming quoteForCheck will eventually include teacherId via service update
+      const isTeacherOwner = userType === UserType.TEACHER && (quoteForCheck as any).teacherId === userId;
+
+      if (!isStudentOwner && !isTeacherOwner) {
+        res.status(403).json({ error: 'Forbidden: You are not authorized to update this quote.' });
         return;
       }
 
-      // Check if quote is already associated with a lesson
-      if (quote.Lesson) { // Prisma includes relation as model name (Lesson)
-        res.status(409).json({ error: 'Conflict: This quote has already been accepted and has an associated lesson.' });
+      // Role-specific action validation (rough examples)
+      if (isStudentOwner && status === LessonQuoteStatusValue.CREATED) {
+        // Students can't revert to CREATED
+        res.status(400).json({ error: 'Invalid action: Student cannot set status to CREATED.' });
+        return;
+      }
+      if (isTeacherOwner && (status === LessonQuoteStatusValue.ACCEPTED)) {
+        // Teachers can't accept/reject quotes
+        res.status(400).json({ error: 'Invalid action: Teacher cannot set status to ACCEPTED.' });
         return;
       }
 
-      // Use LessonService to create the lesson
-      const createdLesson = await lessonService.create(quoteId);
+      // Conflict check for accepting an already accepted quote
+      if (status === LessonQuoteStatusValue.ACCEPTED && quoteForCheck.Lesson) {
+        res.status(409).json({ error: 'Conflict: This quote has already been accepted.' });
+        return;
+      }
 
-      // Send the Lesson model instance directly
-      res.status(200).json(createdLesson);
+      // --- Perform Action based on Status --- 
+
+      if (status === LessonQuoteStatusValue.ACCEPTED && isStudentOwner) {
+        // Student accepts: Create the lesson
+        const createdLesson = await lessonService.create(quoteId);
+        // TODO: Also update the LessonQuote status via lessonQuoteService
+        res.status(200).json(createdLesson); // Return the created lesson
+
+      }
 
     } catch (error) {
-      console.error('Error accepting quote:', error);
-      // Handle potential specific errors from the service if necessary
-      res.status(500).json({ error: 'Failed to accept lesson quote' });
+      console.error(`Error updating status for quote ${quoteId}:`, error);
+      res.status(500).json({ error: 'Failed to update lesson quote status' });
     }
   },
 

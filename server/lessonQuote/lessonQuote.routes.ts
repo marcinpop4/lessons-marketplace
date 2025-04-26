@@ -6,13 +6,13 @@ import { UserType } from '../../shared/models/UserType.js';
 
 const router: Router = express.Router();
 
-// Create quotes for a lesson request (Student only)
-router.post('/create-quotes', authMiddleware, checkRole([UserType.STUDENT]), lessonQuoteController.createLessonQuotes);
+// POST /api/v1/lesson-quotes - Create a quote for a lesson request (Teacher only)
+router.post('/', authMiddleware, checkRole([UserType.TEACHER]), lessonQuoteController.createLessonQuote);
 
-// Get quotes for a lesson request (Any authenticated user)
-router.get('/request/:lessonRequestId', authMiddleware, lessonQuoteController.getLessonQuotesByRequestId);
+// GET /api/v1/lesson-quotes - Get quotes (filtered by query params) (Student or Teacher)
+router.get('/', authMiddleware, checkRole([UserType.STUDENT, UserType.TEACHER]), lessonQuoteController.getLessonQuotes);
 
-// Accept a quote (Student only)
-router.post('/:quoteId/accept', authMiddleware, checkRole([UserType.STUDENT]), lessonQuoteController.acceptQuote);
+// PATCH /api/v1/lesson-quotes/:quoteId - Update a quote's status (Student accepts/rejects, Teacher withdraws/modifies)
+router.patch('/:quoteId', authMiddleware, checkRole([UserType.STUDENT, UserType.TEACHER]), lessonQuoteController.updateLessonQuoteStatus);
 
 export default router; 

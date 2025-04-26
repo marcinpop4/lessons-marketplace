@@ -2,6 +2,9 @@ import { Request, Response, NextFunction } from 'express';
 import { teacherLessonHourlyRateService } from './teacherLessonHourlyRate.service.js';
 import { LessonType } from '../../shared/models/LessonType.js';
 import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourlyRate.js';
+// Import status transition enum
+import { TeacherLessonHourlyRateStatusTransition } from '../../shared/models/TeacherLessonHourlyRateStatus.js';
+import { BadRequestError, NotFoundError, ConflictError } from '../errors/index.js';
 
 // Match error messages defined in the service
 const ServiceErrors = {
@@ -12,6 +15,9 @@ const ServiceErrors = {
     RATE_ALREADY_ACTIVE: 'Lesson rate is already active.',
     RATE_CONFLICT_PREFIX: 'Another rate for type' // Prefix for the dynamic conflict message
 };
+
+// Basic UUID validation regex
+const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 /**
  * Controller for Teacher Lesson Hourly Rate operations
@@ -25,117 +31,73 @@ export const teacherLessonHourlyRateController = {
         try {
             const teacherId = req.user?.id;
             if (!teacherId) {
+                // Using throw new AuthError() pattern might be better with central handler
                 res.status(401).json({ message: 'Unauthorized' });
                 return;
             }
 
             const { lessonType, rateInCents } = req.body;
 
-            // Basic validation (more specific validation is in the service)
-            if (!lessonType || !Object.values(LessonType).includes(lessonType)) {
-                res.status(400).json({
-                    message: `Invalid or missing lesson type. Must be one of: ${Object.values(LessonType).join(', ')}`
-                });
-                return;
-            }
-            if (rateInCents == null || isNaN(rateInCents) || rateInCents <= 0) {
-                res.status(400).json({ message: 'Rate must be a positive number' });
-                return;
-            }
+            // Use service layer for all validation as per architecture rules
+            const result = await teacherLessonHourlyRateService.createOrUpdateLessonRate(teacherId, lessonType, rateInCents);
 
-            const resultRate: TeacherLessonHourlyRate = await teacherLessonHourlyRateService.findOrCreateOrUpdate(teacherId, lessonType, rateInCents);
-            res.status(200).json(resultRate);
+            // Set status code based on whether the rate was created or updated
+            const statusCode = result.wasCreated ? 201 : 200;
+            res.status(statusCode).json(result.rate);
 
         } catch (error) {
-            console.error('[Controller Error] createOrUpdate:', error);
-            if (error instanceof Error) {
-                // Map service error messages to HTTP status codes
-                if (error.message === ServiceErrors.TEACHER_NOT_FOUND || error.message === ServiceErrors.RATE_NOT_FOUND_OR_ACCESS_DENIED) {
-                    res.status(404).json({ message: error.message });
-                } else if (error.message === ServiceErrors.MISSING_DATA) {
-                    res.status(400).json({ message: error.message });
-                } else if (error.message.includes('Conflict:')) { // Catch conflict errors from service
-                    res.status(409).json({ message: error.message });
-                } else {
-                    // Default to 500 for other errors from service or unexpected issues
-                    res.status(500).json({ message: error.message || 'An internal server error occurred.' });
-                }
-            } else {
-                res.status(500).json({ message: 'An unknown internal server error occurred' });
-            }
+            // Pass errors to the central error handler
+            next(error);
         }
     },
 
     /**
-     * Deactivate a lesson hourly rate for the authenticated teacher.
+     * Update the status of a lesson hourly rate (Activate/Deactivate).
      */
+    updateStatus: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const teacherId = req.user?.id;
+            const { rateId } = req.params;
+            const { transition, context } = req.body; // Expect transition (ACTIVATE/DEACTIVATE)
+
+            if (!teacherId) {
+                res.status(401).json({ message: 'Unauthorized' }); // Or throw AuthError
+                return;
+            }
+
+            // Validate rateId format
+            if (!rateId || !UUID_REGEX.test(rateId)) {
+                throw new BadRequestError('Invalid or missing rate ID format in URL. Must be a valid UUID.');
+            }
+
+            // Validate transition value
+            if (!transition || !Object.values(TeacherLessonHourlyRateStatusTransition).includes(transition)) {
+                throw new BadRequestError(`Invalid or missing transition. Must be one of: ${Object.values(TeacherLessonHourlyRateStatusTransition).join(', ')}`);
+            }
+
+            // Call the new service method
+            const updatedRate = await teacherLessonHourlyRateService.updateLessonRateStatus(
+                teacherId,
+                rateId,
+                transition as TeacherLessonHourlyRateStatusTransition,
+                context // Pass context along if provided
+            );
+
+            res.status(200).json(updatedRate);
+
+        } catch (error) {
+            // Pass errors (BadRequestError, NotFoundError, ConflictError etc.) to central handler
+            next(error);
+        }
+    },
+
+    // Remove old deactivate and reactivate methods
+    /*
     deactivate: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const teacherId = req.user?.id;
-            const { rateId } = req.params;
-
-            if (!teacherId) {
-                res.status(401).json({ message: 'Unauthorized' });
-                return;
-            }
-            if (!rateId) {
-                res.status(400).json({ message: 'Missing rate ID in URL' });
-                return;
-            }
-
-            const deactivatedRate: TeacherLessonHourlyRate = await teacherLessonHourlyRateService.deactivate(teacherId, rateId);
-            res.status(200).json(deactivatedRate);
-
-        } catch (error) {
-            console.error('[Controller Error] deactivate:', error);
-            if (error instanceof Error) {
-                if (error.message === ServiceErrors.RATE_NOT_FOUND_OR_ACCESS_DENIED) {
-                    res.status(404).json({ message: error.message });
-                } else if (error.message === ServiceErrors.RATE_ALREADY_DEACTIVATED) {
-                    res.status(409).json({ message: error.message }); // Conflict
-                } else {
-                    res.status(500).json({ message: error.message || 'An error occurred while deactivating the lesson rate.' });
-                }
-            } else {
-                res.status(500).json({ message: 'An unknown error occurred' });
-            }
-        }
+        // ... old implementation ...
     },
-
-    /**
-     * Reactivate a previously deactivated lesson hourly rate for the authenticated teacher.
-     */
     reactivate: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const teacherId = req.user?.id;
-            const { rateId } = req.params;
-
-            if (!teacherId) {
-                res.status(401).json({ message: 'Unauthorized' });
-                return;
-            }
-            if (!rateId) {
-                res.status(400).json({ message: 'Missing rate ID in URL' });
-                return;
-            }
-
-            const reactivatedRate: TeacherLessonHourlyRate = await teacherLessonHourlyRateService.reactivate(teacherId, rateId);
-            res.status(200).json(reactivatedRate);
-
-        } catch (error) {
-            console.error('[Controller Error] reactivate:', error);
-            if (error instanceof Error) {
-                if (error.message === ServiceErrors.RATE_NOT_FOUND_OR_ACCESS_DENIED) {
-                    res.status(404).json({ message: error.message });
-                } else if (error.message === ServiceErrors.RATE_ALREADY_ACTIVE || error.message.startsWith(ServiceErrors.RATE_CONFLICT_PREFIX)) {
-                    // Handle both already active and conflict with another active rate
-                    res.status(409).json({ message: error.message }); // Conflict
-                } else {
-                    res.status(500).json({ message: error.message || 'An error occurred while reactivating the lesson rate.' });
-                }
-            } else {
-                res.status(500).json({ message: 'An unknown error occurred' });
-            }
-        }
+        // ... old implementation ...
     },
+    */
 }; 

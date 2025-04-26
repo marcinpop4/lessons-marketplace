@@ -2,6 +2,7 @@ import { LessonRequest } from './LessonRequest.js';
 import { Teacher } from './Teacher.js';
 import { centsToDisplayDollars } from '../types/CurrencyTypes.js';
 import { LessonType } from './LessonType.js';
+import { LessonQuoteStatus, LessonQuoteStatusValue } from './LessonQuoteStatus.js';
 
 /**
  * Properties required to create a LessonQuote instance.
@@ -12,6 +13,8 @@ interface LessonQuoteProps {
   teacher: Teacher;
   costInCents: number;
   hourlyRateInCents: number;
+  currentStatusId: string | null;
+  currentStatus: LessonQuoteStatus | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -26,6 +29,8 @@ export class LessonQuote {
   teacher: Teacher;
   costInCents: number;
   hourlyRateInCents: number;
+  currentStatusId: string | null;
+  currentStatus: LessonQuoteStatus | null;
   createdAt?: Date;
   updatedAt?: Date;
 
@@ -36,6 +41,8 @@ export class LessonQuote {
     teacher,
     costInCents,
     hourlyRateInCents,
+    currentStatusId,
+    currentStatus,
     createdAt,
     updatedAt,
   }: LessonQuoteProps) {
@@ -44,43 +51,25 @@ export class LessonQuote {
     this.teacher = teacher;
     this.costInCents = costInCents;
     this.hourlyRateInCents = hourlyRateInCents;
-    this.createdAt = createdAt;
-    this.updatedAt = updatedAt;
-  }
+    this.currentStatusId = currentStatusId;
 
-  /**
-   * Create a LessonQuote from a LessonRequest and a Teacher
-   * Automatically calculates the cost based on teacher's hourly rate
-   * @param id Unique identifier for the quote
-   * @param lessonRequest The lesson request
-   * @param teacher The teacher providing the quote
-   * @returns A new LessonQuote instance
-   */
-  static createFromRequest(
-    id: string,
-    lessonRequest: LessonRequest,
-    teacher: Teacher,
-  ): LessonQuote {
-    const hourlyRate = teacher.getHourlyRate(lessonRequest.type);
+    if (!currentStatus || !(currentStatus instanceof LessonQuoteStatus)) {
+      console.warn(`LessonQuote constructor (id: ${id}) received invalid currentStatus prop`, currentStatus);
+      this.currentStatus = new LessonQuoteStatus({
+        id: currentStatusId || 'unknown',
+        lessonQuoteId: id,
+        status: LessonQuoteStatusValue.CREATED,
+        createdAt: createdAt || new Date()
+      });
+      if (this.currentStatus.id === 'unknown') this.currentStatusId = null;
+      else this.currentStatusId = this.currentStatus.id;
 
-    if (!hourlyRate) {
-      throw new Error(`Teacher does not offer lessons of type: ${lessonRequest.type}`);
+    } else {
+      this.currentStatus = currentStatus;
     }
 
-    const costInCents = Math.round(
-      (hourlyRate.rateInCents * lessonRequest.durationMinutes) / 60
-    );
-
-    // Use the new constructor pattern
-    return new LessonQuote({
-      id,
-      lessonRequest,
-      teacher,
-      costInCents,
-      hourlyRateInCents: hourlyRate.rateInCents,
-      // createdAt uses default
-      updatedAt: new Date(), // updatedAt uses default
-    });
+    this.createdAt = createdAt;
+    this.updatedAt = updatedAt;
   }
 
   /**

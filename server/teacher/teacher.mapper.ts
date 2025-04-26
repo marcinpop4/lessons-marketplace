@@ -4,6 +4,8 @@ import { TeacherLessonHourlyRateMapper } from '../teacher-lesson-hourly-rate/tea
 
 // Import Prisma types with correct aliases
 import type { Teacher as DbTeacher, TeacherLessonHourlyRate as DbTeacherLessonHourlyRate } from '@prisma/client';
+// Explicitly import the Status type as well
+import { TeacherLessonHourlyRateStatus as DbTeacherLessonHourlyRateStatus } from '@prisma/client';
 
 /**
  * Maps between Prisma Teacher objects and shared Teacher models.
@@ -13,12 +15,12 @@ export class TeacherMapper {
      * Maps a Prisma Teacher object (and optionally its related hourly rates)
      * to a shared Teacher model instance.
      * @param dbTeacher The plain Teacher object from Prisma.
-     * @param dbTeacherLessonHourlyRates Optional array of plain TeacherLessonHourlyRate objects from Prisma.
+     * @param dbTeacherLessonHourlyRates Optional array of Prisma TeacherLessonHourlyRate objects, potentially including their currentStatus.
      * @returns A new instance of the shared Teacher model.
      */
     public static toModel(
         dbTeacher: DbTeacher, // Use correct alias
-        dbTeacherLessonHourlyRates?: DbTeacherLessonHourlyRate[] // Use correct alias
+        dbTeacherLessonHourlyRates?: (DbTeacherLessonHourlyRate & { currentStatus?: DbTeacherLessonHourlyRateStatus | null })[] // Use correct alias
     ): Teacher {
         // Remove destructuring
         // const { password, isActive, authMethods, createdAt, updatedAt, ...teacherProps } = dbTeacher;
@@ -26,9 +28,11 @@ export class TeacherMapper {
         // Transform date
         const dateOfBirth = new Date(dbTeacher.dateOfBirth);
 
-        // Transform hourly rates using the TeacherLessonHourlyRateMapper
+        // Map rates, passing both the rate and its status (if available) to the rate mapper
         const transformedRates = dbTeacherLessonHourlyRates
-            ? dbTeacherLessonHourlyRates.map(dbRate => TeacherLessonHourlyRateMapper.toModel(dbRate))
+            ? dbTeacherLessonHourlyRates.map(dbRate =>
+                TeacherLessonHourlyRateMapper.toModel(dbRate, dbRate.currentStatus) // Pass status to rate mapper
+            )
             : [];
 
         // Construct the shared model instance using the Teacher constructor, accessing props directly

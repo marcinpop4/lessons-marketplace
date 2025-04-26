@@ -1,150 +1,199 @@
 import request from 'supertest';
 import { Address } from '@shared/models/Address'; // Shared model for response structure
-// import { LessonType } from '@prisma/client'; // No longer needed for setup
 import { v4 as uuidv4 } from 'uuid'; // For generating fake IDs
+import { UserType } from '@shared/models/UserType'; // Needed for login util
+import { Student } from '@shared/models/Student'; // Needed for user util type
+import { Teacher } from '@shared/models/Teacher'; // Needed for user util type
 
-// Seeded user credentials (needed for auth token)
-const SEEDED_STUDENT_EMAIL = 'ethan.parker@example.com'; // From seed.js
-const SEEDED_PASSWORD = '1234'; // From seed.js
+// Import user utilities
+import { createTestStudent, loginTestUser, createTestTeacher } from './utils/user.utils';
+// Import address utilities
+import { createAddress, getAddressById, createAddressUnauthenticated, getAddressByIdUnauthenticated } from './utils/address.utils'; // Corrected import path
 
-// API Base URL from environment variables (set up by jest.setup.api.ts)
-const API_BASE_URL = process.env.VITE_API_BASE_URL;
+// REMOVED: Seeded user credentials no longer needed
+// const SEEDED_STUDENT_EMAIL = 'ethan.parker@example.com';
+// const SEEDED_PASSWORD = '1234';
 
-if (!API_BASE_URL) {
-    throw new Error('Missing required environment variable: VITE_API_BASE_URL. Ensure .env.api-test is loaded correctly.');
-}
+// API Base URL check moved to utils, removed from here
+// const API_BASE_URL = process.env.VITE_API_BASE_URL;
 
+// if (!API_BASE_URL) {
+//    throw new Error('Missing required environment variable: VITE_API_BASE_URL. Ensure .env.api-test is loaded correctly.');
+// }
+
+// Main describe block for the Address resource
 describe('API Integration: /api/v1/addresses', () => {
-    let createdAddressIdForGetTest: string | null = null;
-    let studentAuthToken: string | null = null; // Auth token for authenticated requests
+    // Variables for users created once for the suite
+    let testStudent1: Student;
+    let student1AccessToken: string;
+    let testTeacher1: Teacher; // Use Teacher type
+    let teacher1AccessToken: string; // Add teacher token variable
 
-    // Test data for POST requests
-    const testAddressData = {
-        street: '123 API Test St',
-        city: 'Postville',
-        state: 'PV',
-        postalCode: '11223',
-        country: 'Postland'
-    };
+    // REMOVED: Address ID created in old beforeAll
+    // let createdAddressIdForGetTest: string | null = null;
 
-    // Setup: Login as student to get auth token
+    // Shared setup: Create and log in users
     beforeAll(async () => {
         try {
-            const loginResponse = await request(API_BASE_URL!)
-                .post('/api/v1/auth/login')
-                .send({ email: SEEDED_STUDENT_EMAIL, password: SEEDED_PASSWORD, userType: 'STUDENT' });
+            // Create/Login Student
+            const { user: studentUser, password } = await createTestStudent();
+            testStudent1 = studentUser;
+            student1AccessToken = await loginTestUser(testStudent1.email, password, UserType.STUDENT);
 
-            if (loginResponse.status !== 200 || !loginResponse.body.accessToken) {
-                throw new Error(`Failed to log in as student ${SEEDED_STUDENT_EMAIL}: ${loginResponse.body.error || 'Login endpoint failed'}`);
-            }
-            studentAuthToken = `Bearer ${loginResponse.body.accessToken}`;
-
-            // Create an address specifically for the GET tests using the new POST endpoint
-            const postResponse = await request(API_BASE_URL!)
-                .post('/api/v1/addresses')
-                .set('Authorization', studentAuthToken)
-                .send(testAddressData);
-
-            if (postResponse.status !== 201 || !postResponse.body.id) {
-                throw new Error('Failed to create address via POST during test setup.');
-            }
-            createdAddressIdForGetTest = postResponse.body.id;
+            // Create/Login Teacher
+            const { user: teacherUser, password: teacherPassword } = await createTestTeacher();
+            testTeacher1 = teacherUser as Teacher; // Cast to Teacher type
+            teacher1AccessToken = await loginTestUser(testTeacher1.email, teacherPassword, UserType.TEACHER);
 
         } catch (error) {
+            console.error("Failed setup in beforeAll:", error);
             throw error; // Fail fast if setup fails
         }
-    }, 30000); // Reduced timeout slightly as it's just login + 1 request
+    }); // REMOVED explicit timeout, using Jest default
+
+    // Test data for POST/GET tests - define once
+    const testAddressData = {
+        street: '456 Refactor Ave',
+        city: 'Utilville',
+        state: 'UT',
+        postalCode: '99887',
+        country: 'Refactorland'
+    };
 
     // --- Tests for POST / --- //
     describe('POST /', () => {
-        it('should create a new address successfully (201)', async () => {
-            if (!studentAuthToken) throw new Error('Auth token not available');
+        it('should create a new address successfully for an authenticated student (201)', async () => {
+            if (!student1AccessToken) throw new Error('Student 1 auth token not available for POST test');
 
-            const response = await request(API_BASE_URL!)
-                .post('/api/v1/addresses')
-                .set('Authorization', studentAuthToken)
-                .send(testAddressData);
+            // Use the utility function
+            const response = await createAddress(student1AccessToken, testAddressData);
 
             expect(response.status).toBe(201);
             expect(response.headers['content-type']).toMatch(/application\/json/);
 
             const createdAddress: Address = response.body;
             expect(createdAddress).toBeDefined();
-            expect(createdAddress.id).toBeDefined(); // Should have a generated ID
+            expect(createdAddress.id).toBeDefined();
             expect(createdAddress.street).toEqual(testAddressData.street);
             expect(createdAddress.city).toEqual(testAddressData.city);
             expect(createdAddress.state).toEqual(testAddressData.state);
             expect(createdAddress.postalCode).toEqual(testAddressData.postalCode);
             expect(createdAddress.country).toEqual(testAddressData.country);
-            // Timestamps should exist
             expect(createdAddress.createdAt).toBeDefined();
             expect(createdAddress.updatedAt).toBeDefined();
         });
 
         it('should return 401 Unauthorized if no token is provided', async () => {
-            const response = await request(API_BASE_URL!)
-                .post('/api/v1/addresses')
-                .send(testAddressData); // No Authorization header
+            // Use the unauthenticated utility function
+            const response = await createAddressUnauthenticated(testAddressData);
 
             expect(response.status).toBe(401);
         });
 
         it('should return 400 Bad Request if required fields are missing (e.g., city)', async () => {
-            if (!studentAuthToken) throw new Error('Auth token not available');
+            if (!student1AccessToken) throw new Error('Student 1 auth token not available for POST test');
 
-            const incompleteData = { ...testAddressData };
-            delete (incompleteData as any).city; // Remove city
+            const incompleteData = { ...testAddressData }; // Clone test data
+            delete (incompleteData as any).city; // Intentionally remove a field
 
-            const response = await request(API_BASE_URL!)
-                .post('/api/v1/addresses')
-                .set('Authorization', studentAuthToken)
-                .send(incompleteData);
+            // Use the utility function
+            const response = await createAddress(student1AccessToken, incompleteData);
 
             expect(response.status).toBe(400);
-            expect(response.body.message).toContain('Missing required address fields');
+            // The actual error message might come from validation middleware or the controller/service
+            // Assert against the specific message received
+            expect(response.body.message || response.body.error).toContain('Missing required address fields.');
         });
 
-        // Add more tests for other missing fields if desired
-    });
+        it('should return 403 Forbidden if a Teacher tries to create an address', async () => {
+            if (!teacher1AccessToken) throw new Error('Teacher token not available for POST test');
+
+            // Use the utility function with teacher token
+            const response = await createAddress(teacher1AccessToken, testAddressData);
+
+            expect(response.status).toBe(403);
+            expect(response.body.error).toContain('Forbidden'); // From checkRole middleware
+        });
+    }); // End POST describe
 
     // --- Tests for GET /:id --- //
     describe('GET /:id', () => {
-        it('should fetch an address by its ID successfully (200)', async () => {
-            if (!createdAddressIdForGetTest) throw new Error('Address ID not created in setup for GET test');
+        let addressForGetTest: Address; // Store address created before each GET test
 
-            const response = await request(API_BASE_URL!)
-                .get(`/api/v1/addresses/${createdAddressIdForGetTest}`); // Still doesn't require auth based on route definition
+        // Create a fresh address before each test in this suite
+        beforeEach(async () => {
+            if (!student1AccessToken) throw new Error('Student 1 auth token not available for GET beforeEach');
+
+            // Use the utility function to create an address for this test run
+            const postResponse = await createAddress(student1AccessToken, testAddressData);
+
+            if (postResponse.status !== 201 || !postResponse.body.id) {
+                throw new Error('Failed to create address via POST during GET beforeEach setup.');
+            }
+            addressForGetTest = postResponse.body as Address;
+        });
+
+        it('should fetch an address by its ID successfully (200) for the owning student', async () => {
+            if (!addressForGetTest) throw new Error('Address not created in beforeEach for GET test');
+            if (!addressForGetTest.id) throw new Error('Address ID is missing for GET test');
+
+            // Use the utility function
+            const response = await getAddressById(student1AccessToken, addressForGetTest.id);
 
             expect(response.status).toBe(200);
             expect(response.headers['content-type']).toMatch(/application\/json/);
 
             const address: Address = response.body;
             expect(address).toBeDefined();
-            expect(address.id).toEqual(createdAddressIdForGetTest);
-            expect(address.street).toEqual(testAddressData.street); // Check against data used in setup POST
+            expect(address.id).toEqual(addressForGetTest.id);
+            expect(address.street).toEqual(testAddressData.street);
             expect(address.city).toEqual(testAddressData.city);
             expect(address.state).toEqual(testAddressData.state);
             expect(address.postalCode).toEqual(testAddressData.postalCode);
             expect(address.country).toEqual(testAddressData.country);
         });
 
-        // Keep existing 404 tests
-        it('should return 404 Not Found for a non-existent address ID (valid UUID)', async () => {
+        it('should return 401 Unauthorized if no token is provided', async () => {
+            if (!addressForGetTest) throw new Error('Address not created in beforeEach for GET test');
+            if (!addressForGetTest.id) throw new Error('Address ID is missing for GET test');
+
+            // Use the unauthenticated utility function
+            const response = await getAddressByIdUnauthenticated(addressForGetTest.id);
+            expect(response.status).toBe(401);
+        });
+
+        it('should return 403 Forbidden if a teacher tries to fetch', async () => {
+            if (!addressForGetTest) throw new Error('Address not created in beforeEach for GET test');
+            if (!addressForGetTest.id) throw new Error('Address ID is missing for GET test');
+            if (!teacher1AccessToken) throw new Error('Teacher token not available for GET test');
+
+            // Use the utility function with teacher token
+            const response = await getAddressById(teacher1AccessToken, addressForGetTest.id);
+
+            expect(response.status).toBe(403);
+            expect(response.body.error).toContain('Forbidden'); // From checkRole middleware
+        });
+
+        // Note: A test for another student trying to fetch might be redundant
+        // if the route only allows students AND the address isn't linked to a user directly.
+        // If addresses WERE linked, we'd need an ownership check in the controller.
+        // For now, the checkRole is sufficient based on the current route setup.
+
+        it('should return 404 Not Found for a non-existent address ID (valid UUID) when authenticated', async () => {
             const fakeId = uuidv4();
-            const response = await request(API_BASE_URL!)
-                .get(`/api/v1/addresses/${fakeId}`);
+            // Use the utility function
+            const response = await getAddressById(student1AccessToken, fakeId);
             expect(response.status).toBe(404);
-            expect(response.body.message).toContain(`Address with ID ${fakeId} not found`);
+            expect(response.body.message).toEqual(`Address with ID ${fakeId} not found.`);
         });
 
-        it('should return 404 Not Found for an invalid ID format', async () => {
+        it('should return 404 Not Found for an invalid ID format when authenticated', async () => {
             const invalidId = 'this-is-not-a-valid-uuid';
-            const response = await request(API_BASE_URL!)
-                .get(`/api/v1/addresses/${invalidId}`);
+            // Use the utility function
+            const response = await getAddressById(student1AccessToken, invalidId);
             expect(response.status).toBe(404);
-            expect(response.body.message).toContain(`Address with ID ${invalidId} not found`);
+            expect(response.body.message).toEqual(`Address with ID ${invalidId} not found.`);
         });
+    }); // End GET /:id describe
 
-        // GET /:id still doesn't require auth
-    });
-}); 
+}); // End main describe 

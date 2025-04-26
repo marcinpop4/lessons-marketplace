@@ -6,6 +6,8 @@
 // Remove Prisma type import
 // import type { TeacherLessonHourlyRate as DbTeacherLessonHourlyRate } from '@prisma/client';
 import { LessonType } from './LessonType.js'; // Keep shared enum import if needed (e.g., for type property)
+// Import the new status model and value enum
+import { TeacherLessonHourlyRateStatus, TeacherLessonHourlyRateStatusValue } from './TeacherLessonHourlyRateStatus.js';
 
 /**
  * Properties required to create a TeacherLessonHourlyRate instance.
@@ -15,15 +17,18 @@ interface TeacherLessonHourlyRateProps {
   teacherId: string;
   type: LessonType; // Use shared enum directly
   rateInCents: number;
-  // Allow null to represent an active rate explicitly, alongside undefined for cases where it might not be set
-  deactivatedAt?: Date | null | undefined;
+  // Remove deactivatedAt from props
+  // deactivatedAt?: Date | null | undefined;
   createdAt?: Date; // Optional, defaults to new Date()
   updatedAt?: Date; // Add updatedAt if it should be part of the model
+  // Add status-related props (optional for constructor, required for full obj)
+  currentStatusId?: string | null;
+  currentStatus?: TeacherLessonHourlyRateStatus | null;
 }
 
 /**
  * Represents an hourly rate set by a teacher for a specific lesson type.
- * Tracks activation/deactivation history implicitly via deactivatedAt.
+ * Now uses the standard status model for activation state.
  */
 export class TeacherLessonHourlyRate {
   id: string;
@@ -32,8 +37,12 @@ export class TeacherLessonHourlyRate {
   rateInCents: number; // Rate stored in cents (e.g., $45.50 = 4550 cents)
   createdAt: Date;
   updatedAt?: Date; // Include if managed by the model/mapper
-  // Allow null to represent an active rate explicitly, alongside undefined
-  deactivatedAt?: Date | null | undefined;
+  // Remove deactivatedAt field
+  // deactivatedAt?: Date | null | undefined;
+
+  // Add standard status fields
+  currentStatusId: string | null; // FK to the current status record
+  currentStatus: TeacherLessonHourlyRateStatus | null; // Populated relation object
 
   // Updated constructor using object destructuring
   constructor({
@@ -41,18 +50,20 @@ export class TeacherLessonHourlyRate {
     teacherId,
     type,
     rateInCents,
-    // Default to null, explicitly indicating an active rate
-    deactivatedAt = null,
     createdAt = new Date(), // Default value for optional prop
-    updatedAt // Add updatedAt to constructor if needed
+    updatedAt,
+    // Initialize status fields to null by default in constructor
+    currentStatusId = null,
+    currentStatus = null,
   }: TeacherLessonHourlyRateProps) {
     this.id = id;
     this.teacherId = teacherId;
     this.type = type;
     this.rateInCents = rateInCents;
     this.createdAt = createdAt;
-    this.deactivatedAt = deactivatedAt;
     this.updatedAt = updatedAt; // Assign if included
+    this.currentStatusId = currentStatusId;
+    this.currentStatus = currentStatus;
   }
 
   /**
@@ -77,12 +88,12 @@ export class TeacherLessonHourlyRate {
   }
 
   /**
-   * Check if the hourly rate is active (not deactivated)
-   * @returns Boolean indicating if the rate is active
+   * Check if the hourly rate is active based on its current status.
+   * @returns Boolean indicating if the rate is active.
    */
   isActive(): boolean {
-    // Active if deactivatedAt is explicitly null (or undefined, though null is the expected 'active' state now)
-    return this.deactivatedAt === null || this.deactivatedAt === undefined;
+    // Active if currentStatus exists and its status is ACTIVE
+    return this.currentStatus?.status === TeacherLessonHourlyRateStatusValue.ACTIVE;
   }
 
   /**

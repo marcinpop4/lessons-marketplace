@@ -1,32 +1,55 @@
 import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourlyRate.js';
-import type { TeacherLessonHourlyRate as DbTeacherLessonHourlyRate } from '@prisma/client';
+// Import the Prisma types, including the new status type
+import * as PrismaClient from '@prisma/client'; // Import all types
 import { LessonType } from '../../shared/models/LessonType.js';
+// Import the shared status model and enum
+import { TeacherLessonHourlyRateStatus, TeacherLessonHourlyRateStatusValue } from '../../shared/models/TeacherLessonHourlyRateStatus.js';
 
 /**
  * Maps between Prisma TeacherLessonHourlyRate objects and shared TeacherLessonHourlyRate models.
  */
 export class TeacherLessonHourlyRateMapper {
     /**
-     * Maps a Prisma TeacherLessonHourlyRate object to a shared TeacherLessonHourlyRate model instance.
-     * @param dbTeacherLessonHourlyRate The plain TeacherLessonHourlyRate object from Prisma.
+     * Maps a Prisma TeacherLessonHourlyRateStatus object to a shared TeacherLessonHourlyRateStatus model instance.
+     * @param dbStatus The Prisma status object.
+     * @returns A new instance of the shared TeacherLessonHourlyRateStatus model.
+     */
+    private static toStatusModel(dbStatus: PrismaClient.TeacherLessonHourlyRateStatus): TeacherLessonHourlyRateStatus { // Use namespace
+        return new TeacherLessonHourlyRateStatus({
+            id: dbStatus.id,
+            rateId: dbStatus.rateId,
+            status: dbStatus.status as TeacherLessonHourlyRateStatusValue, // Cast enum
+            context: dbStatus.context, // Prisma JSON maps directly
+            createdAt: dbStatus.createdAt,
+        });
+    }
+
+    /**
+     * Maps a Prisma TeacherLessonHourlyRate object (potentially including its current status relation)
+     * to a shared TeacherLessonHourlyRate model instance.
+     * @param dbRate The plain TeacherLessonHourlyRate object from Prisma.
+     * @param dbCurrentStatus Optional: The related Prisma TeacherLessonHourlyRateStatus object (if included in the query).
      * @returns A new instance of the shared TeacherLessonHourlyRate model.
      */
-    public static toModel(dbTeacherLessonHourlyRate: DbTeacherLessonHourlyRate): TeacherLessonHourlyRate {
-        // Remove destructuring
-        // const { createdAt, updatedAt, type, ...rateProps } = dbTeacherLessonHourlyRate;
+    public static toModel(
+        dbRate: PrismaClient.TeacherLessonHourlyRate, // Use namespace
+        dbCurrentStatus?: PrismaClient.TeacherLessonHourlyRateStatus | null // Use namespace
+    ): TeacherLessonHourlyRate {
 
-        // Instantiate using constructor from shared model, accessing props directly
+        // Map the related status object if provided
+        const currentStatusModel = dbCurrentStatus ? TeacherLessonHourlyRateMapper.toStatusModel(dbCurrentStatus) : null;
+
+        // Instantiate using constructor from shared model
         const instance = new TeacherLessonHourlyRate({
-            id: dbTeacherLessonHourlyRate.id,
-            teacherId: dbTeacherLessonHourlyRate.teacherId,
-            type: dbTeacherLessonHourlyRate.type as LessonType, // Cast Prisma enum to shared enum
-            rateInCents: dbTeacherLessonHourlyRate.rateInCents,
-            // Explicitly handle potential null/undefined from DB if schema allows, otherwise map directly
-            createdAt: dbTeacherLessonHourlyRate.createdAt ?? new Date(), // Assuming createdAt is non-null in DB based on previous code
-            // Directly pass the DB value (Date or null) as null is allowed by the constructor/property type
-            deactivatedAt: dbTeacherLessonHourlyRate.deactivatedAt,
-            // Include updatedAt if it exists and is part of the shared model constructor
-            updatedAt: dbTeacherLessonHourlyRate.updatedAt ?? undefined
+            id: dbRate.id,
+            teacherId: dbRate.teacherId,
+            type: dbRate.type as LessonType, // Cast Prisma enum to shared enum
+            rateInCents: dbRate.rateInCents,
+            createdAt: dbRate.createdAt,
+            updatedAt: dbRate.updatedAt,
+            // Assign mapped status object and its ID
+            currentStatusId: currentStatusModel?.id ?? null,
+            currentStatus: currentStatusModel,
         });
 
         return instance;

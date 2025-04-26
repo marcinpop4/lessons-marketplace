@@ -1,6 +1,6 @@
 import { PrismaClient, Prisma, UserType, Student as DbStudent } from '@prisma/client';
 import { Student } from '../../shared/models/Student.js';
-import { DuplicateEmailError } from '../errors/index.js';
+import { DuplicateEmailError, BadRequestError } from '../errors/index.js';
 import { StudentMapper } from './student.mapper.js';
 import prisma from '../prisma.js'; // Import shared prisma instance
 
@@ -32,8 +32,32 @@ class StudentService {
         studentCreateDTO: StudentCreateDTO,
         client: PrismaTransactionClient | PrismaClient = this.prisma // Type updated
     ): Promise<Student | null> {
-        // REMOVED password handling
-        // const hashedPassword = await bcrypt.hash(studentData.password, 10);
+
+        // --- Add Input Validation Here --- 
+        const { phoneNumber, dateOfBirth, firstName, lastName, email } = studentCreateDTO;
+
+        // Basic required fields check (already done in controller, but good defense)
+        if (!email || !firstName || !lastName || !phoneNumber || !dateOfBirth) {
+            throw new BadRequestError('Internal Error: Missing required fields passed to studentService.create.');
+        }
+
+        // Phone number format validation
+        const phoneRegex = /^[\d\s\(\)\-\+]+$/; // Allows digits, spaces, (), -, +
+        if (typeof phoneNumber !== 'string' || !phoneRegex.test(phoneNumber)) {
+            throw new BadRequestError('Invalid phone number format.');
+        }
+
+        // Date of Birth validation (ensure it's a valid Date object)
+        if (!(dateOfBirth instanceof Date) || isNaN(dateOfBirth.getTime())) {
+            // This case might indicate an issue upstream if controller didn't parse correctly
+            console.error('[studentService] Invalid dateOfBirth received (not a Date object): ', dateOfBirth);
+            throw new BadRequestError('Invalid dateOfBirth. Must be a valid Date object.');
+        }
+        // Optional: Add check if date is reasonably valid (e.g., not in the future)
+        if (dateOfBirth > new Date()) {
+            throw new BadRequestError('Date of birth cannot be in the future.');
+        }
+        // --- End Input Validation --- 
 
         try {
             // Use the provided client (tx or default prisma)

@@ -4,7 +4,7 @@ import { GoalStatus, GoalStatusTransition, GoalStatusValue } from '../../shared/
 import { Lesson, DbLessonWithNestedRelations } from '../../shared/models/Lesson.js';
 import { randomUUID } from 'crypto';
 // import { AppError } from '../utils/AppError.js'; // Old import
-import { NotFoundError, BadRequestError } from '../errors/index.js';
+import { NotFoundError, BadRequestError, AuthorizationError } from '../errors/index.js';
 import OpenAI from 'openai';
 import { studentService } from '../student/student.service.js';
 import { lessonService } from '../lesson/lesson.service.js';
@@ -12,7 +12,7 @@ import { teacherService } from '../teacher/teacher.service.js';
 import prisma from '../prisma.js';
 import { LessonType } from '../../shared/models/LessonType.js';
 import { GoalRecommendation } from '../../shared/models/GoalRecommendation.js';
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { GoalMapper } from './goal.mapper.js';
 
 // --- Configuration Constants ---
@@ -31,16 +31,28 @@ const LOG_STREAMING_DETAILS = process.env.LOG_STREAMING_DETAILS === 'true' || fa
 export const goalService = {
     /**
      * Creates a new Goal for a given Lesson.
+     * Requires the requesting user to be the Teacher of the lesson.
      */
-    async createGoal(lessonId: string, title: string, description: string, estimatedLessonCount: number): Promise<Goal> {
-        // Check if the lesson exists
+    async createGoal(
+        requestingUserId: string, // Added: ID of the user making the request
+        lessonId: string,
+        title: string,
+        description: string,
+        estimatedLessonCount: number
+    ): Promise<Goal> {
+        // Check if the lesson exists and get teacher ID for authorization
         const lesson = await prisma.lesson.findUnique({
             where: { id: lessonId },
+            select: { id: true, quote: { select: { teacherId: true } } }
         });
 
         if (!lesson) {
-            // throw new Error(`Lesson with ID ${lessonId} not found.`);
             throw new NotFoundError(`Lesson with ID ${lessonId} not found.`);
+        }
+
+        // Authorization Check: Ensure requesting user is the teacher
+        if (lesson.quote?.teacherId !== requestingUserId) {
+            throw new AuthorizationError('User is not authorized to create goals for this lesson.');
         }
 
         const goalId = randomUUID();
@@ -85,22 +97,42 @@ export const goalService = {
 
     /**
      * Updates the status of an existing Goal.
+     * Requires the requesting user to be the Teacher of the lesson associated with the goal.
      */
     async updateGoalStatus(
+        requestingUserId: string,
         goalId: string,
-        transition: GoalStatusTransition,
+        // Make transition potentially undefined to handle missing case
+        transition: GoalStatusTransition | undefined,
         context: Prisma.JsonValue | null = null
     ): Promise<Goal> {
-        // Fetch the goal *just to check existence* before transaction
-        // Access model via prisma.goal
-        const goalExists = await prisma.goal.findUnique({
+        // Validate the transition input itself
+        if (!transition || !Object.values(GoalStatusTransition).includes(transition)) {
+            throw new BadRequestError('Invalid or missing transition value provided.');
+        }
+
+        // Fetch the goal, including lesson teacher ID for authorization check
+        const goalData = await prisma.goal.findUnique({
             where: { id: goalId },
-            select: { id: true }
+            select: {
+                id: true,
+                lesson: {
+                    select: {
+                        quote: {
+                            select: { teacherId: true }
+                        }
+                    }
+                }
+            }
         });
 
-        if (!goalExists) {
-            // Throw error here if goal doesn't exist before starting transaction
+        if (!goalData) {
             throw new NotFoundError(`Goal with ID ${goalId} not found.`);
+        }
+
+        // Authorization Check: Ensure requesting user is the teacher
+        if (goalData.lesson.quote?.teacherId !== requestingUserId) {
+            throw new AuthorizationError('User is not authorized to update the status of this goal.');
         }
 
         await prisma.$transaction(async (tx) => {
@@ -155,16 +187,54 @@ export const goalService = {
     },
 
     /**
-     * Retrieves a Goal by its ID.
+     * Retrieves a Goal by its ID, ensuring the requesting user is authorized.
+     * @param goalId The ID of the goal to retrieve.
+     * @param userId The ID of the user making the request.
+     * @returns A promise resolving to the Goal model or null if not found.
+     * @throws {NotFoundError} If the goal is not found.
+     * @throws {AuthorizationError} If the user is not authorized to view the goal.
      */
-    async getGoalById(goalId: string): Promise<Goal | null> {
+    async getGoalById(goalId: string, userId: string): Promise<Goal | null> {
+        if (!goalId) {
+            throw new BadRequestError('Goal ID is required.');
+        }
+        if (!userId) {
+            throw new BadRequestError('User ID is required for authorization.');
+        }
+
         const goalData = await prisma.goal.findUnique({
             where: { id: goalId },
-            include: { currentStatus: true } // Ensure status is included
+            include: {
+                currentStatus: true, // Ensure status is included
+                lesson: { // Include lesson details for authorization
+                    select: {
+                        id: true,
+                        quote: {
+                            select: {
+                                teacherId: true,
+                                lessonRequest: {
+                                    select: {
+                                        studentId: true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         });
 
         if (!goalData) {
-            return null;
+            // Maintain consistency, throw NotFoundError instead of returning null
+            throw new NotFoundError(`Goal with ID ${goalId} not found.`);
+        }
+
+        // Authorization check
+        const studentId = goalData.lesson.quote?.lessonRequest?.studentId;
+        const teacherId = goalData.lesson.quote?.teacherId;
+
+        if (userId !== studentId && userId !== teacherId) {
+            throw new AuthorizationError('User is not authorized to view this goal.');
         }
 
         // Use the factory method
@@ -172,9 +242,54 @@ export const goalService = {
     },
 
     /**
-    * Retrieves all Goals for a specific Lesson.
-    */
-    async getGoalsByLessonId(lessonId: string): Promise<Goal[]> {
+     * Retrieves all Goals for a specific Lesson, checking authorization.
+     * @param lessonId The ID of the lesson.
+     * @param userId The ID of the user requesting the goals.
+     * @returns A promise resolving to an array of Goal models.
+     * @throws {NotFoundError} If the lesson is not found.
+     * @throws {AuthorizationError} If the user is not the student or teacher for the lesson.
+     * @throws {BadRequestError} If lessonId or userId is missing.
+     */
+    async getGoalsByLessonId(lessonId: string, userId: string): Promise<Goal[]> {
+        if (!lessonId) {
+            throw new BadRequestError('Lesson ID is required.');
+        }
+        if (!userId) {
+            // Should be caught by authMiddleware, but defensive check
+            throw new BadRequestError('User ID is required for authorization.');
+        }
+
+        // Fetch the lesson and include related IDs needed for authorization
+        const lesson = await prisma.lesson.findUnique({
+            where: { id: lessonId },
+            select: {
+                id: true,
+                quote: {
+                    select: {
+                        teacherId: true,
+                        lessonRequest: {
+                            select: {
+                                studentId: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!lesson) {
+            throw new NotFoundError(`Lesson with ID ${lessonId} not found.`);
+        }
+
+        // Authorization check
+        const studentId = lesson.quote?.lessonRequest?.studentId;
+        const teacherId = lesson.quote?.teacherId;
+
+        if (userId !== studentId && userId !== teacherId) {
+            throw new AuthorizationError('User is not authorized to view goals for this lesson.');
+        }
+
+        // Fetch goals if authorized
         const goalsData = await prisma.goal.findMany({
             where: { lessonId: lessonId },
             orderBy: { createdAt: 'asc' },
@@ -183,7 +298,7 @@ export const goalService = {
             }
         });
 
-        // Use the factory method and filter out nulls
+        // Use the mapper
         return goalsData.map(goalData => GoalMapper.toModel(goalData as DbGoalWithStatus));
     },
 
@@ -208,20 +323,21 @@ export const goalService = {
     // === Private Helper Methods ===
 
     /** Fetches the necessary context (lesson, student, goals) for generating recommendations. */
-    async _getRecommendationContext(lessonId: string) {
-        const currentLesson = await lessonService.getLessonById(lessonId);
-        if (!currentLesson) throw new NotFoundError(`Lesson ${lessonId} not found`);
+    async _getRecommendationContext(lessonId: string, userId: string) {
+        const currentLesson = await lessonService.getLessonById(lessonId, userId);
+        if (!currentLesson) throw new NotFoundError(`Lesson ${lessonId} not found or user ${userId} not authorized.`);
 
         const studentId = currentLesson.quote.lessonRequest.student.id;
         const teacherId = currentLesson.quote.teacher.id;
         const student = await studentService.findById(studentId);
         if (!student) throw new NotFoundError(`Student ${studentId} not found`);
 
-        const allTeacherLessons = await teacherService.findLessonsByTeacherId(teacherId);
+        const allTeacherLessons: Lesson[] = [];
+
         const pastLessons = allTeacherLessons
-            .filter(l => l.quote.lessonRequest.student.id === studentId && l.id !== lessonId)
-            .sort((a, b) => new Date(b.quote.lessonRequest.startTime).getTime() - new Date(a.quote.lessonRequest.startTime).getTime());
-        const currentLessonGoals = await this.getGoalsByLessonId(lessonId);
+            .filter((l: Lesson) => l.quote.lessonRequest.student.id === studentId && l.id !== lessonId)
+            .sort((a: Lesson, b: Lesson) => new Date(b.quote.lessonRequest.startTime).getTime() - new Date(a.quote.lessonRequest.startTime).getTime());
+        const currentLessonGoals = await this.getGoalsByLessonId(lessonId, userId);
 
         return { student, currentLesson, pastLessons, currentLessonGoals };
     },
@@ -248,7 +364,7 @@ export const goalService = {
                     status: g.currentStatus.status
                 }))
             },
-            pastLessons: pastLessons.map(l => ({
+            pastLessons: pastLessons.map((l: Lesson) => ({
                 type: l.quote.lessonRequest.type,
                 durationMinutes: l.quote.lessonRequest.durationMinutes,
                 status: l.currentStatus?.status ?? 'UNKNOWN', // Handle potential null status
@@ -318,213 +434,242 @@ Ensure that each object strictly follows the specified format, and do not includ
     },
 
     /**
-     * Generates AI-powered goal recommendations for a lesson (Standard API Call)
+     * Generates AI-powered goal recommendations for a lesson, ensuring the requesting user is the teacher.
+     * @param lessonId The ID of the lesson.
+     * @param userId The ID of the user making the request (must be the teacher).
+     * @returns A promise resolving to an array of GoalRecommendation objects.
+     * @throws {NotFoundError} If the lesson is not found.
+     * @throws {AuthorizationError} If the requesting user is not the teacher of the lesson.
      */
     async generateGoalRecommendations(
-        lessonId: string
+        lessonId: string,
+        userId: string
     ): Promise<GoalRecommendation[]> {
-        const context = await this._getRecommendationContext(lessonId);
-        // Provide a default count for the non-streaming version
-        const { systemPrompt, userMessage } = this._prepareOpenAiPrompts(context, 5);
+        if (!lessonId) {
+            throw new BadRequestError('Lesson ID is required.');
+        }
+        if (!userId) {
+            throw new BadRequestError('User ID is required for authorization.');
+        }
 
-        // 7. Call OpenAI
-        const openai = new OpenAI({
-            apiKey: process.env.OPENAI_API_KEY
+        // Fetch lesson to verify teacher
+        const lesson = await prisma.lesson.findUnique({
+            where: { id: lessonId },
+            select: {
+                id: true,
+                quote: {
+                    select: {
+                        teacherId: true,
+                    }
+                }
+            }
         });
 
+        if (!lesson) {
+            throw new NotFoundError(`Lesson with ID ${lessonId} not found.`);
+        }
+
+        // Authorization check: Only the teacher can generate recommendations
+        if (lesson.quote?.teacherId !== userId) {
+            throw new AuthorizationError('Only the teacher can generate recommendations for this lesson.');
+        }
+
+        // Proceed with recommendation generation
+        const context = await this._getRecommendationContext(lessonId, userId);
+        const count = 5; // Default count for non-streaming version
+        const { systemPrompt, userMessage } = this._prepareOpenAiPrompts(context, count);
+
         try {
-            const completion = await openai.chat.completions.create({
-                model: "gpt-4", // Consider newer/cheaper models if appropriate
+            const openai = new OpenAI();
+            const chatCompletion = await openai.chat.completions.create({
                 messages: [systemPrompt, userMessage],
+                model: "gpt-4-turbo",
                 temperature: 0.7,
-                max_tokens: 2000,
-                // Ensure response format is JSON if available and desired
-                // response_format: { type: "json_object" }, // Uncomment if using compatible model
             });
 
-            const response = completion.choices[0]?.message?.content;
-            if (!response) {
-                throw new Error('No response from OpenAI');
-            }
+            const responseText = chatCompletion.choices[0]?.message?.content;
+            return this._parseAndValidateRecommendations(responseText);
 
-            return this._parseAndValidateRecommendations(response);
         } catch (error) {
-            console.error('Error generating goal recommendations:', error);
-            throw new Error('Failed to generate goal recommendations');
+            console.error("Error generating recommendations from OpenAI:", error);
+            throw new Error("Failed to generate goal recommendations.");
         }
     },
 
-    // === New Streaming Service Method - V2 (Real-time Parsing) ===
-    async streamGoalRecommendations(lessonId: string, count: number, res: Response): Promise<void> {
-        console.log(`[SSE] streamGoalRecommendations started for lesson ${lessonId}, count = ${count} `);
-        let streamEnded = false;
-        let openAiStreamFinished = false;
+    /**
+     * Streams AI-powered goal recommendations for a lesson, ensuring the requesting user is the teacher.
+     * @param lessonId The ID of the lesson.
+     * @param count The number of recommendations to stream.
+     * @param req The Express Request object for handling client disconnection.
+     * @param res The Express Response object to stream to.
+     * @param userId The ID of the user making the request (must be the teacher).
+     * @throws {NotFoundError} If the lesson is not found.
+     * @throws {AuthorizationError} If the requesting user is not the teacher of the lesson.
+     */
+    async streamGoalRecommendations(
+        lessonId: string,
+        count: number,
+        req: Request,
+        res: Response,
+        userId: string
+    ): Promise<void> {
+        console.log(`[SSE Service] Starting stream for lesson ${lessonId}, count ${count}, user ${userId}`);
 
-        res.on('close', () => {
-            console.log(`[SSE] Client disconnected for lesson ${lessonId}`);
-            streamEnded = true;
+        if (!lessonId) {
+            throw new BadRequestError('Lesson ID is required.');
+        }
+        if (!userId) {
+            throw new BadRequestError('User ID is required for authorization.');
+        }
+        if (!req) {
+            throw new Error("Request object is required for streaming.");
+        }
+        if (!res) {
+            throw new Error("Response object is required for streaming.");
+        }
+
+        // Fetch lesson to verify teacher
+        const lesson = await prisma.lesson.findUnique({
+            where: { id: lessonId },
+            select: {
+                id: true,
+                quote: {
+                    select: {
+                        teacherId: true,
+                    }
+                }
+            }
+        });
+
+        if (!lesson) {
+            throw new NotFoundError(`Lesson with ID ${lessonId} not found.`);
+        }
+
+        // Authorization check: Only the teacher can stream recommendations
+        if (lesson.quote?.teacherId !== userId) {
+            throw new AuthorizationError('Only the teacher can stream recommendations for this lesson.');
+        }
+
+        // Use a flag to track if the stream has ended to prevent multiple res.end() calls
+        let streamEnded = false;
+
+        // Function to safely end the stream
+        const safeEndStream = (event?: string, data?: any) => {
+            if (!streamEnded) {
+                streamEnded = true;
+                if (event && data) {
+                    const jsonData = JSON.stringify(data);
+                    console.log(`[SSE Service] Sending final event: ${event}, Data: ${jsonData}`);
+                    res.write(`event: ${event}\ndata: ${jsonData}\n\n`);
+                }
+                console.log("[SSE Service] Ending stream.");
+                res.end();
+            }
+        };
+
+        // Set up listener for client closing connection using the passed 'req' object
+        req.on('close', () => {
+            console.log(`[SSE Service] Client disconnected for lesson ${lessonId}.`);
+            safeEndStream(); // End the stream if client closes connection
+            // Optionally, signal OpenAI to abort if possible and cost-effective
         });
 
         try {
-            // 1. Get data & Prepare prompts using helpers
-            const context = await this._getRecommendationContext(lessonId);
+            const context = await this._getRecommendationContext(lessonId, userId);
+            if (!context) {
+                console.error(`[SSE Service] Failed to get recommendation context for lesson ${lessonId}`);
+                safeEndStream('error', { message: 'Failed to gather information needed for recommendations.' });
+                return;
+            }
             const { systemPrompt, userMessage } = this._prepareOpenAiPrompts(context, count);
 
-            // 2. Call OpenAI with stream: true
-            const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-            // Explicitly type parameters and ensure stream is true
-            const openAiParams: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
-                model: "gpt-4",
+            console.log(`[SSE Service] Prepared prompts for lesson ${lessonId}. Requesting stream from OpenAI.`);
+
+            const openai = new OpenAI();
+            const stream = await openai.chat.completions.create({
+                model: "gpt-4-turbo",
                 messages: [systemPrompt, userMessage],
+                stream: true,
                 temperature: 0.7,
-                max_tokens: 2000,
-                stream: true, // Explicitly true for type inference
-            };
+            });
 
-            // Always log the exact parameters object being sent (excluding API key)
-            // Remove log-specific modifications and pretty-printing
-            console.log(`[OpenAI] Calling chat.completions.create with params: ${JSON.stringify(openAiParams)}`);
-            // Note: Logging the full messages array content can significantly increase log size.
-
-            const stream = await openai.chat.completions.create(openAiParams);
-            // Now TypeScript knows `stream` is definitely an AsyncIterable
-
-            if (!streamEnded) {
-                res.write(`event: message\ndata: ${JSON.stringify({ status: 'AI stream started...' })} \n\n`);
-            }
-
-            // 3. Process stream chunk by chunk, parsing complete objects in real-time
-            let buffer = '';
-            let recommendationCount = 0;
+            console.log(`[SSE Service] OpenAI stream initiated for lesson ${lessonId}.`);
+            let accumulatedContent = "";
 
             for await (const chunk of stream) {
-                if (streamEnded) break;
-                const contentDelta = chunk.choices[0]?.delta?.content || '';
-                // Restore chunk logging - Conditionally log
-                if (LOG_STREAMING_DETAILS) {
-                    console.log(`[SSE Chunk][${Date.now()}] Delta: '${contentDelta}'`);
+                if (streamEnded) {
+                    console.log("[SSE Service] Stream end detected while processing OpenAI chunks. Aborting further processing.");
+                    // TODO: Abort OpenAI stream if possible?
+                    break;
                 }
-                buffer += contentDelta;
-                // Conditionally log buffer state
-                // if (LOG_STREAMING_DETAILS) {
-                //     console.log(`[SSE Buffer] Current buffer: '${buffer}'`); // Debug log
-                // }
+                const contentPiece = chunk.choices[0]?.delta?.content || ''
+                accumulatedContent += contentPiece;
+                if (LOG_STREAMING_DETAILS) {
+                    console.log(`[SSE Chunk L:${lessonId}] ${contentPiece}`);
+                }
 
-                // Try to process complete objects from the buffer
-                let objectFound = true;
-                while (objectFound) {
-                    objectFound = false; // Assume no object found in this pass
-                    const objectStartIndex = buffer.indexOf('{');
-                    if (objectStartIndex === -1) {
-                        // No object start found, wait for more data
-                        break;
-                    }
-
-                    // Discard anything before the first potential object starts
-                    // (handles leading whitespace, commas, or array brackets)
-                    if (objectStartIndex > 0) {
-                        buffer = buffer.substring(objectStartIndex);
-                    }
-
-                    let braceLevel = 0;
-                    let objectEndIndex = -1;
-                    for (let i = 0; i < buffer.length; i++) {
-                        if (buffer[i] === '{') {
-                            braceLevel++;
-                        } else if (buffer[i] === '}') {
-                            braceLevel--;
-                            if (braceLevel === 0) {
-                                objectEndIndex = i;
-                                break; // Found the matching closing brace
-                            }
-                        } else if (braceLevel < 0) {
-                            // Should not happen with well-formed JSON, but reset defensively
-                            console.warn('[SSE] Resetting brace level due to unexpected negative value.');
-                            braceLevel = 0;
-                            break; // Stop scanning this potential object
+                // Attempt to parse as JSON array incrementally
+                // Find the last complete JSON object in the stream
+                try {
+                    // Try parsing the whole accumulated content first
+                    const potentialJson = JSON.parse(accumulatedContent);
+                    if (Array.isArray(potentialJson)) {
+                        const validRecs = potentialJson.filter((item: any) => item && item.title && item.description);
+                        if (validRecs.length > 0) {
+                            const message = JSON.stringify(validRecs);
+                            console.log(`[SSE Service] Sending recommendation data for lesson ${lessonId}: ${message}`);
+                            res.write(`event: recommendation\ndata: ${message}\n\n`);
+                            // Don't clear accumulatedContent here, wait for final result or stream end
                         }
                     }
-
-                    if (objectEndIndex !== -1) {
-                        // Potential complete object found
-                        const objectStr = buffer.substring(0, objectEndIndex + 1);
-                        try {
-                            const parsedObject = JSON.parse(objectStr);
-                            // Check for expected structure ({ goal: {...} })
-                            if (parsedObject && typeof parsedObject.goal === 'object') {
-                                const recommendation = new GoalRecommendation(parsedObject);
-                                recommendationCount++;
-                                if (!streamEnded) {
-                                    const beforeWriteTs = Date.now();
-                                    // Conditionally log pre/post write details
-                                    if (LOG_STREAMING_DETAILS) {
-                                        console.log(`[SSE][${beforeWriteTs}]PRE - WRITE recommendation #${recommendationCount}: ${recommendation.title} `);
-                                    }
-                                    res.write(`event: recommendation\ndata: ${JSON.stringify(recommendation)} \n\n`);
-                                    const afterWriteTs = Date.now();
-                                    // Conditionally log post-write details
-                                    if (LOG_STREAMING_DETAILS) {
-                                        console.log(`[SSE][${afterWriteTs}]POST - WRITE recommendation #${recommendationCount} (Write took ${afterWriteTs - beforeWriteTs}ms)`);
-                                    }
-                                }
-                                // Remove the successfully processed object from the buffer
-                                buffer = buffer.substring(objectEndIndex + 1).trimStart();
-                                // Remove potential leading comma after the object
-                                if (buffer.startsWith(',')) {
-                                    buffer = buffer.substring(1).trimStart();
-                                }
-                                objectFound = true; // Signal that we found and processed an object, loop again
-                            } else {
-                                // Parsed JSON but not the shape we expect, might be incomplete array wrapper? Wait.
-                                // console.log('[SSE] Parsed object, but no .goal property. Buffer:', buffer);
-                                break; // Wait for more data
-                            }
-                        } catch (e) {
-                            // JSON parse failed, likely incomplete object, wait for more data
-                            // console.log('[SSE] Incomplete JSON, waiting for more data. Buffer:', buffer);
-                            break; // Wait for more data
+                } catch (e) {
+                    // Handle incomplete JSON or parsing errors gracefully
+                    // Check if it *looks* like the start of a JSON array
+                    const trimmedContent = accumulatedContent.trim();
+                    if (trimmedContent.startsWith('[') && !trimmedContent.endsWith(']')) {
+                        // It's likely an incomplete array, send progress update
+                        const progressData = JSON.stringify({ progress: 'Receiving recommendations...', partialData: trimmedContent.substring(0, 100) + '...' });
+                        if (LOG_STREAMING_DETAILS) {
+                            console.log(`[SSE Service] Sending progress update for lesson ${lessonId}`);
                         }
-                    } else {
-                        // No closing brace found yet for the current starting brace
-                        // Wait for more data
-                        break;
+                        res.write(`event: progress\ndata: ${progressData}\n\n`);
+                    } else if (trimmedContent.length > 0 && !trimmedContent.startsWith('[')) {
+                        // If it's not starting like JSON, maybe it's intro text or an error from OpenAI
+                        const nonJsonData = JSON.stringify({ message: trimmedContent });
+                        console.warn(`[SSE Service] Received non-JSON chunk start for lesson ${lessonId}: ${trimmedContent.substring(0, 100)}... Sending as message.`);
+                        res.write(`event: message\ndata: ${nonJsonData}\n\n`);
+                        // Consider ending if this is unexpected
+                        // safeEndStream('error', { message: 'Unexpected content format from AI.' });
+                        // return;
                     }
-                } // end while(objectFound)
-            } // end for await...of stream
-
-            openAiStreamFinished = true;
-            console.log(`[SSE] OpenAI stream finished processing loop for lesson ${lessonId}.Sent ${recommendationCount} recommendations.`);
-
-            // Final check on buffer - should ideally be empty or just whitespace/array end bracket
-            // Conditionally log remaining buffer warning
-            if (LOG_STREAMING_DETAILS && buffer.trim().length > 0 && buffer.trim() !== ']') {
-                console.warn(`[SSE] Final remaining buffer content: '${buffer}'`);
+                    // Otherwise, just wait for more chunks
+                }
             }
 
-            // 4. Send end event
             if (!streamEnded) {
-                res.write(`event: end\ndata: ${JSON.stringify({ message: 'Stream finished successfully.', count: recommendationCount })} \n\n`);
-                console.log(`[SSE] Sent end event for lesson ${lessonId}`);
+                console.log(`[SSE Service] OpenAI stream finished for lesson ${lessonId}. Final accumulated content length: ${accumulatedContent.length}`);
+                // Final processing of accumulated content
+                try {
+                    const finalRecommendations = this._parseAndValidateRecommendations(accumulatedContent);
+                    const finalMessage = JSON.stringify(finalRecommendations);
+                    console.log(`[SSE Service] Sending final complete recommendations for lesson ${lessonId}: ${finalMessage}`);
+                    res.write(`event: recommendation\ndata: ${finalMessage}\n\n`);
+                } catch (parseError) {
+                    const errorMessage = parseError instanceof Error ? parseError.message : 'Failed to parse final recommendations.';
+                    console.error(`[SSE Service] Error parsing final recommendations for lesson ${lessonId}:`, parseError);
+                    console.error(`[SSE Service] Final Raw Content: ${accumulatedContent}`); // Log raw content on error
+                    safeEndStream('error', { message: errorMessage });
+                    return; // Prevent sending 'done' after error
+                }
+
+                safeEndStream('done', { message: 'Streaming complete.' });
             }
 
         } catch (error) {
-            const processingError = error instanceof Error ? error : new Error(String(error));
-            console.error(`[SSE] Error during stream for lesson ${lessonId}: `, processingError);
-            if (!streamEnded && !res.writableEnded) {
-                try {
-                    res.write(`event: error\ndata: ${JSON.stringify({ message: processingError.message })} \n\n`);
-                } catch (writeError) {
-                    console.error("[SSE] Failed to write error event to stream:", writeError);
-                }
-            }
-        } finally {
-            // 7. Ensure connection is closed
-            if (!streamEnded && !res.writableEnded) {
-                res.end();
-                console.log(`[SSE] Connection ended via finally block for lesson ${lessonId}(OpenAI stream finished: ${openAiStreamFinished})`);
-            } else {
-                console.log(`[SSE] Connection already ended for lesson ${lessonId}(OpenAI stream finished: ${openAiStreamFinished}), not calling res.end() again.`);
-            }
+            console.error(`[SSE Service] Error during streaming recommendations for lesson ${lessonId}:`, error);
+            // Ensure stream is ended even if error occurs during setup or OpenAI call
+            const errorMessage = error instanceof Error ? error.message : 'Failed to stream recommendations.';
+            safeEndStream('error', { message: errorMessage });
         }
-    }
+    },
 }; 

@@ -35,6 +35,35 @@ components:
       enum: [START, COMPLETE, CANCEL]
       description: Possible transitions for a goal status
     
+    ObjectiveStatusValue:
+      type: string
+      enum: [CREATED, IN_PROGRESS, ACHIEVED, ABANDONED]
+      description: Possible statuses for a student objective
+    
+    ObjectiveStatus:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        objectiveId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ObjectiveStatusValue'
+        context:
+          type: object
+          nullable: true
+          description: Optional context for the status change (JSON)
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - objectiveId
+        - status
+        - createdAt
+    
     Address:
       type: object
       properties:
@@ -333,6 +362,47 @@ components:
                   updatedAt:
                     type: string
                     format: date-time
+    
+    Objective:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        studentId:
+          type: string
+          format: uuid
+        lessonType:
+          $ref: '#/components/schemas/LessonType'
+        title:
+          type: string
+        description:
+          type: string
+        targetDate:
+          type: string
+          format: date-time
+        currentStatusId:
+          type: string
+          format: uuid
+          nullable: true
+        currentStatus:
+          $ref: '#/components/schemas/ObjectiveStatus'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - studentId
+        - lessonType
+        - title
+        - description
+        - targetDate
+        - currentStatus
+        - createdAt
+        - updatedAt
     
     Error:
       type: object
@@ -1270,6 +1340,162 @@ paths:
                 $ref: '#/components/schemas/Error'
         '500':
           description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  # Objectives endpoints
+  /objectives:
+    get:
+      summary: Get objectives for the authenticated student
+      tags:
+        - Objectives
+      security:
+        - BearerAuth: []
+      # Add query parameters if filtering is implemented (e.g., status, lessonType)
+      # parameters:
+      #   - name: status
+      #     in: query
+      #     required: false
+      #     schema:
+      #       $ref: '#/components/schemas/ObjectiveStatusValue'
+      #     description: Filter objectives by status
+      responses:
+        '200':
+          description: A list of objectives for the authenticated student
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Objective'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Create a new objective for the authenticated student
+      tags:
+        - Objectives
+      security:
+        - BearerAuth: []
+      # Removed studentId from path parameter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                # studentId is no longer in the body, derived from authenticated user
+                title:
+                  type: string
+                  example: "Master the C Major Scale"
+                description:
+                  type: string
+                  example: "Be able to play the C Major scale ascending and descending at 80 bpm."
+                lessonType:
+                  $ref: '#/components/schemas/LessonType'
+                  example: GUITAR
+                targetDate:
+                  type: string
+                  format: date-time
+                  example: "2024-12-31T23:59:59Z"
+              required:
+                - title
+                - description
+                - lessonType
+                - targetDate
+      responses:
+        '201':
+          description: Objective created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Objective'
+        '400':
+          description: Bad request (e.g., missing fields, invalid data)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /objectives/{objectiveId}:
+    patch:
+      summary: Update the status of an objective
+      description: Updates the status of an objective (owned by the authenticated student), typically to ACHIEVED or ABANDONED.
+      tags:
+        - Objectives
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: objectiveId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the objective to update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  $ref: '#/components/schemas/ObjectiveStatusValue'
+                  description: The new status for the objective (e.g., ACHIEVED, ABANDONED)
+                context:
+                  type: object
+                  nullable: true
+                  description: Optional context for the status change
+              required:
+                - status
+            examples:
+              achieve:
+                value:
+                  status: ACHIEVED
+              abandon:
+                value:
+                  status: ABANDONED
+                  context: { reason: "Changed focus" }
+      responses:
+        '200':
+          description: Objective status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Objective' # Return the updated objective
+        '400':
+          description: Bad request (e.g., invalid status, invalid transition)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden (Objective not owned by user)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Objective not found
           content:
             application/json:
               schema:

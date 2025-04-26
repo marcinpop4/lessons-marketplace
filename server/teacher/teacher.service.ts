@@ -1,17 +1,20 @@
 import { PrismaClient, Prisma, Teacher as DbTeacher, TeacherLessonHourlyRate as DbTeacherLessonHourlyRate, Lesson as DbLesson, Student as DbStudent, Address as DbAddress, LessonRequest as DbLessonRequestPrisma, LessonQuote as DbLessonQuote, LessonStatus as DbLessonStatus, Goal as DbGoal, AuthMethod, UserType } from '@prisma/client';
-// Import shared models
-import { Teacher } from '../../shared/models/Teacher.js';
-import { Student } from '../../shared/models/Student.js';
-import { Address } from '../../shared/models/Address.js';
-import { Lesson, DbLessonWithNestedRelations } from '../../shared/models/Lesson.js';
-import { LessonQuote } from '../../shared/models/LessonQuote.js';
-import { LessonRequest } from '../../shared/models/LessonRequest.js';
-import { LessonStatus, LessonStatusValue } from '../../shared/models/LessonStatus.js';
-import { Goal } from '../../shared/models/Goal.js'; // Goal might be needed for stats or future methods
-import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourlyRate.js';
-import { LessonType } from '../../shared/models/LessonType.js';
+// Import shared models using alias and no extension
+import { Teacher } from '@shared/models/Teacher';
+import { Student } from '@shared/models/Student';
+import { Address } from '@shared/models/Address';
+import { Lesson, DbLessonWithNestedRelations } from '@shared/models/Lesson';
+import { LessonQuote } from '@shared/models/LessonQuote';
+import { LessonRequest } from '@shared/models/LessonRequest';
+import { LessonStatus, LessonStatusValue } from '@shared/models/LessonStatus';
+import { Goal } from '@shared/models/Goal';
+import { TeacherLessonHourlyRate } from '@shared/models/TeacherLessonHourlyRate';
+import { LessonType } from '@shared/models/LessonType';
+import { TeacherLessonHourlyRateStatusValue } from '@shared/models/TeacherLessonHourlyRateStatus';
+
+// Local imports with .js extension
 import prisma from '../prisma.js';
-import { AppError, DuplicateEmailError } from '../errors/index.js'; // Import custom error
+import { AppError, DuplicateEmailError, NotFoundError } from '../errors/index.js';
 import { TeacherMapper } from './teacher.mapper.js';
 import { TeacherLessonHourlyRateMapper } from '../teacher-lesson-hourly-rate/teacher-lesson-hourly-rate.mapper.js';
 import { LessonMapper } from '../lesson/lesson.mapper.js';
@@ -74,23 +77,37 @@ class TeacherService {
 
     /**
      * Find teachers filtered by lesson type and limit.
-     * Returns shared Teacher model instances.
+     * Returns shared Teacher model instances including their ACTIVE rates.
      */
     async findTeachersByLessonType(lessonType: LessonType, limit: number): Promise<Teacher[]> {
         const dbTeachers = await this.prisma.teacher.findMany({
             where: {
+                // Filter teachers who have *at least one* ACTIVE rate for the given type
                 teacherLessonHourlyRates: {
-                    some: { type: lessonType, deactivatedAt: null }
+                    some: {
+                        type: lessonType,
+                        currentStatus: {
+                            status: TeacherLessonHourlyRateStatusValue.ACTIVE
+                        }
+                    }
                 }
             },
             include: {
+                // Include only the ACTIVE rates for the specified type along with their status
                 teacherLessonHourlyRates: {
-                    where: { type: lessonType, deactivatedAt: null }
+                    where: {
+                        type: lessonType,
+                        currentStatus: {
+                            status: TeacherLessonHourlyRateStatusValue.ACTIVE
+                        }
+                    },
+                    include: { currentStatus: true } // Need to include the status object for mapping
                 }
             },
             take: limit
         });
-        // FIXED: Use TeacherMapper.toModel
+
+        // Map using the updated TeacherMapper logic (which will use the Rate mapper)
         return dbTeachers.map(dbTeacher =>
             TeacherMapper.toModel(dbTeacher, dbTeacher.teacherLessonHourlyRates)
         );
@@ -112,45 +129,6 @@ class TeacherService {
         }
         // FIXED: Use TeacherMapper.toModel
         return TeacherMapper.toModel(dbTeacher, dbTeacher.teacherLessonHourlyRates);
-    }
-
-    /**
-     * Find all lessons for a teacher, optionally filtered by student.
-     * Returns transformed shared Lesson models.
-     */
-    async findLessonsByTeacherId(teacherId: string, studentId?: string): Promise<Lesson[]> {
-        const dbLessons = await this.prisma.lesson.findMany({
-            where: {
-                quote: {
-                    teacherId: teacherId,
-                    lessonRequest: studentId ? { studentId } : undefined
-                }
-            },
-            include: {
-                quote: {
-                    include: {
-                        teacher: {
-                            include: {
-                                teacherLessonHourlyRates: true
-                            }
-                        },
-                        lessonRequest: {
-                            include: {
-                                student: true,
-                                address: true
-                            }
-                        }
-                    }
-                },
-                currentStatus: true
-            },
-            orderBy: { createdAt: 'desc' }
-        });
-
-        // Use LessonMapper to transform and filter out nulls
-        return dbLessons
-            .map(lesson => LessonMapper.toModel(lesson as unknown as DbLessonWithNestedRelations))
-            .filter((lesson): lesson is Lesson => lesson !== null);
     }
 
     /**
@@ -227,25 +205,33 @@ class TeacherService {
     }
 
     /**
-     * Find a teacher by ID
-     * @param id The ID of the teacher to find
-     * @returns The teacher if found, null otherwise
+     * Get a specific teacher by ID, including their ACTIVE lesson rates.
+     * @param id The ID of the teacher.
+     * @returns The teacher's full shared model.
+     * @throws NotFoundError if the teacher is not found.
      */
-    async findById(id: string): Promise<Teacher | null> {
-        try {
-            const teacherDb = await this.prisma.teacher.findUnique({
-                where: { id },
-            });
-
-            if (!teacherDb) {
-                return null;
+    async getTeacherById(id: string): Promise<Teacher> {
+        const dbTeacher = await this.prisma.teacher.findUnique({
+            where: { id },
+            include: {
+                // Include only ACTIVE rates, but fetch their status object too
+                teacherLessonHourlyRates: {
+                    where: {
+                        currentStatus: {
+                            status: TeacherLessonHourlyRateStatusValue.ACTIVE
+                        }
+                    },
+                    include: { currentStatus: true }
+                }
             }
+        });
 
-            return TeacherMapper.toModel(teacherDb);
-        } catch (error) {
-            console.error('Error finding teacher:', error);
-            throw error;
+        if (!dbTeacher) {
+            throw new NotFoundError(`Teacher with ID ${id} not found.`);
         }
+
+        // Map using the updated TeacherMapper logic
+        return TeacherMapper.toModel(dbTeacher, dbTeacher.teacherLessonHourlyRates);
     }
 
     /**
@@ -260,6 +246,41 @@ class TeacherService {
             });
         } catch (error) {
             console.error('Error finding teacher by email:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Find a teacher by ID including ONLY their ACTIVE rates.
+     * @param id The ID of the teacher to find
+     * @returns The teacher shared model if found, null otherwise
+     * @deprecated Use getTeacherById which throws NotFoundError, or adjust as needed.
+     */
+    async findById(id: string): Promise<Teacher | null> {
+        try {
+            const teacherDb = await this.prisma.teacher.findUnique({
+                where: { id },
+                include: {
+                    // Update to fetch ACTIVE rates via status
+                    teacherLessonHourlyRates: {
+                        where: {
+                            currentStatus: {
+                                status: TeacherLessonHourlyRateStatusValue.ACTIVE
+                            }
+                        },
+                        include: { currentStatus: true }
+                    }
+                }
+            });
+
+            if (!teacherDb) {
+                return null;
+            }
+
+            // Map using the updated TeacherMapper logic
+            return TeacherMapper.toModel(teacherDb, teacherDb.teacherLessonHourlyRates);
+        } catch (error) {
+            console.error('Error finding teacher:', error);
             throw error;
         }
     }

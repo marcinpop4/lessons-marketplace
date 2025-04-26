@@ -179,6 +179,7 @@ async function main() {
       prisma.goalStatus.deleteMany(),
       prisma.goal.deleteMany(),
       prisma.lessonStatus.deleteMany(),
+      prisma.objective.deleteMany(),
       // Now delete records that others depended on
       prisma.lesson.deleteMany(),       // Depends on LessonQuote
       prisma.lessonQuote.deleteMany(),    // Depends on LessonRequest, Teacher

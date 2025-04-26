@@ -9,10 +9,10 @@ const router: Router = express.Router();
 // Create a new lesson request - requires student authentication
 router.post('/', authMiddleware, checkRole([UserType.STUDENT]), lessonRequestController.createLessonRequest);
 
-// Get a lesson request by ID - requires authentication
-router.get('/:id', authMiddleware, lessonRequestController.getLessonRequestById);
+// Get a lesson request by ID - requires authentication (Owner Student ONLY)
+router.get('/:id', authMiddleware, checkRole([UserType.STUDENT]), lessonRequestController.getLessonRequestById);
 
 // Get all lesson requests for a student - requires specific student or teacher authentication
-router.get('/student/:studentId', authMiddleware, checkRole([UserType.STUDENT]), lessonRequestController.getLessonRequestsByStudent);
+router.get('/', authMiddleware, checkRole([UserType.STUDENT]), lessonRequestController.getLessonRequestsByStudent);
 
 export default router; 

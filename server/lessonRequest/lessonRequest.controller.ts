@@ -1,7 +1,17 @@
-import type { Request, Response } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { lessonRequestService } from './lessonRequest.service.js';
-import { lessonQuoteService } from '../lessonQuote/lessonQuote.service.js';
 import { AddressDTO } from '../../shared/models/Address.js';
+import { UserType } from '../../shared/models/UserType.js';
+import { AuthorizationError } from '../errors/index.js';
+
+// Add user property to Request type
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    userType: UserType;
+    // Add other user properties if needed
+  };
+}
 
 export class LessonRequestController {
   constructor() {
@@ -80,20 +90,13 @@ export class LessonRequestController {
         type: type,
         startTime: parsedStartTime,
         durationMinutes: parseInt(durationMinutes, 10),
-        addressDTO: addressDTO, // Fix the property name to match the expected type
+        addressDTO: addressDTO,
         studentId: studentId
       });
 
-      // Automatic quote creation
-      const quotes = await lessonQuoteService.createQuotesForLessonRequest(
-        lessonRequest.id,
-        type
-      );
-
-      // Return the created lesson request model and the generated quotes
+      // Return the created lesson request model
       res.status(201).json({
-        lessonRequest: lessonRequest, // Return model directly
-        quotes
+        lessonRequest: lessonRequest // Return model directly
       });
 
     } catch (error) {
@@ -112,19 +115,28 @@ export class LessonRequestController {
 
   /**
    * Get a lesson request by ID
-   * @route GET /api/lesson-requests/:id
-   * @param req - Express request
+   * @route GET /api/v1/lesson-requests/:id
+   * @param req - Express request (typed with AuthenticatedRequest)
    * @param res - Express response
+   * @param next - Express next function
    */
-  async getLessonRequestById(req: Request, res: Response): Promise<void> {
+  async getLessonRequestById(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
+      const authenticatedUser = req.user; // Get user from token
+
       if (!id) {
         res.status(400).json({ error: 'Lesson request ID is required' });
         return;
       }
 
-      // Service now returns LessonRequest | null
+      // --- Authentication Check (already done by middleware) --- 
+      if (!authenticatedUser) {
+        // This case should ideally be handled by authMiddleware, but defensive check is okay
+        res.status(401).json({ error: 'Unauthorized', message: 'Authentication required.' });
+        return;
+      }
+
       const lessonRequest = await lessonRequestService.getLessonRequestById(id);
 
       if (!lessonRequest) {
@@ -135,26 +147,47 @@ export class LessonRequestController {
         return;
       }
 
+      // --- Authorization Check: Ownership for Students --- 
+      if (authenticatedUser.userType === UserType.STUDENT && lessonRequest.student.id !== authenticatedUser.id) {
+        // If the user is a student, they must own the request
+        return next(new AuthorizationError('Forbidden: You do not have permission to view this lesson request.'));
+      }
+      // --- End Authorization Check --- 
+
+      // Teachers are allowed based on the checkRole middleware in the route
+      // Students who pass the ownership check are also allowed
+
       // Return model directly
       res.json(lessonRequest);
     } catch (error) {
       console.error('Error fetching lesson request:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      res.status(500).json({ error: 'Internal server error', message: errorMessage });
+      // Use next(error) to let the central error handler manage responses
+      next(error);
     }
   }
 
   /**
    * Get all lesson requests for a student
-   * @route GET /api/lesson-requests/student/:studentId
+   * @route GET /api/v1/lesson-requests?studentId=...
    * @param req - Express request
    * @param res - Express response
    */
   async getLessonRequestsByStudent(req: Request, res: Response): Promise<void> {
     try {
-      const { studentId } = req.params;
-      if (!studentId) {
-        res.status(400).json({ error: 'Student ID is required' });
+      // Get studentId from query parameter
+      const { studentId } = req.query;
+      const authenticatedUserId = req.user?.id; // Get ID from token
+
+      // Validation: Check if studentId query parameter is provided
+      if (!studentId || typeof studentId !== 'string') {
+        res.status(400).json({ error: 'Missing or invalid studentId query parameter' });
+        return;
+      }
+
+      // Authorization Check: Ensure the requested studentId matches the authenticated user
+      if (!authenticatedUserId || studentId !== authenticatedUserId) {
+        res.status(403).json({ error: 'Forbidden', message: 'You can only view your own lesson requests.' });
         return;
       }
 

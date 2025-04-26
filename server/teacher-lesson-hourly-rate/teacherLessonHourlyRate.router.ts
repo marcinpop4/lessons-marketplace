@@ -12,7 +12,11 @@ router.use(checkRole([UserType.TEACHER]));
 
 // Routes
 router.post('/', teacherLessonHourlyRateController.createOrUpdate);
-router.post('/:rateId/deactivate', teacherLessonHourlyRateController.deactivate);
-router.post('/:rateId/reactivate', teacherLessonHourlyRateController.reactivate);
+// New route for updating status
+router.patch('/:rateId/status', teacherLessonHourlyRateController.updateStatus);
+
+// Remove old activate/deactivate routes
+// router.post('/:rateId/deactivate', teacherLessonHourlyRateController.deactivate);
+// router.post('/:rateId/reactivate', teacherLessonHourlyRateController.reactivate);
 
 export default router; 

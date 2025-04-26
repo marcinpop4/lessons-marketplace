@@ -7,21 +7,16 @@ import { UserType } from '../../shared/models/UserType.js';
 const router: Router = express.Router();
 
 // Public routes
-// GET /api/teachers - Get teachers, optionally filtered by lesson type
+// GET /api/v1/teachers - Get teachers, optionally filtered by lesson type
 router.get('/', teacherController.getTeachers);
 
 // Protected routes - Teacher only
-// GET /api/teachers/profile - Get the authenticated teacher's profile
-router.get('/profile', authMiddleware, checkRole([UserType.TEACHER]), teacherController.getTeacherProfile);
-
-// GET /api/teachers/stats - Get teacher statistics
+// GET /api/v1/teachers/stats - Get teacher statistics 
+// IMPORTANT: Define specific paths like '/stats' before parameterized paths like '/:id'
 router.get('/stats', authMiddleware, checkRole([UserType.TEACHER]), teacherController.getTeacherStats);
 
-// GET /api/teachers/:teacherId/lessons - Get all lessons for a specific teacher
-// Requires authentication, authorization handled in controller/service
-router.get('/:teacherId/lessons', authMiddleware, teacherController.getTeacherLessons);
-
-// GET /api/v1/teachers/:teacherId/lessons/:lessonId/goals
-router.get('/:teacherId/lessons/:lessonId/goals', authMiddleware, teacherController.getLessonGoals);
+// GET /api/v1/teachers/:id - Get a specific teacher's profile 
+// Requires authentication 
+router.get('/:id', authMiddleware, teacherController.getTeacherById);
 
 export default router; 

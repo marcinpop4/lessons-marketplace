@@ -6,7 +6,7 @@ import { studentService } from '../student/student.service.js';
 import { teacherService } from '../teacher/teacher.service.js';
 import { refreshTokenService } from './refreshToken.service.js';
 import { passwordService } from './password.service.js'; // Import the new PasswordService
-import { AppError, DuplicateEmailError } from '../errors/index.js';
+import { AppError, DuplicateEmailError, BadRequestError } from '../errors/index.js';
 import { UserType as SharedUserType } from '../../shared/models/UserType.js';
 import { AuthMethodType as SharedAuthMethodType } from '../../shared/models/AuthMethodType.js';
 import { authMethodService } from './auth-method.service.js'; // Import the new auth method service
@@ -141,11 +141,16 @@ class AuthService {
 
   async register(registerUserDTO: RegisterUserDTO): Promise<AuthProviderResult> {
     const { auth, userType, ...profileData } = registerUserDTO;
+    // Removed destructuring for phoneNumber, dateOfBirth here as validation moved
 
-    // Validate that appropriate auth data is provided
+    // --- Input Validation --- 
+    // Keep only validation specific to the auth process itself
     if (auth.method === 'PASSWORD' && !auth.password) {
-      throw new Error('Password is required for PASSWORD authentication method');
+      throw new BadRequestError('Password is required for PASSWORD authentication method');
     }
+    // REMOVED phone number validation block
+    // REMOVED date of birth validation block
+    // --- End Input Validation ---
 
     try {
       // Use transaction to ensure atomicity

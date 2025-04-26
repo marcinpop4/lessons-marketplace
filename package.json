@@ -65,7 +65,7 @@
     "lint-staged": "lint-staged",
     "start": "dotenv -e env/.env.${NODE_ENV:-test} -- node -r tsconfig-paths/register dist/server/index.js",
     "prisma:reset": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate reset --force --schema=server/prisma/schema.prisma",
-    "prisma:resolve-applied": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate resolve --applied",
+    "prisma:resolve-applied": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate resolve --schema=server/prisma/schema.prisma --applied",
     "prisma:resolve-rolled-back": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate resolve --schema=server/prisma/schema.prisma --rolled-back",
     "prisma:fresh-start": "dotenv -e env/.env.${NODE_ENV} -- sh -c 'psql \"$(echo $DATABASE_URL | sed \"s/?schema=public//\")\" -c \"DROP TABLE IF EXISTS _prisma_migrations;\" && prisma migrate dev --name initial_migration --create-only --schema=server/prisma/schema.prisma'",
     "prisma:create-migration": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate dev --schema=server/prisma/schema.prisma",

@@ -2,6 +2,9 @@ import { TeacherLessonHourlyRate as PrismaTeacherLessonHourlyRate, LessonType, P
 import prisma from '../prisma.js';
 import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourlyRate.js';
 import { TeacherLessonHourlyRateMapper } from './teacher-lesson-hourly-rate.mapper.js';
+// Import Status model and enums
+import { TeacherLessonHourlyRateStatus, TeacherLessonHourlyRateStatusValue, TeacherLessonHourlyRateStatusTransition } from '../../shared/models/TeacherLessonHourlyRateStatus.js';
+import { NotFoundError, BadRequestError, ConflictError } from '../errors/index.js';
 
 // Define simple error messages for service layer exceptions
 const Errors = {
@@ -15,187 +18,223 @@ const Errors = {
     TRANSACTION_ERROR: 'Database transaction failed.'
 };
 
+// Define return type for createOrUpdateLessonRate
+interface CreateOrUpdateResult {
+    rate: TeacherLessonHourlyRate;
+    wasCreated: boolean;
+}
+
 class TeacherLessonHourlyRateService {
 
     /**
-     * Finds an existing active rate for the teacher and type, or creates a new one.
-     * Handles deactivation/reactivation logic internally based on existing rates.
-     * @throws Error with specific messages (e.g., Errors.TEACHER_NOT_FOUND)
+     * Creates a new lesson rate or updates the price of an existing active one.
+     * If price changes, the old active rate is marked INACTIVE and a new ACTIVE rate is created.
+     * Always ensures an initial ACTIVE status record is created for new rates.
+     * @returns Object containing the final rate and a boolean indicating if a new rate record was created.
+     * @throws NotFoundError, BadRequestError, ConflictError
      */
-    async findOrCreateOrUpdate(teacherId: string, type: LessonType, rateInCents: number): Promise<TeacherLessonHourlyRate> {
+    async createOrUpdateLessonRate(teacherId: string, type: LessonType, rateInCents: number): Promise<CreateOrUpdateResult> {
         if (!teacherId || !type || rateInCents == null || rateInCents <= 0) {
-            throw new Error(Errors.MISSING_DATA);
+            throw new BadRequestError('Missing or invalid data for creating/updating hourly rate.');
         }
 
-        try {
-            const teacher = await prisma.teacher.findUnique({ where: { id: teacherId } });
-            if (!teacher) {
-                throw new Error(Errors.TEACHER_NOT_FOUND);
-            }
+        // Validate teacher exists (as per architecture rule, service validates dependencies)
+        const teacher = await prisma.teacher.findUnique({ where: { id: teacherId } });
+        if (!teacher) {
+            throw new NotFoundError('Teacher not found.');
+        }
 
-            // Transaction to ensure atomicity
-            const resultRate = await prisma.$transaction(async (tx) => {
-                const existingRates = await tx.teacherLessonHourlyRate.findMany({
-                    where: { teacherId: teacherId, type: type },
-                    orderBy: { createdAt: 'desc' }
-                });
+        let wasCreated = false;
 
-                const activeRate = existingRates.find(rate => rate.deactivatedAt === null);
-                const latestInactiveRate = existingRates.find(rate => rate.deactivatedAt !== null);
-
-                let finalRate: PrismaTeacherLessonHourlyRate;
-
-                if (activeRate) {
-                    if (activeRate.rateInCents !== rateInCents) {
-                        await tx.teacherLessonHourlyRate.update({
-                            where: { id: activeRate.id },
-                            data: { deactivatedAt: new Date() }
-                        });
-                        finalRate = await tx.teacherLessonHourlyRate.create({
-                            data: { teacherId, type, rateInCents }
-                        });
-                    } else {
-                        finalRate = activeRate;
+        const resultRate = await prisma.$transaction(async (tx) => {
+            // Find the current *active* rate for this teacher and type
+            const currentActiveRate = await tx.teacherLessonHourlyRate.findFirst({
+                where: {
+                    teacherId: teacherId,
+                    type: type,
+                    currentStatus: {
+                        status: TeacherLessonHourlyRateStatusValue.ACTIVE
                     }
-                } else if (latestInactiveRate) {
-                    finalRate = await tx.teacherLessonHourlyRate.update({
-                        where: { id: latestInactiveRate.id },
-                        data: { rateInCents, deactivatedAt: null }
-                    });
-                } else {
-                    finalRate = await tx.teacherLessonHourlyRate.create({
-                        data: { teacherId, type, rateInCents }
-                    });
-                }
-                return finalRate;
-            }, {
-                // Add timeout to the transaction options if needed, though default should be okay
-                // timeout: 10000, 
+                },
+                include: { currentStatus: true } // Include status for comparison
             });
 
-            return TeacherLessonHourlyRateMapper.toModel(resultRate);
+            let finalRate: PrismaTeacherLessonHourlyRate & { currentStatus: any }; // Add currentStatus to type
 
-        } catch (error) {
-            console.error('[Service Error] findOrCreateOrUpdate:', error);
-            if (error instanceof Prisma.PrismaClientKnownRequestError) {
-                console.error(`Prisma Error Code: ${error.code}`);
-                // Translate specific Prisma errors to more meaningful generic errors
-                if (error.code === 'P2002') {
-                    throw new Error('Conflict: Operation resulted in a duplicate rate.');
-                } else if (error.code === 'P2025') {
-                    // This might indicate the activeRate.id was invalid if update failed
-                    throw new Error(Errors.RATE_NOT_FOUND_OR_ACCESS_DENIED);
+            if (currentActiveRate) {
+                // Active rate exists
+                if (currentActiveRate.rateInCents !== rateInCents) {
+                    // Price changed: Deactivate old, create new
+
+                    // 1. Create new INACTIVE status for the old rate
+                    const oldInactiveStatus = await tx.teacherLessonHourlyRateStatus.create({
+                        data: {
+                            rateId: currentActiveRate.id,
+                            status: TeacherLessonHourlyRateStatusValue.INACTIVE,
+                            // context: { reason: 'Price updated' } // Optional context
+                        }
+                    });
+                    // 2. Update the old rate to point to the new INACTIVE status
+                    await tx.teacherLessonHourlyRate.update({
+                        where: { id: currentActiveRate.id },
+                        data: { currentStatusId: oldInactiveStatus.id }
+                    });
+
+                    // 3. Create the new rate record
+                    const newRate = await tx.teacherLessonHourlyRate.create({
+                        data: {
+                            teacherId: teacherId,
+                            type: type,
+                            rateInCents: rateInCents
+                        }
+                    });
+                    // 4. Create the initial ACTIVE status for the new rate
+                    const newActiveStatus = await tx.teacherLessonHourlyRateStatus.create({
+                        data: {
+                            rateId: newRate.id,
+                            status: TeacherLessonHourlyRateStatusValue.ACTIVE
+                        }
+                    });
+                    // 5. Link the new rate to its ACTIVE status
+                    finalRate = await tx.teacherLessonHourlyRate.update({
+                        where: { id: newRate.id },
+                        data: { currentStatusId: newActiveStatus.id },
+                        include: { currentStatus: true } // Include status for return
+                    });
+                    wasCreated = true;
                 } else {
-                    // Other Prisma known errors
-                    throw new Error(Errors.DATABASE_ERROR);
+                    // Price is the same: No change needed, return existing active rate
+                    finalRate = currentActiveRate;
+                    wasCreated = false;
                 }
-            } else if (error instanceof Error && Object.values(Errors).includes(error.message)) {
-                throw error; // Re-throw known service errors (like TEACHER_NOT_FOUND)
             } else {
-                throw new Error(Errors.DATABASE_ERROR); // Default to generic DB error for unknown issues
+                // No active rate exists for this type. Create a new one.
+                // 1. Create the new rate record
+                const newRate = await tx.teacherLessonHourlyRate.create({
+                    data: {
+                        teacherId: teacherId,
+                        type: type,
+                        rateInCents: rateInCents
+                    }
+                });
+                // 2. Create the initial ACTIVE status for the new rate
+                const newActiveStatus = await tx.teacherLessonHourlyRateStatus.create({
+                    data: {
+                        rateId: newRate.id,
+                        status: TeacherLessonHourlyRateStatusValue.ACTIVE
+                    }
+                });
+                // 3. Link the new rate to its ACTIVE status
+                finalRate = await tx.teacherLessonHourlyRate.update({
+                    where: { id: newRate.id },
+                    data: { currentStatusId: newActiveStatus.id },
+                    include: { currentStatus: true } // Include status for return
+                });
+                wasCreated = true;
             }
-        }
+            return finalRate;
+        });
+
+        // Return both the mapped rate and the creation status
+        return {
+            rate: TeacherLessonHourlyRateMapper.toModel(resultRate, resultRate.currentStatus),
+            wasCreated: wasCreated
+        };
     }
 
     /**
-     * Deactivates an hourly rate for a specific teacher.
-     * @throws Error with specific messages (e.g., Errors.RATE_NOT_FOUND_OR_ACCESS_DENIED)
+     * Updates the status of a specific lesson rate using transitions.
+     * @param teacherId The ID of the teacher performing the action.
+     * @param rateId The ID of the rate to update.
+     * @param transition The status transition to apply (ACTIVATE/DEACTIVATE).
+     * @param context Optional context for the status change.
+     * @returns The updated TeacherLessonHourlyRate.
+     * @throws NotFoundError, BadRequestError, ConflictError
      */
-    async deactivate(teacherId: string, rateId: string): Promise<TeacherLessonHourlyRate> {
-        try {
-            const rate = await prisma.teacherLessonHourlyRate.findUnique({
-                where: { id: rateId }
+    async updateLessonRateStatus(
+        teacherId: string,
+        rateId: string,
+        transition: TeacherLessonHourlyRateStatusTransition,
+        context?: any
+    ): Promise<TeacherLessonHourlyRate> {
+
+        const updatedRate = await prisma.$transaction(async (tx) => {
+            // 1. Fetch the rate and its current status, ensuring it belongs to the teacher
+            const rate = await tx.teacherLessonHourlyRate.findUnique({
+                where: { id: rateId },
+                include: { currentStatus: true }
             });
 
             if (!rate || rate.teacherId !== teacherId) {
-                throw new Error(Errors.RATE_NOT_FOUND_OR_ACCESS_DENIED);
+                throw new NotFoundError('Lesson rate not found or access denied.');
             }
 
-            if (rate.deactivatedAt !== null) {
-                throw new Error(Errors.RATE_ALREADY_DEACTIVATED);
+            if (!rate.currentStatus) {
+                // Should not happen if creation logic is correct, but handle defensively
+                throw new ConflictError('Cannot transition status: Rate has no current status record.');
             }
 
-            const updatedRate = await prisma.teacherLessonHourlyRate.update({
-                where: { id: rateId },
-                data: { deactivatedAt: new Date() }
-            });
+            const currentStatusValue = rate.currentStatus.status as TeacherLessonHourlyRateStatusValue;
 
-            return TeacherLessonHourlyRateMapper.toModel(updatedRate);
-        } catch (error) {
-            console.error('[Service Error] deactivate:', error);
-            if (error instanceof Prisma.PrismaClientKnownRequestError) {
-                console.error(`Prisma Error Code: ${error.code}`);
-                if (error.code === 'P2025') {
-                    throw new Error(Errors.RATE_NOT_FOUND_OR_ACCESS_DENIED);
-                } else {
-                    throw new Error(Errors.DATABASE_ERROR);
-                }
-            } else if (error instanceof Error && Object.values(Errors).includes(error.message)) {
-                throw error; // Re-throw known service errors
-            } else {
-                throw new Error(Errors.DATABASE_ERROR);
-            }
-        }
-    }
-
-    /**
-     * Reactivates a previously deactivated hourly rate for a specific teacher.
-     * @throws Error with specific messages (e.g., Errors.RATE_ALREADY_ACTIVE)
-     */
-    async reactivate(teacherId: string, rateId: string): Promise<TeacherLessonHourlyRate> {
-        try {
-            const rateToReactivate = await prisma.teacherLessonHourlyRate.findUnique({
-                where: { id: rateId }
-            });
-
-            if (!rateToReactivate || rateToReactivate.teacherId !== teacherId) {
-                throw new Error(Errors.RATE_NOT_FOUND_OR_ACCESS_DENIED);
+            // 2. Validate the transition
+            if (!TeacherLessonHourlyRateStatus.isValidTransition(currentStatusValue, transition)) {
+                throw new ConflictError(`Invalid transition: Cannot ${transition} a rate that is already ${currentStatusValue}.`);
             }
 
-            if (rateToReactivate.deactivatedAt === null) {
-                throw new Error(Errors.RATE_ALREADY_ACTIVE);
-            }
-
-            const reactivatedRate = await prisma.$transaction(async (tx) => {
-                const currentlyActiveRate = await tx.teacherLessonHourlyRate.findFirst({
+            // Special check for ACTIVATE: Ensure no *other* rate of the same type is already active
+            if (transition === TeacherLessonHourlyRateStatusTransition.ACTIVATE) {
+                const otherActiveRate = await tx.teacherLessonHourlyRate.findFirst({
                     where: {
                         teacherId: teacherId,
-                        type: rateToReactivate.type,
-                        deactivatedAt: null,
-                        NOT: { id: rateId }
+                        type: rate.type,
+                        id: { not: rateId }, // Exclude the current rate
+                        currentStatus: {
+                            status: TeacherLessonHourlyRateStatusValue.ACTIVE
+                        }
                     }
                 });
-
-                if (currentlyActiveRate) {
-                    throw new Error(Errors.RATE_CONFLICT_ACTIVE(rateToReactivate.type));
+                if (otherActiveRate) {
+                    throw new ConflictError(`Cannot activate rate: Another rate for type ${rate.type} is already active (ID: ${otherActiveRate.id}). Deactivate it first.`);
                 }
+            }
 
-                return await tx.teacherLessonHourlyRate.update({
-                    where: { id: rateId },
-                    data: { deactivatedAt: null }
-                });
+            // 3. Determine the new status value
+            const newStatusValue = TeacherLessonHourlyRateStatus.getResultingStatus(currentStatusValue, transition);
+
+            // 4. Create the new status record
+            const newStatus = await tx.teacherLessonHourlyRateStatus.create({
+                data: {
+                    rateId: rateId,
+                    status: newStatusValue,
+                    context: context || null // Store context if provided
+                }
             });
 
-            return TeacherLessonHourlyRateMapper.toModel(reactivatedRate);
-        } catch (error) {
-            console.error('[Service Error] reactivate:', error);
-            if (error instanceof Prisma.PrismaClientKnownRequestError) {
-                console.error(`Prisma Error Code: ${error.code}`);
-                if (error.code === 'P2025') {
-                    throw new Error(Errors.RATE_NOT_FOUND_OR_ACCESS_DENIED);
-                } else {
-                    throw new Error(Errors.DATABASE_ERROR);
-                }
-            } else if (error instanceof Error && Object.values(Errors).includes(error.message) || error instanceof Error && error.message.startsWith('Another rate for type')) {
-                // Re-throw known service errors (including the dynamic conflict message)
-                throw error;
-            } else {
-                throw new Error(Errors.DATABASE_ERROR);
-            }
-        }
+            // 5. Update the rate to point to the new status record
+            const finalUpdatedRate = await tx.teacherLessonHourlyRate.update({
+                where: { id: rateId },
+                data: { currentStatusId: newStatus.id },
+                include: { currentStatus: true } // Include the latest status
+            });
+
+            return finalUpdatedRate;
+        });
+
+        // Map and return the result
+        return TeacherLessonHourlyRateMapper.toModel(updatedRate, updatedRate.currentStatus);
     }
 
-    // Removed old create method
+    // Remove old deactivate and reactivate methods
+    /*
+    async deactivate(teacherId: string, rateId: string): Promise<TeacherLessonHourlyRate> {
+        // ... old implementation ...
+    }
+
+    async reactivate(teacherId: string, rateId: string): Promise<TeacherLessonHourlyRate> {
+        // ... old implementation ...
+    }
+    */
+
 }
 
 export const teacherLessonHourlyRateService = new TeacherLessonHourlyRateService();

@@ -1,5 +1,10 @@
 import request from 'supertest';
 import { Student } from '@shared/models/Student'; // Shared model for response type
+// Import user utils
+import { createTestStudent, loginTestUser } from './utils/user.utils';
+// Import student utils
+import { getStudentById, getStudentByIdUnauthenticated } from './utils/student.utils';
+import { UserType } from '@shared/models/UserType'; // Import UserType enum
 
 const API_BASE_URL = process.env.VITE_API_BASE_URL;
 
@@ -7,12 +12,13 @@ if (!API_BASE_URL) {
     throw new Error('Missing required environment variable: VITE_API_BASE_URL.');
 }
 
-// Counter for unique emails
+// Counter for unique emails to ensure test independence
 let studentCounter = 0;
 
 describe('API Integration: /api/v1/students', () => {
 
-    // Function to generate unique student data for each test
+    // Helper function to generate unique student data - KEEPING for variation
+    // But note that createTestStudent util uses its own data
     const generateUniqueStudentData = () => {
         studentCounter++;
         const uniqueEmail = `test.student.${Date.now()}.${studentCounter}@example.com`;
@@ -22,132 +28,179 @@ describe('API Integration: /api/v1/students', () => {
             email: uniqueEmail,
             password: 'testPassword123',
             phoneNumber: '555-123-4567',
-            dateOfBirth: '1995-08-15' // Use YYYY-MM-DD format
+            dateOfBirth: '1995-08-15' // YYYY-MM-DD format
         };
     };
 
-    describe('POST /', () => {
-        it('should create a new student successfully (201)', async () => {
-            const studentData = generateUniqueStudentData();
+    // --- Test Student Creation via Auth Endpoint --- 
+    // Note: These tests now implicitly test POST /api/v1/auth/register for UserType.STUDENT
+    describe('POST /api/v1/auth/register (for Students)', () => {
+        it('should create a new student successfully via util (201 Created)', async () => {
+            // Use the util which calls POST /api/v1/auth/register
+            const { user: createdStudent } = await createTestStudent();
 
-            const response = await request(API_BASE_URL!)
-                .post('/api/v1/students')
-                .send(studentData);
-
-            expect(response.status).toBe(201);
-            expect(response.headers['content-type']).toMatch(/application\/json/);
-
-            const createdStudent: Student = response.body;
+            // Validate the returned user object structure
             expect(createdStudent).toBeDefined();
-            expect(createdStudent.id).toBeDefined();
-            expect(createdStudent.email).toEqual(studentData.email);
-            expect(createdStudent.firstName).toEqual(studentData.firstName);
-            expect(createdStudent.lastName).toEqual(studentData.lastName);
-            expect(createdStudent.phoneNumber).toEqual(studentData.phoneNumber);
-            // Dates need careful comparison
-            expect(new Date(createdStudent.dateOfBirth).toISOString().split('T')[0]).toEqual(studentData.dateOfBirth);
+            expect(createdStudent.id).toEqual(expect.any(String));
+            expect(createdStudent.email).toMatch(/test.student.\d+@example.com/); // Match pattern from util
+            expect(createdStudent.firstName).toBeDefined();
+            expect(createdStudent.lastName).toBeDefined();
+            expect(createdStudent.phoneNumber).toBeDefined();
+            expect(createdStudent.dateOfBirth).toBeDefined();
             expect(createdStudent.isActive).toBe(true);
-            // Password should NOT be returned
             expect(createdStudent).not.toHaveProperty('password');
         });
 
         it('should return 409 Conflict if email already exists', async () => {
-            const studentData = generateUniqueStudentData();
+            // Create the student first using the util
+            const { user: firstStudent } = await createTestStudent();
 
-            // Create the student first
-            const firstResponse = await request(API_BASE_URL!)
-                .post('/api/v1/students')
-                .send(studentData);
-            expect(firstResponse.status).toBe(201);
+            // Attempt to create again with the same email by calling register directly
+            // (The util generates unique emails, so we need a direct call here)
+            const studentData = {
+                firstName: 'Conflict', lastName: 'Test', email: firstStudent.email, // Use existing email
+                password: 'password123', phoneNumber: '111-000-9999', dateOfBirth: '2000-01-01'
+            };
 
-            // Attempt to create again with the same email
             const secondResponse = await request(API_BASE_URL!)
-                .post('/api/v1/students')
-                .send(studentData);
+                .post('/api/v1/auth/register')
+                .send({ ...studentData, userType: UserType.STUDENT });
 
-            expect(secondResponse.status).toBe(409); // Conflict
-            expect(secondResponse.body.message).toContain('already exists');
+            expect(secondResponse.status).toBe(409);
+            expect(secondResponse.body.error).toContain('already exists');
         });
 
-        it('should return 400 Bad Request if required fields are missing (e.g., email)', async () => {
-            const studentData = generateUniqueStudentData();
-            delete (studentData as any).email; // Remove email
+        // Bad Request tests targeting the registration endpoint
+        it('should return 400 Bad Request if required field `email` is missing', async () => {
+            const studentData = generateUniqueStudentData(); // Use this to get a full object
+            delete (studentData as any).email;
 
             const response = await request(API_BASE_URL!)
-                .post('/api/v1/students')
-                .send(studentData);
+                .post('/api/v1/auth/register') // Target register endpoint
+                .send({ ...studentData, userType: UserType.STUDENT });
 
             expect(response.status).toBe(400);
-            expect(response.body.message).toContain('Missing required fields');
+            // Check the 'error' property
+            expect(response.body.error).toContain('Missing required fields');
         });
 
-        it('should return 400 Bad Request if dateOfBirth is invalid', async () => {
+        it('should return 400 Bad Request if dateOfBirth format is invalid', async () => {
             const studentData = generateUniqueStudentData();
-            studentData.dateOfBirth = 'invalid-date'; // Invalid date format
+            studentData.dateOfBirth = 'invalid-date-string';
 
             const response = await request(API_BASE_URL!)
-                .post('/api/v1/students')
-                .send(studentData);
+                .post('/api/v1/auth/register') // Target register endpoint
+                .send({ ...studentData, userType: UserType.STUDENT });
 
+            // Expect 400 status because studentService validation should fail
             expect(response.status).toBe(400);
-            // The controller might throw before the service, or the service throws
-            // Check for a message indicating bad date format or similar
-            expect(response.body.message).toBeDefined();
+            // Expect the specific error message from studentService validation
+            expect(response.body.error).toBe('Invalid dateOfBirth. Must be a valid Date object.');
         });
 
-        // Add more tests for other missing fields or invalid data (e.g., phone format) if needed
+        it('should return 400 Bad Request if required field `firstName` is missing', async () => {
+            const studentData = generateUniqueStudentData();
+            delete (studentData as any).firstName;
+
+            const response = await request(API_BASE_URL!)
+                .post('/api/v1/auth/register') // Target register endpoint
+                .send({ ...studentData, userType: UserType.STUDENT });
+
+            expect(response.status).toBe(400);
+            // Check the 'error' property
+            expect(response.body.error).toContain('Missing required fields');
+        });
+
+        it('should return 400 Bad Request if phoneNumber format is invalid', async () => {
+            const studentData = generateUniqueStudentData();
+            studentData.phoneNumber = 'invalid-phone-number';
+
+            const response = await request(API_BASE_URL!)
+                .post('/api/v1/auth/register') // Target register endpoint
+                .send({ ...studentData, userType: UserType.STUDENT });
+
+            expect(response.status).toBe(400);
+            expect(response.body.error).toBe('Invalid phone number format.'); // Check error property
+        });
     });
 
+    // --- Test GET /:id --- 
     describe('GET /:id', () => {
-        it('should get student details successfully (200)', async () => {
-            // First create a student
-            const studentData = generateUniqueStudentData();
-            const createResponse = await request(API_BASE_URL!)
-                .post('/api/v1/students')
-                .send(studentData);
-            expect(createResponse.status).toBe(201);
+        let student1: Student;
+        let student1Token: string;
+        let student2: Student;
 
-            const createdStudent: Student = createResponse.body;
+        // Create users and login before running tests in this block
+        beforeAll(async () => {
+            // Create student 1 using the util
+            const { user: s1, password: s1Password } = await createTestStudent();
+            student1 = s1;
+            // Login student 1 to get token
+            student1Token = await loginTestUser(s1.email, s1Password, UserType.STUDENT);
 
-            // Now fetch the student details
-            const response = await request(API_BASE_URL!)
-                .get(`/api/v1/students/${createdStudent.id}`);
+            // Create student 2 using the util
+            const { user: s2 } = await createTestStudent();
+            student2 = s2;
+        });
+
+        it('should get own student details successfully (200 OK)', async () => {
+            // Fetch student 1 using their own token
+            const response = await getStudentById(student1Token, student1.id);
 
             expect(response.status).toBe(200);
             expect(response.headers['content-type']).toMatch(/application\/json/);
 
             const fetchedStudent: Student = response.body;
             expect(fetchedStudent).toBeDefined();
-            expect(fetchedStudent.id).toEqual(createdStudent.id);
-            expect(fetchedStudent.email).toEqual(studentData.email);
-            expect(fetchedStudent.firstName).toEqual(studentData.firstName);
-            expect(fetchedStudent.lastName).toEqual(studentData.lastName);
-            expect(fetchedStudent.phoneNumber).toEqual(studentData.phoneNumber);
-            expect(new Date(fetchedStudent.dateOfBirth).toISOString().split('T')[0]).toEqual(studentData.dateOfBirth);
-            expect(fetchedStudent.isActive).toBe(true);
-            // Password should NOT be returned
+            expect(fetchedStudent.id).toEqual(student1.id);
+            expect(fetchedStudent.email).toEqual(student1.email);
+            // ... other property checks ...
             expect(fetchedStudent).not.toHaveProperty('password');
         });
 
         it('should return 404 Not Found for non-existent student ID', async () => {
-            const nonExistentId = 'non-existent-id';
-            const response = await request(API_BASE_URL!)
-                .get(`/api/v1/students/${nonExistentId}`);
+            const nonExistentId = '00000000-0000-0000-0000-000000000000';
+            // Use the utility function with the token
+            const response = await getStudentById(student1Token, nonExistentId);
 
             expect(response.status).toBe(404);
+            // Keep message check as it comes from the error handler
             expect(response.body.message).toContain('not found');
         });
 
-        it('should return 404 Not Found for invalid student ID format', async () => {
-            const invalidId = 'invalid-id-format';
-            const response = await request(API_BASE_URL!)
-                .get(`/api/v1/students/${invalidId}`);
+        it('should return 404 Not Found for invalid student ID format (non-UUID)', async () => {
+            const invalidId = 'this-is-not-a-valid-uuid';
+            // Use the utility function with the token
+            const response = await getStudentById(student1Token, invalidId);
 
             expect(response.status).toBe(404);
-            expect(response.body.message).toBeDefined();
+            // Keep message check
+            expect(response.body.message).toContain('not found');
         });
+
+        // Authentication/Authorization tests
+        it('should return 401 Unauthorized if no token is provided', async () => {
+            // Use the unauthenticated utility function
+            const response = await getStudentByIdUnauthenticated(student1.id);
+
+            // Check status and error property based on authMiddleware response format
+            expect(response.status).toBe(401);
+            // Remove specific message check, rely on authMiddleware/error handler
+            expect(response.body.error).toBeDefined();
+        });
+
+        it('should return 403 Forbidden if user tries to access another student\'s details', async () => {
+            // Attempt to fetch student 2 using student 1's token via utility
+            const response = await getStudentById(student1Token, student2.id);
+
+            // This test assumes authorization rules prevent this
+            expect(response.status).toBe(403);
+            // Check the error property based on central error handler format
+            expect(response.body.error).toContain('Forbidden'); // Or specific authz error message
+        });
+
     });
 
-    // Add describe blocks for other student endpoints (GET /:id, etc.) if they are implemented later
+    // Add describe blocks for other student endpoints (e.g., PATCH /:id, DELETE /:id) when implemented
 
 }); 

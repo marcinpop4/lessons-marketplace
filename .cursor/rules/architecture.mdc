@@ -3,18 +3,87 @@ description: Guidelines for application architecture
 globs: ["**/*.ts", "**/*.tsx"]
 alwaysApply: true
 ---
-
 # Architecture
 
-- Always keep business logic and calculations in the appropriate layer:
-  - For single-model operations: Place logic in the model itself
-  - For multi-model operations: Use dedicated service classes
-  - Never implement business logic or calculations directly in UI components or controllers
-- Models are declared in shared/models. Use those throughout the app and don't create interfaces to compensate for something missing in the shared model. We'll update the shared model first.
-- Prisma database types need to model themselves after the shared models.
-- When generating log files, append a timestamp and avoid overriding files.
-- Avoid updates and deletes in the database. Invalidate records for a delete (soft-delete). Invalidate records and create new ones for updates.
+## Guiding Principles
 
-## File Organization
-- Always put scripts in the ./scripts folder. Add subfolders to keep the folder organized.
-- Never create symlinks and always reference files where they are located. 
+- **Layered Structure:** Maintain a clear separation of concerns between different layers (API/Routing, Controller, Service, Data Access/ORM).
+- **Shared Models:** Models defined in `/shared/models` are the canonical data structures used *between* layers (Controllers, Services) and for API responses. Avoid using Prisma-generated types outside the Service and Mapper layers.
+- **Dependency Flow:** Dependencies should generally flow inwards: Routes -> Controllers -> Services -> Prisma/Mappers. Avoid direct dependencies skipping layers (e.g., Controller calling Prisma).
+- **Validation:** The **Service layer is the single source of truth and responsibility for all data validation**, including presence, type, format, and business rule checks for its domain.
+
+## Layer Responsibilities (within `server/`)
+
+### `*.route.ts` / `*.router.ts` (API Layer)
+
+-   **Responsibility:** Define API endpoints, apply middleware, and route requests to Controller methods.
+-   **Details:**
+    -   Utilizes Express Router (`express.Router()`).
+    -   Applies necessary middleware *before* the controller handler (e.g., `authMiddleware`, `checkRole`). Note: Request body *parsing* middleware is still necessary, but validation logic middleware should not be used here if services handle all validation.
+    -   Delegates the core request handling logic to methods within the corresponding `*.controller.ts`.
+    -   SHOULD NOT contain business logic or data validation.
+
+### `*.controller.ts` (Controller Layer)
+
+-   **Responsibility:** Handle the request/response lifecycle. Orchestrate interaction between HTTP requests and the Service layer. Interpret service layer outcomes (data or errors) into HTTP responses.
+-   **Details:**
+    -   Receives `Request`, `Response`, `NextFunction` from the Router.
+    -   Parses incoming request data (params, query, body) into primitive types or DTOs suitable for the Service layer.
+    -   Performs authorization checks specific to the request context (e.g., is the authenticated user allowed to access/modify this *specific instance* of a resource?). Role-based access is typically handled by middleware.
+    -   Calls appropriate methods in the corresponding `*.service.ts` file(s), passing the prepared data. **Does NOT perform validation on the data.**
+    -   Receives data (typically shared models) or errors back from the Service layer.
+    -   Interprets errors thrown by the Service layer (including validation errors like `BadRequestError`, `NotFoundError`, `DuplicateEmailError`, etc.) and maps them to appropriate HTTP status codes and error responses.
+    -   Formats successful HTTP responses (setting status codes, sending JSON data based on shared models).
+    -   MUST NOT contain business logic or data validation logic.
+    -   MUST NOT interact directly with Prisma or the database.
+
+### `*.service.ts` (Service Layer)
+
+-   **Responsibility:** Encapsulate core business logic, rules, and data orchestration. **Perform all data validation** for its operations.
+-   **Details:**
+    -   Contains core business rules, calculations, state transition logic, etc.
+    -   **MUST perform comprehensive validation of ALL input data** necessary for its operations. This includes:
+        -   Presence checks (required fields).
+        -   Type checks (e.g., is a value a number where expected?).
+        -   Format validation (e.g., phone numbers, specific date constraints, email format).
+        -   Range checks.
+        -   Existence checks (e.g., does this related entity ID exist?).
+        -   Cross-field validation.
+        -   Enforcement of all business rules.
+    -   Throws specific, descriptive errors (e.g., `BadRequestError`, `NotFoundError`, custom domain errors) when validation fails or business rules are violated.
+    -   Orchestrates operations that may involve multiple data models or steps (e.g., using `prisma.$transaction`).
+    -   **Is the primary layer authorized to interact with Prisma** for data fetching and persistence.
+    -   May call other services to reuse business logic (those services will perform their own input validation).
+    -   Receives input data (primitive types, DTOs) from Controllers or other Services.
+    -   Uses `*.mapper.ts` to transform Prisma entity objects into shared models before returning data upwards.
+
+### `*.mapper.ts` (Mapper Layer)
+
+-   **Responsibility:** Translate data structures between the Prisma layer and the shared models.
+-   **Details:**
+    -   Contains logic to convert Prisma entity objects into shared models (`/shared/models`).
+    -   **Is explicitly allowed to import and reference both Prisma types (`@prisma/client`) and shared model types (`@shared/models`)**.
+    -   SHOULD NOT contain business logic or validation.
+
+### Prisma (`@prisma/client`, `schema.prisma`)
+
+-   **Responsibility:** Define the database schema and provide the ORM interface for database interactions.
+-   **Details:**
+    -   `schema.prisma` is the source of truth for database structure.
+    -   Prisma Client (`@prisma/client`) provides type-safe database access.
+    -   **Direct interaction MUST be confined to the `*.service.ts` layer**, with exceptions for mappers (types) and `seed.ts` (cleanup).
+
+### `seed.ts`
+
+-   **Responsibility:** Populate the database with initial data.
+-   **Details:**
+    -   SHOULD primarily use `*.service.ts` methods to ensure business rules and **validation** are applied during seeding.
+    -   **Is explicitly allowed direct Prisma Client access *only* for clearing existing data (`deleteMany()`)** before seeding runs.
+
+## File Organization (Summary)
+
+-   Keep business logic and **all validation** primarily in the Service layer.
+-   Models are declared in `shared/models`. Use these between layers above data access.
+-   Prisma types (`@prisma/client`) are confined to Services, Mappers, and seed cleanup.
+-   Place scripts in `./scripts`.
+-   Reference files directly; avoid symlinks.

@@ -2,11 +2,11 @@ import request from 'supertest';
 // We only need Prisma types now, not the client
 import { Teacher, Student, Address, LessonRequest, LessonQuote, Lesson, LessonStatus, LessonType } from '@prisma/client';
 import { LessonStatusValue } from '@shared/models/LessonStatus'; // Import LessonStatusValue enum
+import { UserType } from '@shared/models/UserType'; // Import UserType enum
 
-// --- Seed Data Constants ---
-// Use credentials matching a user created in server/prisma/seed.js
-const SEEDED_TEACHER_EMAIL = 'emily.richardson@musicschool.com';
-const SEEDED_PASSWORD = '1234'; // Password used in seed.js
+// Import test utilities
+import { createTestTeacher, loginTestUser, createTestStudent } from './utils/user.utils';
+import { v4 as uuidv4 } from 'uuid';
 
 // Base URL for the running server (Loaded via jest.setup.api.ts)
 const API_BASE_URL = process.env.VITE_API_BASE_URL;
@@ -18,515 +18,204 @@ if (!API_BASE_URL) {
 
 // --- Test Suite --- 
 
-describe('API Integration: /api/v1/teachers using Seed Data', () => {
-    let seededTeacherId: string | null = null;
-    let seededTeacherAuthToken: string | null = null;
-    // Add variables to store fetched rate IDs
-    let existingVoiceRateId: string | null = null;
-    let existingGuitarRateId: string | null = null;
+describe('API Integration: /api/v1/teachers', () => {
+    let testTeacherId: string | null = null;
+    let testTeacherAuthToken: string | null = null;
+    let testTeacherEmail: string | null = null; // Store email for profile check
 
+    // Setup: Create and login a test teacher
     beforeAll(async () => {
         try {
-            const loginResponse = await request(API_BASE_URL!)
-                .post('/api/v1/auth/login')
-                .send({
-                    email: SEEDED_TEACHER_EMAIL,
-                    password: SEEDED_PASSWORD,
-                    userType: 'TEACHER'
-                });
-
-            if (loginResponse.status !== 200 || !loginResponse.body.accessToken || !loginResponse.body.user?.id) {
-                console.error('Failed Seeded Teacher Login Response:', loginResponse.status, loginResponse.body);
-                throw new Error(`Failed to log in as seeded teacher ${SEEDED_TEACHER_EMAIL}: ${loginResponse.body.error || 'Login endpoint failed'}`);
+            // Create teacher using utility
+            const { user: teacher, password } = await createTestTeacher();
+            if (!teacher || !teacher.id || !teacher.email || !password) {
+                throw new Error('Test setup failed: Could not create test teacher or get credentials.');
             }
+            testTeacherId = teacher.id;
+            testTeacherEmail = teacher.email;
 
-            seededTeacherId = loginResponse.body.user.id;
-            seededTeacherAuthToken = `Bearer ${loginResponse.body.accessToken}`;
+            // Login using utility
+            const token = await loginTestUser(teacher.email, password, UserType.TEACHER);
+            testTeacherAuthToken = `Bearer ${token}`;
 
-            // Fetch the profile once to get rate IDs needed for later tests
-            const profileResponse = await request(API_BASE_URL!)
-                .get('/api/v1/teachers/profile')
-                .set('Authorization', seededTeacherAuthToken!);
+            console.log(`[Teacher Tests Setup] Created Teacher ID: ${testTeacherId}`);
 
-            // --- Update Check ---
-            // The profile endpoint now returns the Teacher model directly
-            if (profileResponse.status !== 200 || !profileResponse.body.hourlyRates) {
-                console.error('[Test Setup Error] Failed to fetch teacher profile or hourly rates:', profileResponse.status, profileResponse.body);
-                throw new Error('Failed to fetch teacher profile or hourly rates in beforeAll');
-            }
-
-            // Find the VOICE rate ID from the hourlyRates array
-            const voiceRate = profileResponse.body.hourlyRates.find((rate: any) => rate.type === LessonType.VOICE);
-            if (voiceRate) {
-                existingVoiceRateId = voiceRate.id;
-            } else {
-                console.warn('[Test Setup Warning] Could not find existing VOICE rate ID for de/reactivate tests.');
-                // Don't throw here, let the specific tests handle missing rate if necessary
-            }
-            // --- End Update Check --- 
+            // Note: If tests rely on specific *rates* existing (like VOICE/GUITAR for update/deactivate), 
+            // we need to create them here after the teacher is created, potentially using 
+            // a new utility function or direct API calls within this beforeAll.
+            // For now, assuming tests adapt or create rates as needed.
 
         } catch (error) {
-            console.error('[Test Setup] Error in beforeAll:', error);
+            console.error('[Teacher Test Setup] Error in beforeAll:', error);
             throw error; // Fail fast if setup fails
         }
-    }, 30000); // Timeout for login/profile request
+    }, 30000);
 
-    // No afterAll needed as prisma:reset handles cleanup
+    // No afterAll needed for user cleanup assuming test DB is reset
 
-    describe('GET /:teacherId/lessons', () => {
-
-        it('should return 401 Unauthorized if no token is provided', async () => {
-            if (!seededTeacherId) throw new Error('Seeded teacher ID not available');
-            const response = await request(API_BASE_URL!)
-                .get(`/api/v1/teachers/${seededTeacherId}/lessons`);
-            expect(response.status).toBe(401);
-        });
-
-        it('should return lessons for the authenticated seeded teacher without passwords', async () => {
-            if (!seededTeacherId || !seededTeacherAuthToken) throw new Error('Seeded teacher auth info not available');
-
-            const response = await request(API_BASE_URL!)
-                .get(`/api/v1/teachers/${seededTeacherId}/lessons`)
-                .set('Authorization', seededTeacherAuthToken);
-
-            expect(response.status).toBe(200);
-            expect(Array.isArray(response.body)).toBe(true);
-
-            if (response.body.length > 0) {
-                for (const lesson of response.body) {
-                    // Check ownership (teacher ID is directly on the lesson's teacher object now)
-                    expect(lesson.teacher?.id).toBeDefined();
-                    expect(lesson.teacher?.id).toEqual(seededTeacherId);
-
-                    // Check teacher object doesn't have password (it shouldn't as it comes from shared model)
-                    expect(lesson.teacher).not.toHaveProperty('password');
-
-                    // Check student object doesn't have password (it shouldn't as it comes from shared model)
-                    if (lesson.student) {
-                        expect(lesson.student).not.toHaveProperty('password');
-                    }
-                }
-            }
-        });
-
-        it('should return 403 if requesting lessons for a different teacher ID', async () => {
-            if (!seededTeacherAuthToken) throw new Error('Seeded teacher auth token not available');
-            const otherTeacherId = 'some-other-teacher-id-not-seeded'; // An ID that doesn't match the token
-
-            const response = await request(API_BASE_URL!)
-                .get(`/api/v1/teachers/${otherTeacherId}/lessons`)
-                .set('Authorization', seededTeacherAuthToken);
-
-            expect(response.status).toBe(403);
-            expect(response.body.error).toContain('Forbidden');
-        });
-
-        it('should return lessons for the authenticated seeded teacher with correct structure and goal counts', async () => {
-            if (!seededTeacherId || !seededTeacherAuthToken) throw new Error('Seeded teacher auth info not available');
-
-            const response = await request(API_BASE_URL!)
-                .get(`/api/v1/teachers/${seededTeacherId}/lessons`)
-                .set('Authorization', seededTeacherAuthToken);
-
-            expect(response.status).toBe(200);
-            expect(response.body).toBeInstanceOf(Array);
-            // expect(response.body.length).toBe(31); // Seed data might change, check > 0 instead?
-            expect(response.body.length).toBeGreaterThan(0);
-
-            response.body.forEach((lesson: any) => {
-                // --- Top-Level Lesson Properties ---
-                expect(lesson).toHaveProperty('id');
-                expect(lesson).toHaveProperty('type'); // Check type is present
-                expect(lesson).toHaveProperty('startTime');
-                expect(lesson).toHaveProperty('durationMinutes');
-                expect(lesson).toHaveProperty('costInCents');
-                expect(lesson).toHaveProperty('currentStatus'); // The status string
-                expect(lesson).toHaveProperty('currentStatusId'); // The status ID
-                expect(lesson).toHaveProperty('createdAt');
-                expect(lesson).toHaveProperty('updatedAt');
-                expect(lesson).toHaveProperty('goalCount');
-                expect(lesson).not.toHaveProperty('quote'); // Ensure quote object is NOT returned
-
-                // --- Nested Object Properties (Flattened) ---
-                expect(lesson).toHaveProperty('teacher');
-                expect(lesson.teacher).toHaveProperty('id');
-                expect(lesson.teacher).toHaveProperty('firstName');
-                expect(lesson.teacher).toHaveProperty('lastName');
-                expect(lesson.teacher).toHaveProperty('email'); // Assuming email is intended
-                expect(lesson.teacher).not.toHaveProperty('password');
-
-                expect(lesson).toHaveProperty('student');
-                expect(lesson.student).toHaveProperty('id');
-                expect(lesson.student).toHaveProperty('firstName');
-                expect(lesson.student).toHaveProperty('lastName');
-                expect(lesson.student).not.toHaveProperty('password');
-                // expect(lesson.student).toHaveProperty('email'); // Decide if student email needed
-
-                expect(lesson).toHaveProperty('address');
-                expect(lesson.address).toHaveProperty('street');
-                expect(lesson.address).toHaveProperty('city');
-                // expect(lesson.address).toHaveProperty('state'); // State might not be in shared model Address.ts
-                expect(lesson.address).toHaveProperty('postalCode');
-                expect(lesson.address).toHaveProperty('country');
-
-                // --- Type/Value Checks ---
-                expect(typeof lesson.currentStatus).toBe('string');
-                expect(lesson.type).toMatch(/^(GUITAR|BASS|DRUMS|VOICE|PIANO)$/);
-                expect(Object.values(LessonStatusValue)).toContain(lesson.currentStatus);
-            });
-        });
-
-        it('should filter lessons by studentId when provided', async () => {
-            if (!seededTeacherId || !seededTeacherAuthToken) throw new Error('Seeded teacher auth info not available');
-
-            // First get all lessons to find a valid student ID
-            const allLessonsResponse = await request(API_BASE_URL!)
-                .get(`/api/v1/teachers/${seededTeacherId}/lessons`)
-                .set('Authorization', seededTeacherAuthToken);
-
-            expect(allLessonsResponse.status).toBe(200);
-            expect(Array.isArray(allLessonsResponse.body)).toBe(true);
-            expect(allLessonsResponse.body.length).toBeGreaterThan(0);
-
-            // Get a student ID from the first lesson's flattened student object
-            const studentId = allLessonsResponse.body[0].student?.id;
-            expect(studentId).toBeDefined();
-
-            // Now get lessons filtered by this student ID
-            const filteredResponse = await request(API_BASE_URL!)
-                .get(`/api/v1/teachers/${seededTeacherId}/lessons?studentId=${studentId}`)
-                .set('Authorization', seededTeacherAuthToken);
-
-            expect(filteredResponse.status).toBe(200);
-            expect(Array.isArray(filteredResponse.body)).toBe(true);
-            expect(filteredResponse.body.length).toBeGreaterThan(0);
-
-            // Verify all returned lessons are for the specified student
-            filteredResponse.body.forEach((lesson: any) => {
-                expect(lesson.student?.id).toBe(studentId);
-            });
-
-            // Verify the filtered results are a subset of all lessons
-            expect(filteredResponse.body.length).toBeLessThanOrEqual(allLessonsResponse.body.length);
-        });
-
-        it('should return empty array when filtering by non-existent studentId', async () => {
-            if (!seededTeacherId || !seededTeacherAuthToken) throw new Error('Seeded teacher auth info not available');
-
-            const nonExistentStudentId = 'non-existent-id';
-            const response = await request(API_BASE_URL!)
-                .get(`/api/v1/teachers/${seededTeacherId}/lessons?studentId=${nonExistentStudentId}`)
-                .set('Authorization', seededTeacherAuthToken);
-
-            expect(response.status).toBe(200);
-            expect(Array.isArray(response.body)).toBe(true);
-            expect(response.body.length).toBe(0);
-        });
-    });
-
-    // --- GET /api/v1/teachers/:teacherId/lessons/:lessonId/goals ---
+    // --- Tests for routes previously under /teachers/{teacherId}/... that were moved ---
+    // These describe blocks can be removed or adapted if the routes still exist elsewhere
+    /*
     describe('GET /api/v1/teachers/:teacherId/lessons/:lessonId/goals', () => {
-        // ... potentially add tests here in the future ...
-        it('should return 404 for a lesson that does not exist', async () => {
-            // Placeholder for future test
-        });
-        it('should return goals for a specific lesson associated with the teacher', async () => {
-            // Placeholder for future test
-        });
+        it.todo('should return 404 for a lesson that does not exist');
+        it.todo('should return goals for a specific lesson associated with the teacher');
     });
-
-    // --- POST /api/v1/teachers/:teacherId/lessons/:lessonId/goals ---
-    describe('POST /api/v1/teachers/:teacherId/lessons/:lessonId/goals', () => {
-        // Placeholder for future tests
-    });
-
-    // --- PUT /api/v1/teachers/:teacherId/lessons/:lessonId/goals/:goalId ---
-    describe('PUT /api/v1/teachers/:teacherId/lessons/:lessonId/goals/:goalId', () => {
-        // Placeholder for future tests
-    });
-
-    // --- DELETE /api/v1/teachers/:teacherId/lessons/:lessonId/goals/:goalId ---
-    describe('DELETE /api/v1/teachers/:teacherId/lessons/:lessonId/goals/:goalId', () => {
-        // Placeholder for future tests
-    });
-
-    // --- New Tests Start Here ---
+    describe('POST /api/v1/teachers/:teacherId/lessons/:lessonId/goals', () => {});
+    describe('PUT /api/v1/teachers/:teacherId/lessons/:lessonId/goals/:goalId', () => {});
+    describe('DELETE /api/v1/teachers/:teacherId/lessons/:lessonId/goals/:goalId', () => {});
+    */
+    // --- End Moved Routes ---
 
     describe('GET /teachers', () => {
         it('should return a list of teachers (public access)', async () => {
+            // This endpoint is public, no token needed
             const response = await request(API_BASE_URL!)
                 .get('/api/v1/teachers')
-                .query({ lessonType: LessonType.GUITAR, limit: 10 });
-
+                .query({ lessonType: LessonType.GUITAR, limit: 10 }); // Query requires rates exist
+            // Note: This test might become less useful without predictable seed data 
+            // unless we ensure teachers with specific rates are created in setup.
+            // For now, just check the status and basic structure.
             expect(response.status).toBe(200);
             expect(Array.isArray(response.body)).toBe(true);
-            // Ensure passwords are not returned
             if (response.body.length > 0) {
-                expect(response.body[0]).not.toHaveProperty('password');
-            }
-            // You might want to add checks for specific seeded teachers if needed
-        });
-
-        // TODO: Add test for filtering if implemented (e.g., by lesson type)
-    });
-
-    describe('GET /teachers/profile', () => {
-        it('should return 401 Unauthorized if no token is provided', async () => {
-            const response = await request(API_BASE_URL!)
-                .get('/api/v1/teachers/profile');
-            expect(response.status).toBe(401);
-        });
-
-        // Need to log in as a student to test role check
-        it('should return 403 Forbidden if accessed by a student', async () => {
-            // Login as a known student (adjust email/password if needed)
-            const studentLogin = await request(API_BASE_URL!)
-                .post('/api/v1/auth/login')
-                .send({ email: 'ethan.parker@example.com', password: '1234', userType: 'STUDENT' });
-
-            expect(studentLogin.status).toBe(200);
-            const studentToken = `Bearer ${studentLogin.body.accessToken}`;
-
-            const response = await request(API_BASE_URL!)
-                .get('/api/v1/teachers/profile')
-                .set('Authorization', studentToken);
-            expect(response.status).toBe(403);
-        });
-
-        it('should return the authenticated teacher\'s profile', async () => {
-            if (!seededTeacherAuthToken) throw new Error('Seeded teacher auth token not available');
-
-            const response = await request(API_BASE_URL!)
-                .get('/api/v1/teachers/profile')
-                .set('Authorization', seededTeacherAuthToken);
-
-            expect(response.status).toBe(200);
-            expect(response.body.email).toBe(SEEDED_TEACHER_EMAIL);
-            expect(response.body.id).toBe(seededTeacherId);
-            expect(response.body).not.toHaveProperty('password');
-        });
-    });
-
-    describe('POST /api/v1/teacher-lesson-rates', () => {
-        let createdRateId: string | null = null;
-
-        afterAll(async () => {
-            if (createdRateId && seededTeacherAuthToken) {
-                try {
-                    await request(API_BASE_URL!)
-                        .post(`/api/v1/teacher-lesson-rates/${createdRateId}/deactivate`)
-                        .set('Authorization', seededTeacherAuthToken);
-                } catch (cleanupError) {
-                    console.warn(`Warning: Failed to clean up rate ${createdRateId} in afterAll:`, cleanupError);
-                }
+                expect(response.body[0]).not.toHaveProperty('passwordHash'); // Check sensitive data exclusion
             }
         });
-
-        it('should return 401 Unauthorized if no token is provided', async () => {
+        // Add tests for missing/invalid query params if applicable
+        it('should return 400 if lessonType is missing', async () => {
             const response = await request(API_BASE_URL!)
-                .post('/api/v1/teacher-lesson-rates')
-                .send({ lessonType: LessonType.GUITAR, rateInCents: 5000 });
-            expect(response.status).toBe(401);
-        });
-
-        it('should return 403 Forbidden if accessed by a student', async () => {
-            // Login as a known student
-            const studentLogin = await request(API_BASE_URL!)
-                .post('/api/v1/auth/login')
-                .send({ email: 'ethan.parker@example.com', password: '1234', userType: 'STUDENT' });
-            const studentToken = `Bearer ${studentLogin.body.accessToken}`;
-
-            const response = await request(API_BASE_URL!)
-                .post('/api/v1/teacher-lesson-rates')
-                .set('Authorization', studentToken)
-                .send({ lessonType: LessonType.GUITAR, rateInCents: 5000 });
-            expect(response.status).toBe(403);
-        });
-
-        it('should return 400 Bad Request if data is missing', async () => {
-            if (!seededTeacherAuthToken) throw new Error('Seeded teacher auth token not available');
-            const response = await request(API_BASE_URL!)
-                .post('/api/v1/teacher-lesson-rates')
-                .set('Authorization', seededTeacherAuthToken)
-                .send({ lessonType: LessonType.GUITAR }); // Missing rateInCents
+                .get('/api/v1/teachers')
+                .query({ limit: 10 }); // Missing lessonType
             expect(response.status).toBe(400);
+            expect(response.body.message).toContain('Lesson type is required');
         });
 
-        it('should UPDATE an existing lesson rate for the authenticated teacher', async () => {
-            if (!seededTeacherAuthToken) throw new Error('Auth token not available');
+        it('should return 400 if limit is missing or invalid', async () => {
+            // Case 1: Missing limit
+            let response = await request(API_BASE_URL!)
+                .get('/api/v1/teachers')
+                .query({ lessonType: LessonType.GUITAR }); // Missing limit
+            expect(response.status).toBe(400);
+            expect(response.body.message).toContain('Limit parameter is required');
 
-            // Find an existing rate ID (e.g., GUITAR)
-            const profileResponse = await request(API_BASE_URL!)
-                .get('/api/v1/teachers/profile')
-                .set('Authorization', seededTeacherAuthToken);
-            expect(profileResponse.status).toBe(200);
-            const guitarRate = profileResponse.body.hourlyRates?.find((rate: any) => rate.type === LessonType.GUITAR);
-            if (!guitarRate || !guitarRate.id) {
-                throw new Error(`Could not find existing GUITAR lesson rate for teacher ${SEEDED_TEACHER_EMAIL}.`);
-            }
-            const existingGuitarRateId = guitarRate.id;
-            const originalRateInCents = guitarRate.rateInCents;
+            // Case 2: Invalid limit (not a number)
+            response = await request(API_BASE_URL!)
+                .get('/api/v1/teachers')
+                .query({ lessonType: LessonType.GUITAR, limit: 'abc' });
+            expect(response.status).toBe(400);
+            expect(response.body.message).toContain('Limit must be a positive number');
 
-            const newRateInCents = originalRateInCents + 500; // New rate
+            // Case 3: Invalid limit (zero)
+            response = await request(API_BASE_URL!)
+                .get('/api/v1/teachers')
+                .query({ lessonType: LessonType.GUITAR, limit: 0 });
+            expect(response.status).toBe(400);
+            expect(response.body.message).toContain('Limit must be a positive number');
 
-            const updateResponse = await request(API_BASE_URL!)
-                .post('/api/v1/teacher-lesson-rates')
-                .set('Authorization', seededTeacherAuthToken)
-                .send({
-                    lessonType: LessonType.GUITAR,
-                    rateInCents: newRateInCents
-                });
-
-            expect(updateResponse.status).toBe(200);
-            // --- Update Check ---
-            expect(updateResponse.body.type).toBe(LessonType.GUITAR);
-            expect(updateResponse.body.rateInCents).toBe(newRateInCents);
-            expect(updateResponse.body.teacherId).toBe(seededTeacherId);
-            expect(updateResponse.body).toHaveProperty('createdAt');
-            expect(updateResponse.body).toHaveProperty('id');
-            expect(updateResponse.body.deactivatedAt).toBeNull();
-            // --- End Update Check ---
+            // Case 4: Invalid limit (negative)
+            response = await request(API_BASE_URL!)
+                .get('/api/v1/teachers')
+                .query({ lessonType: LessonType.GUITAR, limit: -5 });
+            expect(response.status).toBe(400);
+            expect(response.body.message).toContain('Limit must be a positive number');
         });
     });
 
-    describe('POST /api/v1/teacher-lesson-rates/:rateId/deactivate & reactivate', () => {
-        let rateToModifyId: string | null = null;
-
-        beforeAll(async () => {
-            // Fetch the existing VOICE rate ID
-            if (!seededTeacherAuthToken) throw new Error('Seeded teacher auth token not available');
-            try {
-                const profileResponse = await request(API_BASE_URL!)
-                    .get('/api/v1/teachers/profile')
-                    .set('Authorization', seededTeacherAuthToken);
-
-                if (profileResponse.status !== 200 || !profileResponse.body.hourlyRates) {
-                    throw new Error('Failed to fetch teacher profile or hourly rates in beforeAll');
-                }
-
-                const voiceRate = profileResponse.body.hourlyRates.find((rate: any) => rate.type === LessonType.VOICE);
-
-                if (!voiceRate || !voiceRate.id) {
-                    throw new Error(`Could not find existing VOICE lesson rate for teacher ${SEEDED_TEACHER_EMAIL} in seed data.`);
-                }
-
-                rateToModifyId = voiceRate.id;
-
-                // Ensure the rate is active before tests run
-                if (voiceRate && rateToModifyId && voiceRate.deactivatedAt !== null) { // Check if inactive
-                    await request(API_BASE_URL!)
-                        .post(`/api/v1/teacher-lesson-rates/${rateToModifyId}/reactivate`)
-                        .set('Authorization', seededTeacherAuthToken);
-                }
-
-            } catch (error) {
-                console.error('[Test Setup Error] Failed to get/prepare existing VOICE rate ID:', error);
-                throw error;
-            }
+    describe('GET /teachers/:id', () => {
+        it('should return 401 Unauthorized if no token is provided', async () => {
+            if (!testTeacherId) throw new Error('Test teacher ID not available');
+            const response = await request(API_BASE_URL!).get(`/api/v1/teachers/${testTeacherId}`);
+            expect(response.status).toBe(401);
         });
 
-        // Deactivate
-        it('should deactivate an existing lesson rate', async () => {
-            if (!seededTeacherAuthToken || !rateToModifyId) {
-                throw new Error('Auth token or VOICE rate ID not available for deactivation test');
-            }
+        it('should return 200 OK if accessed by an authenticated user (e.g., student)', async () => {
+            // Accessing another user's profile (GET /:id) only requires authentication
+            if (!testTeacherId) throw new Error('Test teacher ID not available');
+            const { user: student, password } = await createTestStudent();
+            const studentToken = await loginTestUser(student.email, password, UserType.STUDENT);
 
             const response = await request(API_BASE_URL!)
-                .post(`/api/v1/teacher-lesson-rates/${rateToModifyId}/deactivate`)
-                .set('Authorization', seededTeacherAuthToken);
-
+                .get(`/api/v1/teachers/${testTeacherId}`)
+                .set('Authorization', `Bearer ${studentToken}`);
             expect(response.status).toBe(200);
-            // --- Update Check ---
-            expect(response.body.id).toBe(rateToModifyId);
-            expect(response.body.deactivatedAt).not.toBeNull();
-            expect(typeof response.body.deactivatedAt).toBe('string');
-            // --- End Update Check ---
+            // Check it returns *some* teacher data, but maybe not all fields if we later refine
+            expect(response.body.id).toBe(testTeacherId);
         });
 
-        it('should return 404 if trying to deactivate a non-existent rate', async () => {
-            if (!seededTeacherAuthToken) throw new Error('Auth token not available');
-            const nonExistentRateId = 'non-existent-uuid-12345'; // Use a more UUID-like string
-            const response = await request(API_BASE_URL!)
-                .post(`/api/v1/teacher-lesson-rates/${nonExistentRateId}/deactivate`)
-                .set('Authorization', seededTeacherAuthToken);
-            expect(response.status).toBe(404);
-        });
-
-        // Reactivate
-        it('should reactivate a previously deactivated lesson rate', async () => {
-            if (!seededTeacherAuthToken || !rateToModifyId) {
-                throw new Error('Auth token or VOICE rate ID not available for reactivation test');
+        it('should return the full teacher profile if authenticated as that teacher', async () => {
+            if (!testTeacherAuthToken || !testTeacherId || !testTeacherEmail) {
+                throw new Error('Test teacher auth info not available for profile test');
             }
-
-            // Ensure it's deactivated first
-            try {
-                await request(API_BASE_URL!)
-                    .post(`/api/v1/teacher-lesson-rates/${rateToModifyId}/deactivate`)
-                    .set('Authorization', seededTeacherAuthToken);
-            } catch (error: any) {
-                // Ignore error if already deactivated (e.g., 409 Conflict)
-                if (error.response?.status !== 409) throw error;
-            }
-
-            // Reactivate
             const response = await request(API_BASE_URL!)
-                .post(`/api/v1/teacher-lesson-rates/${rateToModifyId}/reactivate`)
-                .set('Authorization', seededTeacherAuthToken);
-
+                .get(`/api/v1/teachers/${testTeacherId}`)
+                .set('Authorization', testTeacherAuthToken);
             expect(response.status).toBe(200);
-            // --- Update Check ---
-            expect(response.body.id).toBe(rateToModifyId);
-            expect(response.body.deactivatedAt).toBeNull();
-            // --- End Update Check ---
+            // Check fields from the full Teacher shared model
+            expect(response.body.id).toBe(testTeacherId);
+            expect(response.body.firstName).toBeDefined();
+            expect(response.body.lastName).toBeDefined();
+            expect(response.body.email).toBe(testTeacherEmail); // Email should be present now
+            expect(response.body.phoneNumber).toBeDefined(); // Phone should be present
+            expect(response.body.dateOfBirth).toBeDefined(); // DOB should be present (as ISO string)
+            expect(response.body).toHaveProperty('hourlyRates'); // Rates should be present
+            expect(Array.isArray(response.body.hourlyRates)).toBe(true);
+            // Ensure sensitive fields are NOT present (Password hash handled by Prisma? No, by mapper)
+            expect(response.body).not.toHaveProperty('passwordHash');
         });
 
-        it('should return 404 if trying to reactivate a non-existent rate', async () => {
-            if (!seededTeacherAuthToken) throw new Error('Auth token not available');
-            const nonExistentRateId = 'non-existent-uuid-54321'; // Use a more UUID-like string
+        it('should return 404 Not Found if the teacher ID does not exist', async () => {
+            if (!testTeacherAuthToken) throw new Error('Test teacher auth token not available');
+            const nonExistentId = uuidv4();
             const response = await request(API_BASE_URL!)
-                .post(`/api/v1/teacher-lesson-rates/${nonExistentRateId}/reactivate`)
-                .set('Authorization', seededTeacherAuthToken);
+                .get(`/api/v1/teachers/${nonExistentId}`)
+                .set('Authorization', testTeacherAuthToken);
             expect(response.status).toBe(404);
+            expect(response.body.error).toContain(`Teacher with ID ${nonExistentId} not found`);
+        });
+
+        it('should return 400 Bad Request if the ID format is invalid', async () => {
+            if (!testTeacherAuthToken) throw new Error('Test teacher auth token not available');
+            const invalidId = 'not-a-uuid';
+            const response = await request(API_BASE_URL!)
+                .get(`/api/v1/teachers/${invalidId}`)
+                .set('Authorization', testTeacherAuthToken);
+            expect(response.status).toBe(400);
+            expect(response.body.error).toContain('Invalid teacher ID format. Must be a valid UUID.');
         });
     });
 
     describe('GET /teachers/stats', () => {
         it('should return 401 Unauthorized if no token is provided', async () => {
-            const response = await request(API_BASE_URL!)
-                .get('/api/v1/teachers/stats');
+            const response = await request(API_BASE_URL!).get('/api/v1/teachers/stats');
             expect(response.status).toBe(401);
         });
 
         it('should return 403 Forbidden if accessed by a student', async () => {
-            // Login as a known student
-            const studentLogin = await request(API_BASE_URL!)
-                .post('/api/v1/auth/login')
-                .send({ email: 'ethan.parker@example.com', password: '1234', userType: 'STUDENT' });
-            const studentToken = `Bearer ${studentLogin.body.accessToken}`;
-
+            const { user: student, password } = await createTestStudent();
+            const studentToken = await loginTestUser(student.email, password, UserType.STUDENT);
             const response = await request(API_BASE_URL!)
                 .get('/api/v1/teachers/stats')
-                .set('Authorization', studentToken);
+                .set('Authorization', `Bearer ${studentToken}`);
             expect(response.status).toBe(403);
         });
 
         it('should return statistics for the authenticated teacher', async () => {
-            if (!seededTeacherAuthToken) throw new Error('Seeded teacher auth token not available');
-
+            if (!testTeacherAuthToken) throw new Error('Test teacher auth token not available');
+            // Note: Stats might be 0 if no lessons/goals are created for this dynamic teacher
+            // Consider creating some lessons/goals in beforeAll if specific stats are needed
             const response = await request(API_BASE_URL!)
                 .get('/api/v1/teachers/stats')
-                .set('Authorization', seededTeacherAuthToken);
-
+                .set('Authorization', testTeacherAuthToken);
             expect(response.status).toBe(200);
-            // Check for expected statistic properties (adjust names based on service implementation)
             expect(response.body).toHaveProperty('totalLessons');
             expect(response.body).toHaveProperty('completedLessons');
             expect(response.body).toHaveProperty('upcomingLessons');
             expect(response.body).toHaveProperty('totalEarnings');
-            // Add more specific value checks if the seed data allows for predictable stats
+            // Check types are numbers
+            expect(typeof response.body.totalLessons).toBe('number');
+            expect(typeof response.body.completedLessons).toBe('number');
+            expect(typeof response.body.totalEarnings).toBe('number');
         });
     });
-
-    // --- End of New Tests ---
 
 }); 

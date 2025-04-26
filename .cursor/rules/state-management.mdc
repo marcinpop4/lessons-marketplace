@@ -1,17 +1,87 @@
 ---
-description: Standards for state management
-globs: ["**/*.ts", "**/*.tsx"]
-alwaysApply: true
+description: State management pattern (status)
+globs: 
+alwaysApply: false
 ---
+# Status Model Implementation
 
-# State Management
+## Goal
+To provide a consistent, traceable, and immutable way to manage the status of core models (like Lessons, Goals, Objectives, etc.) throughout their lifecycle.
 
-- Never infer state or status values.
-- All status changes must be explicit results of specific events or actions.
-- Status transitions should be clearly defined and traceable to specific triggers.
-- Use appropriate state management patterns for the complexity of the application.
-- Keep state as local as possible, lifting it up only when necessary.
-- Document complex state machines with diagrams or clear comments.
-- Ensure state changes are predictable and easy to debug.
-- Consider using finite state machines for complex state transitions.
-- Avoid direct mutation of state; prefer immutable state updates. 
+## Core Principles
+- **Immutability:** Status history is preserved. Changing a model's status means creating a *new* status record, not updating an existing one.
+- **Separation:** The status history and logic are encapsulated in a dedicated status model, separate from the main model.
+- **Traceability:** Each status change is recorded with a timestamp and optional context.
+- **State Machine:** Transitions between statuses are explicitly defined and validated.
+- **Explicitness:** Never infer state or status values based on other data or lack thereof. Status changes MUST be the direct result of a defined transition event.
+
+## Implementation Components
+
+When adding status tracking to a model (e.g., `MyModel`), implement the following:
+
+1.  **Status Value Enum (`[MyModel]StatusValue.ts`):**
+    *   Define an enum listing all possible discrete states the model can be in (e.g., `CREATED`, `IN_PROGRESS`, `COMPLETED`).
+    *   Based on: `shared/models/GoalStatus.ts` (`GoalStatusValue`)
+
+2.  **Status Transition Enum (`[MyModel]StatusTransition.ts` or within Status Model):**
+    *   Define an enum listing the *actions* or *events* that cause a status change (e.g., `START`, `COMPLETE`, `ABANDON`).
+    *   Based on: `shared/models/GoalStatus.ts` (`GoalStatusTransition`)
+
+3.  **Status Model (`[MyModel]Status.ts`):**
+    *   Create a dedicated class/model (e.g., `MyModelStatus`).
+    *   **Properties:**
+        *   `id`: Unique identifier for this specific status instance.
+        *   `[myModel]Id`: Foreign key linking back to the main model instance (`MyModel.id`).
+        *   `status`: The actual status value from the `[MyModel]StatusValue` enum for this point in time.
+        *   `context`: Optional (`JsonValue | null`) field to store relevant data about *why* this status was entered (e.g., reason for rejection, completion notes).
+            *   **`JsonValue` Type:** Use the following type definition to allow flexible, JSON-compatible data structures for the `context` field, avoiding direct dependency on Prisma types in shared models:
+                ```typescript
+                type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
+                ```
+        *   `createdAt`: Timestamp for when this status record was created.
+    *   **State Machine Logic:**
+        *   Include a `static readonly StatusTransitions` map defining valid transitions:
+            ```typescript
+            // Inside [MyModel]Status class
+            static readonly StatusTransitions = {
+                [MyModelStatusValue.STATE_A]: {
+                    [MyModelStatusTransition.ACTION_1]: MyModelStatusValue.STATE_B,
+                    // ... other actions from STATE_A
+                },
+                [MyModelStatusValue.STATE_B]: {
+                    // ... actions from STATE_B
+                },
+                // ... other states
+            } as const;
+            ```
+        *   Implement static helper methods like `isValidTransition(currentStatus, transition)` and `getResultingStatus(currentStatus, transition)`.
+    *   Based on: `shared/models/GoalStatus.ts` (`GoalStatus` class)
+
+4.  **Main Model (`[MyModel].ts`):**
+    *   Add a `currentStatusId` property (string | null) which is a foreign key pointing to the `id` of the *current* `[MyModel]Status` record.
+    *   Add a `currentStatus` property which holds the *actual* `[MyModel]Status` object, populated via relations in queries.
+    *   The main model itself SHOULD NOT store the status value directly.
+    *   Based on: `shared/models/Goal.ts` (properties `currentStatusId`, `currentStatus`)
+
+5.  **Database Schema (e.g., Prisma `schema.prisma`):**
+    *   Define both `MyModel` and `MyModelStatus` tables.
+    *   Establish the relationship:
+        *   `MyModel` has a one-to-many relation to `MyModelStatus` (for the full history, named e.g., `statuses`).
+        *   `MyModel` has a one-to-one relation (via `currentStatusId`) to `MyModelStatus` for the current status (named e.g., `currentStatus`). Link `currentStatusId` field to `MyModelStatus.id`.
+        *   `MyModelStatus` has a required relation back to `MyModel` via `myModelId`.
+
+6.  **Service Logic (`[myModel].service.ts`):**
+    *   **Creation:** When creating a `MyModel` instance, typically within a transaction:
+        1. Create the `MyModel` record (potentially without `currentStatusId` initially).
+        2. Create the initial `MyModelStatus` record (e.g., with `status: [MyModel]StatusValue.CREATED`).
+        3. Update the `MyModel` record to set its `currentStatusId` to the ID of the newly created status record and connect the history relation.
+    *   **Status Updates:** When updating the status (e.g., via `updateMyModelStatus(myModelId, transition, context)`):
+        1. Fetch the `MyModel` instance *including* its `currentStatus`.
+        2. Use `MyModelStatus.isValidTransition` to check if the requested `transition` is valid from the `currentStatus.status`. Throw an error (e.g., `BadRequestError`) if invalid.
+        3. Determine the `newStatusValue` using `MyModelStatus.getResultingStatus`.
+        4. **Create a *new* `MyModelStatus` record** with the `newStatusValue` and any provided `context`.
+        5. **Update the `MyModel` record**, setting its `currentStatusId` to the ID of the *newly created* status record. Also, connect the new status to the history relation.
+        6. Perform steps 1-5 within a database transaction (`prisma.$transaction`) to ensure atomicity.
+
+## Example Reference
+Refer to `Goal.ts` / `GoalStatus.ts` and `goal.service.ts` for a concrete implementation example.
