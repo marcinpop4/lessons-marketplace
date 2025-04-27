@@ -1,22 +1,22 @@
 /**
- * Prisma Seed Script (Refactored)
- * 
+ * Prisma Seed Script (Refactored 2)
+ *
  * This script seeds the database using service classes to adhere to architectural guidelines.
- * It relies on shared models and service logic for data creation and validation.
+ * It focuses on creating a structured set of data for 4 students and 4 teachers.
  */
 
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
-// import bcryptjs from 'bcryptjs'; // No longer needed here
+import chalk from 'chalk'; // Import chalk
 
 // Import shared models and enums
-import { LessonType } from '@shared/models/LessonType';
-// Import both value and transition enums for LessonStatus
-import { LessonStatusValue, LessonStatusTransition } from '@shared/models/LessonStatus';
-import { GoalStatusValue, GoalStatusTransition } from '@shared/models/GoalStatus';
-import { Goal } from '@shared/models/Goal';
+import { LessonType } from '@shared/models/LessonType.js';
+import { LessonStatusValue } from '@shared/models/LessonStatus.js';
+import { LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus.js'; // Added
+import { GoalStatusValue, GoalStatusTransition } from '@shared/models/GoalStatus.js';
+import { Goal } from '@shared/models/Goal.js';
 import { Address, AddressDTO } from '../../shared/models/Address.js';
 import { Student } from '../../shared/models/Student.js';
 import { Teacher } from '../../shared/models/Teacher.js';
@@ -24,41 +24,39 @@ import { LessonRequest } from '../../shared/models/LessonRequest.js';
 import { LessonQuote } from '../../shared/models/LessonQuote.js';
 import { Lesson } from '../../shared/models/Lesson.js';
 import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourlyRate.js';
+import { UserType } from '../../shared/models/UserType.js';
+import { AuthMethod } from '../auth/auth.service.js'; // Ensure AuthMethod enum itself is imported if used directly
 
-// Import ALL services 
+// Import ALL services
 import { teacherService } from '../teacher/teacher.service.js';
 import { studentService } from '../student/student.service.js';
 import { addressService } from '../address/address.service.js';
 import { lessonRequestService } from '../lessonRequest/lessonRequest.service.js';
-// Import the lesson quote service
 import { lessonQuoteService } from '../lessonQuote/lessonQuote.service.js';
 import { lessonService } from '../lesson/lesson.service.js';
 import { teacherLessonHourlyRateService } from '../teacher-lesson-hourly-rate/teacherLessonHourlyRate.service.js';
 import { goalService } from '../goal/goal.service.js';
+import authService from '../auth/auth.service.js'; // Default import
+import { utilService } from '../util/util.service.js'; // Import new util service
 
-// Import authService
-import authService, { AuthMethod } from '../auth/auth.service.js';
-import { UserType } from '../../shared/models/UserType.js';
-
-// Initialize Prisma client (passed to services)
+// Initialize Prisma client (not used directly except by UtilService)
 import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+const prisma = new PrismaClient(); // Keep for finally block
 
-// Load environment variables from .env file in the project root
+// --- Environment Setup ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const envFile = path.resolve(__dirname, `../../env/.env.${process.env.NODE_ENV}`);
-
 if (!process.env.NODE_ENV) {
   throw new Error('NODE_ENV environment variable is required');
 }
-
+const envFile = path.resolve(__dirname, `../../env/.env.${process.env.NODE_ENV}`);
 const result = dotenv.config({ path: envFile });
 if (result.error) {
   throw new Error(`Failed to load environment file at ${envFile}: ${result.error.message}`);
 }
 
-// Function to get base rate
+// --- Helper Functions ---
+
 function getBaseRateInCents(lessonType: LessonType): number {
   switch (lessonType) {
     case LessonType.VOICE: return 5000;
@@ -69,7 +67,6 @@ function getBaseRateInCents(lessonType: LessonType): number {
   }
 }
 
-// Helper function to add days/hours to a date
 function addToDate(date: Date, days: number, hours: number): Date {
   const newDate = new Date(date);
   newDate.setDate(newDate.getDate() + days);
@@ -77,451 +74,256 @@ function addToDate(date: Date, days: number, hours: number): Date {
   return newDate;
 }
 
-// Hash password function REMOVED - Handled by services
-// async function hashPassword(password) { ... }
-
-// Sample addresses 
-const sampleAddresses = [
-  { street: '123 Main Street', city: 'New York', state: 'NY', postalCode: '10001', country: 'USA' },
-  { street: '456 Oak Avenue', city: 'Los Angeles', state: 'CA', postalCode: '90001', country: 'USA' },
-  { street: '789 Pine Boulevard', city: 'Chicago', state: 'IL', postalCode: '60601', country: 'USA' },
-  { street: '101 Maple Drive', city: 'Houston', state: 'TX', postalCode: '77001', country: 'USA' },
-  { street: '202 Cedar Lane', city: 'Miami', state: 'FL', postalCode: '33101', country: 'USA' }
-];
-
-// Sample Goal Data Generator
-function getSampleGoalData(lessonType: LessonType, studentAge: number) {
-  // Basic goals, customize further based on type/age
+// Sample Goal Data Generator (kept from original)
+function getSampleGoalData(lessonType: LessonType) {
   const goals = [
-    {
-      created: { title: 'Understand Basic Theory', description: 'Learn the fundamental concepts related to the instrument.', estimatedLessonCount: 2 },
-      started: { title: 'Practice Basic Scales', description: 'Practice the major and minor scales daily.', estimatedLessonCount: 4 },
-      achieved: { title: 'Play First Simple Song', description: 'Learn and play a simple song from start to finish.', estimatedLessonCount: 3, context: { notes: 'Student successfully played \'Twinkle Twinkle Little Star\' with steady rhythm and correct notes.' } }
-    }
+    { title: 'Understand Basic Theory', description: 'Learn fundamental concepts.', estimatedLessonCount: 2 },
+    { title: 'Practice Basic Scales', description: 'Practice major/minor scales.', estimatedLessonCount: 4 },
+    { title: 'Play Simple Song', description: 'Learn a simple song.', estimatedLessonCount: 3 }
   ];
-
-  // Example customization (can be expanded)
-  if (lessonType === LessonType.GUITAR && studentAge > 12) {
-    goals[0].started.title = 'Practice Chord Transitions';
-    goals[0].started.description = 'Practice transitioning smoothly between G, C, and D chords.';
-    goals[0].achieved.context.notes = 'Student can now play the basic chord progression for \'Knockin\' on Heaven\'s Door\'.';
-  }
-  if (lessonType === LessonType.DRUMS) {
-    goals[0].created.title = 'Basic Drum Setup & Grip';
-    goals[0].created.description = 'Learn how to set up the drum kit correctly and hold the sticks properly.';
-    goals[0].started.title = 'Practice Basic Rock Beat';
-    goals[0].started.description = 'Practice a standard 4/4 rock beat (kick, snare, hi-hat).';
-    goals[0].achieved.title = 'Play Beat with Simple Fill';
-    goals[0].achieved.description = 'Maintain a steady rock beat and incorporate a simple drum fill.';
-    goals[0].achieved.context.notes = 'Student can play a steady basic rock beat for 1 minute and execute a simple snare fill on cue.';
-  }
-
-  // Select one set for this lesson
-  return goals[0]; // Just returning the first set for simplicity
+  // Simple selection for now
+  if (lessonType === LessonType.DRUMS) return goals[1]; // Practice scales (rudiments)
+  if (lessonType === LessonType.GUITAR) return goals[2]; // Play song
+  return goals[0]; // Basic theory for others
 }
 
-// Define target statuses early - REMOVED REQUESTED and REJECTED
-const targetStatuses: LessonStatusValue[] = [
-  LessonStatusValue.ACCEPTED,
-  LessonStatusValue.DEFINED,
-  LessonStatusValue.COMPLETED,
-  LessonStatusValue.VOIDED
-];
-
-// --- Helper: Determine Transition Sequence ---
-function getTransitionsToReachStatus(targetStatus: LessonStatusValue): LessonStatusTransition[] {
-  // ASSUMPTION: Lesson starts in ACCEPTED state after creation via lessonService.create(quoteId)
-  switch (targetStatus) {
-    // case LessonStatusValue.REQUESTED: // Cannot transition back to requested
-    //   return [];
-    case LessonStatusValue.ACCEPTED:
-      return []; // Already in this state
-    // case LessonStatusValue.REJECTED: // Cannot transition from ACCEPTED to REJECTED
-    //  return [];
-    case LessonStatusValue.DEFINED:
-      return [LessonStatusTransition.DEFINE]; // ACCEPTED -> DEFINE
-    case LessonStatusValue.COMPLETED:
-      return [LessonStatusTransition.DEFINE, LessonStatusTransition.COMPLETE]; // ACCEPTED -> DEFINE -> COMPLETE
-    case LessonStatusValue.VOIDED:
-      // Assuming VOID can happen after DEFINED
-      return [LessonStatusTransition.DEFINE, LessonStatusTransition.VOID]; // ACCEPTED -> DEFINE -> VOID
-    default:
-      console.warn(`Unsupported target status for transition generation: ${targetStatus}`);
-      return [];
-  }
-}
-
-// Helper function to safely delete records from tables that may not exist yet
-async function safeDeleteMany(tableName: string): Promise<void> {
-  try {
-    // Use dynamic property access to check if the table exists
-    const table = (prisma as any)[tableName];
-    if (table && typeof table.deleteMany === 'function') {
-      await table.deleteMany();
-      console.log(`Successfully cleared ${tableName} table.`);
-    } else {
-      console.log(`Skipping deletion for ${tableName} - table not found in schema.`);
-    }
-  } catch (error) {
-    console.warn(`Error clearing ${tableName} table:`, error);
-  }
-}
-
-// Define a type for the result of createOrUpdateLessonRate based on the error
-type CreateOrUpdateResult = { wasCreated: boolean, rate: TeacherLessonHourlyRate };
+// --- Main Seeding Logic ---
 
 async function main() {
+  const commonPassword = "12345678"; // Use updated password
+  const NUM_STUDENTS = 4;
+  const NUM_TEACHERS = 4;
+  const NUM_ADDRESSES = 4;
+  const NUM_REQUESTS_PER_STUDENT = 4;
+  const ALL_LESSON_TYPES = Object.values(LessonType);
 
-  const commonPassword = "1234";
+  try { // Ensure main try block is present
+    // 1. Clear Database using UtilService
+    await utilService.clearDatabase();
+    console.log(chalk.yellow('Database cleared.')); // Summary log
 
-  try {
-    // Clear existing data (using direct Prisma for seed cleanup)
-    await prisma.$transaction([
-      // Delete records that depend on others first
-      prisma.goalStatus.deleteMany(),
-      prisma.goal.deleteMany(),
-      prisma.lessonStatus.deleteMany(),
-      prisma.objectiveStatus.deleteMany(), // Assuming ObjectiveStatus depends on Objective
-      prisma.objective.deleteMany(), // Assuming Objective depends on Student/Lesson
-      prisma.lessonQuoteStatus.deleteMany(), // DELETE LessonQuoteStatus FIRST
-      // Now delete records that others depended on
-      prisma.lesson.deleteMany(),       // Depends on LessonQuote
-      prisma.lessonQuote.deleteMany(),    // Depends on LessonRequest, Teacher
-      prisma.lessonRequest.deleteMany(),  // Depends on Student, Address
-      prisma.teacherLessonHourlyRate.deleteMany(), // Depends on Teacher
-      // Delete auth-related tables
-      prisma.userAuthMethod.deleteMany(),
-      prisma.passwordCredential.deleteMany(),
-      // Now delete the base records
-      prisma.address.deleteMany(),
-      prisma.teacher.deleteMany(),
-      prisma.student.deleteMany(),
-      // Note: RefreshToken might need deletion if used, but not included here
-    ]);
-
-    // Create Teachers using TeacherService
+    // 2. Create Base Data (Teachers, Students, Addresses)
+    // Teacher Data
     const teacherData = [
       { firstName: 'Emily', lastName: 'Richardson', email: 'emily.richardson@musicschool.com', phoneNumber: '123-456-7890', dateOfBirth: new Date('1980-04-12') },
       { firstName: 'Michael', lastName: 'Chen', email: 'michael.chen@musicschool.com', phoneNumber: '123-456-7891', dateOfBirth: new Date('1975-09-23') },
       { firstName: 'Sophia', lastName: 'Martinez', email: 'sophia.martinez@musicschool.com', phoneNumber: '123-456-7892', dateOfBirth: new Date('1982-11-05') },
       { firstName: 'James', lastName: 'Wilson', email: 'james.wilson@musicschool.com', phoneNumber: '123-456-7893', dateOfBirth: new Date('1978-06-18') },
-      { firstName: 'Olivia', lastName: 'Thompson', email: 'olivia.thompson@musicschool.com', phoneNumber: '123-456-7894', dateOfBirth: new Date('1985-02-27') }
     ];
 
-    // Create teachers using authService.register for proper credential setup
-    const teachers: Teacher[] = await Promise.all(
-      teacherData.map(teacher => {
-        const registrationData = {
-          ...teacher,
-          userType: UserType.TEACHER,
-          auth: {
-            method: 'PASSWORD' as AuthMethod,
-            password: commonPassword
-          }
-        };
-        return authService.register(registrationData)
-          .then(result => {
-            // Return full teacher object, not just what's in the auth result
-            return teacherService.findById(result.user.id);
-          });
-      })
-    ).then(results => results.filter((t): t is Teacher => t !== null));
+    const allTeachers: Teacher[] = (await Promise.all(
+      teacherData.map(teacher => authService.register({
+        ...teacher,
+        userType: UserType.TEACHER,
+        auth: { method: AuthMethod.PASSWORD, password: commonPassword } // Corrected AuthMethod usage
+      }).then(result => teacherService.getTeacherById(result.user.id))
+      )
+    )).filter((t): t is Teacher => t !== null);
 
-    console.log('Teachers created (via service):', teachers.length);
+    const teachers = allTeachers.slice(0, NUM_TEACHERS);
+    if (teachers.length < NUM_TEACHERS) throw new Error(`Failed to create enough teachers. Needed ${NUM_TEACHERS}, got ${teachers.length}`);
+    console.log(chalk.green(`✓ ${teachers.length} Teachers created.`)); // Summary log
 
-    // Get Emily Richardson's teacher record (for tests)
-    const emilyRichardson = teachers.find(teacher => teacher.email === 'emily.richardson@musicschool.com');
-    if (!emilyRichardson) {
-      throw new Error('Emily Richardson teacher record not found');
-    }
-
-    // Create Students using StudentService with proper auth
+    // Student Data
     const studentData = [
       { firstName: 'Ethan', lastName: 'Parker', email: 'ethan.parker@example.com', phoneNumber: '987-654-3210', dateOfBirth: new Date('2000-05-15') },
       { firstName: 'Ava', lastName: 'Johnson', email: 'ava.johnson@example.com', phoneNumber: '987-654-3211', dateOfBirth: new Date('2001-08-22') },
       { firstName: 'Noah', lastName: 'Williams', email: 'noah.williams@example.com', phoneNumber: '987-654-3212', dateOfBirth: new Date('2000-11-07') },
       { firstName: 'Isabella', lastName: 'Lee', email: 'isabella.lee@example.com', phoneNumber: '987-654-3213', dateOfBirth: new Date('2002-03-19') },
-      { firstName: 'Lucas', lastName: 'Garcia', email: 'lucas.garcia@example.com', phoneNumber: '987-654-3214', dateOfBirth: new Date('2003-07-01') },
-      { firstName: 'Mia', lastName: 'Brown', email: 'mia.brown@example.com', phoneNumber: '987-654-3215', dateOfBirth: new Date('2004-09-30') },
-      { firstName: 'Benjamin', lastName: 'Davis', email: 'benjamin.davis@example.com', phoneNumber: '987-654-3216', dateOfBirth: new Date('2005-01-14') },
-      { firstName: 'Zoe', lastName: 'Rodriguez', email: 'zoe.rodriguez@example.com', phoneNumber: '987-654-3217', dateOfBirth: new Date('2006-04-25') },
-      { firstName: 'Samuel', lastName: 'Smith', email: 'samuel.smith@example.com', phoneNumber: '987-654-3218', dateOfBirth: new Date('2007-06-03') },
-      { firstName: 'Charlotte', lastName: 'Taylor', email: 'charlotte.taylor@example.com', phoneNumber: '987-654-3219', dateOfBirth: new Date('2008-10-17') }
     ];
 
-    // Create students using authService.register for proper credential setup
-    const students: Student[] = await Promise.all(
-      studentData.map(student => {
-        const registrationData = {
-          ...student,
-          userType: UserType.STUDENT,
-          auth: {
-            method: 'PASSWORD' as AuthMethod,
-            password: commonPassword
-          }
-        };
-        return authService.register(registrationData)
-          .then(result => {
-            // Return full student object, not just what's in the auth result
-            return studentService.findById(result.user.id);
-          });
-      })
-    ).then(results => results.filter((s): s is Student => s !== null));
+    const allStudents: Student[] = (await Promise.all(
+      studentData.map(student => authService.register({
+        ...student,
+        userType: UserType.STUDENT,
+        auth: { method: AuthMethod.PASSWORD, password: commonPassword } // Corrected AuthMethod usage
+      }).then(result => studentService.findById(result.user.id))
+      )
+    )).filter((s: Student | null): s is Student => s !== null);
 
-    console.log('Students created (via service):', students.length);
+    const students = allStudents.slice(0, NUM_STUDENTS);
+    if (students.length < NUM_STUDENTS) throw new Error(`Failed to create enough students. Needed ${NUM_STUDENTS}, got ${students.length}`);
+    console.log(chalk.green(`✓ ${students.length} Students created.`)); // Summary log
 
-    // Create Addresses using AddressService
-    const createdAddresses = await Promise.all(
-      sampleAddresses.map(addressData => {
-        const addressDto: AddressDTO = {
-          street: addressData.street,
-          city: addressData.city,
-          state: addressData.state,
-          postalCode: addressData.postalCode,
-          country: addressData.country
-        };
-        return addressService.create(addressDto);
-      })
-    );
-    const addresses: Address[] = createdAddresses.filter((addr): addr is Address => addr !== null);
-    if (addresses.length !== sampleAddresses.length) {
-      console.warn('Warning: Some addresses failed to create.');
-    }
-    console.log('Addresses created (via service):', addresses.length);
+    // Address Data
+    const sampleAddresses = [
+      { street: '123 Main Street', city: 'New York', state: 'NY', postalCode: '10001', country: 'USA' },
+      { street: '456 Oak Avenue', city: 'Los Angeles', state: 'CA', postalCode: '90001', country: 'USA' },
+      { street: '789 Pine Boulevard', city: 'Chicago', state: 'IL', postalCode: '60601', country: 'USA' },
+      { street: '101 Maple Drive', city: 'Houston', state: 'TX', postalCode: '77001', country: 'USA' },
+    ];
 
-    // Create Hourly Rates using TeacherLessonHourlyRateService
-    const rateCreationResults: CreateOrUpdateResult[] = []; // Use the defined type
+    const addresses: Address[] = (await Promise.all(
+      sampleAddresses.slice(0, NUM_ADDRESSES).map(addr => addressService.create(addr as AddressDTO))
+    )).filter((addr): addr is Address => addr !== null);
+    if (addresses.length < NUM_ADDRESSES) throw new Error(`Failed to create enough addresses. Needed ${NUM_ADDRESSES}, got ${addresses.length}`);
+    console.log(chalk.green(`✓ ${addresses.length} Addresses created.`)); // Summary log
+
+    // 3. Create Teacher Rates
+    let ratesCreatedCount = 0;
     for (const teacher of teachers) {
-      // Create rates for ALL lesson types for every teacher
-      const lessonTypesToCreate = Object.values(LessonType); // REMOVED filter
-
-      const teacherRateResults = await Promise.all(
-        lessonTypesToCreate.map(lessonType => {
-          const baseRateInCents = getBaseRateInCents(lessonType);
-          const rateVariationInCents = (teacher.id.charCodeAt(0) % 1000) - 500; // -500 to +499 cents variation
-          const rateInCents = baseRateInCents + rateVariationInCents;
-          // Assume the service returns CreateOrUpdateResult
-          return teacherLessonHourlyRateService.createOrUpdateLessonRate(
-            teacher.id,
-            lessonType,
-            rateInCents
-          );
-        })
-      );
-      rateCreationResults.push(...teacherRateResults); // Push the results
+      for (const lessonType of ALL_LESSON_TYPES) {
+        const rateInCents = getBaseRateInCents(lessonType); // Use fixed base rate
+        try {
+          await teacherLessonHourlyRateService.createOrUpdateLessonRate(teacher.id, lessonType, rateInCents);
+          ratesCreatedCount++;
+        } catch (rateError) {
+          console.error(chalk.red(`Failed to create rate for teacher ${teacher.id}, type ${lessonType}:`), rateError);
+        }
+      }
     }
+    const expectedRateCount = teachers.length * ALL_LESSON_TYPES.length;
+    if (ratesCreatedCount < expectedRateCount) {
+      console.warn(chalk.yellow(`Warning: Created ${ratesCreatedCount} rates, expected ${expectedRateCount}. Some teachers might be missing rates.`));
+    }
+    console.log(chalk.green(`✓ ${ratesCreatedCount} Teacher Rates created/updated.`)); // Summary log
 
-    // Ensure Emily Richardson has a VOICE rate specifically, as the filtering logic might skip it.
-    const emilyVoiceRateResult = await teacherLessonHourlyRateService.createOrUpdateLessonRate(
-      emilyRichardson.id,
-      LessonType.VOICE,
-      getBaseRateInCents(LessonType.VOICE) // Use the base rate for simplicity
+    const teachersWithRates: Teacher[] = await Promise.all(
+      teachers.map(t => teacherService.getTeacherById(t.id))
     );
-    rateCreationResults.push(emilyVoiceRateResult); // Push the result
+    // console.log(`Refetched ${teachersWithRates.length} teachers with rates.`); // Removed internal log
 
-    // Extract the actual rates from the results
-    const teacherLessonHourlyRates: TeacherLessonHourlyRate[] = rateCreationResults
-      .map(result => result.rate) // Get the rate property
-      .filter((rate): rate is TeacherLessonHourlyRate => rate !== null); // Filter should technically not be needed now, but safe to keep
 
-    console.log('TeacherLessonHourlyRates created (via service):', teacherLessonHourlyRates.length);
-
-    // Create Lesson Requests using LessonRequestService
+    // 4. Create Lesson Requests
     const lessonRequests: LessonRequest[] = [];
-    const lessonTypes = Object.values(LessonType);
     const today = new Date();
-    const numLessonsPerStatus = 5;
-    const numTargetStatuses = targetStatuses.length;
-    const numBaseLessonRequests = numLessonsPerStatus * numTargetStatuses;
-    const numTotalLessonRequests = numBaseLessonRequests + 1;
+    for (let s = 0; s < students.length; s++) {
+      const student = students[s];
+      const studentLessonType = ALL_LESSON_TYPES[s % ALL_LESSON_TYPES.length];
+      // console.log(`  Student ${s + 1} (${student.firstName}) requesting ${studentLessonType}...`); // Removed internal log
 
-    for (let i = 0; i < numTotalLessonRequests; i++) {
-      const student = students[i % students.length];
-      const lessonType = lessonTypes[i % lessonTypes.length];
-      const address = addresses[i % addresses.length];
-      const startTime = addToDate(today, Math.floor(i / 4), 9 + (i % 8));
-
-      if (!address) {
-        console.warn(`Skipping lesson request creation for index ${i} due to missing address.`);
-        continue;
-      }
-
-      const request = await lessonRequestService.createLessonRequest({
-        studentId: student.id,
-        addressDTO: {
-          street: address.street,
-          city: address.city,
-          state: address.state,
-          postalCode: address.postalCode,
-          country: address.country
-        },
-        type: lessonType,
-        startTime,
-        durationMinutes: 60,
-      });
-      if (request) {
-        lessonRequests.push(request);
-      }
-    }
-    console.log(`LessonRequests created (via service): ${lessonRequests.length}`);
-
-    // Create Lesson Quotes using LessonQuoteService
-    const emilyQuotes: LessonQuote[] = [];
-    const emilyHourlyRates = teacherLessonHourlyRates.filter(rate => rate.teacherId === emilyRichardson.id);
-    if (lessonRequests.length < numTotalLessonRequests) {
-      throw new Error(`Not enough lesson requests for seeding. Need ${numTotalLessonRequests}, got ${lessonRequests.length}.`);
-    }
-
-    for (let i = 0; i < numTotalLessonRequests; i++) {
-      const request = lessonRequests[i];
-      const hourlyRate = emilyHourlyRates.find(rate => rate.type === request.type);
-      if (!hourlyRate) throw new Error(`No rate for Emily for ${request.type} on request ${i}`);
-      const costInCents = Math.round((hourlyRate.rateInCents * request.durationMinutes) / 60);
-
-      const quote = await lessonQuoteService.create({
-        lessonRequestId: request.id,
-        teacherId: emilyRichardson.id,
-        costInCents,
-        hourlyRateInCents: hourlyRate.rateInCents,
-      });
-      if (quote) {
-        emilyQuotes.push(quote);
-      }
-    }
-    console.log(`LessonQuotes created for Emily (via service): ${emilyQuotes.length}`);
-
-    // --- NEW SEEDING LOGIC: Create 5 Lessons per Status --- 
-    const createdLessonsData: { lesson: Lesson | null; finalStatus: LessonStatusValue | string }[] = [];
-    let quoteIndex = 0;
-
-    for (const targetStatus of targetStatuses) {
-      for (let i = 0; i < 5; i++) {
-        if (quoteIndex >= numBaseLessonRequests) {
-          console.warn('Warning: Reached quote limit unexpectedly during status loop.');
-          break;
-        }
-        const quote = emilyQuotes[quoteIndex++];
-        if (!quote) {
-          console.warn(`Skipping lesson creation for quote index ${quoteIndex - 1} due to missing quote.`);
-          continue;
-        }
-
-        const createdLessonInitial = await lessonService.create(quote.id);
-        if (!createdLessonInitial?.id) {
-          console.error(`Failed to create lesson for quote ${quote.id}`);
-          continue;
-        }
-        const lessonId = createdLessonInitial.id;
-
-        let currentLessonState: Lesson | null = createdLessonInitial;
+      for (let r = 0; r < NUM_REQUESTS_PER_STUDENT; r++) {
+        const address = addresses[(s + r) % addresses.length];
+        const startTime = addToDate(today, s * 7 + r, 10 + r * 2);
 
         try {
-          const transitions = getTransitionsToReachStatus(targetStatus);
-          for (const transition of transitions) {
-            let context = {};
-            if (transition === LessonStatusTransition.COMPLETE) {
-              context = { notes: 'Lesson completed during seed.' };
-            }
-            currentLessonState = await lessonService.updateStatus(
-              lessonId,
-              transition,
-              context,
-              emilyRichardson.id
-            );
-            if (!currentLessonState) {
-              throw new Error(`Failed to apply transition ${transition} to lesson ${lessonId}`);
-            }
+          const request = await lessonRequestService.createLessonRequest({
+            studentId: student.id,
+            addressDTO: {
+              street: address.street,
+              city: address.city,
+              state: address.state,
+              postalCode: address.postalCode,
+              country: address.country
+            },
+            type: studentLessonType,
+            startTime,
+            durationMinutes: 60,
+          });
+          if (request) {
+            lessonRequests.push(request);
           }
-          createdLessonsData.push({ lesson: currentLessonState, finalStatus: targetStatus });
-        } catch (transitionError) {
-          console.error(`   ERROR transitioning lesson ${lessonId.substring(0, 8)}... for target ${targetStatus}. Error: ${transitionError instanceof Error ? transitionError.message : transitionError}`);
-          const finalStatusOnError = currentLessonState?.currentStatus?.status || 'UNKNOWN';
-          createdLessonsData.push({ lesson: currentLessonState, finalStatus: finalStatusOnError });
+        } catch (requestError) {
+          console.error(chalk.red(`Failed to create lesson request ${r + 1} for student ${student.id}:`), requestError);
         }
       }
     }
+    console.log(chalk.green(`✓ ${lessonRequests.length} Lesson Requests created.`)); // Summary log
 
-    // --- Create 1 extra DEFINED lesson with NO goals for testing --- 
-    const extraQuoteForDefinedLesson = emilyQuotes[numBaseLessonRequests];
-    let goalFreeDefinedLesson: Lesson | null = null;
-    try {
-      if (!extraQuoteForDefinedLesson) {
-        throw new Error('Missing the extra quote needed for the goal-free defined lesson.');
+    // 5. Create Lesson Quotes for ALL Requests from ALL Teachers
+    const createdQuotes: LessonQuote[] = [];
+    for (const request of lessonRequests) {
+      try {
+        const quotesForRequest = await lessonQuoteService.createQuotes(request, teachersWithRates);
+        createdQuotes.push(...quotesForRequest);
+        // console.log(`  Created ${quotesForRequest.length} quotes for request ${request.id.substring(0, 8)}...`); // Removed internal log
+      } catch (quoteError) {
+        console.error(chalk.red(`Failed to create quotes for request ${request.id}:`), quoteError);
       }
-      const initialLesson = await lessonService.create(extraQuoteForDefinedLesson.id);
-      if (!initialLesson?.id) throw new Error('Failed to create initial goal-free lesson.');
-
-      // Directly transition from initial state (assumed ACCEPTED) to DEFINED
-      goalFreeDefinedLesson = await lessonService.updateStatus(initialLesson.id, LessonStatusTransition.DEFINE, {}, emilyRichardson.id);
-    } catch (error) {
-      console.error(`   ERROR creating special goal-free DEFINED lesson: ${error instanceof Error ? error.message : error}`);
     }
-    // --- End extra lesson creation --- 
+    console.log(chalk.green(`✓ ${createdQuotes.length} Lesson Quotes created.`)); // Summary log
 
-    // --- Create Goals for DEFINED/COMPLETED lessons --- 
+    // 6. Select One Quote Per Student and Create Lessons
+    const quotesToAccept: LessonQuote[] = [];
+    for (const student of students) {
+      // Find the first available quote for this student
+      const quote = createdQuotes.find(q =>
+        q.lessonRequest?.student?.id === student.id
+      );
+      if (quote) {
+        quotesToAccept.push(quote);
+        // console.log(`  Selected quote ${quote.id.substring(0, 8)} for student ${student.id.substring(0, 8)}.`); // Removed internal log
+      } else {
+        console.warn(chalk.yellow(`Warning: No suitable quote found for student ${student.id.substring(0, 8)}. This student will not have a lesson.`));
+      }
+    }
+
+    // Create lessons concurrently for the selected quotes
+    const lessonCreationPromises = quotesToAccept.map(async (quote) => {
+      try {
+        // console.log(`Creating lesson for quote ${quote.id.substring(0, 8)}...`); // Removed internal log
+        const lesson = await lessonService.create(quote.id);
+        if (lesson) {
+          // console.log(`Lesson ${lesson.id.substring(0, 8)} created.`); // Removed internal log
+          return lesson;
+        } else {
+          console.warn(chalk.yellow(`Warning: lessonService.create returned null for quote ${quote.id.substring(0, 8)}.`)); // Keep warning
+          return null;
+        }
+      } catch (lessonError) {
+        console.error(chalk.red(`Failed to create lesson for quote ${quote.id}:`), lessonError);
+        return null; // Return null on error
+      }
+    });
+
+    const createdLessonsResults = await Promise.all(lessonCreationPromises);
+    // Filter out nulls (lessons that failed to create)
+    const createdLessons: Lesson[] = createdLessonsResults.filter((l): l is Lesson => l !== null);
+
+    console.log(chalk.green(`✓ ${createdLessons.length} Lessons created.`)); // Summary log
+
+    // 7. Create Goals for Lessons
     let goalsCreatedCount = 0;
-    const lessonsForGoals = createdLessonsData
-      .filter(data => data.lesson && (data.finalStatus === LessonStatusValue.DEFINED || data.finalStatus === LessonStatusValue.COMPLETED))
-      .map(data => data.lesson as Lesson);
+    for (const lesson of createdLessons) {
+      // Refetch the lesson WITH necessary relations for goal creation, as lessonService.create might not return them
+      let lessonForGoal: Lesson | null = null;
+      try {]
+        lessonForGoal = lesson; // Use the lesson we already have
 
-    for (const lesson of lessonsForGoals) {
-      const student = lesson.quote?.lessonRequest?.student;
-      const lessonType = lesson.quote?.lessonRequest?.type;
-      const lessonId = lesson.id;
+      } catch (fetchError) {
+        // This catch block might not be needed if we use the existing lesson object
+        console.error(chalk.red(`  Error potentially occurred while trying to refetch lesson ${lesson.id}:`), fetchError);
+        lessonForGoal = null; // Ensure it's null if fetch fails
+      }
 
-      if (!student || !lessonType || !lessonId) {
-        console.warn(`   Skipping goal creation for lesson ${lessonId?.substring(0, 8) ?? 'UNKNOWN'}... due to missing required nested data.`);
+      if (!lessonForGoal) {
+        console.warn(chalk.yellow(`Warning: Skipping goal creation for lesson ${lesson.id.substring(0, 8)} because lesson data is unavailable.`));
         continue;
       }
 
-      const studentAge = new Date().getFullYear() - new Date(student.dateOfBirth).getFullYear();
-      const sampleGoals = getSampleGoalData(lessonType, studentAge);
 
+      const teacherId = lessonForGoal.quote?.teacher?.id;
+      const lessonType = lessonForGoal.quote?.lessonRequest?.type;
+
+      if (!teacherId || !lessonType) {
+        console.warn(chalk.yellow(`Warning: Skipping goal creation for lesson ${lessonForGoal.id.substring(0, 8)} due to missing teacher/type info in the lesson object.`));
+        continue;
+      }
+
+      const goalData = getSampleGoalData(lessonType);
       try {
-        const createdGoal = await goalService.createGoal(
-          emilyRichardson.id,
-          lesson.id,
-          sampleGoals.created.title,
-          sampleGoals.created.description,
-          sampleGoals.created.estimatedLessonCount
+        await goalService.createGoal(
+          teacherId,
+          lessonForGoal.id,
+          goalData.title,
+          goalData.description,
+          goalData.estimatedLessonCount
         );
         goalsCreatedCount++;
-
-        const startedGoal = await goalService.createGoal(
-          emilyRichardson.id,
-          lesson.id,
-          sampleGoals.started.title,
-          sampleGoals.started.description,
-          sampleGoals.started.estimatedLessonCount
-        );
-        await goalService.updateGoalStatus(emilyRichardson.id, startedGoal.id, GoalStatusTransition.START);
-        goalsCreatedCount++;
-
-        const achievedGoal = await goalService.createGoal(
-          emilyRichardson.id,
-          lesson.id,
-          sampleGoals.achieved.title,
-          sampleGoals.achieved.description,
-          sampleGoals.achieved.estimatedLessonCount
-        );
-        await goalService.updateGoalStatus(emilyRichardson.id, achievedGoal.id, GoalStatusTransition.START);
-        await goalService.updateGoalStatus(emilyRichardson.id, achievedGoal.id, GoalStatusTransition.COMPLETE, sampleGoals.achieved.context);
-        goalsCreatedCount++;
-
+        // console.log(`  Created goal for lesson ${lessonForGoal.id.substring(0, 8)} by teacher ${teacherId.substring(0, 8)}.`); // Removed internal log
       } catch (goalError) {
-        console.error(`   Failed to create goals for lesson ${lessonId.substring(0, 8)}...:`, goalError);
+        console.error(chalk.red(`Failed to create goal for lesson ${lessonForGoal.id}:`), goalError);
       }
     }
-    console.log(`Goals created (via service): ${goalsCreatedCount}`);
-    // --- END NEW SEEDING LOGIC --- 
+    console.log(chalk.green(`✓ ${goalsCreatedCount} Goals created.`)); // Summary log
 
-  } catch (e) {
-    console.error("Seeding failed:", e);
+  } catch (e) { // Ensure catch block exists
+    console.error(chalk.red("Seeding script failed:"), e);
     process.exit(1);
-  } finally {
+  } finally { // Ensure finally block exists
     await prisma.$disconnect();
-    console.log('Seeding finished successfully.');
+    console.log(chalk.blue('Seeding script finished.'));
   }
-}
+} // Ensure main function closing brace exists
 
-main(); 
+main(); // Ensure main function call exists 

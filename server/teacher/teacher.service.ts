@@ -14,10 +14,11 @@ import { TeacherLessonHourlyRateStatusValue } from '@shared/models/TeacherLesson
 
 // Local imports with .js extension
 import prisma from '../prisma.js';
-import { AppError, DuplicateEmailError, NotFoundError } from '../errors/index.js';
+import { AppError, BadRequestError, DuplicateEmailError, NotFoundError } from '../errors/index.js';
 import { TeacherMapper } from './teacher.mapper.js';
 import { TeacherLessonHourlyRateMapper } from '../teacher-lesson-hourly-rate/teacher-lesson-hourly-rate.mapper.js';
 import { LessonMapper } from '../lesson/lesson.mapper.js';
+import { isUuid } from '../utils/validation.utils.js';
 
 // Define the type for the Prisma client or transaction client
 // Use Prisma.TransactionClient for the interactive transaction type
@@ -100,8 +101,6 @@ class TeacherService {
             },
             take: limit
         });
-
-        console.log('----------------------------dbTeachers', dbTeachers);
 
         // Map using the updated TeacherMapper logic (which will use the Rate mapper)
         return dbTeachers.map(dbTeacher =>
@@ -279,6 +278,42 @@ class TeacherService {
             console.error('Error finding teacher:', error);
             throw error;
         }
+    }
+
+    /**
+     * NEW METHOD: Get multiple teachers by their IDs, including their rates and status.
+     * @param teacherIds An array of teacher UUIDs.
+     * @returns An array of Teacher shared model instances.
+     * @throws BadRequestError if the input array is empty or contains invalid UUIDs.
+     */
+    async getTeachersByIds(teacherIds: string[]): Promise<Teacher[]> {
+        // --- Validation ---
+        if (!teacherIds || teacherIds.length === 0) {
+            throw new BadRequestError('Teacher IDs array cannot be empty.');
+        }
+        const invalidIds = teacherIds.filter(id => !isUuid(id));
+        if (invalidIds.length > 0) {
+            throw new BadRequestError(`Invalid Teacher IDs provided: ${invalidIds.join(', ')}`);
+        }
+        // --- End Validation ---
+
+        const dbTeachers = await this.prisma.teacher.findMany({
+            where: {
+                id: { in: teacherIds }
+            },
+            include: {
+                // Include ALL rates and their status for the matched teachers
+                // The mapper needs this to determine active rates, etc.
+                teacherLessonHourlyRates: {
+                    include: { currentStatus: true }
+                }
+            }
+        });
+
+        // Map using the TeacherMapper
+        return dbTeachers.map(dbTeacher =>
+            TeacherMapper.toModel(dbTeacher, dbTeacher.teacherLessonHourlyRates)
+        );
     }
 }
 

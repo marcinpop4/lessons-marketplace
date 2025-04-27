@@ -109,7 +109,6 @@ const TeacherQuotesPage: React.FC = () => {
 
         <TeacherQuotesList
           lessonRequestId={lessonRequestId}
-          lessonType={lessonRequest.type}
           onQuoteAccepted={handleQuoteAccepted}
           onError={handleError}
         />

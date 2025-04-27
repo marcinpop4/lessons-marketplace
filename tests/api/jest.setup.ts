@@ -50,9 +50,7 @@ if (result.error) {
 
 // Hook to run after all tests in each file
 afterAll(async () => {
-    console.log('[jest.setup.ts] Running afterAll hook to clean database...');
     await cleanupDatabase();
-    console.log('[jest.setup.ts] Database cleanup function finished.');
 });
 
 // Example: Extending expect (if needed)

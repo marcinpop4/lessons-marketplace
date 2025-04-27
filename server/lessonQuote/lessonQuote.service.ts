@@ -46,54 +46,66 @@ type DbLessonQuoteForUpdateCheck = Prisma.LessonQuoteGetPayload<{
     };
 }>;
 
+// Type for Teacher with nested rates and status needed for validation
+type DbTeacherWithRatesAndStatus = Prisma.TeacherGetPayload<{
+    include: {
+        teacherLessonHourlyRates: {
+            include: { currentStatus: true } // Include status for validation
+        }
+    }
+}>;
+
 class LessonQuoteService {
     private readonly prisma = prisma;
 
     /**
      * Create a single lesson quote and its initial status record within a transaction.
-     * @param quoteData - Data for creating the quote
-     * @returns The created LessonQuote shared model instance or null on error
+     * Validates that the teacher has an active rate for the requested lesson type.
+     * Calculates cost based on the active rate and lesson request duration.
+     * @param lessonRequest - The LessonRequest object.
+     * @param teacher - The Teacher object (must include hourlyRates with currentStatus).
+     * @returns The created LessonQuote shared model instance.
+     * @throws BadRequestError if teacher has no active rate for the lesson type.
+     * @throws NotFoundError if related entities (implicitly handled by transaction/caller).
+     * @throws AppError for internal calculation or transaction issues.
      */
-    async create(quoteData: {
-        lessonRequestId: string;
-        teacherId: string;
-        costInCents: number;
-        hourlyRateInCents: number;
-    }): Promise<LessonQuote> {
+    async create(lessonRequest: LessonRequest, teacher: Teacher): Promise<LessonQuote> {
         // --- Validation ---
-        if (!quoteData.lessonRequestId || !isUuid(quoteData.lessonRequestId)) {
-            throw new BadRequestError('Valid Lesson Request ID is required.');
+        // 1. Validate Teacher has an active rate for the lesson type
+        const activeRate = teacher.hourlyRates.find(
+            (rate) => rate.type === lessonRequest.type && rate.isActive()
+        );
+        if (!activeRate) {
+            throw new BadRequestError(`Teacher ${teacher.id} does not have an active hourly rate for lesson type ${lessonRequest.type}.`);
         }
-        if (!quoteData.teacherId || !isUuid(quoteData.teacherId)) {
-            throw new BadRequestError('Valid Teacher ID is required.');
+
+        // 2. Calculate Cost and Rate
+        const hourlyRateInCents = activeRate.rateInCents;
+        const costInCents = activeRate.calculateCostForDuration(lessonRequest.durationMinutes);
+
+        // Basic validation for calculated cost (should ideally not fail if rate/duration are valid)
+        if (typeof costInCents !== 'number' || !Number.isInteger(costInCents) || costInCents < 0) {
+            throw new AppError('Calculated cost is invalid based on teacher rate and lesson duration.', 500);
         }
-        if (typeof quoteData.costInCents !== 'number' || !Number.isInteger(quoteData.costInCents) || quoteData.costInCents < 0) {
-            throw new BadRequestError('Cost must be a non-negative integer.');
+        if (typeof hourlyRateInCents !== 'number' || !Number.isInteger(hourlyRateInCents) || hourlyRateInCents <= 0) {
+            throw new AppError('Hourly rate derived from teacher rate is invalid.', 500);
         }
-        if (typeof quoteData.hourlyRateInCents !== 'number' || !Number.isInteger(quoteData.hourlyRateInCents) || quoteData.hourlyRateInCents <= 0) {
-            throw new BadRequestError('Hourly rate must be a positive integer.');
-        }
+        // --- End Validation ---
 
         let createdQuoteId: string | null = null;
         try {
             await this.prisma.$transaction(async (tx) => {
-                const lessonRequest = await tx.lessonRequest.findUnique({ where: { id: quoteData.lessonRequestId } });
-                if (!lessonRequest) {
-                    throw new NotFoundError(`Lesson Request with ID ${quoteData.lessonRequestId} not found.`);
-                }
-                // Optional: Add check if teacher exists
-                const teacher = await tx.teacher.findUnique({ where: { id: quoteData.teacherId } });
-                if (!teacher) {
-                    throw new NotFoundError(`Teacher with ID ${quoteData.teacherId} not found.`);
-                }
+                // Note: Existence of lessonRequest and teacher is implicitly assumed
+                // as they are passed as validated objects. The activeRate check above
+                // further confirms the necessary teacher rate exists.
 
                 // 1. Create the LessonQuote
                 const newDbQuote = await tx.lessonQuote.create({
                     data: {
-                        lessonRequestId: quoteData.lessonRequestId,
-                        teacherId: quoteData.teacherId,
-                        costInCents: quoteData.costInCents,
-                        hourlyRateInCents: quoteData.hourlyRateInCents,
+                        lessonRequestId: lessonRequest.id,
+                        teacherId: teacher.id,
+                        costInCents: costInCents,          // Use calculated value
+                        hourlyRateInCents: hourlyRateInCents,  // Use calculated value
                     },
                 });
                 createdQuoteId = newDbQuote.id;
@@ -135,87 +147,53 @@ class LessonQuoteService {
                 throw new ConflictError('A quote for this teacher and lesson request may already exist.');
             }
             console.error("Error in LessonQuoteService.create:", error);
-            // Rethrow other errors (NotFound, BadRequest, AppError, generic errors)
+            // Rethrow other errors (BadRequest, AppError, generic errors)
             throw error;
         }
     }
 
     /**
-     * Generates and creates lesson quotes for a given lesson request.
-     * Finds available teachers, calculates costs, and creates quotes using the `create` method.
-     * @param lessonRequestId - The ID of the lesson request.
-     * @param lessonType - The type of lesson requested.
+     * Generates and creates lesson quotes for a given lesson request, potentially for a specific list of teachers.
+     * If no teachers are provided, it finds available teachers first.
+     * @param lessonRequest - The lesson request object containing details like type and duration.
+     * @param teachers - Optional array of specific teachers to generate quotes for. If omitted or empty, finds available teachers.
      * @returns An array of created LessonQuote shared models.
      */
-    async generateAndCreateQuotes(lessonRequestId: string, lessonType: LessonType): Promise<LessonQuote[]> {
+    async createQuotes(lessonRequest: LessonRequest, teachers?: Teacher[]): Promise<LessonQuote[]> {
         // --- Validation ---
-        if (!lessonRequestId || !isUuid(lessonRequestId)) {
-            throw new BadRequestError('Valid Lesson Request ID is required.');
-        }
-        if (!lessonType || !Object.values(LessonType).includes(lessonType)) {
-            throw new BadRequestError(`Invalid lesson type provided: ${lessonType}`);
+        if (!lessonRequest) { // Basic check on the input object
+            throw new BadRequestError('Lesson Request object is required.');
         }
 
-        // --- Fetch necessary data ---
-        // 1. Get the lesson request details (needed for duration)
-        const lessonRequest = await this.prisma.lessonRequest.findUnique({
-            where: { id: lessonRequestId },
-            // select: { durationMinutes: true }, // Only select needed fields
-        });
-        if (!lessonRequest) {
-            throw new NotFoundError(`Lesson Request with ID ${lessonRequestId} not found.`);
-        }
-        const durationMinutes = lessonRequest.durationMinutes;
+        // --- Determine Target Teachers ---
+        let targetTeachers = teachers;
+        if (!targetTeachers || targetTeachers.length === 0) {
+            targetTeachers = await teacherService.findTeachersByLessonType(lessonRequest.type, 5); // Use passed lessonType
 
-        // 2. Find available teachers with active rates for this lesson type
-        // Using the teacherService method which already handles finding active rates
-        // Use a reasonable limit, e.g., 5, or make it configurable if needed
-        const availableTeachers = await teacherService.findTeachersByLessonType(lessonType, 5);
-
-        if (availableTeachers.length === 0) {
-            console.log(`No available teachers found for lesson type: ${lessonType}`);
-            return []; // Return empty array if no teachers are available
+            if (targetTeachers.length === 0) {
+                console.log(`No available teachers found for lesson type: ${lessonRequest.type}`); // Use passed lessonType
+                return []; // Return empty array if no teachers are found/available
+            }
         }
+
 
         // --- Generate and Create Quotes ---
         const createdQuotes: LessonQuote[] = [];
         const quoteCreationPromises: Promise<LessonQuote | null>[] = [];
 
-        for (const teacher of availableTeachers) {
-            // Find the specific rate for the requested lesson type
-            // Use the 'hourlyRates' property from the shared Teacher model
-            const rate = teacher.hourlyRates.find(
-                (r: TeacherLessonHourlyRate) => r.type === lessonType && r.currentStatus?.status === TeacherLessonHourlyRateStatusValue.ACTIVE
-            );
-
-            if (rate) {
-                const hourlyRateInCents = rate.rateInCents;
-                // Calculate cost based on the rate and lesson request duration
-                const costInCents = Math.round((hourlyRateInCents * durationMinutes) / 60.0);
-
-                // Create quote using the existing `create` method
-                // Push the promise returned by `create` to the array
-                quoteCreationPromises.push(
-                    this.create({
-                        lessonRequestId,
-                        teacherId: teacher.id,
-                        costInCents,
-                        hourlyRateInCents,
+        for (const teacher of targetTeachers) {
+            // Call the refactored create method
+            quoteCreationPromises.push(
+                this.create(lessonRequest, teacher) // Pass lessonType
+                    .catch(error => {
+                        // Log specific error (e.g., BadRequestError if rate is missing/inactive for *this* teacher)
+                        console.error(`Failed to create quote for teacher ${teacher.id} and request ${lessonRequest.id}:`, error.message || error);
+                        return null; // Return null on failure for filtering later
                     })
-                        .catch(error => {
-                            // Log error for this specific quote creation but don't stop others
-                            console.error(`Failed to create quote for teacher ${teacher.id} and request ${lessonRequestId}:`, error);
-                            return null; // Return null on failure for filtering later
-                        })
-                );
-            } else {
-                // This shouldn't happen if findTeachersByLessonType works correctly
-                // and includes the active rate used for filtering.
-                console.warn(`Teacher ${teacher.id} was returned by findTeachersByLessonType but no active rate found for ${lessonType}. Check TeacherMapper logic.`);
-            }
+            );
         }
 
-        // Wait for all quote creation attempts to settle (succeed or fail)
+        // Wait for all quote creation attempts to settle
         const results = await Promise.allSettled(quoteCreationPromises);
 
         // Filter out failures (nulls) and extract successful quotes
@@ -223,8 +201,6 @@ class LessonQuoteService {
             if (result.status === 'fulfilled' && result.value) {
                 createdQuotes.push(result.value);
             }
-            // Optionally log failures from settled promises if needed
-            // if (result.status === 'rejected') { ... }
         }
 
         return createdQuotes;
@@ -314,33 +290,6 @@ class LessonQuoteService {
     }
 
     /**
-     * Get a specific lesson quote with minimal related data for acceptance checks.
-     * Returns raw Prisma data.
-     * @param quoteId - ID of the lesson quote
-     * @returns Lesson quote with nested lesson request student ID and lesson ID, or null
-     */
-    async getQuoteForAcceptanceCheck(quoteId: string): Promise<Prisma.LessonQuoteGetPayload<{ include: { lessonRequest: { select: { studentId: true } }, Lesson: { select: { id: true } } } }> | null> {
-        // --- Validation ---
-        if (!quoteId || !isUuid(quoteId)) {
-            throw new BadRequestError('Valid Quote ID is required.');
-        }
-        // --- End Validation ---
-
-        try {
-            return await this.prisma.lessonQuote.findUnique({
-                where: { id: quoteId },
-                include: {
-                    lessonRequest: { select: { studentId: true } }, // Select only needed field
-                    Lesson: { select: { id: true } } // Check if a lesson already exists
-                }
-            });
-        } catch (error) {
-            console.error(`Error fetching quote ${quoteId} for acceptance check:`, error);
-            throw new Error(`Failed to fetch quote: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    /**
      * Get all quotes for a lesson request
      * @param lessonRequestId - ID of the lesson request
      * @returns Array of LessonQuote shared model instances
@@ -414,11 +363,6 @@ class LessonQuoteService {
         if (!userId) { // userType checked below
             throw new AuthorizationError('User ID is required for authorization.');
         }
-        // TODO: Replace `any` with actual UserType enum import
-        // if (!userType || !Object.values(UserType).includes(userType)) {
-        //     throw new AuthorizationError('Valid User Type is required for authorization.');
-        // }
-        // --- End Validation ---
 
         try {
             const updatedQuote = await this.prisma.$transaction(async (tx) => {

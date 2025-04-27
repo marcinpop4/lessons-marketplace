@@ -11,9 +11,15 @@ import { UserType as SharedUserType } from '../../shared/models/UserType.js';
 import { AuthMethodType as SharedAuthMethodType } from '../../shared/models/AuthMethodType.js';
 import { authMethodService } from './auth-method.service.js'; // Import the new auth method service
 import { UserType as PrismaUserType, Teacher as DbTeacher, Student as DbStudent, Prisma } from '@prisma/client';
+import { UserType } from '@shared/models/UserType.js';
+import { isUuid } from '../utils/validation.utils.js';
 
-// Use string literals that match Prisma's enums
-export type AuthMethod = 'PASSWORD' | 'GOOGLE' | 'FACEBOOK';
+// Define AuthMethod as an enum
+export enum AuthMethod {
+  PASSWORD = 'PASSWORD',
+  GOOGLE = 'GOOGLE',
+  FACEBOOK = 'FACEBOOK'
+}
 
 // --- Define DTOs and Result Types Here --- 
 interface RegisterUserDTO {

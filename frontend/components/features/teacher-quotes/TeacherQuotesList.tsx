@@ -1,22 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { LessonQuote } from '@shared/models/LessonQuote';
 import { LessonType } from '@shared/models/LessonType';
-import { getLessonQuotesByRequestId } from '@frontend/api/lessonQuotesApi';
-import { createLessonQuotes } from '@frontend/api/teacherQuoteApi';
+import { getLessonQuotesByRequestId, createLessonQuotesForRequest } from '@frontend/api/lessonQuotesApi';
 import TeacherQuoteCard from './TeacherQuoteCard';
 import './TeacherQuotesList.css';
 import { useAuth } from '@frontend/contexts/AuthContext';
 
 interface TeacherQuotesListProps {
   lessonRequestId: string;
-  lessonType: LessonType;
   onQuoteAccepted: (lessonId: string) => void;
   onError: (error: string) => void;
 }
 
 const TeacherQuotesList: React.FC<TeacherQuotesListProps> = ({
   lessonRequestId,
-  lessonType,
   onQuoteAccepted,
   onError
 }) => {
@@ -32,7 +29,7 @@ const TeacherQuotesList: React.FC<TeacherQuotesListProps> = ({
       let existingQuotes = await getLessonQuotesByRequestId(lessonRequestId);
 
       if (existingQuotes.length === 0 && user?.userType === 'STUDENT') {
-        const generatedQuotes = await createLessonQuotes(lessonRequestId, lessonType);
+        const generatedQuotes = await createLessonQuotesForRequest(lessonRequestId);
 
         if (generatedQuotes.length === 0) {
           setError('Sorry, no available teachers could provide a quote for this lesson type at this time.');
@@ -56,7 +53,7 @@ const TeacherQuotesList: React.FC<TeacherQuotesListProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [lessonRequestId, lessonType, onError, user?.userType]);
+  }, [lessonRequestId, onError, user?.userType]);
 
   useEffect(() => {
     loadAndGenerateQuotes();

@@ -103,9 +103,10 @@ export class LessonRequestService {
   /**
    * Get a lesson request by ID
    * @param id - Lesson request ID
-   * @returns LessonRequest shared model instance or null if not found
+   * @returns LessonRequest shared model instance
+   * @throws NotFoundError if lesson request is not found
    */
-  async getLessonRequestById(id: string): Promise<LessonRequest | null> {
+  async getLessonRequestById(id: string): Promise<LessonRequest> {
     // --- Validation ---
     if (!id || !isUuid(id)) {
       throw new BadRequestError('Valid Lesson Request ID is required.');
@@ -121,7 +122,7 @@ export class LessonRequestService {
     });
 
     if (!dbLessonRequest) {
-      return null;
+      throw new NotFoundError(`Lesson Request with ID ${id} not found`);
     }
 
     // Use LessonRequestMapper

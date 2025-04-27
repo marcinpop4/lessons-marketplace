@@ -10,8 +10,8 @@ const router: Router = express.Router();
  * @openapi
  * /lesson-quotes:
  *   post:
- *     summary: Create lesson quote (Teacher only)
- *     description: Allows a teacher to create a quote in response to a lesson request.
+ *     summary: Create lesson quotes for a request
+ *     description: Allows an authenticated student to request the generation of lesson quotes for their lesson request. Optionally, specific teachers can be requested.
  *     tags:
  *       - Lesson Quotes
  *     security:
@@ -21,22 +21,38 @@ const router: Router = express.Router();
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/CreateLessonQuoteDTO' # Adjust DTO name if needed
+ *             type: object
+ *             properties:
+ *               lessonRequestId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: The ID of the student's lesson request for which to generate quotes.
+ *               teacherIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *                 description: Optional. An array of specific teacher UUIDs to generate quotes for. If omitted or null, quotes will be generated for available teachers based on the lesson request type.
+ *                 nullable: true
+ *             required:
+ *               - lessonRequestId
  *     responses:
  *       '201':
- *         description: Lesson quote created successfully.
+ *         description: Lesson quote(s) created successfully.
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/LessonQuote'
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/LessonQuote'
  *       '400':
- *         description: Bad request (e.g., validation error, quote already exists for request).
+ *         description: Bad request (e.g., validation error, invalid lessonRequestId or teacherIds format, request not found).
  *       '401':
  *         description: Unauthorized.
  *       '403':
- *         description: Forbidden (User is not a Teacher or not the requested teacher).
+ *         description: Forbidden (User is not a Student, or student does not own the lesson request).
  *       '404':
- *         description: Lesson request not found.
+ *         description: Lesson request or specified teachers not found.
  */
 router.post('/', authMiddleware, checkRole([UserType.STUDENT, UserType.TEACHER]), lessonQuoteController.createLessonQuote);
 

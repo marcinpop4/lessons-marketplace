@@ -113,31 +113,6 @@ export class LessonStatus {
     }
 
     /**
-     * Static factory method to create a LessonStatus instance from a database object.
-     * @param dbStatus The plain object returned by the database.
-     * @returns A new instance of the shared LessonStatus model.
-     */
-    public static fromDb(dbStatus: {
-        id: string;
-        lessonId: string;
-        status: string;
-        context?: JsonValue | null;
-        createdAt: Date;
-    }): LessonStatus {
-        // Validate that the status is a valid LessonStatusValue
-        const statusValue = LessonStatus.validateStatus(dbStatus.status);
-
-        // Create and return the shared model instance
-        return new LessonStatus({
-            id: dbStatus.id,
-            lessonId: dbStatus.lessonId,
-            status: statusValue,
-            context: dbStatus.context || null,
-            createdAt: dbStatus.createdAt
-        });
-    }
-
-    /**
      * Create a new LessonStatus record.
      */
     static create(
@@ -269,5 +244,27 @@ export class LessonStatus {
         }
         // Simple conversion: Capitalize first letter, rest lowercase
         return transition.charAt(0).toUpperCase() + transition.slice(1).toLowerCase();
+    }
+
+    /**
+     * Gets the valid transition *enum values* allowed from a given status.
+     * @param currentStatus The current status value
+     * @returns An array of valid LessonStatusTransition enum values.
+     */
+    static getValidTransitionsForStatus(currentStatus: LessonStatusValue): LessonStatusTransition[] {
+        const possibleTransitionsObject = LessonStatus.StatusTransitions[currentStatus];
+        if (!possibleTransitionsObject) {
+            return [];
+        }
+
+        const validTransitions: LessonStatusTransition[] = [];
+        for (const key in possibleTransitionsObject) {
+            // Ensure it's a valid key of the enum
+            if (Object.prototype.hasOwnProperty.call(LessonStatusTransition, key)) {
+                // Directly access the enum value using the key
+                validTransitions.push(LessonStatusTransition[key as keyof typeof LessonStatusTransition]);
+            }
+        }
+        return validTransitions;
     }
 }

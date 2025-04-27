@@ -4,7 +4,10 @@ import { LessonType as SharedLessonType } from '@shared/models/LessonType.js';
 import { LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus.js';
 import { UserType as SharedUserType } from '@shared/models/UserType.js';
 import { AuthorizationError, BadRequestError } from '../errors/index.js';
-
+import { lessonRequestService } from '@server/lessonRequest/lessonRequest.service.js';
+import { Teacher } from '@shared/models/Teacher.js';
+import { teacherService } from '@server/teacher/teacher.service.js';
+import { isUuid } from '../utils/validation.utils.js';
 /**
  * Controller for lesson quote-related operations
  */
@@ -13,12 +16,12 @@ export const lessonQuoteController = {
    * POST /
    * Generate and create quotes for a lesson request.
    * Requires STUDENT role.
-   * @param req Request with { lessonRequestId, lessonType } in the body
+   * @param req Request with { lessonRequestId, teacherIds } in the body
    * @param res Response
    */
   createLessonQuote: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { lessonRequestId, lessonType } = req.body;
+      const { lessonRequestId, teacherIds } = req.body;
       const studentId = req.user?.id;
 
       if (!studentId) {
@@ -28,13 +31,33 @@ export const lessonQuoteController = {
         throw new AuthorizationError('Only students can initiate quote generation.');
       }
 
-      if (!lessonType || !Object.values(SharedLessonType).includes(lessonType as SharedLessonType)) {
-        throw new BadRequestError(`Invalid lesson type provided: ${lessonType}`);
+      if (!lessonRequestId || !isUuid(lessonRequestId)) {
+        throw new BadRequestError('Valid Lesson Request ID is required.');
       }
 
-      const quotes = await lessonQuoteService.generateAndCreateQuotes(
-        lessonRequestId,
-        lessonType as SharedLessonType
+      let teachers: Teacher[] | undefined = undefined;
+
+      if (teacherIds !== undefined && teacherIds !== null) {
+        if (!Array.isArray(teacherIds)) {
+          throw new BadRequestError('teacherIds must be an array if provided.');
+        }
+        const invalidIds = teacherIds.filter(id => typeof id !== 'string' || !isUuid(id));
+        if (invalidIds.length > 0) {
+          throw new BadRequestError(`Invalid Teacher UUIDs provided in teacherIds: ${invalidIds.join(', ')}`);
+        }
+        if (teacherIds.length === 0) {
+          throw new BadRequestError('teacherIds cannot be an empty array if provided; omit the field instead.');
+        }
+
+        const validatedTeacherIds: string[] = teacherIds;
+        teachers = await teacherService.getTeachersByIds(validatedTeacherIds);
+      }
+
+      const lessonRequest = await lessonRequestService.getLessonRequestById(lessonRequestId);
+
+      const quotes = await lessonQuoteService.createQuotes(
+        lessonRequest,
+        teachers
       );
 
       res.status(201).json(quotes);
