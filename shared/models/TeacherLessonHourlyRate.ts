@@ -57,10 +57,6 @@ interface TeacherLessonHourlyRateProps {
  *         currentStatus:
  *           $ref: '#/components/schemas/TeacherLessonHourlyRateStatus' # Assuming this schema exists
  *           nullable: true
- *         isActive:
- *           type: boolean
- *           description: Derived field indicating if the rate is currently active.
- *           readOnly: true
  *         rateInDollars:
  *           type: number
  *           format: float
@@ -98,7 +94,7 @@ export class TeacherLessonHourlyRate {
     updatedAt,
     // Initialize status fields to null by default in constructor
     currentStatusId = null,
-    currentStatus = null,
+    currentStatus = null
   }: TeacherLessonHourlyRateProps) {
     this.id = id;
     this.teacherId = teacherId;
@@ -136,9 +132,9 @@ export class TeacherLessonHourlyRate {
    * @returns Boolean indicating if the rate is active.
    */
   isActive(): boolean {
-    // Active if currentStatus exists and its status is ACTIVE
     return this.currentStatus?.status === TeacherLessonHourlyRateStatusValue.ACTIVE;
   }
+
 
   /**
    * Calculate the cost for a lesson of a given duration

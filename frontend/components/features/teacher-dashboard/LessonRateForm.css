@@ -71,8 +71,9 @@ body[data-theme="dark"] .lesson-rate-form select {
   transform: translateY(-50%);
 }
 
-.lesson-rate-form input[type="number"] {
-  padding-left: 1.75rem;
+/* Apply padding to the specific rate input by ID */
+.lesson-rate-form input#lessonRate {
+  padding-left: 1.75rem; /* Make space for the currency symbol */
 }
 
 .lesson-rate-form form {

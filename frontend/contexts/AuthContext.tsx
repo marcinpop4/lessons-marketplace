@@ -88,17 +88,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Initialize auth headers
         await initializeAuth();
 
-        // Try to refresh the token
+        // Attempt to refresh the token using the HttpOnly refresh token cookie
         try {
-          const response = await apiClient.post(`/api/v1/auth/refresh-token`, {});
+          const response = await apiClient.post(`/api/v1/refresh-token`, {});
+          const newAccessToken = response.data.accessToken;
+          if (newAccessToken) {
+            // Save the new access token
+            localStorage.setItem('auth_token', newAccessToken);
+            axios.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`;
+            apiClient.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`;
 
-          // Save the new access token
-          localStorage.setItem('auth_token', response.data.accessToken);
-          axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
-          apiClient.defaults.headers.common['Authorization'] = `Bearer ${response.data.accessToken}`;
-
-          // Set user data from refresh response
-          setUser(response.data.user);
+            // Set user data from refresh response
+            setUser(response.data.user);
+          }
         } catch (error) {
           console.error('Token refresh failed:', error);
           // Clear auth state if not authenticated

@@ -2,44 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import TeacherProfileComponent from '../../../components/features/teacher-dashboard/TeacherProfile';
-import TeacherStats from '../../../components/features/teacher-dashboard/TeacherStats';
+import TeacherStatsComponent from '../../../components/features/teacher-dashboard/TeacherStats';
 import TeacherLessonRatesManager from '../../../components/features/teacher-dashboard/TeacherLessonRatesManager';
 import apiClient from '../../../api/apiClient';
 import axios from 'axios';
 import './profile.css';
 
-interface TeacherProfile {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phoneNumber: string;
-  dateOfBirth: string;
-  lessonRates: LessonRate[];
-}
+// Import shared models
+import { Teacher } from '@shared/models/Teacher.js';
+import { TeacherLessonHourlyRate } from '@shared/models/TeacherLessonHourlyRate.js';
+import { TeacherProfileStats } from '@shared/models/TeacherProfileStats.js';
 
-interface LessonRate {
-  id: string;
-  type: string;
-  rateInCents: number;
-  isActive: boolean;
-  deactivatedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface TeacherStats {
-  totalLessons: number;
-  completedLessons: number;
-  upcomingLessons: number;
-  activeQuotes: number;
+// Define the new combined profile structure using shared models
+interface TeacherDashboardData {
+  teacher: Teacher;
+  teacherLessonHourlyRates: TeacherLessonHourlyRate[];
+  teacherProfileStats: TeacherProfileStats;
 }
 
 const TeacherDashboardPage: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<TeacherProfile | null>(null);
-  const [stats, setStats] = useState<TeacherStats | null>(null);
+  const [dashboardData, setDashboardData] = useState<TeacherDashboardData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -83,16 +67,42 @@ const TeacherDashboardPage: React.FC = () => {
       try {
         setLoading(true);
 
-        // Use Promise.all to fetch profile and stats in parallel
+        if (!user?.id) {
+          throw new Error("User ID not found. Cannot fetch teacher data.");
+        }
+
         const [profileResponse, statsResponse] = await Promise.all([
-          apiClient.get('/api/v1/teachers/profile'),
+          apiClient.get(`/api/v1/teachers/${user.id}`),
           apiClient.get('/api/v1/teachers/stats')
         ]);
 
-        setProfile(profileResponse.data);
-        setStats(statsResponse.data);
+        // Instantiate shared models from API data
+        const rawProfileData = profileResponse.data;
+        const rawStatsData = statsResponse.data;
+
+        // Instantiate Teacher model (requires mapping rates)
+        const mappedRates = (rawProfileData.hourlyRates || []).map((rateData: any) =>
+          new TeacherLessonHourlyRate({ ...rateData }) // Assuming API data matches props for now
+          // TODO: Add proper mapping if API structure differs from TeacherLessonHourlyRateProps
+        );
+
+        const teacherInstance = new Teacher({
+          ...rawProfileData,
+          dateOfBirth: new Date(rawProfileData.dateOfBirth), // Convert date string
+          hourlyRates: mappedRates
+        });
+
+        // Instantiate TeacherProfileStats model
+        const statsInstance = new TeacherProfileStats(rawStatsData);
+
+        // Set the combined dashboard state
+        setDashboardData({
+          teacher: teacherInstance,
+          teacherLessonHourlyRates: teacherInstance.hourlyRates, // Use rates from the Teacher instance
+          teacherProfileStats: statsInstance
+        });
+
       } catch (err) {
-        // Extract more detailed error information
         if (axios.isAxiosError(err)) {
           const errorMessage = err.response?.data?.error || err.message;
           const statusCode = err.response?.status;
@@ -148,21 +158,34 @@ const TeacherDashboardPage: React.FC = () => {
         <button className="btn btn-secondary" onClick={handleLogout}>Logout</button>
       </div>
 
-      {profile && (
+      {dashboardData && (
         <div className="dashboard-content space-y-6">
-          <TeacherProfileComponent profile={profile} />
+          <TeacherProfileComponent profile={{
+            firstName: dashboardData.teacher.firstName,
+            lastName: dashboardData.teacher.lastName,
+            email: dashboardData.teacher.email,
+            phoneNumber: dashboardData.teacher.phoneNumber
+          }} />
 
           <TeacherLessonRatesManager
-            lessonRates={profile.lessonRates}
+            lessonRates={dashboardData.teacherLessonHourlyRates}
             onRatesUpdated={(updatedRates) => {
-              setProfile({
-                ...profile,
-                lessonRates: updatedRates
+              setDashboardData(prevData => {
+                if (!prevData) return null;
+                const updatedTeacher = new Teacher({
+                  ...prevData.teacher,
+                  hourlyRates: updatedRates
+                });
+                return {
+                  ...prevData,
+                  teacher: updatedTeacher,
+                  teacherLessonHourlyRates: updatedRates
+                };
               });
             }}
           />
 
-          <TeacherStats stats={stats} />
+          <TeacherStatsComponent stats={dashboardData.teacherProfileStats} />
         </div>
       )}
     </div>

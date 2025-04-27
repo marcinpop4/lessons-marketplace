@@ -97,7 +97,6 @@ export class LessonQuote {
     this.currentStatusId = currentStatusId;
 
     if (!currentStatus || !(currentStatus instanceof LessonQuoteStatus)) {
-      console.warn(`LessonQuote constructor (id: ${id}) received invalid currentStatus prop`, currentStatus);
       this.currentStatus = new LessonQuoteStatus({
         id: currentStatusId || 'unknown',
         lessonQuoteId: id,

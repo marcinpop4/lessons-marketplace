@@ -89,11 +89,10 @@ export class LessonService {
                     }
                 });
 
-                // 4. Set initial status to ACCEPTED
                 await this.updateStatusInternal(
                     tx,
                     currentLessonId,
-                    LessonStatusValue.ACCEPTED,
+                    LessonStatusValue.REQUESTED,
                     {}
                 );
 

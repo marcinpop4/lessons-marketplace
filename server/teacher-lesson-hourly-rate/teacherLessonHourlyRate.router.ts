@@ -12,7 +12,7 @@ router.use(checkRole([UserType.TEACHER]));
 
 // Routes
 router.post('/', teacherLessonHourlyRateController.createOrUpdate);
-// New route for updating status
-router.patch('/:rateId/status', teacherLessonHourlyRateController.updateStatus);
+// Change route for updating status
+router.patch('/:id', teacherLessonHourlyRateController.updateStatus);
 
 export default router; 

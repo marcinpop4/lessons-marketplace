@@ -51,7 +51,7 @@ export class TeacherLessonHourlyRateMapper {
             updatedAt: dbRate.updatedAt,
             // Assign mapped status object and its ID
             currentStatusId: currentStatusModel?.id ?? null,
-            currentStatus: currentStatusModel,
+            currentStatus: currentStatusModel
         });
 
         return instance;

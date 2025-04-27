@@ -82,7 +82,7 @@ class TeacherService {
     async findTeachersByLessonType(lessonType: LessonType, limit: number): Promise<Teacher[]> {
         const dbTeachers = await this.prisma.teacher.findMany({
             where: {
-                // Filter teachers who have *at least one* ACTIVE rate for the given type
+                // Filter teachers who have *at least one* ACTIVE rate (any type)
                 teacherLessonHourlyRates: {
                     some: {
                         type: lessonType,
@@ -93,19 +93,15 @@ class TeacherService {
                 }
             },
             include: {
-                // Include only the ACTIVE rates for the specified type along with their status
+                // Include ALL rates for the matched teachers, but ensure their status is also included
                 teacherLessonHourlyRates: {
-                    where: {
-                        type: lessonType,
-                        currentStatus: {
-                            status: TeacherLessonHourlyRateStatusValue.ACTIVE
-                        }
-                    },
-                    include: { currentStatus: true } // Need to include the status object for mapping
+                    include: { currentStatus: true } // Still need status for the mapper
                 }
             },
             take: limit
         });
+
+        console.log('----------------------------dbTeachers', dbTeachers);
 
         // Map using the updated TeacherMapper logic (which will use the Rate mapper)
         return dbTeachers.map(dbTeacher =>

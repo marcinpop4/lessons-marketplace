@@ -10,8 +10,9 @@ import { GoalRecommendation } from '@shared/models/GoalRecommendation';
  */
 export const getGoalsByLessonId = async (lessonId: string): Promise<Goal[]> => {
     try {
-        const response = await apiClient.get(`/api/v1/lessons/${lessonId}/goals`);
-        // TODO: Add validation/instantiation if API returns plain data
+        const response = await apiClient.get(`/api/v1/goals?lessonId=${lessonId}`);
+        // Assuming the API returns an array of goal data directly
+        // TODO: Add proper instantiation if Goal model requires it
         return response.data as Goal[];
     } catch (error) {
         console.error(`Error fetching goals for lesson ${lessonId}:`, error);

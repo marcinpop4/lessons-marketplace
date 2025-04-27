@@ -68,7 +68,7 @@ export interface TeacherLessonApiResponseItem {
  */
 export const getTeacherLessons = async (teacherId: string): Promise<TeacherLessonApiResponseItem[]> => {
     try {
-        const response = await apiClient.get<TeacherLessonApiResponseItem[]>(`/api/v1/teachers/${teacherId}/lessons`);
+        const response = await apiClient.get<TeacherLessonApiResponseItem[]>(`/api/v1/lessons?teacherId=${teacherId}`);
         // Return the raw data. Instantiation will happen in the component.
         return response.data;
     } catch (error) {

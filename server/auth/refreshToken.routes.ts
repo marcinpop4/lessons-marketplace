@@ -31,6 +31,6 @@ const router: Router = express.Router();
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/refresh-token', refreshTokenController.refreshAccessToken);
+router.post('/', refreshTokenController.refreshAccessToken);
 
 export default router; 

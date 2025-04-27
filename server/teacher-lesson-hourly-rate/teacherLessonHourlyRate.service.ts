@@ -25,6 +25,7 @@ interface CreateOrUpdateResult {
 }
 
 class TeacherLessonHourlyRateService {
+    private readonly prisma = prisma;
 
     /**
      * Creates a new lesson rate or updates the price of an existing active one.
@@ -39,14 +40,14 @@ class TeacherLessonHourlyRateService {
         }
 
         // Validate teacher exists (as per architecture rule, service validates dependencies)
-        const teacher = await prisma.teacher.findUnique({ where: { id: teacherId } });
+        const teacher = await this.prisma.teacher.findUnique({ where: { id: teacherId } });
         if (!teacher) {
             throw new NotFoundError('Teacher not found.');
         }
 
         let wasCreated = false;
 
-        const resultRate = await prisma.$transaction(async (tx) => {
+        const resultRate = await this.prisma.$transaction(async (tx) => {
             // Find the current *active* rate for this teacher and type
             const currentActiveRate = await tx.teacherLessonHourlyRate.findFirst({
                 where: {
@@ -158,7 +159,7 @@ class TeacherLessonHourlyRateService {
         context?: any
     ): Promise<TeacherLessonHourlyRate> {
 
-        const updatedRate = await prisma.$transaction(async (tx) => {
+        const updatedRate = await this.prisma.$transaction(async (tx) => {
             // 1. Fetch the rate and its current status, ensuring it belongs to the teacher
             const rate = await tx.teacherLessonHourlyRate.findUnique({
                 where: { id: rateId },
@@ -222,6 +223,28 @@ class TeacherLessonHourlyRateService {
 
         // Map and return the result
         return TeacherLessonHourlyRateMapper.toModel(updatedRate, updatedRate.currentStatus);
+    }
+
+    /**
+     * Find a specific rate by its ID, ensuring it belongs to the specified teacher.
+     * Includes the current status.
+     */
+    async findRateById(teacherId: string, rateId: string): Promise<TeacherLessonHourlyRate | null> {
+        const dbRate = await this.prisma.teacherLessonHourlyRate.findUnique({
+            where: {
+                id: rateId,
+                teacherId: teacherId // Ensure the rate belongs to the requesting teacher
+            },
+            include: {
+                currentStatus: true
+            }
+        });
+
+        if (!dbRate) {
+            return null;
+        }
+
+        return TeacherLessonHourlyRateMapper.toModel(dbRate, dbRate.currentStatus);
     }
 
     // Remove old deactivate and reactivate methods

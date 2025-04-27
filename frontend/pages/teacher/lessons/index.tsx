@@ -19,94 +19,100 @@ interface LessonDisplayData {
     goalCount: number;
 }
 
-// Helper function to instantiate models from the FLATTENED API data
-// TODO: Update TeacherLessonApiResponseItem type if defined elsewhere (e.g., teacherApi.ts)
-// type TeacherLessonApiResponseItem = any; // Use 'any' for now, define properly later
-
-const instantiateLessonFromData = (data: /*TeacherLessonApiResponseItem*/ any): LessonDisplayData | null => {
+// Helper function to instantiate models from the API data structure
+const instantiateLessonFromData = (data: TeacherLessonApiResponseItem): LessonDisplayData | null => {
     try {
-        // Instantiate directly nested models first
+        // Access nested data structures according to TeacherLessonApiResponseItem
+        const quoteData = data.quote;
+        const lessonRequestData = quoteData?.lessonRequest;
+        const studentData = lessonRequestData?.student;
+        const teacherData = quoteData?.teacher;
+        const addressData = lessonRequestData?.address;
+        const lessonStatusData = data.currentStatus;
+
+        // Add null checks for potentially missing nested data
+        if (!quoteData || !lessonRequestData || !studentData || !teacherData || !addressData || !lessonStatusData) {
+            console.error(`Incomplete data for lesson ID ${data.id}. Skipping instantiation.`, data);
+            return null;
+        }
+
         const student = new Student({
-            id: data.student.id,
-            firstName: data.student.firstName,
-            lastName: data.student.lastName,
-            // Provide defaults for fields not in the flattened API response
-            email: '',
-            phoneNumber: '',
-            dateOfBirth: new Date(0)
+            id: studentData.id,
+            firstName: studentData.firstName,
+            lastName: studentData.lastName,
+            email: studentData.email, // Expecting email on student data from API now
+            phoneNumber: '', // Provide defaults if not present
+            dateOfBirth: new Date(0) // Provide defaults if not present
         });
 
         const teacher = new Teacher({
-            id: data.teacher.id,
-            firstName: data.teacher.firstName,
-            lastName: data.teacher.lastName,
-            email: data.teacher.email, // Email is included in the teacher object
-            // Provide defaults for fields not in the flattened API response
-            phoneNumber: '',
-            dateOfBirth: new Date(0)
-            // hourlyRates defaults in constructor
+            id: teacherData.id,
+            firstName: teacherData.firstName,
+            lastName: teacherData.lastName,
+            email: teacherData.email,
+            phoneNumber: '', // Provide defaults if not present
+            dateOfBirth: new Date(0) // Provide defaults if not present
         });
 
         const address = new Address({
-            // Use properties from the flattened address object
-            street: data.address.street,
-            city: data.address.city,
-            postalCode: data.address.postalCode,
-            country: data.address.country,
-            // Provide defaults for fields not in the flattened API response (if Address constructor requires them)
-            id: '', // Assuming Address ID isn't critical here or provided
-            state: '' // Assuming state isn't critical here or provided
+            id: addressData.id, // Expecting address ID
+            street: addressData.street,
+            city: addressData.city,
+            state: addressData.state,
+            postalCode: addressData.postalCode,
+            country: addressData.country
         });
 
-        // Reconstruct LessonRequest using top-level and nested data
         const lessonRequest = new LessonRequest({
-            // LessonRequest ID isn't directly available in the flattened structure.
-            // Using lesson ID as a placeholder, but this might not be correct semantically.
-            id: `req-for-${data.id}`, // Placeholder ID
-            type: data.type as LessonType, // Use top-level type
-            startTime: new Date(data.startTime), // Use top-level startTime
-            durationMinutes: data.durationMinutes, // Use top-level durationMinutes
-            address: address, // Use constructed address
-            student: student // Use constructed student
+            id: lessonRequestData.id,
+            type: lessonRequestData.type as LessonType,
+            startTime: new Date(lessonRequestData.startTime),
+            durationMinutes: lessonRequestData.durationMinutes,
+            address: address,
+            student: student,
+            createdAt: lessonRequestData.createdAt ? new Date(lessonRequestData.createdAt) : undefined,
+            updatedAt: lessonRequestData.updatedAt ? new Date(lessonRequestData.updatedAt) : undefined
         });
 
-        // Map the nested currentStatus from the API response for the quote
-        // Assuming `data.quoteStatus` contains the status info for the quote in the flattened response
-        const quoteStatusData = data.quoteStatus; // Adjust if the property name is different
-        const quoteCurrentStatusModel = quoteStatusData
-            ? new LessonQuoteStatus({
-                id: quoteStatusData.id,
-                lessonQuoteId: data.quoteId || `quote-for-${data.id}`, // Use quoteId if available, else placeholder
-                status: quoteStatusData.status as LessonQuoteStatusValue, // Add type assertion
-                context: quoteStatusData.context || null,
-                createdAt: quoteStatusData.createdAt ? new Date(quoteStatusData.createdAt) : new Date()
-            })
-            : null;
+        // Reconstruct LessonQuoteStatus if quote status exists - THIS LOGIC MIGHT BE IRRELEVANT NOW
+        // If the API for fetching lessons doesn't include quote's status details, this should be null.
+        // Let's assume it's not included based on the previous error.
+        const quoteCurrentStatusModel = null;
+        /* quoteStatusData // Keep commented out unless API confirms quote status is provided here
+        ? new LessonQuoteStatus({
+            id: quoteStatusData.id,
+            lessonQuoteId: quoteData.id,
+            status: quoteStatusData.status as LessonQuoteStatusValue,
+            context: quoteStatusData.context || null,
+            createdAt: quoteStatusData.createdAt ? new Date(quoteStatusData.createdAt) : new Date()
+        })
+        : null; */
 
         const lessonQuote = new LessonQuote({
-            id: data.quoteId || `quote-for-${data.id}`, // Use quoteId if available, else placeholder
-            costInCents: data.costInCents, // Use top-level costInCents
-            hourlyRateInCents: data.hourlyRateInCents ?? 0, // Use top-level hourlyRate if available
-            lessonRequest: lessonRequest, // Use constructed lessonRequest
-            teacher: teacher, // Use constructed teacher
-            currentStatus: quoteCurrentStatusModel, // Pass mapped status object
-            currentStatusId: quoteCurrentStatusModel?.id ?? null // Pass status ID
-            // createdAt is likely not needed/available in flattened view
+            id: quoteData.id,
+            costInCents: quoteData.costInCents,
+            hourlyRateInCents: quoteData.hourlyRateInCents,
+            lessonRequest: lessonRequest,
+            teacher: teacher,
+            currentStatus: quoteCurrentStatusModel, // Pass mapped status object if available (now likely null)
+            currentStatusId: null, // Explicitly pass null as required by LessonQuoteProps
+            createdAt: quoteData.createdAt ? new Date(quoteData.createdAt) : undefined,
+            updatedAt: quoteData.updatedAt ? new Date(quoteData.updatedAt) : undefined
         });
 
         // Construct LessonStatus for the lesson itself
         const lessonStatus = new LessonStatus({
-            id: data.currentStatusId,
+            id: lessonStatusData.id,
             lessonId: data.id,
-            status: data.currentStatus as LessonStatusValue,
-            // context: null, // Assuming context is not provided
-            createdAt: new Date() // Defaulting createdAt as it's not in the flattened response
+            status: lessonStatusData.status as LessonStatusValue,
+            context: lessonStatusData.context || null, // Include context if available
+            createdAt: lessonStatusData.createdAt ? new Date(lessonStatusData.createdAt) : new Date()
         });
 
         // Construct the final Lesson model
         const lesson = new Lesson({
             id: data.id,
-            quote: lessonQuote, // Use the reconstructed quote
+            quote: lessonQuote,
             currentStatus: lessonStatus,
             createdAt: data.createdAt ? new Date(data.createdAt) : undefined,
             updatedAt: data.updatedAt ? new Date(data.updatedAt) : undefined

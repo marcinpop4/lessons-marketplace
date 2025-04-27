@@ -32,7 +32,6 @@ const TeacherQuotesList: React.FC<TeacherQuotesListProps> = ({
       let existingQuotes = await getLessonQuotesByRequestId(lessonRequestId);
 
       if (existingQuotes.length === 0 && user?.userType === 'STUDENT') {
-        console.log('No existing quotes found, attempting to generate new ones...');
         const generatedQuotes = await createLessonQuotes(lessonRequestId, lessonType);
 
         if (generatedQuotes.length === 0) {
