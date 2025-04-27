@@ -84,7 +84,7 @@ import lessonRequestRoutes from './lessonRequest/lessonRequest.routes.js';
 import teacherRoutes from './teacher/teacher.routes.js';
 import lessonRoutes from './lesson/lesson.routes.js';
 import authRoutes from './auth/auth.routes.js';
-import refreshTokenRoutes from './auth/refreshToken.route.js';
+import refreshTokenRoutes from './auth/refreshToken.routes.js';
 import lessonQuoteRoutes from './lessonQuote/lessonQuote.routes.js';
 import addressRoutes from './address/address.routes.js';
 import healthRoutes from './health/health.routes.js';
@@ -132,77 +132,6 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-
-// --- Routes --- 
-
-// Health Check Endpoint
-app.get('/api/health', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  const maxRetries = 3;
-  let lastError = null;
-
-  // Try multiple times to connect to the database
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      // Test database connection
-      await prisma.$queryRaw`SELECT 1 as health_check`;
-
-      // Check database configuration
-      const dbConfig = {
-        host: process.env.DB_HOST || 'not_set',
-        port: process.env.DB_PORT || 'not_set',
-        database: process.env.POSTGRES_DB || 'not_set',
-        user: process.env.POSTGRES_USER || 'not_set',
-        url_set: Boolean(process.env.DATABASE_URL),
-        ssl: process.env.DB_SSL === 'true'
-      };
-
-      res.status(200).json({
-        status: 'ok',
-        database: 'connected',
-        attempt,
-        databaseConfig: {
-          ...dbConfig,
-          // Mask sensitive data
-          password: process.env.POSTGRES_PASSWORD ? '******' : 'not_set'
-        },
-        timestamp: new Date().toISOString()
-      });
-      return;
-    } catch (error) {
-      lastError = error;
-      console.error(`Database connection error (attempt ${attempt}/${maxRetries}):`, error);
-
-      // Wait before retry (exponential backoff)
-      if (attempt < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, attempt * 1000));
-      }
-    }
-  }
-
-  // All retries failed
-  const errorMessage = lastError instanceof Error ? lastError.message : 'Unknown database error';
-  const dbConfig = {
-    host: process.env.DB_HOST || 'not_set',
-    port: process.env.DB_PORT || 'not_set',
-    database: process.env.POSTGRES_DB || 'not_set',
-    user: process.env.POSTGRES_USER || 'not_set',
-    url_set: Boolean(process.env.DATABASE_URL),
-    ssl: process.env.DB_SSL === 'true'
-  };
-
-  res.status(500).json({
-    status: 'error',
-    database: 'disconnected',
-    error: errorMessage,
-    retries: maxRetries,
-    databaseConfig: {
-      ...dbConfig,
-      // Mask sensitive data
-      password: process.env.POSTGRES_PASSWORD ? '******' : 'not_set'
-    },
-    timestamp: new Date().toISOString()
-  });
-});
 
 // API Routes
 app.use('/api/v1/auth', authRoutes);

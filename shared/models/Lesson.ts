@@ -7,6 +7,49 @@ import { Student } from './Student.js';
 import { Address } from './Address.js';
 
 /**
+ * @openapi
+ * components:
+ *   schemas:
+ *     Lesson:
+ *       type: object
+ *       description: Represents a booked music lesson between a teacher and student.
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: Unique identifier for the lesson.
+ *         quote:
+ *           $ref: '#/components/schemas/LessonQuote'
+ *         currentStatus:
+ *           $ref: '#/components/schemas/LessonStatus'
+ *           nullable: true
+ *         statuses:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/LessonStatus'
+ *           description: History of status changes for this lesson.
+ *         goals:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/Goal'
+ *           description: Goals associated with this lesson.
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the lesson was created.
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the lesson was last updated.
+ *       required:
+ *         - id
+ *         - quote
+ *         - statuses
+ *         - goals
+ *         - createdAt
+ *         - updatedAt
+ */
+
+/**
  * Database representation of a Lesson with nested relations
  */
 export interface DbLessonWithNestedRelations {

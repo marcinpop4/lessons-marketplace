@@ -3,6 +3,42 @@
  * Used for lesson locations and potentially other address needs
  */
 
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     Address:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: Unique identifier for the address
+ *           example: 'add_123abc'
+ *         street:
+ *           type: string
+ *           example: '123 Main St'
+ *         city:
+ *           type: string
+ *           example: 'Anytown'
+ *         state:
+ *           type: string
+ *           example: 'CA'
+ *         postalCode:
+ *           type: string
+ *           example: '12345'
+ *         country:
+ *           type: string
+ *           example: 'USA'
+ *         # Add other properties like createdAt, updatedAt if they exist and are relevant
+ *       required:
+ *         - id
+ *         - street
+ *         - city
+ *         - state
+ *         - postalCode
+ *         - country
+ */
+
 // Interface for constructor properties
 interface AddressProps {
   id?: string; // Make ID optional as it might not exist before creation

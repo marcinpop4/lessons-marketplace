@@ -1,4 +1,4 @@
-import { Lesson } from '@shared/models/Lesson.js';
+import { Lesson } from '@shared/models/Lesson';
 import { LessonRequest } from '@shared/models/LessonRequest';
 import { LessonQuote } from '@shared/models/LessonQuote';
 import { Teacher } from '@shared/models/Teacher';
@@ -6,6 +6,7 @@ import { Address } from '@shared/models/Address';
 import { Student } from '@shared/models/Student';
 import apiClient from './apiClient';
 import { LessonStatus, LessonStatusValue, LessonStatusTransition } from '@shared/models/LessonStatus';
+import { LessonQuoteStatus, LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus';
 import axios, { AxiosError } from 'axios';
 
 // Check for API base URL using Vite's import.meta.env
@@ -51,6 +52,18 @@ export const getLessonById = async (id: string): Promise<Lesson> => {
     const response = await apiClient.get(`/api/v1/lessons/${id}`);
     const data = response.data;
 
+    // Map the nested currentStatus from the API response for the quote
+    const quoteStatusData = data.quote.currentStatus; // Assuming API includes this nested status
+    const quoteCurrentStatusModel = quoteStatusData
+      ? new LessonQuoteStatus({
+        id: quoteStatusData.id,
+        lessonQuoteId: data.quote.id,
+        status: quoteStatusData.status as LessonQuoteStatusValue, // Add type assertion
+        context: quoteStatusData.context || null,
+        createdAt: quoteStatusData.createdAt ? new Date(quoteStatusData.createdAt) : new Date()
+      })
+      : null;
+
     const lessonQuote = new LessonQuote({
       id: data.quote.id,
       lessonRequest: new LessonRequest({
@@ -85,6 +98,8 @@ export const getLessonById = async (id: string): Promise<Lesson> => {
       }),
       costInCents: data.quote.costInCents,
       hourlyRateInCents: data.quote.hourlyRateInCents,
+      currentStatus: quoteCurrentStatusModel, // Pass the mapped status object
+      currentStatusId: quoteCurrentStatusModel?.id ?? null, // Pass the ID from the mapped status
       createdAt: new Date(data.quote.createdAt)
     });
 

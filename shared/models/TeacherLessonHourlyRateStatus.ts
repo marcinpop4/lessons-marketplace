@@ -1,12 +1,34 @@
 import { TeacherLessonHourlyRate } from './TeacherLessonHourlyRate.js';
 
 // Define allowed status values for a TeacherLessonHourlyRate
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     TeacherLessonHourlyRateStatusValue:
+ *       type: string
+ *       enum:
+ *         - ACTIVE
+ *         - INACTIVE
+ *       description: Possible status values for a teacher's hourly rate.
+ */
 export enum TeacherLessonHourlyRateStatusValue {
     ACTIVE = 'ACTIVE',     // The rate is currently active and can be used
     INACTIVE = 'INACTIVE', // The rate has been deactivated and cannot be used
 }
 
 // Define allowed transitions between statuses
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     TeacherLessonHourlyRateStatusTransition:
+ *       type: string
+ *       enum:
+ *         - ACTIVATE
+ *         - DEACTIVATE
+ *       description: Possible transition actions for a teacher's hourly rate status.
+ */
 export enum TeacherLessonHourlyRateStatusTransition {
     ACTIVATE = 'ACTIVATE',     // Event to make an inactive rate active
     DEACTIVATE = 'DEACTIVATE', // Event to make an active rate inactive
@@ -25,8 +47,36 @@ interface TeacherLessonHourlyRateStatusProps {
 }
 
 /**
- * Represents a single status record in the history of a TeacherLessonHourlyRate.
- * Implements the state machine logic for rate status transitions.
+ * @openapi
+ * components:
+ *   schemas:
+ *     TeacherLessonHourlyRateStatus:
+ *       type: object
+ *       description: Represents a snapshot of a teacher hourly rate's status.
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: Unique identifier for the status record.
+ *         rateId:
+ *           type: string
+ *           description: ID of the TeacherLessonHourlyRate this status belongs to.
+ *         status:
+ *           $ref: '#/components/schemas/TeacherLessonHourlyRateStatusValue'
+ *         context:
+ *           type: object # Represents JSON
+ *           nullable: true
+ *           description: Optional context data associated with this status change.
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when this status was recorded.
+ *         # rate: # Optional relation, maybe exclude from base schema?
+ *         #   $ref: '#/components/schemas/TeacherLessonHourlyRate'
+ *       required:
+ *         - id
+ *         - rateId
+ *         - status
+ *         - createdAt
  */
 export class TeacherLessonHourlyRateStatus {
     id: string;

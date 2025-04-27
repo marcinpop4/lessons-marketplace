@@ -1,11 +1,18 @@
-import { Prisma } from '@prisma/client';
 
-// Define a JSON value type if not already defined globally
-// If you have a global JsonValue type, you can remove this.
-type JsonValue = Prisma.JsonValue;
+type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
 
 /**
- * Possible status values for a student objective.
+ * @openapi
+ * components:
+ *   schemas:
+ *     ObjectiveStatusValue:
+ *       type: string
+ *       enum:
+ *         - CREATED
+ *         - IN_PROGRESS
+ *         - ACHIEVED
+ *         - ABANDONED
+ *       description: Possible status values for a student objective.
  */
 export enum ObjectiveStatusValue {
     CREATED = 'CREATED',       // The objective has been defined but not started.
@@ -15,7 +22,16 @@ export enum ObjectiveStatusValue {
 }
 
 /**
- * Defines the possible transition actions that can be taken on an objective.
+ * @openapi
+ * components:
+ *   schemas:
+ *     ObjectiveStatusTransition:
+ *       type: string
+ *       enum:
+ *         - START
+ *         - COMPLETE
+ *         - ABANDON
+ *       description: Possible transition actions for an objective status.
  */
 export enum ObjectiveStatusTransition {
     START = 'START',         // Begin working on the objective.
@@ -35,8 +51,34 @@ interface ObjectiveStatusProps {
 }
 
 /**
- * Represents a status change for a student objective.
- * Each status change is immutable and creates a new record.
+ * @openapi
+ * components:
+ *   schemas:
+ *     ObjectiveStatus:
+ *       type: object
+ *       description: Represents a snapshot of an objective's status at a point in time.
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: Unique identifier for the status record.
+ *         objectiveId:
+ *           type: string
+ *           description: ID of the objective this status belongs to.
+ *         status:
+ *           $ref: '#/components/schemas/ObjectiveStatusValue'
+ *         context:
+ *           type: object # Represents JSON
+ *           nullable: true
+ *           description: Optional context data associated with this status change.
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when this status was recorded.
+ *       required:
+ *         - id
+ *         - objectiveId
+ *         - status
+ *         - createdAt
  */
 export class ObjectiveStatus {
     id: string;

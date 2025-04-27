@@ -20,8 +20,37 @@ interface TeacherProps {
 }
 
 /**
- * Teacher model representing instructors who offer music lessons
- * Extends the base Person model and adds teaching-specific properties
+ * @openapi
+ * components:
+ *   schemas:
+ *     Teacher:
+ *       allOf:
+ *         - $ref: '#/components/schemas/Person'
+ *       type: object
+ *       description: Represents a teacher user who provides lessons.
+ *       properties:
+ *         hourlyRates:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/TeacherLessonHourlyRate' # Assuming TeacherLessonHourlyRate schema exists
+ *           description: List of hourly rates for different lesson types offered by the teacher.
+ *         # Include createdAt/updatedAt if they are part of the shared model
+ *         # createdAt:
+ *         #   type: string
+ *         #   format: date-time
+ *         #   description: Timestamp when the teacher was created.
+ *         # updatedAt:
+ *         #   type: string
+ *         #   format: date-time
+ *         #   description: Timestamp when the teacher was last updated.
+ *       required:
+ *         - id # Inherited required fields from Person
+ *         - firstName
+ *         - lastName
+ *         - email
+ *         - phoneNumber
+ *         - dateOfBirth
+ *         - hourlyRates # Define if this is always expected
  */
 export class Teacher extends Person {
   // Collection of hourly rates by lesson type
@@ -91,34 +120,6 @@ export class Teacher extends Person {
    */
   getActiveHourlyRates(): TeacherLessonHourlyRate[] {
     return this.hourlyRates.filter(rate => rate.isActive());
-  }
-
-  /**
-   * Deactivates an hourly rate for a specific lesson type
-   * @param lessonType The type of lesson to deactivate
-   * @returns True if the rate was found and deactivated, false otherwise
-   */
-  deactivateHourlyRate(lessonType: LessonType): boolean {
-    const rate = this.hourlyRates.find(rate => rate.type === lessonType);
-    if (rate) {
-      rate.deactivatedAt = new Date();
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Reactivates a previously deactivated hourly rate
-   * @param lessonType The type of lesson to reactivate
-   * @returns True if the rate was found and reactivated, false otherwise
-   */
-  reactivateHourlyRate(lessonType: LessonType): boolean {
-    const rate = this.hourlyRates.find(rate => rate.type === lessonType);
-    if (rate) {
-      rate.deactivatedAt = undefined; // Or set to null if that's the preferred 'active' state
-      return true;
-    }
-    return false;
   }
 
   /**

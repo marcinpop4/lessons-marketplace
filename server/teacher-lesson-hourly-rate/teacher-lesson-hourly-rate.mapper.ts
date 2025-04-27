@@ -4,6 +4,8 @@ import * as PrismaClient from '@prisma/client'; // Import all types
 import { LessonType } from '../../shared/models/LessonType.js';
 // Import the shared status model and enum
 import { TeacherLessonHourlyRateStatus, TeacherLessonHourlyRateStatusValue } from '../../shared/models/TeacherLessonHourlyRateStatus.js';
+// Import the shared JsonValue type
+import { JsonValue } from '../../shared/types/JsonTypes.js'; // Add this import
 
 /**
  * Maps between Prisma TeacherLessonHourlyRate objects and shared TeacherLessonHourlyRate models.
@@ -19,7 +21,7 @@ export class TeacherLessonHourlyRateMapper {
             id: dbStatus.id,
             rateId: dbStatus.rateId,
             status: dbStatus.status as TeacherLessonHourlyRateStatusValue, // Cast enum
-            context: dbStatus.context, // Prisma JSON maps directly
+            context: (dbStatus.context as JsonValue) ?? undefined, // Explicitly cast and handle nullish
             createdAt: dbStatus.createdAt,
         });
     }

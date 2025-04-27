@@ -2,7 +2,19 @@
 type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
 
 /**
- * Possible status values for a lesson.
+ * @openapi
+ * components:
+ *   schemas:
+ *     LessonStatusValue:
+ *       type: string
+ *       enum:
+ *         - REQUESTED
+ *         - ACCEPTED
+ *         - DEFINED
+ *         - REJECTED
+ *         - COMPLETED
+ *         - VOIDED
+ *       description: Possible status values for a lesson.
  */
 export enum LessonStatusValue {
     REQUESTED = 'REQUESTED',
@@ -14,7 +26,18 @@ export enum LessonStatusValue {
 }
 
 /**
- * Defines the possible transition actions that can be taken on a lesson.
+ * @openapi
+ * components:
+ *   schemas:
+ *     LessonStatusTransition:
+ *       type: string
+ *       enum:
+ *         - ACCEPT
+ *         - DEFINE
+ *         - REJECT
+ *         - COMPLETE
+ *         - VOID
+ *       description: Possible transition actions for a lesson status.
  */
 export enum LessonStatusTransition {
     ACCEPT = 'ACCEPT',
@@ -39,8 +62,34 @@ interface LessonStatusProps {
 }
 
 /**
- * Represents a status change for a lesson.
- * Each status change is immutable and creates a new record.
+ * @openapi
+ * components:
+ *   schemas:
+ *     LessonStatus:
+ *       type: object
+ *       description: Represents a snapshot of a lesson's status at a point in time.
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: Unique identifier for the status record.
+ *         lessonId:
+ *           type: string
+ *           description: ID of the lesson this status belongs to.
+ *         status:
+ *           $ref: '#/components/schemas/LessonStatusValue'
+ *         context:
+ *           type: object # Represents JSON
+ *           nullable: true
+ *           description: Optional context data associated with this status change.
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when this status was recorded.
+ *       required:
+ *         - id
+ *         - lessonId
+ *         - status
+ *         - createdAt
  */
 export class LessonStatus {
     id: string;

@@ -6,15 +6,6 @@ import { UserType } from '../../shared/models/UserType.js';
 // Import all required errors from the central index file
 import { AuthorizationError, BadRequestError, NotFoundError } from '../errors/index.js';
 
-// Add user property to Request type
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    userType: UserType;
-    // Add other user properties if needed
-  };
-}
-
 export class LessonRequestController {
   constructor() {
     // Bind methods to ensure 'this' context
@@ -30,7 +21,7 @@ export class LessonRequestController {
    * @param res - Express response
    * @param next - Express next function
    */
-  async createLessonRequest(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+  async createLessonRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       // Extract data and user
       const { type, startTime, durationMinutes, addressObj, studentId } = req.body;
@@ -97,7 +88,7 @@ export class LessonRequestController {
    * @param res - Express response
    * @param next - Express next function
    */
-  async getLessonRequestById(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+  async getLessonRequestById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       // Extract params and user
       const { id } = req.params;
@@ -144,11 +135,12 @@ export class LessonRequestController {
    * @param req - Express request
    * @param res - Express response
    */
-  async getLessonRequestsByStudent(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+  async getLessonRequestsByStudent(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       // Get studentId from query parameter
       const { studentId } = req.query as { studentId?: string }; // Type assertion for query param
-      const authenticatedUser = req.user; // Get user info from token
+      // Cast req.user to expected structure, using string for userType
+      const authenticatedUser = req.user as { id: string; userType: string } | undefined; // Get user info from token
 
       // --- Validation: Check if studentId is provided ---
       if (!studentId) {
@@ -162,6 +154,7 @@ export class LessonRequestController {
       }
 
       // --- Authorization: Ensure student is requesting their own data ---
+      // Compare string value from casted userType
       if (authenticatedUser.userType === UserType.STUDENT && authenticatedUser.id !== studentId) {
         return next(new AuthorizationError('Forbidden: You can only view your own lesson requests.'));
       }

@@ -1,6 +1,50 @@
 import { GoalStatus, GoalStatusValue } from './GoalStatus.js';
 
 /**
+ * @openapi
+ * components:
+ *   schemas:
+ *     Goal:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: Unique identifier for the goal.
+ *         lessonId:
+ *           type: string
+ *           description: ID of the lesson this goal belongs to.
+ *         title:
+ *           type: string
+ *           description: Title of the goal.
+ *         description:
+ *           type: string
+ *           description: Detailed description of the goal.
+ *         estimatedLessonCount:
+ *           type: integer
+ *           description: Estimated number of lessons to achieve this goal.
+ *           example: 5
+ *         currentStatus:
+ *           $ref: '#/components/schemas/GoalStatus' # Refers to the GoalStatus schema
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the goal was created.
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the goal was last updated.
+ *       required:
+ *         - id
+ *         - lessonId
+ *         - title
+ *         - description
+ *         - estimatedLessonCount
+ *         - currentStatus
+ *         - createdAt
+ *         - updatedAt
+ */
+
+/**
  * Database representation of a Goal with CurrentStatus
  */
 export interface DbGoalWithStatus {

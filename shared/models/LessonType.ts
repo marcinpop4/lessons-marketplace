@@ -1,5 +1,15 @@
 /**
- * Enum representing the types of music lessons offered in the marketplace
+ * @openapi
+ * components:
+ *   schemas:
+ *     LessonType:
+ *       type: string
+ *       enum:
+ *         - VOICE
+ *         - GUITAR
+ *         - BASS
+ *         - DRUMS
+ *       description: The type of music lesson.
  */
 export enum LessonType {
   VOICE = "VOICE",

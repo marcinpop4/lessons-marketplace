@@ -174,7 +174,7 @@ describe('API Integration: /api/v1/addresses', () => {
             expect(response.body.error).toContain('Forbidden'); // From checkRole middleware
         });
 
-        // Note: A test for another student trying to fetch might be redundant
+        // Note: A test for another student trying to fetch might be redundant 
         // if the route only allows students AND the address isn't linked to a user directly.
         // If addresses WERE linked, we'd need an ownership check in the controller.
         // For now, the checkRole is sufficient based on the current route setup.

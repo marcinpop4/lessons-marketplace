@@ -2,6 +2,7 @@ import request from 'supertest';
 import { LessonQuote } from '@shared/models/LessonQuote';
 import { Lesson } from '@shared/models/Lesson';
 import { LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus';
+import { LessonType } from '@shared/models/LessonType';
 
 // Base URL
 const API_BASE_URL = process.env.VITE_API_BASE_URL;
@@ -9,50 +10,48 @@ if (!API_BASE_URL) {
     throw new Error('[Lesson Quote Utils] Missing required environment variable: VITE_API_BASE_URL.');
 }
 
+// Updated interface for creating quotes (via generate endpoint)
 interface CreateQuoteData {
     lessonRequestId: string;
-    costInCents: number;
-    hourlyRateInCents: number;
+    lessonType: LessonType;
 }
 
 /**
- * Creates a test lesson quote using the API.
- * Requires the teacher's authentication token.
- * 
- * @param teacherToken - The Bearer token for the teacher.
- * @param quoteData - Data for the quote (lessonRequestId, costInCents, hourlyRateInCents).
- * @returns The created LessonQuote object.
+ * Creates (generates) test lesson quotes using the API.
+ * Requires the student's authentication token.
+ * The API will find available teachers and generate quotes for them.
+ *
+ * @param studentToken - The Bearer token for the student.
+ * @param quoteData - Data for generating quotes (lessonRequestId, lessonType).
+ * @returns An array of the created LessonQuote objects.
  */
-export const createTestLessonQuote = async (teacherToken: string, quoteData: CreateQuoteData): Promise<LessonQuote> => {
-    if (!teacherToken.startsWith('Bearer ')) {
-        teacherToken = `Bearer ${teacherToken}`;
+export const createTestLessonQuote = async (studentToken: string, quoteData: CreateQuoteData): Promise<LessonQuote[]> => {
+    if (!studentToken.startsWith('Bearer ')) {
+        studentToken = `Bearer ${studentToken}`;
     }
 
     const response = await request(API_BASE_URL!)
         .post('/api/v1/lesson-quotes')
-        .set('Authorization', teacherToken)
+        .set('Authorization', studentToken)
         .send(quoteData);
 
     if (response.status !== 201) {
-        console.error('Failed to create test lesson quote via util:', response.status, response.body);
-        throw new Error(`Util failed to create lesson quote. Status: ${response.status}, Body: ${JSON.stringify(response.body)}`);
+        console.error('Failed to create/generate test lesson quotes via util:', response.status, response.body);
+        throw new Error(`Util failed to create/generate lesson quotes. Status: ${response.status}, Body: ${JSON.stringify(response.body)}`);
     }
 
-    // Assuming the response body is the created LessonQuote object
-    if (!response.body || !response.body.id) {
-        console.error('Lesson quote object missing or invalid from successful POST /lesson-quotes response:', response.body);
-        throw new Error('Lesson quote object missing or invalid from response body after creation.');
+    if (!Array.isArray(response.body)) {
+        console.error('Expected an array from successful POST /lesson-quotes response:', response.body);
+        throw new Error('Expected an array from response body after quote generation.');
     }
 
-    // We might need to instantiate the class here if the API returns plain JSON
-    // For now, let's assume the structure matches and cast
-    return response.body as LessonQuote;
+    return response.body as LessonQuote[];
 };
 
 /**
  * Accepts a test lesson quote using the API, which should create a Lesson.
  * Requires the student's authentication token.
- * 
+ *
  * @param studentToken - The Bearer token for the student.
  * @param quoteId - The ID of the lesson quote to accept.
  * @returns The ID of the LessonRequest associated with the accepted quote.
@@ -72,7 +71,6 @@ export const acceptTestLessonQuote = async (studentToken: string, quoteId: strin
         throw new Error(`Util failed to accept lesson quote ${quoteId}. Status: ${response.status}, Body: ${JSON.stringify(response.body)}`);
     }
 
-    // Validate the response body is the updated LessonQuote
     const updatedQuote = response.body;
     if (!updatedQuote || !updatedQuote.id ||
         !updatedQuote.currentStatus || updatedQuote.currentStatus.status !== LessonQuoteStatusValue.ACCEPTED ||
@@ -81,24 +79,23 @@ export const acceptTestLessonQuote = async (studentToken: string, quoteId: strin
         throw new Error('Updated LessonQuote object missing or invalid from response body after accepting quote.');
     }
 
-    // Return the ID of the related lesson request
     return updatedQuote.lessonRequest.id;
 };
 
 // --- Lower-level API Call Utilities ---
 
-// --- POST /lesson-quotes --- 
+// --- POST /lesson-quotes ---
 
+// Updated payload for generating quotes
 interface CreateQuotePayload {
     lessonRequestId: string;
-    costInCents: number;
-    hourlyRateInCents: number;
+    lessonType: LessonType;
 }
 
 /**
- * Creates a new lesson quote via API.
- * @param token Raw JWT token (Teacher).
- * @param payload Quote data.
+ * Creates (generates) new lesson quotes via API.
+ * @param token Raw JWT token (Student).
+ * @param payload Quote generation data.
  * @returns Supertest response promise.
  */
 export const createQuote = (token: string, payload: CreateQuotePayload): request.Test => {
@@ -109,8 +106,8 @@ export const createQuote = (token: string, payload: CreateQuotePayload): request
 };
 
 /**
- * Creates a new lesson quote without authentication.
- * @param payload Quote data.
+ * Creates (generates) new lesson quotes without authentication.
+ * @param payload Quote generation data.
  * @returns Supertest response promise.
  */
 export const createQuoteUnauthenticated = (payload: CreateQuotePayload): request.Test => {
@@ -148,7 +145,7 @@ export const getQuotesByLessonRequestIdUnauthenticated = (lessonRequestId: strin
 // --- PATCH /lesson-quotes/:quoteId --- 
 
 interface UpdateQuoteStatusPayload {
-    status: LessonQuoteStatusValue; // Only status update is supported via PATCH
+    status: LessonQuoteStatusValue;
 }
 
 /**

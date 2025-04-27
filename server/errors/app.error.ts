@@ -1,4 +1,30 @@
-// Base class for predictable application errors with status codes
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     Error:
+ *       type: object
+ *       properties:
+ *         error:
+ *           type: string
+ *           description: A message describing the error.
+ *           example: 'Resource not found'
+ *         details:
+ *           type: array # For Zod errors, could be object for others
+ *           items:
+ *             type: object
+ *           description: Optional additional error details (e.g., validation issues).
+ *         stack:
+ *           type: string
+ *           description: Optional stack trace (in development).
+ *       required:
+ *         - error
+ */
+
+/**
+ * Base class for custom application errors.
+ * Allows setting a status code and differentiating operational errors (expected) from bugs.
+ */
 export class AppError extends Error {
     public readonly status: number;
     public readonly isOperational: boolean;

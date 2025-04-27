@@ -42,7 +42,55 @@ export interface ObjectiveProps {
 }
 
 /**
- * Objective model representing a specific target set by a student for a particular lesson type.
+ * @openapi
+ * components:
+ *   schemas:
+ *     Objective:
+ *       type: object
+ *       description: Represents a student's learning objective for a specific lesson type.
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: Unique identifier for the objective.
+ *         studentId:
+ *           type: string
+ *           description: ID of the student who set this objective.
+ *         student:
+ *           $ref: '#/components/schemas/Student' # Assuming Student schema exists
+ *           description: (Optional) The student object associated with this objective.
+ *           nullable: true
+ *         lessonType:
+ *           $ref: '#/components/schemas/LessonType'
+ *         title:
+ *           type: string
+ *           description: Title of the objective.
+ *         description:
+ *           type: string
+ *           description: Detailed description of the objective.
+ *         targetDate:
+ *           type: string
+ *           format: date-time
+ *           description: Target date for achieving the objective.
+ *         currentStatus:
+ *           $ref: '#/components/schemas/ObjectiveStatus' # Assuming ObjectiveStatus schema exists
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the objective was created.
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the objective was last updated.
+ *       required:
+ *         - id
+ *         - studentId
+ *         - lessonType
+ *         - title
+ *         - description
+ *         - targetDate
+ *         - currentStatus
+ *         - createdAt
+ *         - updatedAt
  */
 export class Objective implements ObjectiveProps {
     id: string;

@@ -3,6 +3,7 @@ import { LessonType } from '@shared/models/LessonType';
 import { Address } from '@shared/models/Address';
 import { LessonQuote } from '@shared/models/LessonQuote';
 import apiClient from './apiClient';
+import { LessonQuoteStatus, LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus';
 
 export interface CreateLessonRequestPayload {
   type: LessonType;
@@ -39,6 +40,12 @@ interface ApiQuoteData {
   createdAt: string;
   expiresAt: string;
   hourlyRateInCents: number;
+  currentStatus?: {
+    id: string;
+    status: string;
+    context?: any;
+    createdAt?: string;
+  } | null;
 }
 
 /**
@@ -61,9 +68,9 @@ export const createLessonRequest = async (data: CreateLessonRequestPayload): Pro
 
     const response = await apiClient.post('/api/v1/lesson-requests', payload);
 
-    // Expect the nested structure again
-    // const responseData = response.data as ApiResponseData;
-    const { lessonRequest: responseData, quotes } = response.data as { lessonRequest: ApiResponseData; quotes: ApiQuoteData[] };
+    // Backend returns the lessonRequest object directly
+    const responseData = response.data as ApiResponseData;
+    // const { lessonRequest: responseData, quotes } = response.data as { lessonRequest: ApiResponseData; quotes: ApiQuoteData[] };
 
     // Ensure proper date instantiation
     const lessonRequest = new LessonRequest({
@@ -81,20 +88,13 @@ export const createLessonRequest = async (data: CreateLessonRequestPayload): Pro
       student: responseData.student
     });
 
-    // Restore quote transformation
-    const transformedQuotes = quotes.map(quote => new LessonQuote({
-      id: quote.id,
-      lessonRequest,
-      teacher: quote.teacher,
-      costInCents: quote.costInCents,
-      hourlyRateInCents: quote.hourlyRateInCents,
-      createdAt: new Date(quote.createdAt)
-    }));
+    // Since quotes are not returned by this endpoint anymore, remove quote transformation
+    // const transformedQuotes = quotes.map(quote => { ... });
 
     return {
       lessonRequest,
-      quotes: transformedQuotes // Return transformed quotes
-      // quotes: [] 
+      // Return empty array for quotes as they are not part of the response
+      quotes: []
     };
   } catch (error) {
     console.error('Error creating lesson request:', error);

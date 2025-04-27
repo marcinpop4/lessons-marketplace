@@ -4,10 +4,34 @@ import prisma from '../prisma.js'; // Already has .js
 const router: Router = express.Router();
 
 /**
- * Health check endpoint
- * Returns 200 OK status to indicate server is running and database is connected
- * @route GET /api/health
- * @access Public
+ * @openapi
+ * /api/v1/health:
+ *   get:
+ *     summary: Health check
+ *     description: Checks if the server is running and can connect to the database.
+ *     tags:
+ *       - Health
+ *     responses:
+ *       '200':
+ *         description: Server is healthy and database connection is successful.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: ok }
+ *                 timestamp: { type: string, format: date-time }
+ *                 message: { type: string }
+ *       '500':
+ *         description: Server is running but database connection failed.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: error }
+ *                 timestamp: { type: string, format: date-time }
+ *                 message: { type: string }
  */
 router.get('/', async (_req, res) => {
   try {

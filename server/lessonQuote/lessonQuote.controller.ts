@@ -1,18 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
-// import { PrismaClient } from '@prisma/client'; // Remove unused
 import { lessonQuoteService } from './lessonQuote.service.js';
-import { lessonService } from '../lesson/lesson.service.js'; // Import LessonService
-// lessonRequestService no longer needed here
-// import { lessonRequestService } from '../lessonRequest/lessonRequest.service.js';
-import { LessonType as SharedLessonType } from '@shared/models/LessonType.js'; // Alias for clarity
-// lessonController no longer needed here
-// import { lessonController } from '../lesson/lesson.controller.js';
+import { LessonType as SharedLessonType } from '@shared/models/LessonType.js';
 import { LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus.js';
-import { UserType } from '@shared/models/UserType.js'; // Import UserType enum
-// Import error classes used by controller logic (only Auth remaining)
-import { AuthorizationError } from '../errors/index.js';
-
-// const prismaClient = new PrismaClient(); // Remove unused
+import { UserType as SharedUserType } from '@shared/models/UserType.js';
+import { AuthorizationError, BadRequestError } from '../errors/index.js';
 
 /**
  * Controller for lesson quote-related operations
@@ -20,34 +11,35 @@ import { AuthorizationError } from '../errors/index.js';
 export const lessonQuoteController = {
   /**
    * POST /
-   * Create a single quote for a lesson request.
-   * Requires TEACHER role.
-   * @param req Request with { lessonRequestId, costInCents, hourlyRateInCents } in the body
+   * Generate and create quotes for a lesson request.
+   * Requires STUDENT role.
+   * @param req Request with { lessonRequestId, lessonType } in the body
    * @param res Response
    */
   createLessonQuote: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      // Extract data and user ID
-      const { lessonRequestId, costInCents, hourlyRateInCents } = req.body;
-      const teacherId = req.user?.id; // Get teacher ID from authenticated user
+      const { lessonRequestId, lessonType } = req.body;
+      const studentId = req.user?.id;
 
-      // Basic check for teacher ID from middleware
-      if (!teacherId) {
-        throw new AuthorizationError('Teacher ID not found on authenticated request.');
+      if (!studentId) {
+        throw new AuthorizationError('Student ID not found on authenticated request.');
+      }
+      if (req.user?.userType !== SharedUserType.STUDENT) {
+        throw new AuthorizationError('Only students can initiate quote generation.');
       }
 
-      // Call service - validation (IDs, numbers, request existence) happens inside
-      const quote = await lessonQuoteService.create({
-        lessonRequestId,
-        teacherId,
-        costInCents,
-        hourlyRateInCents,
-      });
+      if (!lessonType || !Object.values(SharedLessonType).includes(lessonType as SharedLessonType)) {
+        throw new BadRequestError(`Invalid lesson type provided: ${lessonType}`);
+      }
 
-      // Service throws NotFoundError or ConflictError if necessary
-      res.status(201).json(quote);
+      const quotes = await lessonQuoteService.generateAndCreateQuotes(
+        lessonRequestId,
+        lessonType as SharedLessonType
+      );
+
+      res.status(201).json(quotes);
     } catch (error) {
-      next(error); // Pass errors (Auth, NotFound, Conflict, BadRequest) to central handler
+      next(error);
     }
   },
 
@@ -60,33 +52,30 @@ export const lessonQuoteController = {
    */
   getLessonQuotes: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      // Extract query and user info
       const { lessonRequestId } = req.query as { lessonRequestId?: string };
       const userId = req.user?.id;
       const userType = req.user?.userType;
 
-      // Basic check for user details from middleware
       if (!userId || !userType) {
         throw new AuthorizationError('User details not found on authenticated request.');
       }
 
-      // Call service - validation (ID presence/format) happens inside
-      // Service *could* also handle authorization, but keeping it here is also valid
-      // If kept here, need to fetch request first.
-      // Let's assume service handles auth for now for consistency.
-      const quotes = await lessonQuoteService.getQuotesByLessonRequest(lessonRequestId!); // Pass potentially validated ID
-      // Service will throw NotFoundError or AuthorizationError if needed
+      if (!lessonRequestId) {
+        throw new BadRequestError('lessonRequestId query parameter is required.');
+      }
+
+      const quotes = await lessonQuoteService.getQuotesByLessonRequest(lessonRequestId);
 
       res.status(200).json(quotes);
 
     } catch (error) {
-      next(error); // Pass errors (Auth, NotFound, BadRequest) to central handler
+      next(error);
     }
   },
 
   /**
    * PATCH /:quoteId
-   * Update a lesson quote status (e.g., accept, reject, withdraw).
+   * Update a lesson quote status (e.g., accept, reject).
    * Requires STUDENT or TEACHER role.
    * Expects body: { status: LessonQuoteStatusValue, context?: any }
    * @param req Request with quoteId as route param and status/context in body
@@ -99,30 +88,28 @@ export const lessonQuoteController = {
       const userId = req.user?.id;
       const userType = req.user?.userType;
 
-      // Basic check for user details
       if (!userId || !userType) {
         throw new AuthorizationError('User details not found on authenticated request.');
       }
 
-      // Call the new service method which handles all validation, auth, and logic
+      if (!status || !Object.values(LessonQuoteStatusValue).includes(status as LessonQuoteStatusValue)) {
+        throw new BadRequestError(`Invalid status value provided: ${status}`);
+      }
+
+      const sharedUserType = userType as SharedUserType;
+
       const updatedQuote = await lessonQuoteService.updateStatus(
         quoteId,
-        status,
+        status as LessonQuoteStatusValue,
         context ?? null,
         userId,
-        userType
+        sharedUserType
       );
 
-      // If updateStatus results in lesson creation, the ACCEPTED quote is returned.
-      // The client might need separate logic if it expects the *lesson* object upon acceptance.
-      // For now, return the updated quote.
       res.status(200).json(updatedQuote);
 
     } catch (error) {
-      next(error); // Pass all errors (BadRequest, NotFound, Auth, Conflict, AppError) from service
+      next(error);
     }
   },
-
-  // Removed getLessonQuoteById as it's not used in routes
-  // Removed acceptLessonQuote as it was replaced by acceptQuote
-}; 
+};

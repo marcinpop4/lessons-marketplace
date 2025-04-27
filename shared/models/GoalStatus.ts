@@ -1,5 +1,18 @@
+import { Goal } from './Goal.js';
+import { JsonValue } from '../types/JsonTypes.js'; // Import the shared type
+
 /**
- * Possible status values for a goal associated with a lesson.
+ * @openapi
+ * components:
+ *   schemas:
+ *     GoalStatusValue:
+ *       type: string
+ *       enum:
+ *         - CREATED
+ *         - IN_PROGRESS
+ *         - ACHIEVED
+ *         - ABANDONED
+ *       description: Possible status values for a goal.
  */
 export enum GoalStatusValue {
     CREATED = 'CREATED',       // The goal has been defined but not started.
@@ -9,16 +22,22 @@ export enum GoalStatusValue {
 }
 
 /**
- * Defines the possible transition actions that can be taken on a goal.
+ * @openapi
+ * components:
+ *   schemas:
+ *     GoalStatusTransition:
+ *       type: string
+ *       enum:
+ *         - START
+ *         - COMPLETE
+ *         - ABANDON
+ *       description: Possible transition actions for a goal status.
  */
 export enum GoalStatusTransition {
     START = 'START',         // Begin working on the goal.
     COMPLETE = 'COMPLETE',   // Mark the goal as achieved.
     ABANDON = 'ABANDON'      // Give up on the goal.
 }
-
-// Define a JSON value type to replace the Prisma one
-type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
 
 /**
  * Properties required to create a GoalStatus instance.
@@ -32,8 +51,34 @@ interface GoalStatusProps {
 }
 
 /**
- * Represents a status change for a goal.
- * Each status change is immutable and creates a new record.
+ * @openapi
+ * components:
+ *   schemas:
+ *     GoalStatus:
+ *       type: object
+ *       description: Represents a snapshot of a goal's status at a point in time.
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: Unique identifier for the status record.
+ *         goalId:
+ *           type: string
+ *           description: ID of the goal this status belongs to.
+ *         status:
+ *           $ref: '#/components/schemas/GoalStatusValue'
+ *         context:
+ *           type: object # Representing JSON
+ *           nullable: true
+ *           description: Optional context data associated with this status change.
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when this status was recorded.
+ *       required:
+ *         - id
+ *         - goalId
+ *         - status
+ *         - createdAt
  */
 export class GoalStatus {
     id: string;

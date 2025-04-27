@@ -15,7 +15,42 @@ export interface UserAuthMethodProps {
 }
 
 /**
- * Represents the shared data model for a user's authentication method.
+ * @openapi
+ * components:
+ *   schemas:
+ *     UserAuthMethod:
+ *       type: object
+ *       description: Represents an authentication method linked to a user.
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: Unique identifier for the auth method record.
+ *         userId:
+ *           type: string
+ *           description: ID of the user (Student or Teacher) this method belongs to.
+ *         userType:
+ *           $ref: '#/components/schemas/UserType' # Assuming UserType schema exists
+ *         method:
+ *           $ref: '#/components/schemas/AuthMethodType'
+ *         isActive:
+ *           type: boolean
+ *           description: Whether this authentication method is currently active.
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the auth method was linked.
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the auth method was last updated.
+ *       required:
+ *         - id
+ *         - userId
+ *         - userType
+ *         - method
+ *         - isActive
+ *         - createdAt
+ *         - updatedAt
  */
 export class UserAuthMethod {
     id: string;

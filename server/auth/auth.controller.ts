@@ -3,8 +3,8 @@ import { Request, Response, NextFunction } from 'express';
 import authService, { AuthMethod } from './auth.service.js';
 import { refreshTokenService } from './refreshToken.service.js';
 import { cookieOptions, REFRESH_TOKEN_COOKIE_NAME } from './auth.constants.js';
-import { UserType as PrismaUserType } from '@prisma/client';
 import { UserType } from '../../shared/models/UserType.js';
+import { LoginUserDTO } from '../../shared/dtos/LoginUser.dto.js'; // Import the new DTO
 import { AppError, DuplicateEmailError } from '../errors/index.js'; // Import custom errors
 
 export class AuthController {
@@ -70,21 +70,24 @@ export class AuthController {
     // POST /login
     async login(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const { email, password, userType } = req.body;
+            // Use the DTO for validation/typing
+            const { email, password, userType }: LoginUserDTO = req.body;
 
-            // 1. Basic Input Validation
+            // 1. Basic Input Validation (already present, but good to keep)
             if (!email || !password || !userType) {
                 res.status(400).json({ error: 'Email, password, and userType are required' });
                 return;
             }
 
-            if (userType !== 'STUDENT' && userType !== 'TEACHER') {
+            // Check userType using the imported enum
+            if (userType !== UserType.STUDENT && userType !== UserType.TEACHER) {
                 res.status(400).json({ error: 'Invalid userType' });
                 return;
             }
 
-            // 2. Call AuthService authenticate (which will check for PASSWORD auth method)
-            const credentials = { email, password, userType: userType as UserType };
+            // 2. Call AuthService authenticate
+            // Pass the validated DTO object structure
+            const credentials: LoginUserDTO = { email, password, userType };
             const { user, accessToken, uniqueRefreshToken } = await authService.authenticate(credentials);
 
             // 3. Response

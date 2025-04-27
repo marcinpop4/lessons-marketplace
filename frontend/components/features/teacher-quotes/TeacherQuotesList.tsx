@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LessonQuote } from '@shared/models/LessonQuote';
 import { LessonType } from '@shared/models/LessonType';
 import { getLessonQuotesByRequestId } from '@frontend/api/lessonQuotesApi';
 import { createLessonQuotes } from '@frontend/api/teacherQuoteApi';
 import TeacherQuoteCard from './TeacherQuoteCard';
 import './TeacherQuotesList.css';
+import { useAuth } from '@frontend/contexts/AuthContext';
 
 interface TeacherQuotesListProps {
   lessonRequestId: string;
@@ -20,94 +21,83 @@ const TeacherQuotesList: React.FC<TeacherQuotesListProps> = ({
   onError
 }) => {
   const [quotes, setQuotes] = useState<LessonQuote[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
-  const fetchQuotes = async () => {
-    try {
-      const quotesData = await getLessonQuotesByRequestId(lessonRequestId);
-      setQuotes(quotesData);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch quotes';
-      setError(errorMessage);
-      onError(errorMessage);
-    }
-  };
-
-  useEffect(() => {
-    fetchQuotes();
-  }, [lessonRequestId]);
-
-  const handleCreateQuotes = async () => {
+  const loadAndGenerateQuotes = useCallback(async () => {
     setLoading(true);
     setError(null);
-
     try {
-      const newQuotes = await createLessonQuotes(lessonRequestId, lessonType);
+      let existingQuotes = await getLessonQuotesByRequestId(lessonRequestId);
 
-      if (newQuotes.length === 0) {
-        setError('No more teachers available for quotes');
-        return;
+      if (existingQuotes.length === 0 && user?.userType === 'STUDENT') {
+        console.log('No existing quotes found, attempting to generate new ones...');
+        const generatedQuotes = await createLessonQuotes(lessonRequestId, lessonType);
+
+        if (generatedQuotes.length === 0) {
+          setError('Sorry, no available teachers could provide a quote for this lesson type at this time.');
+          setQuotes([]);
+        } else {
+          setQuotes(generatedQuotes);
+        }
+      } else {
+        setQuotes(existingQuotes);
+        if (existingQuotes.length === 0 && user?.userType !== 'STUDENT') {
+          console.warn('TeacherQuotesList loaded with no existing quotes for a non-student user.');
+          setError('No quotes found for this request.');
+        }
       }
-
-      // Update the quotes list
-      setQuotes(prevQuotes => [...prevQuotes, ...newQuotes]);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create quotes';
+      console.error("Error loading or generating quotes:", err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load or generate quotes';
       setError(errorMessage);
       onError(errorMessage);
+      setQuotes([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [lessonRequestId, lessonType, onError, user?.userType]);
+
+  useEffect(() => {
+    loadAndGenerateQuotes();
+  }, [loadAndGenerateQuotes]);
 
   const handleQuoteAccepted = (lessonId: string) => {
     onQuoteAccepted(lessonId);
   };
 
+  if (loading) {
+    return <div className="loading-spinner">Loading quotes...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="alert alert-error teacher-quotes-list">
+        <p>{error}</p>
+      </div>
+    );
+  }
+
+  if (quotes.length === 0) {
+    return (
+      <div className="alert alert-info teacher-quotes-list">
+        <p>No quotes are currently available for this lesson request.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="teacher-quotes-list">
-      {error && (
-        <div className="alert alert-error">
-          {error}
-        </div>
-      )}
-
-      {quotes.length === 0 ? (
-        <div className="no-quotes">
-          <p>No quotes available yet.</p>
-          <button
-            onClick={handleCreateQuotes}
-            disabled={loading}
-            className="btn btn-primary"
-          >
-            {loading ? 'Creating Quotes...' : 'Get Quotes'}
-          </button>
-        </div>
-      ) : (
-        <>
-          <div className="quotes-grid">
-            {quotes.map(quote => (
-              <TeacherQuoteCard
-                key={quote.id}
-                quote={quote}
-                onAccept={handleQuoteAccepted}
-              />
-            ))}
-          </div>
-          {quotes.length < 5 && (
-            <div className="get-more-quotes">
-              <button
-                onClick={handleCreateQuotes}
-                disabled={loading}
-                className="btn btn-secondary"
-              >
-                {loading ? 'Creating Quotes...' : 'Get More Quotes'}
-              </button>
-            </div>
-          )}
-        </>
-      )}
+      <div className="quotes-grid">
+        {quotes.map(quote => (
+          <TeacherQuoteCard
+            key={quote.id}
+            quote={quote}
+            onAccept={handleQuoteAccepted}
+          />
+        ))}
+      </div>
     </div>
   );
 };

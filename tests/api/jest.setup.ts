@@ -2,6 +2,9 @@ import * as dotenv from 'dotenv';
 // Use require for built-in Node modules in Jest setup
 const path = require('path');
 const fs = require('fs');
+import { cleanupDatabase } from './globalTeardown';
+
+
 
 // Explicitly check if path is loaded before using it
 if (!path || typeof path.resolve !== 'function') {
@@ -41,4 +44,16 @@ if (result.error) {
     if (!process.env.VITE_API_BASE_URL) {
         // Potentially add a check here if needed, but no console output
     }
-} 
+}
+
+// Optionally load general polyfills or setup mocks here
+
+// Hook to run after all tests in each file
+afterAll(async () => {
+    console.log('[jest.setup.ts] Running afterAll hook to clean database...');
+    await cleanupDatabase();
+    console.log('[jest.setup.ts] Database cleanup function finished.');
+});
+
+// Example: Extending expect (if needed)
+// expect.extend({ ... }); 

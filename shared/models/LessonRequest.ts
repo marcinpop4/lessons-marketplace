@@ -3,6 +3,49 @@ import { Student } from './Student.js';
 import { Address } from './Address.js';
 
 /**
+ * @openapi
+ * components:
+ *   schemas:
+ *     LessonRequest:
+ *       type: object
+ *       description: A student's request for a lesson.
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: Unique identifier for the lesson request.
+ *         type:
+ *           $ref: '#/components/schemas/LessonType'
+ *         startTime:
+ *           type: string
+ *           format: date-time
+ *           description: Requested start time for the lesson.
+ *         durationMinutes:
+ *           type: integer
+ *           description: Requested duration of the lesson in minutes.
+ *         address:
+ *           $ref: '#/components/schemas/Address'
+ *         student:
+ *           $ref: '#/components/schemas/Student'
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the request was created.
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the request was last updated.
+ *       required:
+ *         - id
+ *         - type
+ *         - startTime
+ *         - durationMinutes
+ *         - address
+ *         - student
+ *         - createdAt
+ *         - updatedAt
+ */
+
+/**
  * Properties required to create a LessonRequest instance.
  */
 interface LessonRequestProps {

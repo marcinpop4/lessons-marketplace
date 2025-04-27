@@ -27,8 +27,52 @@ interface TeacherLessonHourlyRateProps {
 }
 
 /**
- * Represents an hourly rate set by a teacher for a specific lesson type.
- * Now uses the standard status model for activation state.
+ * @openapi
+ * components:
+ *   schemas:
+ *     TeacherLessonHourlyRate:
+ *       type: object
+ *       description: Represents an hourly rate set by a teacher for a specific lesson type.
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: Unique identifier for the hourly rate record.
+ *         teacherId:
+ *           type: string
+ *           description: ID of the teacher this rate belongs to.
+ *         type:
+ *           $ref: '#/components/schemas/LessonType'
+ *         rateInCents:
+ *           type: integer
+ *           description: Hourly rate in cents.
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the rate was created.
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the rate was last updated.
+ *           nullable: true
+ *         currentStatus:
+ *           $ref: '#/components/schemas/TeacherLessonHourlyRateStatus' # Assuming this schema exists
+ *           nullable: true
+ *         isActive:
+ *           type: boolean
+ *           description: Derived field indicating if the rate is currently active.
+ *           readOnly: true
+ *         rateInDollars:
+ *           type: number
+ *           format: float
+ *           description: Derived field showing the rate in dollars.
+ *           readOnly: true
+ *       required:
+ *         - id
+ *         - teacherId
+ *         - type
+ *         - rateInCents
+ *         - createdAt
+ *         # currentStatus might be null, so not required
  */
 export class TeacherLessonHourlyRate {
   id: string;

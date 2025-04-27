@@ -11,6 +11,7 @@ import { Teacher } from '@shared/models/Teacher';
 import { Address } from '@shared/models/Address';
 import { LessonType } from '@shared/models/LessonType'; // Import LessonType enum
 import { useAuth } from '@frontend/contexts/AuthContext';
+import { LessonQuoteStatus, LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus';
 
 // Interface to hold both lesson model and extra display data
 interface LessonDisplayData {
@@ -69,18 +70,31 @@ const instantiateLessonFromData = (data: /*TeacherLessonApiResponseItem*/ any): 
             student: student // Use constructed student
         });
 
-        // Reconstruct LessonQuote using top-level and nested data
+        // Map the nested currentStatus from the API response for the quote
+        // Assuming `data.quoteStatus` contains the status info for the quote in the flattened response
+        const quoteStatusData = data.quoteStatus; // Adjust if the property name is different
+        const quoteCurrentStatusModel = quoteStatusData
+            ? new LessonQuoteStatus({
+                id: quoteStatusData.id,
+                lessonQuoteId: data.quoteId || `quote-for-${data.id}`, // Use quoteId if available, else placeholder
+                status: quoteStatusData.status as LessonQuoteStatusValue, // Add type assertion
+                context: quoteStatusData.context || null,
+                createdAt: quoteStatusData.createdAt ? new Date(quoteStatusData.createdAt) : new Date()
+            })
+            : null;
+
         const lessonQuote = new LessonQuote({
-            // Quote ID isn't directly available. Using placeholder.
-            id: `quote-for-${data.id}`, // Placeholder ID
+            id: data.quoteId || `quote-for-${data.id}`, // Use quoteId if available, else placeholder
             costInCents: data.costInCents, // Use top-level costInCents
-            // Provide default for missing hourlyRateInCents
-            hourlyRateInCents: 0, // Default to 0 as it's not in the flattened response
+            hourlyRateInCents: data.hourlyRateInCents ?? 0, // Use top-level hourlyRate if available
             lessonRequest: lessonRequest, // Use constructed lessonRequest
-            teacher: teacher // Use constructed teacher
+            teacher: teacher, // Use constructed teacher
+            currentStatus: quoteCurrentStatusModel, // Pass mapped status object
+            currentStatusId: quoteCurrentStatusModel?.id ?? null // Pass status ID
+            // createdAt is likely not needed/available in flattened view
         });
 
-        // Construct LessonStatus
+        // Construct LessonStatus for the lesson itself
         const lessonStatus = new LessonStatus({
             id: data.currentStatusId,
             lessonId: data.id,

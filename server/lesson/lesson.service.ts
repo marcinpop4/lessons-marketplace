@@ -24,7 +24,8 @@ const lessonIncludeForMapper = {
                     student: true,
                     address: true
                 }
-            }
+            },
+            currentStatus: true
         }
     }
 };

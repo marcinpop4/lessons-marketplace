@@ -1,8 +1,16 @@
-// Using a generic JsonValue type to avoid direct Prisma dependency in shared models
-type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
+import { JsonValue } from '../types/JsonTypes.js'; // Import the shared type
 
 /**
- * Possible status values for a lesson quote.
+ * @openapi
+ * components:
+ *   schemas:
+ *     LessonQuoteStatusValue:
+ *       type: string
+ *       enum:
+ *         - CREATED
+ *         - ACCEPTED
+ *         - REJECTED
+ *       description: Possible status values for a lesson quote.
  */
 export enum LessonQuoteStatusValue {
     CREATED = 'CREATED',     // Quote has been generated but not acted upon.
@@ -12,7 +20,15 @@ export enum LessonQuoteStatusValue {
 }
 
 /**
- * Defines the possible transition actions that can be taken on a lesson quote.
+ * @openapi
+ * components:
+ *   schemas:
+ *     LessonQuoteStatusTransition:
+ *       type: string
+ *       enum:
+ *         - ACCEPT
+ *         - REJECT
+ *       description: Possible transition actions for a lesson quote status.
  */
 export enum LessonQuoteStatusTransition {
     ACCEPT = 'ACCEPT',     // Student accepts the quote.
@@ -32,7 +48,34 @@ interface LessonQuoteStatusProps {
 }
 
 /**
- * Represents a status change for a lesson quote.
+ * @openapi
+ * components:
+ *   schemas:
+ *     LessonQuoteStatus:
+ *       type: object
+ *       description: Represents a snapshot of a lesson quote's status at a point in time.
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: Unique identifier for the status record.
+ *         lessonQuoteId:
+ *           type: string
+ *           description: ID of the lesson quote this status belongs to.
+ *         status:
+ *           $ref: '#/components/schemas/LessonQuoteStatusValue'
+ *         context:
+ *           type: object
+ *           nullable: true
+ *           description: Optional context data associated with this status change.
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when this status was recorded.
+ *       required:
+ *         - id
+ *         - lessonQuoteId
+ *         - status
+ *         - createdAt
  */
 export class LessonQuoteStatus {
     id: string;

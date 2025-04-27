@@ -11,8 +11,49 @@ interface PersonProps {
 }
 
 /**
- * Base class for shared person attributes
- * Used as a foundation for both Teacher and Student models
+ * @openapi
+ * components:
+ *   schemas:
+ *     Person:
+ *       type: object
+ *       description: Base properties common to both Students and Teachers.
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: Unique identifier for the person.
+ *         firstName:
+ *           type: string
+ *           description: Person's first name.
+ *         lastName:
+ *           type: string
+ *           description: Person's last name.
+ *         email:
+ *           type: string
+ *           format: email
+ *           description: Person's email address.
+ *         phoneNumber:
+ *           type: string
+ *           description: Person's phone number.
+ *         dateOfBirth:
+ *           type: string
+ *           format: date-time # Or just 'date' if time is not stored
+ *           description: Person's date of birth.
+ *         fullName:
+ *           type: string
+ *           description: Person's full name (derived).
+ *           readOnly: true
+ *         age:
+ *           type: integer
+ *           nullable: true
+ *           description: Person's age in years (derived).
+ *           readOnly: true
+ *       required:
+ *         - id
+ *         - firstName
+ *         - lastName
+ *         - email
+ *         - phoneNumber
+ *         - dateOfBirth
  */
 export abstract class Person {
   id: string;

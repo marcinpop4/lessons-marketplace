@@ -5,6 +5,7 @@ import { LessonType } from '@shared/models/LessonType';
 import apiClient from './apiClient';
 import { Student } from '@shared/models/Student';
 import { Address } from '@shared/models/Address';
+import { LessonQuoteStatus, LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus';
 
 // Interface for teacher with hourly rate information
 export interface TeacherWithRates extends Teacher {
@@ -37,7 +38,7 @@ export const createLessonQuotes = async (
   lessonRequestId: string,
   lessonType: LessonType
 ): Promise<LessonQuote[]> => {
-  const response = await apiClient.post('/api/v1/lesson-quotes/create-quotes', {
+  const response = await apiClient.post('/api/v1/lesson-quotes', {
     lessonRequestId,
     lessonType
   });
@@ -80,6 +81,18 @@ export const createLessonQuotes = async (
       // Missing hourlyRates? Assuming they are not needed here or fetched separately
     });
 
+    // Map the nested currentStatus from the API response for the quote
+    const quoteStatusData = quote.currentStatus; // Assuming API includes this nested status
+    const quoteCurrentStatusModel = quoteStatusData
+      ? new LessonQuoteStatus({
+        id: quoteStatusData.id,
+        lessonQuoteId: quote.id,
+        status: quoteStatusData.status as LessonQuoteStatusValue, // Add type assertion
+        context: quoteStatusData.context || null,
+        createdAt: quoteStatusData.createdAt ? new Date(quoteStatusData.createdAt) : new Date()
+      })
+      : null;
+
     // Create the LessonQuote using object pattern
     return new LessonQuote({
       id: quote.id,
@@ -87,6 +100,8 @@ export const createLessonQuotes = async (
       teacher,
       costInCents: quote.costInCents,
       hourlyRateInCents: quote.hourlyRateInCents,
+      currentStatus: quoteCurrentStatusModel, // Pass mapped status object
+      currentStatusId: quoteCurrentStatusModel?.id ?? null, // Pass status ID
       createdAt: new Date(quote.createdAt)
     });
   });
@@ -117,9 +132,15 @@ interface ApiQuoteData {
   costInCents: number;
   hourlyRateInCents: number;
   createdAt: string;
-  expiresAt: string;
+  // expiresAt: string; // Consider removing if no longer sent by API
   lessonRequest: any; // Define more strictly if possible
   teacher: any;       // Define more strictly if possible
+  currentStatus?: { // Add optional currentStatus object
+    id: string;
+    status: string; // Assuming status is string initially
+    context?: any;
+    createdAt?: string;
+  } | null;
 }
 
 // Function to transform raw API data into domain models
@@ -162,6 +183,18 @@ const transformQuotes = (quotesData: ApiQuoteData[]): LessonQuote[] => {
       // hourlyRates likely not needed here
     });
 
+    // Map the nested currentStatus from the API response for the quote
+    const quoteStatusData = quote.currentStatus; // Assuming API includes this nested status in ApiQuoteData
+    const quoteCurrentStatusModel = quoteStatusData
+      ? new LessonQuoteStatus({
+        id: quoteStatusData.id,
+        lessonQuoteId: quote.id,
+        status: quoteStatusData.status as LessonQuoteStatusValue, // Add type assertion
+        context: quoteStatusData.context || null,
+        createdAt: quoteStatusData.createdAt ? new Date(quoteStatusData.createdAt) : new Date()
+      })
+      : null;
+
     // Use object pattern for LessonQuote
     return new LessonQuote({
       id: quote.id,
@@ -169,6 +202,8 @@ const transformQuotes = (quotesData: ApiQuoteData[]): LessonQuote[] => {
       teacher,
       costInCents: quote.costInCents,
       hourlyRateInCents: quote.hourlyRateInCents,
+      currentStatus: quoteCurrentStatusModel, // Pass mapped status object
+      currentStatusId: quoteCurrentStatusModel?.id ?? null, // Pass status ID
       createdAt: new Date(quote.createdAt)
     });
   });

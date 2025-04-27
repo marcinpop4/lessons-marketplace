@@ -14,8 +14,9 @@ export default {
   // Load environment variables before running any test files
   setupFiles: [
     // Use <rootDir> explicitly since relative path caused issues
-    '<rootDir>/jest.setup.ts' 
+    // REMOVE: '<rootDir>/jest.setup.ts' // Moved to setupFilesAfterEnv
   ],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'], // Correct extension to .ts
   // ADD the 'transform' section
   transform: {
     '^.+\.tsx?$': ['ts-jest', {
@@ -43,6 +44,5 @@ export default {
     '^@frontend/(.*)$': '<rootDir>/../../frontend/$1' // Added frontend alias
   },
   testTimeout: 30000, // Slightly increased timeout
-  // Add verbose logging
   verbose: true
 }; 

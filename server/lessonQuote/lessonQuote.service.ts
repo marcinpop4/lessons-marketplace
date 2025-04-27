@@ -18,6 +18,9 @@ import { isUuid } from '../utils/validation.utils.js';
 import { lessonService } from '../lesson/lesson.service.js';
 import { UserType as PrismaUserType } from '@prisma/client';
 import { UserType as SharedUserType } from '@shared/models/UserType.js';
+import { teacherService } from '../teacher/teacher.service.js';
+import { v4 as uuidv4 } from 'uuid';
+import { LessonQuoteStatus } from '@shared/models/LessonQuoteStatus.js';
 
 // Define Prisma types for includes required by mapper methods
 // Type for Teacher with nested rates
@@ -56,7 +59,7 @@ class LessonQuoteService {
         teacherId: string;
         costInCents: number;
         hourlyRateInCents: number;
-    }): Promise<LessonQuote | null> {
+    }): Promise<LessonQuote> {
         // --- Validation ---
         if (!quoteData.lessonRequestId || !isUuid(quoteData.lessonRequestId)) {
             throw new BadRequestError('Valid Lesson Request ID is required.');
@@ -65,94 +68,166 @@ class LessonQuoteService {
             throw new BadRequestError('Valid Teacher ID is required.');
         }
         if (typeof quoteData.costInCents !== 'number' || !Number.isInteger(quoteData.costInCents) || quoteData.costInCents < 0) {
-            // Allow 0 for free lessons? Assume >= 0 for now.
             throw new BadRequestError('Cost must be a non-negative integer.');
         }
         if (typeof quoteData.hourlyRateInCents !== 'number' || !Number.isInteger(quoteData.hourlyRateInCents) || quoteData.hourlyRateInCents <= 0) {
             throw new BadRequestError('Hourly rate must be a positive integer.');
         }
-        // TODO: Add check if teacher exists?
-        // TODO: Add check if lesson request exists? (Handled by Prisma FK constraint, but explicit check is clearer)
-        // --- End Validation ---
 
         let createdQuoteId: string | null = null;
         try {
-            // Follow the workflow: Create Quote -> Create Status -> Update Quote Status Link
             await this.prisma.$transaction(async (tx) => {
-                // Optional: Explicit check if Lesson Request exists
                 const lessonRequest = await tx.lessonRequest.findUnique({ where: { id: quoteData.lessonRequestId } });
                 if (!lessonRequest) {
                     throw new NotFoundError(`Lesson Request with ID ${quoteData.lessonRequestId} not found.`);
                 }
+                // Optional: Add check if teacher exists
+                const teacher = await tx.teacher.findUnique({ where: { id: quoteData.teacherId } });
+                if (!teacher) {
+                    throw new NotFoundError(`Teacher with ID ${quoteData.teacherId} not found.`);
+                }
 
-                // 1. Create the LessonQuote (currentStatusId will be null initially)
+                // 1. Create the LessonQuote
                 const newDbQuote = await tx.lessonQuote.create({
                     data: {
                         lessonRequestId: quoteData.lessonRequestId,
                         teacherId: quoteData.teacherId,
                         costInCents: quoteData.costInCents,
                         hourlyRateInCents: quoteData.hourlyRateInCents,
-                        // currentStatusId is omitted, defaults according to schema (likely null)
                     },
                 });
-                createdQuoteId = newDbQuote.id; // Capture the ID
+                createdQuoteId = newDbQuote.id;
 
-                // 2. Create the initial LessonQuoteStatus, connecting back to the quote
+                // 2. Create the initial LessonQuoteStatus
                 const initialStatus = await tx.lessonQuoteStatus.create({
                     data: {
                         status: LessonQuoteStatusValue.CREATED,
-                        lessonQuote: { // Explicitly connect to the quote created in step 1
-                            connect: { id: newDbQuote.id },
-                        },
-                        // context: null // Optional
+                        lessonQuote: { connect: { id: newDbQuote.id } },
                     },
                 });
 
-                // 3. Update the LessonQuote to link its currentStatusId to the new status
+                // 3. Update the LessonQuote to link its currentStatusId
                 await tx.lessonQuote.update({
                     where: { id: newDbQuote.id },
-                    data: {
-                        currentStatusId: initialStatus.id,
-                    },
+                    data: { currentStatusId: initialStatus.id },
                 });
             });
 
             if (!createdQuoteId) {
-                throw new Error(
-                    "Transaction completed but quote ID was not captured."
-                );
+                // This case should ideally not happen if transaction succeeds without error
+                throw new AppError('Lesson quote creation failed unexpectedly after transaction.', 500);
             }
 
-            // Fetch the complete quote record post-transaction, including the status
-            const finalDbQuote = await this.prisma.lessonQuote.findUniqueOrThrow(
-                {
-                    where: { id: createdQuoteId },
-                    include: {
-                        teacher: {
-                            include: { teacherLessonHourlyRates: true },
-                        },
-                        lessonRequest: {
-                            include: { student: true, address: true },
-                        },
-                        currentStatus: true, // Include the linked status
-                    },
-                }
-            );
+            const finalDbQuote = await this.prisma.lessonQuote.findUniqueOrThrow({
+                where: { id: createdQuoteId },
+                include: {
+                    teacher: { include: { teacherLessonHourlyRates: true } }, // Include rates for mapping
+                    lessonRequest: { include: { student: true, address: true } },
+                    currentStatus: true,
+                },
+            });
 
-            // Pass the full object including status to the mapper
-            return LessonQuoteMapper.toModel(
-                finalDbQuote as DbLessonQuoteWithRelations
-            );
+            return LessonQuoteMapper.toModel(finalDbQuote as DbLessonQuoteWithRelations);
         } catch (error) {
-            // Check if error is PrismaClientKnownRequestError and log code if so
-            if (error instanceof Prisma.PrismaClientKnownRequestError) {
-                console.error("Prisma Error in LessonQuoteService.create:", error.code, error.message);
-            } else {
-                console.error("Error in LessonQuoteService.create:", error);
+            // Handle specific Prisma errors if needed (e.g., unique constraints)
+            if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+                // Example: A quote might already exist for this teacher/request combination?
+                throw new ConflictError('A quote for this teacher and lesson request may already exist.');
             }
-            // Rethrow or handle as appropriate for your error strategy
+            console.error("Error in LessonQuoteService.create:", error);
+            // Rethrow other errors (NotFound, BadRequest, AppError, generic errors)
             throw error;
         }
+    }
+
+    /**
+     * Generates and creates lesson quotes for a given lesson request.
+     * Finds available teachers, calculates costs, and creates quotes using the `create` method.
+     * @param lessonRequestId - The ID of the lesson request.
+     * @param lessonType - The type of lesson requested.
+     * @returns An array of created LessonQuote shared models.
+     */
+    async generateAndCreateQuotes(lessonRequestId: string, lessonType: LessonType): Promise<LessonQuote[]> {
+        // --- Validation ---
+        if (!lessonRequestId || !isUuid(lessonRequestId)) {
+            throw new BadRequestError('Valid Lesson Request ID is required.');
+        }
+        if (!lessonType || !Object.values(LessonType).includes(lessonType)) {
+            throw new BadRequestError(`Invalid lesson type provided: ${lessonType}`);
+        }
+
+        // --- Fetch necessary data ---
+        // 1. Get the lesson request details (needed for duration)
+        const lessonRequest = await this.prisma.lessonRequest.findUnique({
+            where: { id: lessonRequestId },
+            // select: { durationMinutes: true }, // Only select needed fields
+        });
+        if (!lessonRequest) {
+            throw new NotFoundError(`Lesson Request with ID ${lessonRequestId} not found.`);
+        }
+        const durationMinutes = lessonRequest.durationMinutes;
+
+        // 2. Find available teachers with active rates for this lesson type
+        // Using the teacherService method which already handles finding active rates
+        // Use a reasonable limit, e.g., 5, or make it configurable if needed
+        const availableTeachers = await teacherService.findTeachersByLessonType(lessonType, 5);
+
+        if (availableTeachers.length === 0) {
+            console.log(`No available teachers found for lesson type: ${lessonType}`);
+            return []; // Return empty array if no teachers are available
+        }
+
+        // --- Generate and Create Quotes ---
+        const createdQuotes: LessonQuote[] = [];
+        const quoteCreationPromises: Promise<LessonQuote | null>[] = [];
+
+        for (const teacher of availableTeachers) {
+            // Find the specific rate for the requested lesson type
+            // Use the 'hourlyRates' property from the shared Teacher model
+            const rate = teacher.hourlyRates.find(
+                (r: TeacherLessonHourlyRate) => r.type === lessonType && r.currentStatus?.status === TeacherLessonHourlyRateStatusValue.ACTIVE
+            );
+
+            if (rate) {
+                const hourlyRateInCents = rate.rateInCents;
+                // Calculate cost based on the rate and lesson request duration
+                const costInCents = Math.round((hourlyRateInCents * durationMinutes) / 60.0);
+
+                // Create quote using the existing `create` method
+                // Push the promise returned by `create` to the array
+                quoteCreationPromises.push(
+                    this.create({
+                        lessonRequestId,
+                        teacherId: teacher.id,
+                        costInCents,
+                        hourlyRateInCents,
+                    })
+                        .catch(error => {
+                            // Log error for this specific quote creation but don't stop others
+                            console.error(`Failed to create quote for teacher ${teacher.id} and request ${lessonRequestId}:`, error);
+                            return null; // Return null on failure for filtering later
+                        })
+                );
+            } else {
+                // This shouldn't happen if findTeachersByLessonType works correctly
+                // and includes the active rate used for filtering.
+                console.warn(`Teacher ${teacher.id} was returned by findTeachersByLessonType but no active rate found for ${lessonType}. Check TeacherMapper logic.`);
+            }
+        }
+
+        // Wait for all quote creation attempts to settle (succeed or fail)
+        const results = await Promise.allSettled(quoteCreationPromises);
+
+        // Filter out failures (nulls) and extract successful quotes
+        for (const result of results) {
+            if (result.status === 'fulfilled' && result.value) {
+                createdQuotes.push(result.value);
+            }
+            // Optionally log failures from settled promises if needed
+            // if (result.status === 'rejected') { ... }
+        }
+
+        return createdQuotes;
     }
 
     /**
@@ -320,12 +395,11 @@ class LessonQuoteService {
      */
     async updateStatus(
         quoteId: string,
-        newStatus: any, // Validate type below
+        newStatus: LessonQuoteStatusValue,
         context: Record<string, unknown> | null,
         userId: string,
-        userType: any // Use actual UserType enum eventually
+        userType: SharedUserType
     ): Promise<LessonQuote> {
-
         // --- Validation ---
         if (!quoteId || !isUuid(quoteId)) {
             throw new BadRequestError('Valid Quote ID is required.');
@@ -349,81 +423,54 @@ class LessonQuoteService {
         try {
             const updatedQuote = await this.prisma.$transaction(async (tx) => {
                 // Fetch current quote with necessary relations for checks
-                const currentQuote = await tx.lessonQuote.findUnique({
+                const quote = await tx.lessonQuote.findUniqueOrThrow({
                     where: { id: quoteId },
                     include: {
-                        currentStatus: true,
                         lessonRequest: { select: { studentId: true } },
-                        teacher: { select: { id: true } }, // Need teacherId for auth
-                        Lesson: { select: { id: true } } // Check if lesson exists
-                    }
+                        Lesson: { select: { id: true } },
+                        teacher: { select: { id: true } },
+                        currentStatus: true,
+                    },
                 });
 
-                // Add detailed logging HERE, immediately after fetching
-                // console.log(`[AuthCheck-Early] Fetched quote for update: quoteId=${currentQuote?.id}, status=${currentQuote?.currentStatus?.status}`);
-                // console.log(`[AuthCheck-Early] userId (from token): ${userId}`);
-                // console.log(`[AuthCheck-Early] userType (from token): ${userType}`);
-                // console.log(`[AuthCheck-Early] quote.lessonRequest.studentId: ${currentQuote?.lessonRequest?.studentId}`);
-                // console.log(`[AuthCheck-Early] quote.teacherId: ${currentQuote?.teacherId}`);
-
-                if (!currentQuote) {
-                    throw new NotFoundError(`Quote with ID ${quoteId} not found.`);
+                if (!quote.currentStatus) {
+                    throw new AppError('Lesson quote is missing current status information.', 500);
                 }
-                if (!currentQuote.currentStatus) {
-                    throw new AppError(`Data integrity issue: Quote ${quoteId} is missing current status.`, 500);
-                }
+                const currentStatusValue = quote.currentStatus.status as LessonQuoteStatusValue;
+                // validNewStatus already validated in the initial checks
 
-                const currentStatusValue = currentQuote.currentStatus.status as LessonQuoteStatusValue;
+                // --- Authorization Checks based on ROLE and ACTION ---
+                const isStudentOwner = userType === SharedUserType.STUDENT && quote.lessonRequest?.studentId === userId;
+                const isTeacherOwner = userType === SharedUserType.TEACHER && quote.teacherId === userId;
 
-                // --- Conflict Check (PRIORITIZE for ACCEPT) ---
-                if (validNewStatus === LessonQuoteStatusValue.ACCEPTED && currentQuote.Lesson) {
-                    throw new ConflictError(`Conflict: Quote ${quoteId} has already been accepted and linked to Lesson ${currentQuote.Lesson.id}.`);
-                }
-
-                // --- Authorization Check ---
-                // Logging from previous step (keep for now) - compare against SharedUserType
-                // console.log(`[AuthCheck] userType === SharedUserType.STUDENT: ${userType === SharedUserType.STUDENT}`);
-                // console.log(`[AuthCheck] currentQuote.lessonRequest?.studentId === userId: ${currentQuote.lessonRequest?.studentId === userId}`);
-
-                // Ensure comparison uses SharedUserType (the alias)
-                const isStudentOwner = userType === SharedUserType.STUDENT && currentQuote.lessonRequest?.studentId === userId;
-                const isTeacherOwner = userType === SharedUserType.TEACHER && currentQuote.teacherId === userId;
-
-                if (!isStudentOwner && !isTeacherOwner) {
-                    throw new AuthorizationError('Forbidden: You are not authorized to update this quote.');
-                }
-
-                // --- State Transition Validation (Simple - enhance with state machine class if needed) ---
-                // TODO: Replace with a proper state machine logic if complex transitions arise
-                let allowed = false;
-                if (isStudentOwner) {
-                    if (currentStatusValue === LessonQuoteStatusValue.CREATED &&
-                        (validNewStatus === LessonQuoteStatusValue.ACCEPTED || validNewStatus === LessonQuoteStatusValue.REJECTED)) {
-                        allowed = true;
+                if (validNewStatus === LessonQuoteStatusValue.ACCEPTED) {
+                    // Only the specific student who owns the request can ACCEPT
+                    if (!isStudentOwner) {
+                        throw new AuthorizationError('Only the requesting student can accept a lesson quote.');
                     }
-                } else if (isTeacherOwner) {
-                    // Add allowed transitions for TEACHER if any
-                    // Example (if WITHDRAWN status existed):
-                    // if (currentStatusValue === LessonQuoteStatusValue.CREATED && validNewStatus === LessonQuoteStatusValue.WITHDRAWN) {
-                    //     allowed = true;
-                    // }
-                    // Add other real teacher transitions here if needed in the future
+                    // Check if a lesson has already been created for this quote
+                    if (quote.Lesson) {
+                        throw new BadRequestError('Cannot accept a quote that already has an associated lesson.');
+                    }
+                } else if (validNewStatus === LessonQuoteStatusValue.REJECTED) {
+                    // Only the specific student who owns the request can REJECT
+                    if (!isStudentOwner) {
+                        throw new AuthorizationError('Only the requesting student can reject a lesson quote.');
+                    }
+                } else {
+                    // If the target status is neither ACCEPTED nor REJECTED, and no other
+                    // role-specific checks allow it, it's an invalid request.
+                    // This covers the case where a student tries to move from ACCEPTED -> CREATED
+                    throw new BadRequestError(`Invalid target status '${validNewStatus}' for this operation or user role.`);
                 }
-
-                if (!allowed) {
-                    throw new BadRequestError(`Invalid status transition: Cannot move from ${currentStatusValue} to ${validNewStatus} by user type ${userType}.`);
-                }
+                // If no specific check matched/threw, proceed.
 
                 // --- Perform Actions ---
                 let createdLessonId: string | null = null;
                 // 1. Create Lesson if Student is Accepting
                 if (validNewStatus === LessonQuoteStatusValue.ACCEPTED && isStudentOwner) {
-                    // Call lessonService.create within the transaction
-                    // Need to ensure lessonService.create accepts the transaction client (tx)
-                    // Assuming lessonService.create handles its own checks (quote exists, not used)
-                    const lesson = await lessonService.create(quoteId); // Pass quoteId
+                    const lesson = await lessonService.create(quoteId);
                     createdLessonId = lesson.id;
-                    // Note: lessonService.create should ideally set the quote status implicitly or return info needed
                 }
 
                 // 2. Create new LessonQuoteStatus
@@ -431,7 +478,6 @@ class LessonQuoteService {
                     data: {
                         lessonQuoteId: quoteId,
                         status: validNewStatus,
-                        // Cast context to satisfy Prisma's InputJsonValue requirement
                         context: (context ?? Prisma.JsonNull) as Prisma.InputJsonValue,
                     }
                 });
@@ -458,8 +504,13 @@ class LessonQuoteService {
             return LessonQuoteMapper.toModel(updatedQuote as DbLessonQuoteWithRelations);
 
         } catch (error) {
-            // Re-throw known errors
-            if (error instanceof BadRequestError || error instanceof NotFoundError || error instanceof AuthorizationError || error instanceof ConflictError || error instanceof AppError) {
+            // Catch Prisma P2025 specifically for NotFoundError
+            if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+                // The .findUniqueOrThrow inside the transaction failed
+                throw new NotFoundError(`Quote with ID ${quoteId} not found.`);
+            }
+            // Re-throw other known application errors
+            if (error instanceof BadRequestError || error instanceof AuthorizationError || error instanceof NotFoundError || error instanceof AppError) {
                 throw error;
             }
             // Log and wrap unknown errors

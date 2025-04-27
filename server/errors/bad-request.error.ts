@@ -1,7 +1,24 @@
 import { AppError } from './app.error.js';
 
 /**
- * Represents a 400 Bad Request error.
+ * @openapi
+ * components:
+ *   schemas:
+ *     BadRequestError:
+ *       allOf:
+ *         - $ref: '#/components/schemas/AppError'
+ *       type: object
+ *       description: Error indicating a client-side error, such as malformed request syntax, invalid request message framing, or deceptive request routing. Typically represents validation errors.
+ *       properties:
+ *         name:
+ *           type: string
+ *           example: BadRequestError
+ *         statusCode:
+ *           type: integer
+ *           example: 400
+ *         message:
+ *           type: string
+ *           example: Bad request
  */
 export class BadRequestError extends AppError {
     /**

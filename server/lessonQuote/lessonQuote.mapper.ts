@@ -2,7 +2,7 @@ import { LessonQuote } from '../../shared/models/LessonQuote.js';
 import { TeacherMapper } from '../teacher/teacher.mapper.js';
 import { LessonRequestMapper } from '../lessonRequest/lessonRequest.mapper.js';
 import { LessonQuoteStatusMapper } from '../lessonQuoteStatus/lessonQuoteStatus.mapper.js';
-import { Prisma } from '@prisma/client';
+import { Prisma, LessonQuoteStatus as PrismaLessonQuoteStatus } from '@prisma/client';
 
 // Define Prisma types for includes required by the mapper
 type DbTeacherWithRates = Prisma.TeacherGetPayload<{ include: { teacherLessonHourlyRates: true } }>;
@@ -47,7 +47,8 @@ export class LessonQuoteMapper {
 
             // Map the currentStatus using the correct mapper (LessonQuoteStatusMapper)
             const currentStatusModel = currentStatus
-                ? LessonQuoteStatusMapper.toModel(currentStatus as Prisma.LessonStatus)
+                // Cast to unknown first, then to the imported aliased Prisma type
+                ? LessonQuoteStatusMapper.toModel(currentStatus as unknown as PrismaLessonQuoteStatus)
                 : null;
 
             // Construct the shared model instance, adding currentStatus AND currentStatusId

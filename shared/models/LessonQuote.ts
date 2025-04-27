@@ -5,6 +5,49 @@ import { LessonType } from './LessonType.js';
 import { LessonQuoteStatus, LessonQuoteStatusValue } from './LessonQuoteStatus.js';
 
 /**
+ * @openapi
+ * components:
+ *   schemas:
+ *     LessonQuote:
+ *       type: object
+ *       description: A teacher's quote for a specific lesson request.
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: Unique identifier for the lesson quote.
+ *         lessonRequest:
+ *           $ref: '#/components/schemas/LessonRequest'
+ *         teacher:
+ *           $ref: '#/components/schemas/Teacher'
+ *         costInCents:
+ *           type: integer
+ *           description: Total cost of the lesson in cents.
+ *         hourlyRateInCents:
+ *           type: integer
+ *           description: Hourly rate used for this quote in cents.
+ *         currentStatus:
+ *           $ref: '#/components/schemas/LessonQuoteStatus'
+ *           nullable: true
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the quote was created.
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the quote was last updated.
+ *       required:
+ *         - id
+ *         - lessonRequest
+ *         - teacher
+ *         - costInCents
+ *         - hourlyRateInCents
+ *         - createdAt
+ *         - updatedAt
+ *         # currentStatus might be null initially, so not required here
+ */
+
+/**
  * Properties required to create a LessonQuote instance.
  */
 interface LessonQuoteProps {

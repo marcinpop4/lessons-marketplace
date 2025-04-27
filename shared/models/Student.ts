@@ -15,8 +15,27 @@ interface StudentProps {
 }
 
 /**
- * Student model representing users who can book and attend lessons
- * Extends the base Person model
+ * @openapi
+ * components:
+ *   schemas:
+ *     Student:
+ *       allOf:
+ *         - $ref: '#/components/schemas/Person'
+ *       type: object
+ *       description: Represents a student user.
+ *       properties:
+ *         isActive:
+ *           type: boolean
+ *           description: Whether the student account is currently active.
+ *           nullable: true # If it can be optional/null
+ *       required:
+ *         - id # Inherited required fields from Person
+ *         - firstName
+ *         - lastName
+ *         - email
+ *         - phoneNumber
+ *         - dateOfBirth
+ *         # isActive is not required here as it's optional
  */
 export class Student extends Person {
   isActive?: boolean;

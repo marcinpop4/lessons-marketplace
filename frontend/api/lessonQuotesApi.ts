@@ -1,6 +1,7 @@
 import { LessonQuote } from '@shared/models/LessonQuote';
 import { LessonRequest } from '@shared/models/LessonRequest';
 import apiClient from './apiClient';
+import { LessonQuoteStatus, LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus';
 
 /**
  * Get quotes for a lesson request
@@ -8,7 +9,7 @@ import apiClient from './apiClient';
  * @returns Array of lesson quotes
  */
 export const getLessonQuotesByRequestId = async (lessonRequestId: string): Promise<LessonQuote[]> => {
-  const response = await apiClient.get(`/api/v1/lesson-quotes/request/${lessonRequestId}`);
+  const response = await apiClient.get(`/api/v1/lesson-quotes?lessonRequestId=${lessonRequestId}`);
   return response.data.map((quote: any) => {
     const lessonRequest = new LessonRequest({
       id: quote.lessonRequest.id,
@@ -19,12 +20,26 @@ export const getLessonQuotesByRequestId = async (lessonRequestId: string): Promi
       student: quote.lessonRequest.student
     });
     const teacher = quote.teacher;
+
+    const quoteStatusData = quote.currentStatus;
+    const quoteCurrentStatusModel = quoteStatusData
+      ? new LessonQuoteStatus({
+        id: quoteStatusData.id,
+        lessonQuoteId: quote.id,
+        status: quoteStatusData.status as LessonQuoteStatusValue,
+        context: quoteStatusData.context || null,
+        createdAt: quoteStatusData.createdAt ? new Date(quoteStatusData.createdAt) : new Date()
+      })
+      : null;
+
     return new LessonQuote({
       id: quote.id,
       lessonRequest,
       teacher,
       costInCents: quote.costInCents,
       hourlyRateInCents: quote.hourlyRateInCents,
+      currentStatus: quoteCurrentStatusModel,
+      currentStatusId: quoteCurrentStatusModel?.id ?? null,
       createdAt: new Date(quote.createdAt)
     });
   });

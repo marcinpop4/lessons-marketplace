@@ -1,4 +1,32 @@
 /**
+ * @openapi
+ * components:
+ *   schemas:
+ *     GoalRecommendation:
+ *       type: object
+ *       description: An AI-generated goal recommendation.
+ *       properties:
+ *         title:
+ *           type: string
+ *           description: The suggested title for the goal.
+ *         description:
+ *           type: string
+ *           description: The suggested description for the goal.
+ *         estimatedLessonCount:
+ *           type: integer
+ *           description: The estimated number of lessons to achieve the goal.
+ *         difficulty:
+ *           type: string
+ *           description: The AI-classified difficulty level.
+ *           example: Intermediate
+ *       required:
+ *         - title
+ *         - description
+ *         - estimatedLessonCount
+ *         - difficulty
+ */
+
+/**
  * Represents a single AI-generated goal recommendation with flattened properties.
  */
 export class GoalRecommendation {

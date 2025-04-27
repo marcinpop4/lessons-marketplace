@@ -4,14 +4,6 @@ import authService, { AuthMethod } from '../auth/auth.service.js';
 import { UserType } from '../../shared/models/UserType.js';
 import { AuthorizationError } from '../errors/index.js';
 
-// Define AuthenticatedRequest interface (or import if central)
-interface AuthenticatedRequest extends Request {
-    user?: {
-        id: string;
-        userType: UserType; // Use shared UserType
-    };
-}
-
 /**
  * Controller for student-related operations.
  */
@@ -86,10 +78,11 @@ export const studentController = {
      * @param res Response object.
      * @param next Next function for error handling.
      */
-    async getStudentById(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    async getStudentById(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const { id: requestedStudentId } = req.params; // Rename for clarity
-            const authenticatedUser = req.user; // Get authenticated user info
+            const { id: requestedStudentId } = req.params;
+            // Cast req.user to expected structure, using string for userType
+            const authenticatedUser = req.user as { id: string; userType: string } | undefined;
 
             // Basic validation (already required by authMiddleware)
             if (!authenticatedUser) {
@@ -111,7 +104,7 @@ export const studentController = {
             }
 
             // --- Authorization Check: Resource Ownership --- 
-            // If the authenticated user is a STUDENT, they can only get their own profile.
+            // Compare string values (authenticatedUser.userType is already treated as string)
             if (authenticatedUser.userType === UserType.STUDENT && authenticatedUser.id !== requestedStudentId) {
                 // Throwing an error will be caught and handled by the error middleware (usually returning 403)
                 return next(new AuthorizationError('Forbidden: Students can only retrieve their own profile.'));

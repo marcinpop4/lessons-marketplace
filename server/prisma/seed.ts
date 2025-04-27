@@ -120,22 +120,31 @@ function getSampleGoalData(lessonType: LessonType, studentAge: number) {
   return goals[0]; // Just returning the first set for simplicity
 }
 
+// Define target statuses early - REMOVED REQUESTED and REJECTED
+const targetStatuses: LessonStatusValue[] = [
+  LessonStatusValue.ACCEPTED,
+  LessonStatusValue.DEFINED,
+  LessonStatusValue.COMPLETED,
+  LessonStatusValue.VOIDED
+];
+
 // --- Helper: Determine Transition Sequence ---
 function getTransitionsToReachStatus(targetStatus: LessonStatusValue): LessonStatusTransition[] {
+  // ASSUMPTION: Lesson starts in ACCEPTED state after creation via lessonService.create(quoteId)
   switch (targetStatus) {
-    case LessonStatusValue.REQUESTED:
-      return [];
+    // case LessonStatusValue.REQUESTED: // Cannot transition back to requested
+    //   return [];
     case LessonStatusValue.ACCEPTED:
-      return [LessonStatusTransition.ACCEPT];
-    case LessonStatusValue.REJECTED:
-      return [LessonStatusTransition.REJECT];
+      return []; // Already in this state
+    // case LessonStatusValue.REJECTED: // Cannot transition from ACCEPTED to REJECTED
+    //  return [];
     case LessonStatusValue.DEFINED:
-      return [LessonStatusTransition.ACCEPT, LessonStatusTransition.DEFINE];
+      return [LessonStatusTransition.DEFINE]; // ACCEPTED -> DEFINE
     case LessonStatusValue.COMPLETED:
-      return [LessonStatusTransition.ACCEPT, LessonStatusTransition.DEFINE, LessonStatusTransition.COMPLETE];
-    // Define a path to VOIDED, e.g., via DEFINED state
+      return [LessonStatusTransition.DEFINE, LessonStatusTransition.COMPLETE]; // ACCEPTED -> DEFINE -> COMPLETE
     case LessonStatusValue.VOIDED:
-      return [LessonStatusTransition.ACCEPT, LessonStatusTransition.DEFINE, LessonStatusTransition.VOID];
+      // Assuming VOID can happen after DEFINED
+      return [LessonStatusTransition.DEFINE, LessonStatusTransition.VOID]; // ACCEPTED -> DEFINE -> VOID
     default:
       console.warn(`Unsupported target status for transition generation: ${targetStatus}`);
       return [];
@@ -158,19 +167,12 @@ async function safeDeleteMany(tableName: string): Promise<void> {
   }
 }
 
+// Define a type for the result of createOrUpdateLessonRate based on the error
+type CreateOrUpdateResult = { wasCreated: boolean, rate: TeacherLessonHourlyRate };
+
 async function main() {
 
   const commonPassword = "1234";
-
-  // --- Define target statuses early --- 
-  const targetStatuses: LessonStatusValue[] = [
-    LessonStatusValue.REQUESTED,
-    LessonStatusValue.ACCEPTED,
-    LessonStatusValue.DEFINED,
-    LessonStatusValue.REJECTED,
-    LessonStatusValue.COMPLETED,
-    LessonStatusValue.VOIDED
-  ];
 
   try {
     // Clear existing data (using direct Prisma for seed cleanup)
@@ -179,7 +181,9 @@ async function main() {
       prisma.goalStatus.deleteMany(),
       prisma.goal.deleteMany(),
       prisma.lessonStatus.deleteMany(),
-      prisma.objective.deleteMany(),
+      prisma.objectiveStatus.deleteMany(), // Assuming ObjectiveStatus depends on Objective
+      prisma.objective.deleteMany(), // Assuming Objective depends on Student/Lesson
+      prisma.lessonQuoteStatus.deleteMany(), // DELETE LessonQuoteStatus FIRST
       // Now delete records that others depended on
       prisma.lesson.deleteMany(),       // Depends on LessonQuote
       prisma.lessonQuote.deleteMany(),    // Depends on LessonRequest, Teacher
@@ -286,23 +290,40 @@ async function main() {
     console.log('Addresses created (via service):', addresses.length);
 
     // Create Hourly Rates using TeacherLessonHourlyRateService
-    const createdHourlyRates: (TeacherLessonHourlyRate | null)[] = [];
+    const rateCreationResults: CreateOrUpdateResult[] = []; // Use the defined type
     for (const teacher of teachers) {
-      const teacherRates = await Promise.all(
-        Object.values(LessonType).map(async (lessonType) => {
+      // Create rates for ALL lesson types for every teacher
+      const lessonTypesToCreate = Object.values(LessonType); // REMOVED filter
+
+      const teacherRateResults = await Promise.all(
+        lessonTypesToCreate.map(lessonType => {
           const baseRateInCents = getBaseRateInCents(lessonType);
-          const rateVariationInCents = Math.floor(Math.random() * 10) * 500;
+          const rateVariationInCents = (teacher.id.charCodeAt(0) % 1000) - 500; // -500 to +499 cents variation
           const rateInCents = baseRateInCents + rateVariationInCents;
-          return teacherLessonHourlyRateService.findOrCreateOrUpdate(
+          // Assume the service returns CreateOrUpdateResult
+          return teacherLessonHourlyRateService.createOrUpdateLessonRate(
             teacher.id,
             lessonType,
             rateInCents
           );
         })
       );
-      createdHourlyRates.push(...teacherRates);
+      rateCreationResults.push(...teacherRateResults); // Push the results
     }
-    const teacherLessonHourlyRates: TeacherLessonHourlyRate[] = createdHourlyRates.filter((rate): rate is TeacherLessonHourlyRate => rate !== null);
+
+    // Ensure Emily Richardson has a VOICE rate specifically, as the filtering logic might skip it.
+    const emilyVoiceRateResult = await teacherLessonHourlyRateService.createOrUpdateLessonRate(
+      emilyRichardson.id,
+      LessonType.VOICE,
+      getBaseRateInCents(LessonType.VOICE) // Use the base rate for simplicity
+    );
+    rateCreationResults.push(emilyVoiceRateResult); // Push the result
+
+    // Extract the actual rates from the results
+    const teacherLessonHourlyRates: TeacherLessonHourlyRate[] = rateCreationResults
+      .map(result => result.rate) // Get the rate property
+      .filter((rate): rate is TeacherLessonHourlyRate => rate !== null); // Filter should technically not be needed now, but safe to keep
+
     console.log('TeacherLessonHourlyRates created (via service):', teacherLessonHourlyRates.length);
 
     // Create Lesson Requests using LessonRequestService
@@ -430,12 +451,8 @@ async function main() {
       const initialLesson = await lessonService.create(extraQuoteForDefinedLesson.id);
       if (!initialLesson?.id) throw new Error('Failed to create initial goal-free lesson.');
 
-      const acceptedLesson = await lessonService.updateStatus(initialLesson.id, LessonStatusTransition.ACCEPT, {}, emilyRichardson.id);
-      if (!acceptedLesson) {
-        throw new Error('Failed to transition goal-free lesson to ACCEPTED');
-      }
-
-      goalFreeDefinedLesson = await lessonService.updateStatus(acceptedLesson.id, LessonStatusTransition.DEFINE, {}, emilyRichardson.id);
+      // Directly transition from initial state (assumed ACCEPTED) to DEFINED
+      goalFreeDefinedLesson = await lessonService.updateStatus(initialLesson.id, LessonStatusTransition.DEFINE, {}, emilyRichardson.id);
     } catch (error) {
       console.error(`   ERROR creating special goal-free DEFINED lesson: ${error instanceof Error ? error.message : error}`);
     }
@@ -462,6 +479,7 @@ async function main() {
 
       try {
         const createdGoal = await goalService.createGoal(
+          emilyRichardson.id,
           lesson.id,
           sampleGoals.created.title,
           sampleGoals.created.description,
@@ -470,22 +488,24 @@ async function main() {
         goalsCreatedCount++;
 
         const startedGoal = await goalService.createGoal(
+          emilyRichardson.id,
           lesson.id,
           sampleGoals.started.title,
           sampleGoals.started.description,
           sampleGoals.started.estimatedLessonCount
         );
-        await goalService.updateGoalStatus(startedGoal.id, GoalStatusTransition.START);
+        await goalService.updateGoalStatus(emilyRichardson.id, startedGoal.id, GoalStatusTransition.START);
         goalsCreatedCount++;
 
         const achievedGoal = await goalService.createGoal(
+          emilyRichardson.id,
           lesson.id,
           sampleGoals.achieved.title,
           sampleGoals.achieved.description,
           sampleGoals.achieved.estimatedLessonCount
         );
-        await goalService.updateGoalStatus(achievedGoal.id, GoalStatusTransition.START);
-        await goalService.updateGoalStatus(achievedGoal.id, GoalStatusTransition.COMPLETE, sampleGoals.achieved.context);
+        await goalService.updateGoalStatus(emilyRichardson.id, achievedGoal.id, GoalStatusTransition.START);
+        await goalService.updateGoalStatus(emilyRichardson.id, achievedGoal.id, GoalStatusTransition.COMPLETE, sampleGoals.achieved.context);
         goalsCreatedCount++;
 
       } catch (goalError) {

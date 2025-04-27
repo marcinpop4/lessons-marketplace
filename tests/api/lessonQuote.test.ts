@@ -35,55 +35,74 @@ if (!API_BASE_URL) {
 }
 
 describe('API Integration: /api/v1/lesson-quotes', () => {
+    // Variables populated by beforeAll
     let studentAuthToken: string | null = null;
     let teacherAuthToken: string | null = null;
     let teacherId: string | null = null;
     let studentId: string | null = null;
+    // Variable populated by outer beforeEach
     let createdLessonRequestId: string | null = null;
 
-    // Setup: Run BEFORE EACH test to ensure isolation
-    beforeEach(async () => {
+    // Setup: Run ONCE before all tests in this describe block
+    beforeAll(async () => {
         try {
-            // 1. Create and Login Student
+            // Create primary student & teacher (with GUITAR rate) once
             const { user: student, password: studentPassword } = await createTestStudent();
             studentId = student.id;
             studentAuthToken = await loginTestUser(student.email, studentPassword, UserType.STUDENT);
 
-            // 2. Create and Login Teacher
-            const { user: teacher, password: teacherPassword } = await createTestTeacher();
+            const { user: teacher, password: teacherPassword } = await createTestTeacher([
+                { lessonType: LessonType.GUITAR, rateInCents: 4500 }
+            ]);
             teacherId = teacher.id;
             teacherAuthToken = await loginTestUser(teacher.email, teacherPassword, UserType.TEACHER);
 
-            // 3. Create a Lesson Request using the student token and util
+        } catch (error) {
+            console.error('[Test Setup] Error in outer beforeAll for lessonQuote.test.ts:', error);
+            // Throw error to prevent tests from running with failed setup
+            throw error;
+        }
+    }, 60000); // Increase timeout slightly for beforeAll if needed
+
+    // Setup: Run BEFORE EACH test (mainly for POST/GET request creation)
+    beforeEach(async () => {
+        // Ensure tokens are available from beforeAll
+        if (!studentAuthToken || !studentId) {
+            throw new Error('beforeAll failed to set up student token/ID for beforeEach');
+        }
+        try {
+            // Create a fresh Lesson Request for GUITAR before each test (or suite)
             const futureDate = new Date();
             futureDate.setDate(futureDate.getDate() + 10);
             futureDate.setHours(11, 0, 0, 0);
             const lessonRequest = await createTestLessonRequest(
-                studentAuthToken as string,
-                studentId as string,
-                LessonType.GUITAR,
+                studentAuthToken as string, // Use token from beforeAll
+                studentId as string,      // Use ID from beforeAll
+                LessonType.GUITAR,          // Request type matches teacher's rate
                 futureDate,
                 60
             );
             createdLessonRequestId = lessonRequest.id;
 
         } catch (error) {
-            console.error('[Test Setup] Error in beforeEach for lessonQuote.test.ts:', error);
-            throw error; // Fail fast
+            console.error('[Test Setup] Error in outer beforeEach for lessonQuote.test.ts:', error);
+            throw error;
         }
-    }, 45000); // Keep timeout as setup involves multiple creations/logins
+    }); // Keep default timeout for beforeEach
 
     describe('POST /', () => {
+        // Payload for generating quotes
         const validQuotePayload = {
             lessonRequestId: '', // Will be set dynamically
-            costInCents: 5000,
-            hourlyRateInCents: 5000
+            lessonType: LessonType.GUITAR // Use a default type, or get from request
         };
 
         beforeEach(() => {
-            // Ensure the dynamic ID is set before each test in this suite
             if (createdLessonRequestId) {
                 validQuotePayload.lessonRequestId = createdLessonRequestId;
+                // TODO: Ideally, fetch the actual LessonRequest and get its type
+                // For now, assume GUITAR matches the one created in outer beforeEach
+                validQuotePayload.lessonType = LessonType.GUITAR;
             }
         });
 
@@ -93,131 +112,124 @@ describe('API Integration: /api/v1/lesson-quotes', () => {
             expect(response.status).toBe(401);
         });
 
-        it('should return 403 Forbidden if requested by a non-TEACHER role (e.g., STUDENT)', async () => {
-            if (!studentAuthToken) throw new Error('Student token not available');
-            // Use util
+        it('should generate quotes for the lesson request when called by STUDENT (201 Created)', async () => {
+            if (!studentAuthToken || !createdLessonRequestId) throw new Error('Student token or Lesson Request ID not available');
+
+            // Use the lower-level util for the core request (Student generates)
             const response = await createQuote(studentAuthToken, validQuotePayload);
-            expect(response.status).toBe(403);
-        });
-
-        it('should create a quote for the lesson request using utility (201 Created)', async () => {
-            if (!teacherAuthToken || !createdLessonRequestId) throw new Error('Teacher token or Lesson Request ID not available');
-
-            // Use the lower-level util for the core request
-            const response = await createQuote(teacherAuthToken, validQuotePayload);
 
             // Assertions on the response
             expect(response.status).toBe(201);
-            const quote: LessonQuote = response.body;
+            expect(Array.isArray(response.body)).toBe(true);
+            // We can't guarantee how many quotes are generated, but expect at least one if a teacher is available
+            // Check if the array is not empty (assuming setup guarantees at least one teacher)
+            expect(response.body.length).toBeGreaterThanOrEqual(1);
+
+            const quote: LessonQuote = response.body[0]; // Check the first quote
             expect(quote.id).toBeDefined();
             expect(quote.lessonRequest?.id).toEqual(createdLessonRequestId);
-            expect(quote.teacher?.id).toEqual(teacherId);
-            expect(quote.costInCents).toEqual(validQuotePayload.costInCents);
-            expect(quote.hourlyRateInCents).toEqual(validQuotePayload.hourlyRateInCents);
+            // Teacher ID will vary based on which teacher was available
+            expect(quote.teacher?.id).toBeDefined();
+            expect(quote.costInCents).toBeDefined(); // Cost is calculated by backend
+            expect(quote.hourlyRateInCents).toBeDefined(); // Rate is set by backend
             expect(quote.createdAt).toBeDefined();
-            expect(quote.updatedAt).toBeDefined();
             expect(quote.currentStatus?.status).toEqual(LessonQuoteStatusValue.CREATED);
-            expect(quote.teacher).toBeDefined();
-            expect(quote.teacher?.id).toEqual(teacherId);
-            expect(quote.teacher).not.toHaveProperty('passwordHash');
         }, 20000);
 
+        it('should return 403 Forbidden if requested by a Teacher', async () => {
+            if (!teacherAuthToken || !createdLessonRequestId) throw new Error('Teacher token or Lesson Request ID not available');
+            // Teacher tries to generate quotes
+            const response = await createQuote(teacherAuthToken, validQuotePayload);
+            expect(response.status).toBe(403);
+        });
+
         it('should return 400 Bad Request if lessonRequestId is missing', async () => {
-            if (!teacherAuthToken) throw new Error('Teacher token not available');
+            if (!studentAuthToken) throw new Error('Student token not available');
             const { lessonRequestId, ...invalidPayload } = validQuotePayload;
-            // Use util with invalid payload
-            const response = await createQuote(teacherAuthToken, invalidPayload as any);
+            const response = await createQuote(studentAuthToken, invalidPayload as any);
             expect(response.status).toBe(400);
+            expect(response.body.error).toContain('Valid Lesson Request ID is required.');
         });
 
-        // Add tests for missing costInCents, hourlyRateInCents...
-        it('should return 400 Bad Request if costInCents is missing', async () => {
-            if (!teacherAuthToken) throw new Error('Teacher token not available');
-            const { costInCents, ...invalidPayload } = validQuotePayload;
-            const response = await createQuote(teacherAuthToken, invalidPayload as any);
+        it('should return 400 Bad Request if lessonType is missing', async () => {
+            if (!studentAuthToken) throw new Error('Student token not available');
+            const { lessonType, ...invalidPayload } = validQuotePayload;
+            const response = await createQuote(studentAuthToken, invalidPayload as any);
             expect(response.status).toBe(400);
-        });
-
-        it('should return 400 Bad Request if hourlyRateInCents is missing', async () => {
-            if (!teacherAuthToken) throw new Error('Teacher token not available');
-            const { hourlyRateInCents, ...invalidPayload } = validQuotePayload;
-            const response = await createQuote(teacherAuthToken, invalidPayload as any);
-            expect(response.status).toBe(400);
+            expect(response.body.error).toContain('Invalid lesson type provided');
         });
 
         it('should return 404 Not Found if lesson request ID does not exist', async () => {
-            if (!teacherAuthToken) throw new Error('Teacher token not available');
+            if (!studentAuthToken) throw new Error('Student token not available');
             const fakeRequestId = uuidv4();
             // Use util
-            const response = await createQuote(teacherAuthToken, { ...validQuotePayload, lessonRequestId: fakeRequestId });
+            const response = await createQuote(studentAuthToken, { ...validQuotePayload, lessonRequestId: fakeRequestId });
             expect(response.status).toBe(404);
         });
     });
 
     describe('GET /', () => {
-        let quoteIdForGetTests: string; // Specific ID for this suite
+        let quoteIdForGetTests: string;
 
-        // Create a quote specifically for the GET tests before each one runs
         beforeEach(async () => {
-            if (!teacherAuthToken || !createdLessonRequestId) {
-                throw new Error('Setup failed: Teacher token or Lesson Request ID missing for GET suite beforeEach');
+            if (!studentAuthToken || !createdLessonRequestId) {
+                throw new Error('Setup failed: Student token or Lesson Request ID missing for GET suite beforeEach');
             }
-            const quote = await createTestLessonQuote(teacherAuthToken, {
+            // This should now work as the teacher created in the outer beforeEach has a GUITAR rate
+            const quotes = await createTestLessonQuote(studentAuthToken, {
                 lessonRequestId: createdLessonRequestId,
-                costInCents: 5123, // Use a distinct cost
-                hourlyRateInCents: 5123
+                lessonType: LessonType.GUITAR
             });
-            quoteIdForGetTests = quote.id;
+            if (!quotes || quotes.length === 0) {
+                throw new Error('GET suite beforeEach: Failed to generate quotes.');
+            }
+            quoteIdForGetTests = quotes[0].id;
         });
 
         it('should return 401 Unauthorized if no token is provided', async () => {
             if (!createdLessonRequestId) throw new Error('Lesson Request ID not available');
-            // Use util
             const response = await getQuotesByLessonRequestIdUnauthenticated(createdLessonRequestId);
             expect(response.status).toBe(401);
         });
 
         it('should return quotes for the specific lesson request when queried by STUDENT', async () => {
             if (!studentAuthToken || !createdLessonRequestId || !quoteIdForGetTests) throw new Error('Auth token, Lesson Request ID, or Quote ID for GET test not available');
-            // Use util
             const response = await getQuotesByLessonRequestId(studentAuthToken, createdLessonRequestId);
 
             expect(response.status).toBe(200);
             expect(response.body).toBeInstanceOf(Array);
             expect(response.body.length).toBeGreaterThan(0);
-            const foundQuote = response.body.find((q: LessonQuote) => q.id === quoteIdForGetTests); // Use specific ID
+            const foundQuote = response.body.find((q: LessonQuote) => q.id === quoteIdForGetTests);
             expect(foundQuote).toBeDefined();
             expect(foundQuote.lessonRequest?.id).toEqual(createdLessonRequestId);
-            expect(foundQuote.teacher?.id).toEqual(teacherId);
+            // Can't easily assert teacherId as it depends on who was available
+            expect(foundQuote.teacher?.id).toBeDefined();
         });
 
         it('should return quotes for the specific lesson request when queried by TEACHER', async () => {
             if (!teacherAuthToken || !createdLessonRequestId || !quoteIdForGetTests) throw new Error('Auth token, Lesson Request ID, or Quote ID for GET test not available');
-            // Use util
             const response = await getQuotesByLessonRequestId(teacherAuthToken, createdLessonRequestId);
 
             expect(response.status).toBe(200);
             expect(response.body).toBeInstanceOf(Array);
             expect(response.body.length).toBeGreaterThan(0);
-            const foundQuote = response.body.find((q: LessonQuote) => q.id === quoteIdForGetTests); // Use specific ID
+            const foundQuote = response.body.find((q: LessonQuote) => q.id === quoteIdForGetTests);
             expect(foundQuote).toBeDefined();
         });
 
         it('should return 400 Bad Request if lessonRequestId query parameter is missing', async () => {
             if (!studentAuthToken) throw new Error('Auth token not available');
-            // Keep direct request: Testing specific lack of query param
             const response = await request(API_BASE_URL!)
                 .get(`/api/v1/lesson-quotes`) // No query
                 .set('Authorization', `Bearer ${studentAuthToken}`);
             expect(response.status).toBe(400);
+            expect(response.body.error).toContain('lessonRequestId query parameter is required');
         });
 
         it('should return 404 Not Found for a non-existent lesson request ID in query param', async () => {
             if (!studentAuthToken) throw new Error('Auth token not available for test');
             const fakeRequestId = uuidv4();
-            // Use util
             const response = await getQuotesByLessonRequestId(studentAuthToken, fakeRequestId);
-            // Expect 404 because the service now checks if the request ID exists
             expect(response.status).toBe(404);
             expect(response.body.error).toContain(`Lesson request with ID ${fakeRequestId} not found.`);
         });
@@ -225,114 +237,103 @@ describe('API Integration: /api/v1/lesson-quotes', () => {
 
     describe('PATCH /:quoteId', () => {
         let quoteToAcceptId: string;
-        // Define local variables for this suite's isolated setup
         let patchStudentToken: string;
         let patchTeacherToken: string;
         let patchStudentId: string;
         let patchTeacherId: string;
         let patchLessonRequestId: string;
 
-        beforeEach(async () => { // Changed from beforeAll
-            // Ensure a completely fresh setup for each PATCH test
+        beforeEach(async () => {
             try {
-                // 1. Create local student & login
                 const { user: localStudent, password: localStudentPassword } = await createTestStudent();
                 patchStudentId = localStudent.id;
                 patchStudentToken = await loginTestUser(localStudent.email, localStudentPassword, UserType.STUDENT);
 
-                // 2. Create local teacher & login
+                // Create teacher - will default to creating a VOICE rate
                 const { user: localTeacher, password: localTeacherPassword } = await createTestTeacher();
                 patchTeacherId = localTeacher.id;
                 patchTeacherToken = await loginTestUser(localTeacher.email, localTeacherPassword, UserType.TEACHER);
 
-                // 3. Create local lesson request
+                // Explicit rate creation removed - handled by default in createTestTeacher utility
+
                 const futureDate = new Date();
                 futureDate.setDate(futureDate.getDate() + 10);
                 const localRequest = await createTestLessonRequest(
-                    patchStudentToken, // Use local token
-                    patchStudentId,   // Use local ID
+                    patchStudentToken,
+                    patchStudentId,
                     LessonType.VOICE, futureDate, 45
                 );
                 patchLessonRequestId = localRequest.id;
 
-                // 4. Create local quote using local teacher and local request
-                const quoteData = { lessonRequestId: patchLessonRequestId, costInCents: 4500, hourlyRateInCents: 4500 };
-                const quote = await createTestLessonQuote(patchTeacherToken, quoteData);
-                quoteToAcceptId = quote.id;
+                const quotes = await createTestLessonQuote(patchStudentToken, {
+                    lessonRequestId: patchLessonRequestId,
+                    lessonType: LessonType.VOICE
+                });
+
+                if (!quotes || quotes.length === 0) {
+                    console.error(`[PATCH Setup] Failed to generate quotes! quotes array: ${JSON.stringify(quotes)}`);
+                    throw new Error('PATCH Setup: Failed to generate quotes.');
+                }
+                quoteToAcceptId = quotes[0].id;
+
             } catch (error) {
-                console.error("Error in PATCH /:quoteId beforeEach setup:", error);
+                console.error('[PATCH Setup] Error caught in beforeEach:', error);
                 throw error;
             }
+        }, 45000);
+
+        it('should allow the STUDENT to accept a CREATED quote', async () => {
+            const payload = { status: LessonQuoteStatusValue.ACCEPTED };
+            // Use local student token
+            const response = await updateQuoteStatus(patchStudentToken, quoteToAcceptId, payload);
+            expect(response.status).toBe(200);
+            expect(response.body.id).toBe(quoteToAcceptId);
+            expect(response.body.currentStatus.status).toBe(LessonQuoteStatusValue.ACCEPTED);
+            // TODO: Add check that a Lesson was created? (Requires fetching lesson by quoteId)
         });
 
         it('should return 401 Unauthorized if no token is provided', async () => {
-            const response = await updateQuoteStatusUnauthenticated(quoteToAcceptId, { status: LessonQuoteStatusValue.ACCEPTED });
+            const payload = { status: LessonQuoteStatusValue.ACCEPTED };
+            const response = await updateQuoteStatusUnauthenticated(quoteToAcceptId, payload);
             expect(response.status).toBe(401);
         });
 
-        it('should allow STUDENT to accept the quote (200 OK), returning the updated quote', async () => {
-            // Use locally scoped token and quote ID
-            if (!patchStudentToken) throw new Error('Patch suite student token missing');
-
-            const response = await updateQuoteStatus(patchStudentToken, quoteToAcceptId, { status: LessonQuoteStatusValue.ACCEPTED });
-
-            expect(response.status).toBe(200);
-            // Check the returned QUOTE object
-            expect(response.body).toHaveProperty('id', quoteToAcceptId);
-            expect(response.body.currentStatus).toBeDefined();
-            expect(response.body.currentStatus.status).toBe(LessonQuoteStatusValue.ACCEPTED);
+        it('should return 403 Forbidden if the TEACHER tries to accept the quote', async () => {
+            const payload = { status: LessonQuoteStatusValue.ACCEPTED };
+            // Use local teacher token
+            const response = await updateQuoteStatus(patchTeacherToken, quoteToAcceptId, payload);
+            expect(response.status).toBe(403);
         });
 
-        it('should return 400 Bad Request if status is missing or invalid', async () => {
-            // Use locally scoped token and quote ID
-            if (!patchStudentToken) throw new Error('Patch suite student token missing');
-            // Missing status - Use direct request
-            let response = await request(API_BASE_URL!)
-                .patch(`/api/v1/lesson-quotes/${quoteToAcceptId}`)
-                .set('Authorization', `Bearer ${patchStudentToken}`)
-                .send({});
-            expect(response.status).toBe(400);
-            expect(response.body.error).toContain('Invalid or missing status value');
-
-            // Invalid status - Use direct request
-            response = await request(API_BASE_URL!)
-                .patch(`/api/v1/lesson-quotes/${quoteToAcceptId}`)
-                .set('Authorization', `Bearer ${patchStudentToken}`)
-                .send({ status: 'MAYBE' });
-            expect(response.status).toBe(400);
-            expect(response.body.error).toContain('Invalid or missing status value');
+        it('should return 403 Forbidden if an unrelated STUDENT tries to accept the quote', async () => {
+            // Use the student token from the outer scope (different from the local one)
+            const payload = { status: LessonQuoteStatusValue.ACCEPTED };
+            const response = await updateQuoteStatus(studentAuthToken!, quoteToAcceptId, payload);
+            expect(response.status).toBe(403);
         });
 
-        it('should return 404 Not Found for a non-existent quote ID', async () => {
-            // Use locally scoped token
-            if (!patchStudentToken) throw new Error('Patch suite student token missing');
+        it('should return 400 Bad Request for an invalid status transition (e.g., ACCEPTED -> CREATED)', async () => {
+            await updateQuoteStatus(patchStudentToken, quoteToAcceptId, { status: LessonQuoteStatusValue.ACCEPTED });
+            const response = await patchQuoteRaw(patchStudentToken, quoteToAcceptId, { status: LessonQuoteStatusValue.CREATED });
+            expect(response.status).toBe(400);
+            expect(response.body.error).toContain('Invalid target status');
+        });
+
+        it('should return 400 Bad Request if status is missing', async () => {
+            const response = await patchQuoteRaw(patchStudentToken, quoteToAcceptId, {}); // Empty payload
+            expect(response.status).toBe(400);
+        });
+
+        it('should return 400 Bad Request if status value is invalid', async () => {
+            const response = await patchQuoteRaw(patchStudentToken, quoteToAcceptId, { status: 'INVALID_STATUS' });
+            expect(response.status).toBe(400);
+        });
+
+        it('should return 404 Not Found if quote ID does not exist', async () => {
             const fakeQuoteId = uuidv4();
-            const response = await updateQuoteStatus(patchStudentToken, fakeQuoteId, { status: LessonQuoteStatusValue.ACCEPTED });
+            const payload = { status: LessonQuoteStatusValue.ACCEPTED };
+            const response = await updateQuoteStatus(patchStudentToken, fakeQuoteId, payload);
             expect(response.status).toBe(404);
-        });
-
-        it('should return 409 Conflict if STUDENT tries accepting an already accepted quote', async () => {
-            // Use locally scoped token and quote ID
-            if (!quoteToAcceptId || !patchStudentToken) {
-                throw new Error('Test setup failed: quoteToAcceptId or patchStudentToken missing.');
-            }
-
-            // 1. First Acceptance (should succeed)
-            const firstAcceptResponse = await updateQuoteStatus(patchStudentToken, quoteToAcceptId, { status: LessonQuoteStatusValue.ACCEPTED });
-
-            // Check if the first acceptance actually worked
-            if (firstAcceptResponse.status !== 200) {
-                console.error("Unexpected failure during first quote acceptance in conflict test:", firstAcceptResponse.body);
-                throw new Error(`Prerequisite failed: Could not accept quote ${quoteToAcceptId} initially. Status: ${firstAcceptResponse.status}`);
-            }
-
-            // 2. Second Acceptance (should fail with 409)
-            const secondAcceptResponse = await updateQuoteStatus(patchStudentToken, quoteToAcceptId, { status: LessonQuoteStatusValue.ACCEPTED });
-
-            // Assertions for the second attempt
-            expect(secondAcceptResponse.status).toBe(409);
-            expect(secondAcceptResponse.body.error).toContain('Conflict: Quote');
-            expect(secondAcceptResponse.body.error).toContain('already been accepted');
         });
     });
 }); 

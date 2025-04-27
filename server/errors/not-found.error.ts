@@ -1,7 +1,24 @@
 import { AppError } from './app.error.js';
 
 /**
- * Represents a 404 Not Found error.
+ * @openapi
+ * components:
+ *   schemas:
+ *     NotFoundError:
+ *       allOf:
+ *         - $ref: '#/components/schemas/AppError'
+ *       type: object
+ *       description: Error indicating that the requested resource could not be found.
+ *       properties:
+ *         name:
+ *           type: string
+ *           example: NotFoundError
+ *         statusCode:
+ *           type: integer
+ *           example: 404
+ *         message:
+ *           type: string
+ *           example: Resource not found
  */
 export class NotFoundError extends AppError {
     /**
