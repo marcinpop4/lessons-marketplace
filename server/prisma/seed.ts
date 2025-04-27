@@ -277,7 +277,7 @@ async function main() {
     for (const lesson of createdLessons) {
       // Refetch the lesson WITH necessary relations for goal creation, as lessonService.create might not return them
       let lessonForGoal: Lesson | null = null;
-      try {]
+      try {
         lessonForGoal = lesson; // Use the lesson we already have
 
       } catch (fetchError) {
