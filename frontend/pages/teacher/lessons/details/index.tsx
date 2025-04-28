@@ -4,7 +4,7 @@ import { Lesson } from '@shared/models/Lesson';
 import { Goal } from '@shared/models/Goal';
 import { LessonStatusValue, LessonStatusTransition } from '@shared/models/LessonStatus';
 import { getLessonById, updateLessonStatus } from '@frontend/api/lessonApi';
-import { getGoalsByLessonId, generateGoalRecommendations } from '@frontend/api/goalApi';
+import { getGoalsByLessonId } from '@frontend/api/goalApi'; // Removed generateGoalRecommendations as we use SSE
 import { GoalRecommendation } from '@shared/models/GoalRecommendation';
 import TeacherLessonDetailCard from '@frontend/components/TeacherLessonDetailCard';
 import GoalManager from '@frontend/components/GoalManager';
@@ -19,7 +19,7 @@ interface FormData {
 }
 
 // Define the desired recommendation count as a constant
-const RECOMMENDATION_COUNT = 6; // Adjust this value as needed (backend caps at 10)
+const RECOMMENDATION_COUNT = 6; // Keep for potential display logic
 
 const TeacherLessonDetailsPage: React.FC = () => {
     const { lessonId } = useParams<{ lessonId: string }>();
@@ -36,21 +36,20 @@ const TeacherLessonDetailsPage: React.FC = () => {
     const [selectedRecommendationData, setSelectedRecommendationData] = useState<FormData | null>(null);
     const [isStreamingComplete, setIsStreamingComplete] = useState<boolean>(false);
 
-    // Ref to hold the EventSource instance
     const eventSourceRef = useRef<EventSource | null>(null);
 
-    // --- Effect for cleaning up EventSource on unmount ---
+    // --- Cleanup Effect --- 
     useEffect(() => {
-        // Return cleanup function
         return () => {
             if (eventSourceRef.current) {
-                console.log('[SSE] Closing EventSource connection on component unmount.');
+                console.log('[SSE] Closing EventSource on component unmount.');
                 eventSourceRef.current.close();
                 eventSourceRef.current = null;
             }
         };
-    }, []); // Empty dependency array ensures this runs only on mount and unmount
+    }, []);
 
+    // --- Fetch Lesson Data Effect --- 
     useEffect(() => {
         if (!lessonId) {
             setError('Lesson ID is missing from URL.');
@@ -125,17 +124,20 @@ const TeacherLessonDetailsPage: React.FC = () => {
         navigate(-1);
     };
 
-    const handleGetRecommendations = async () => {
-        if (!lessonId || isGeneratingRecommendations) return; // Prevent multiple triggers
+    const handleGetRecommendations = useCallback(async () => {
+        if (!lessonId || isGeneratingRecommendations) return;
 
+        // Close any existing connection before starting a new one
         if (eventSourceRef.current) {
+            console.log('[SSE] Closing existing EventSource before starting new one.');
             eventSourceRef.current.close();
+            eventSourceRef.current = null;
         }
 
         setIsGeneratingRecommendations(true);
-        setIsStreamingComplete(false); // Reset streaming complete status
+        setIsStreamingComplete(false);
         setRecommendationError(null);
-        setRecommendations([]);
+        setRecommendations([]); // Clear previous recommendations
         setSelectedRecommendationData(null);
 
         const token = localStorage.getItem('auth_token');
@@ -145,80 +147,102 @@ const TeacherLessonDetailsPage: React.FC = () => {
             setIsGeneratingRecommendations(false);
             return;
         }
-        const url = `/api/v1/goals/recommendations/stream?lessonId=${lessonId}&count=${RECOMMENDATION_COUNT}&token=${encodeURIComponent(token)}`;
-        console.log(`[SSE] Connecting to ${url}`);
-        const newEventSource = new EventSource(url /* { withCredentials: true } */);
-        eventSourceRef.current = newEventSource;
 
-        newEventSource.addEventListener('recommendation', (event) => {
-            try {
-                console.log('[SSE] Received recommendation event:', event.data);
-                const recommendation = JSON.parse(event.data) as GoalRecommendation; // Backend sends JSON
-                // IMPORTANT: Instantiate the class if frontend needs its methods.
-                // If just accessing properties, the parsed object might be sufficient.
-                // const recommendationInstance = new GoalRecommendation(parsedData); // Use if needed
+        const sseUrl = `/api/v1/goals/recommendations/stream?lessonId=${lessonId}&token=${encodeURIComponent(token)}`;
 
-                setRecommendations((prev) => [...prev, recommendation]);
-            } catch (error) {
-                console.error('[SSE] Error parsing recommendation data:', error);
-                // Optionally update UI to show parsing error
-            }
-        });
+        try {
+            const newEventSource = new EventSource(sseUrl);
+            eventSourceRef.current = newEventSource;
 
-        newEventSource.addEventListener('end', (event) => {
-            console.log('[SSE] Received end event:', event.data);
-            setIsGeneratingRecommendations(false);
-            setIsStreamingComplete(true); // Set streaming complete status
-            if (eventSourceRef.current) {
-                eventSourceRef.current.close();
-                eventSourceRef.current = null;
-                console.log('[SSE] Connection closed by end event.');
-            }
-            try {
-                const endData = JSON.parse(event.data);
-                // Optionally display end message: `Stream finished: ${endData.count} recommendations.`
-            } catch (e) { /* Ignore parsing error for end event */ }
-        });
-
-        newEventSource.addEventListener('error', (event) => {
-            // This handles specific 'error' events sent by the server
-            // AND general connection errors (where event.data might be undefined)
-            console.error('[SSE] Received error event:', event);
-            let errorMessage = 'An unknown error occurred during recommendation generation.';
-            try {
-                // Check if it's a custom error event from the server
-                if ((event as MessageEvent).data) {
-                    const errorData = JSON.parse((event as MessageEvent).data);
-                    errorMessage = errorData.message || errorMessage;
-                } else if (newEventSource.readyState === EventSource.CLOSED) {
-                    // Check if the error is due to connection being closed
-                    // Might happen if server restarts or network issue
-                    errorMessage = 'Connection to server lost or closed unexpectedly.';
-                    // Avoid setting error if it was closed intentionally by 'end' event shortly before
-                    if (isGeneratingRecommendations) {
-                        setRecommendationError(errorMessage);
-                    }
-                } else {
-                    setRecommendationError(errorMessage);
+            // Listener for recommendation data (server uses 'message' event type now)
+            newEventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log("[SSE] Received message event:", data);
+                    // Assuming data is a single GoalRecommendation object per event
+                    // If it needs class methods, instantiate: new GoalRecommendation(data)
+                    setRecommendations((prev) => [...prev, data as GoalRecommendation]);
+                } catch (e) {
+                    console.error("[SSE] Error parsing message data:", event.data, e);
+                    // Optionally update UI
                 }
-            } catch (e) {
-                // Ignore parsing error for the error event itself
-                setRecommendationError(errorMessage);
-            }
+            };
 
-            // Only set error if still in generating state (avoid race condition with 'end' event)
-            if (isGeneratingRecommendations) {
+            // Listener for explicit 'done' event from server
+            newEventSource.addEventListener('done', (event) => {
+                console.log("[SSE] Received done event:", event.data);
+                setIsGeneratingRecommendations(false);
+                setIsStreamingComplete(true);
+                if (eventSourceRef.current) {
+                    eventSourceRef.current.close();
+                    eventSourceRef.current = null;
+                    console.log('[SSE] Connection closed by done event.');
+                }
+                try {
+                    // Optional: Parse and display the success message from the server
+                    if (event.data) {
+                        const doneData = JSON.parse(event.data);
+                        console.log("Stream completion message:", doneData.message);
+                    }
+                } catch (e) { /* Ignore parsing error for done event message */ }
+            });
+
+            // Listener for explicit 'error' event from server
+            newEventSource.addEventListener('error', (event) => {
+                console.error('[SSE] Received error event:', event);
+                let errorMessage = 'An error occurred during recommendation generation.'; // Default
+                try {
+                    // Check if event.data exists and is parseable
+                    if ((event as MessageEvent).data) {
+                        const errorData = JSON.parse((event as MessageEvent).data);
+                        if (errorData?.message) {
+                            errorMessage = errorData.message;
+                        }
+                        console.error('[SSE] Parsed server error event data:', errorData);
+                    } else {
+                        console.error("[SSE] Received error event with no data.");
+                    }
+                } catch (e) {
+                    console.error('[SSE] Error parsing error event data:', (event as MessageEvent).data, e);
+                    errorMessage = 'Received an invalid error message format from server.';
+                }
+
                 setRecommendationError(errorMessage);
-            }
-            setIsGeneratingRecommendations(false);
-            setIsStreamingComplete(true); // Also mark as complete on error
-            if (eventSourceRef.current) {
-                eventSourceRef.current.close();
+                setIsGeneratingRecommendations(false);
+                setIsStreamingComplete(true); // Mark as complete even on error
+                if (eventSourceRef.current) {
+                    eventSourceRef.current.close(); // Close connection
+                    eventSourceRef.current = null;
+                    console.log('[SSE] Connection closed by error event.');
+                }
+            });
+
+            // Generic handler for connection errors (e.g., network issue)
+            newEventSource.onerror = (event) => {
+                // This catches network errors or if the server drops connection unexpectedly
+                // Avoid duplicate actions if a specific 'error' or 'done' event already handled closure
+                if (!eventSourceRef.current) {
+                    console.log("[SSE] onerror called but connection already closed.");
+                    return;
+                }
+
+                console.error('[SSE] Generic EventSource error (onerror):', event);
+                setRecommendationError('Connection error or stream unexpectedly closed.');
+                setIsGeneratingRecommendations(false);
+                setIsStreamingComplete(true);
+
+                eventSourceRef.current.close(); // Ensure closure
                 eventSourceRef.current = null;
-                console.log('[SSE] Connection closed due to error event or network issue.');
-            }
-        });
-    };
+                console.log('[SSE] Connection closed by generic onerror handler.');
+            };
+
+        } catch (error) {
+            console.error("[SSE] Failed to create EventSource:", error);
+            setRecommendationError('Failed to establish connection for recommendations.');
+            setIsGeneratingRecommendations(false);
+        }
+
+    }, [lessonId, isGeneratingRecommendations]); // Added dependencies
 
     const handleSelectRecommendation = (recommendation: GoalRecommendation) => {
         if (!recommendation) {
@@ -288,21 +312,18 @@ const TeacherLessonDetailsPage: React.FC = () => {
                 onGoalsChange={handleGoalsChange}
             />
 
-            <div className="flex justify-end space-x-3 mt-6">
-                <Button variant="secondary" onClick={handleCancel} disabled={isSaving}>
-                    Cancel
-                </Button>
+            <div className="flex justify-end space-x-4 mt-6">
+                <Button onClick={handleCancel} variant="secondary" disabled={isSaving}>Cancel</Button>
                 {!isLessonDefined && (
-                    <Button
+                    <Button onClick={handleSaveAndDefine}
+                        disabled={isSaving || goals.length === 0 || goals.every(g => g.currentStatus?.status === GoalStatusValue.ABANDONED)}
                         variant="primary"
-                        onClick={handleSaveAndDefine}
-                        disabled={!goals.some(g => g.currentStatus?.status !== GoalStatusValue.ABANDONED) || isSaving}
                     >
                         {isSaving ? 'Saving...' : 'Save and Define Lesson'}
                     </Button>
                 )}
+                {isSaving && error && <p className="text-red-500 text-sm mt-2">Error saving: {error}</p>}
             </div>
-            {error && isSaving && <p className="text-red-500 text-right mt-2">Save Error: {error}</p>}
         </div>
     );
 };

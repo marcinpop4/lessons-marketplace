@@ -1,21 +1,67 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Objective } from '@shared/models/Objective';
 import { LessonType, formatDisplayLabel } from '@shared/models/LessonType'; // Import LessonType and formatter
 import Button from '@frontend/components/shared/Button/Button';
 import Card from '@frontend/components/shared/Card/Card';
+import { ObjectiveRecommendation } from '@shared/models/ObjectiveRecommendation'; // Import recommendation type
+
+// Placeholder Component (Simplified)
+const PlaceholderCard: React.FC = () => (
+    <div className="p-3 rounded-md border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 animate-pulse">
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
+        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full mb-1"></div>
+        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-5/6 mb-2"></div>
+        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+    </div>
+);
 
 interface AddObjectiveFormProps {
     onObjectiveAdded: () => void; // Callback to notify parent to refresh data
+    // AI Props
+    onGenerateRecommendations: (lessonType: LessonType | null) => Promise<void>; // Pass optional filter
+    isGeneratingRecommendations: boolean;
+    recommendationError: string | null;
+    initialData: ObjectiveRecommendation | null; // Use ObjectiveRecommendation type
+    recommendations: ObjectiveRecommendation[];
+    onSelectRecommendation: (recommendation: ObjectiveRecommendation | null) => void; // Allow null for deselection
+    isStreaming: boolean;
 }
 
-const AddObjectiveForm: React.FC<AddObjectiveFormProps> = ({ onObjectiveAdded }) => {
+const AddObjectiveForm: React.FC<AddObjectiveFormProps> = ({
+    onObjectiveAdded,
+    onGenerateRecommendations,
+    isGeneratingRecommendations,
+    recommendationError,
+    initialData,
+    recommendations,
+    onSelectRecommendation,
+    isStreaming
+}) => {
     const [title, setTitle] = useState<string>('');
     const [description, setDescription] = useState<string>('');
-    const [lessonType, setLessonType] = useState<LessonType | ''>(''); // Use LessonType enum, empty string for initial
-    const [targetDate, setTargetDate] = useState<string>(''); // Store as string for date input
+    const [lessonType, setLessonType] = useState<LessonType | ''>('');
+    const [targetDate, setTargetDate] = useState<string>('');
 
     const [isAdding, setIsAdding] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Effect to pre-fill form when initialData changes
+    useEffect(() => {
+        if (initialData) {
+            setTitle(initialData.title);
+            setDescription(initialData.description);
+            setLessonType(initialData.lessonType || ''); // Handle null lessonType
+            setTargetDate(initialData.targetDate); // Date is already string YYYY-MM-DD
+            setError(null); // Clear local form error when pre-filling
+        } else {
+            // Option: Clear form if initialData is null (recommendation deselected)
+            // Uncomment if you want deselection to clear fields
+            // setTitle('');
+            // setDescription('');
+            // setLessonType('');
+            // setTargetDate('');
+        }
+    }, [initialData]);
 
     // Get today's date in YYYY-MM-DD format for min attribute on date input
     const getTodayDateString = () => {
@@ -97,6 +143,7 @@ const AddObjectiveForm: React.FC<AddObjectiveFormProps> = ({ onObjectiveAdded })
             setLessonType('');
             setTargetDate('');
             setError(null);
+            onSelectRecommendation(null); // Deselect recommendation after successful add
 
         } catch (err: any) {
             console.error("Error adding objective:", err);
@@ -105,6 +152,23 @@ const AddObjectiveForm: React.FC<AddObjectiveFormProps> = ({ onObjectiveAdded })
             setIsAdding(false);
         }
     };
+
+    const handleGenerateClick = () => {
+        // Pass the currently selected lessonType (or null if none selected) as a filter
+        onGenerateRecommendations(lessonType || null);
+    };
+
+    const handleRecommendationClick = (rec: ObjectiveRecommendation) => {
+        // Toggle selection: if clicking the already selected one, deselect (set initialData to null)
+        if (initialData?.title === rec.title && initialData?.description === rec.description) {
+            onSelectRecommendation(null);
+        } else {
+            onSelectRecommendation(rec);
+        }
+    };
+
+    // Calculate received count
+    const receivedCount = recommendations.length;
 
     return (
         <Card
@@ -153,14 +217,14 @@ const AddObjectiveForm: React.FC<AddObjectiveFormProps> = ({ onObjectiveAdded })
                 {/* Lesson Type Select */}
                 <div>
                     <label htmlFor="objective-lesson-type" className="block text-sm font-medium mb-1">
-                        Lesson Type
+                        Lesson Type (Optional Filter for AI)
                     </label>
                     <select
                         id="objective-lesson-type"
                         value={lessonType}
                         onChange={(e) => setLessonType(e.target.value as LessonType)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:focus:ring-offset-gray-900"
-                        disabled={isAdding}
+                        disabled={isAdding || isGeneratingRecommendations}
                         aria-label="Lesson Type"
                         required
                     >
@@ -191,8 +255,17 @@ const AddObjectiveForm: React.FC<AddObjectiveFormProps> = ({ onObjectiveAdded })
                     />
                 </div>
 
-                {/* Submit Button */}
-                <div className="flex justify-end items-center pt-2">
+                {/* Action Buttons */}
+                <div className="flex flex-wrap justify-end items-center gap-3 pt-2">
+                    <Button
+                        variant="accent"
+                        onClick={handleGenerateClick}
+                        disabled={isGeneratingRecommendations || isAdding}
+                        className="whitespace-nowrap"
+                        aria-label="Generate Objectives with AI"
+                    >
+                        {isGeneratingRecommendations ? 'Generating...' : '✨ Generate Objectives with AI'}
+                    </Button>
                     <Button
                         id="add-objective-button"
                         variant="primary"
@@ -204,8 +277,41 @@ const AddObjectiveForm: React.FC<AddObjectiveFormProps> = ({ onObjectiveAdded })
                 </div>
             </div>
 
+            {/* Render recommendations and placeholders */}
+            {(recommendations.length > 0 || isStreaming) && (
+                <div className="mt-6 border-t pt-4 space-y-3 dark:border-gray-700">
+                    <h4 className="text-base font-semibold text-gray-700 dark:text-gray-300">✨ AI Recommendations ({receivedCount})</h4>
+                    {isStreaming && <p className="text-sm text-gray-600 dark:text-gray-400">Receiving recommendations... Select one to pre-fill the form.</p>}
+                    {!isStreaming && recommendations.length > 0 && <p className="text-sm text-gray-600 dark:text-gray-400">Select a recommendation to pre-fill the form.</p>}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {recommendations.map((rec, index) => (
+                            <div
+                                key={index} // Use index for non-persistent list
+                                className={`p-3 rounded-md border cursor-pointer transition-all 
+                                    ${initialData?.title === rec.title && initialData?.description === rec.description
+                                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/[.3] dark:border-blue-700'
+                                        : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-600 bg-white dark:bg-gray-800'
+                                    }`}
+                                onClick={() => handleRecommendationClick(rec)}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => e.key === 'Enter' || e.key === ' ' ? handleRecommendationClick(rec) : null}
+                                aria-pressed={initialData?.title === rec.title}
+                            >
+                                <h5 className="font-medium text-sm text-gray-900 dark:text-gray-100 mr-2">{rec.title}</h5>
+                                <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{rec.description}</p>
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    Target: {rec.targetDate} {rec.lessonType ? `(${formatDisplayLabel(rec.lessonType)})` : ''}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Error Display */}
             {error && <p className="text-sm text-red-500 mt-2" role="alert">Error: {error}</p>}
+            {recommendationError && <p className="text-sm text-orange-500 mt-2" role="alert">AI Error: {recommendationError}</p>}
         </Card>
     );
 };

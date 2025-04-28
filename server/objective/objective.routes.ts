@@ -26,7 +26,7 @@ const requireStudent = [authMiddleware, checkRole([UserType.STUDENT])];
  *             schema:
  *               type: array
  *               items:
- *                 $ref: '#/components/schemas/Objective' # TODO: Verify shared model path/name
+ *                 $ref: '#/components/schemas/Objective'
  *       401:
  *         description: Unauthorized - User not authenticated.
  *       403:
@@ -48,14 +48,29 @@ router.get('/', requireStudent, objectiveController.getObjectives);
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/ObjectiveCreateDTO' # TODO: Define/Import ObjectiveCreateDTO
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               lessonType:
+ *                 $ref: '#/components/schemas/LessonType'
+ *               targetDate:
+ *                 type: string
+ *                 format: date-time
+ *             required:
+ *               - title
+ *               - description
+ *               - lessonType
+ *               - targetDate
  *     responses:
  *       201:
  *         description: Objective created successfully.
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Objective' # TODO: Verify shared model path/name
+ *               $ref: '#/components/schemas/Objective'
  *       400:
  *         description: Bad Request - Invalid input data.
  *       401:
@@ -71,7 +86,7 @@ router.post('/', requireStudent, objectiveController.createObjective);
  *   patch:
  *     tags: [Objectives]
  *     summary: Update the status of an objective
- *     description: Updates the status (e.g., achieved) of a specific learning objective belonging to the authenticated student.
+ *     description: Updates the status of a specific learning objective belonging to the authenticated student.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -80,23 +95,31 @@ router.post('/', requireStudent, objectiveController.createObjective);
  *         required: true
  *         schema:
  *           type: string
- *           format: uuid # Assuming UUIDs, adjust if needed
+ *           format: uuid
  *         description: ID of the objective to update.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/ObjectiveUpdateStatusDTO' # TODO: Define/Import ObjectiveUpdateStatusDTO
+ *             type: object
+ *             properties:
+ *               status:
+ *                 $ref: '#/components/schemas/ObjectiveStatusValue'
+ *               context:
+ *                 type: object
+ *                 nullable: true
+ *             required:
+ *               - status
  *     responses:
  *       200:
  *         description: Objective status updated successfully.
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Objective' # TODO: Verify shared model path/name
+ *               $ref: '#/components/schemas/Objective'
  *       400:
- *         description: Bad Request - Invalid input data (e.g., invalid status).
+ *         description: Bad Request - Invalid input data (e.g., invalid status, invalid transition).
  *       401:
  *         description: Unauthorized - User not authenticated.
  *       403:
@@ -105,5 +128,61 @@ router.post('/', requireStudent, objectiveController.createObjective);
  *         description: Not Found - Objective with the given ID not found.
  */
 router.patch('/:objectiveId', requireStudent, objectiveController.updateObjectiveStatus);
+
+// --- AI Recommendation Route ---
+
+/**
+ * @openapi
+ * /api/v1/objectives/recommendations/stream:
+ *   get:
+ *     tags: [Objectives]
+ *     summary: Stream AI-generated objective recommendations
+ *     description: Streams AI-powered learning objective recommendations tailored to the authenticated student, optionally filtered by lesson type.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: lessonType
+ *         in: query
+ *         required: false
+ *         schema:
+ *           $ref: '#/components/schemas/LessonType'
+ *         description: Optional lesson type to focus recommendations on.
+ *       - name: count
+ *         in: query
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 6
+ *           minimum: 1
+ *           maximum: 10
+ *         description: Number of recommendations to generate.
+ *     responses:
+ *       '200':
+ *         description: Stream of objective recommendations (text/event-stream)
+ *         content:
+ *           text/event-stream:
+ *             schema:
+ *               type: string
+ *               description: Server-sent events stream containing ObjectiveRecommendation objects.
+ *       '400':
+ *         description: Bad Request (e.g., invalid lessonType or count)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       '401':
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       '403':
+ *         description: Forbidden - User is not a student
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.get('/recommendations/stream', requireStudent, objectiveController.streamRecommendations);
 
 export default router; 

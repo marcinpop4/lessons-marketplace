@@ -6,7 +6,7 @@ import chalk from 'chalk';
 import url from 'url'; // Import the url module
 
 // --- Helper function to scrub sensitive data --- 
-const scrubSensitiveData = (obj: any, keysToScrub: string[] = ['password', 'email', 'token', 'authorization', 'apiKey', 'secret']): any => {
+const scrubSensitiveData = (obj: any, keysToScrub: string[] = ['password', 'email', 'token', 'accessToken', 'authorization', 'apiKey', 'secret']): any => {
   if (obj === null || typeof obj !== 'object') {
     return obj; // Return non-objects as is
   }

@@ -5,7 +5,7 @@ import { goalService } from './goal.service.js';
 // Zod removed as validation moves to service
 // import { z } from 'zod';
 // Errors are handled by central error handler or service
-// import { BadRequestError } from '../errors/index.js';
+import { BadRequestError } from '../errors/index.js';
 import { UserType as PrismaUserType } from '@prisma/client';
 
 // Zod Schemas Removed
@@ -135,76 +135,73 @@ export const goalController = {
      */
     async generateRecommendations(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
         try {
-            // Extract lessonId directly
-            const { lessonId } = req.query;
             const authenticatedUser = req.user;
             if (!authenticatedUser?.id) {
                 throw new Error('Authenticated user ID not found. Middleware issue?');
             }
             const userId = authenticatedUser.id;
 
-            // Call service - lessonId validation and authorization happens inside
-            const recommendations = await goalService.generateGoalRecommendations(String(lessonId), userId);
+            // Extract lessonId from the *query* parameters for consistency
+            const { lessonId } = req.query;
+            if (!lessonId || typeof lessonId !== 'string') {
+                // Send 400 if lessonId is missing or invalid
+                return next(new BadRequestError('Missing or invalid lessonId query parameter.'));
+            }
+
+            // Call service - validation and authorization happens inside
+            const recommendations = await goalService.generateGoalRecommendations(lessonId, userId);
             res.status(200).json(recommendations);
         } catch (error) {
-            next(error); // Pass errors (NotFound, Auth, BadIdFormat, OpenAI errors) to central handler
+            next(error); // Pass errors to central handler
         }
     },
 
-    // === New Streaming Method ===
+    /**
+     * GET /goals/recommendations/stream - Stream AI-powered goal recommendations
+     */
     async streamRecommendations(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
-        // Set headers for SSE - MUST happen before any async work or potential errors
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        res.flushHeaders(); // Flush the headers to establish the connection
-
         try {
             const authenticatedUser = req.user;
-            // User ID check - required for service call
             if (!authenticatedUser?.id) {
-                // Throwing here won't work well with SSE, log and end
+                // Cannot easily throw for SSE once headers might be sent, log and maybe end
                 console.error("[SSE Controller] Authenticated user ID not found.");
-                goalService._streamError(res, 'Authentication required.', 401); // Use helper
+                res.status(401).end(); // End with Unauthorized
                 return;
             }
             const userId = authenticatedUser.id;
 
-            // Extract lessonId and count
+            // Extract lessonId and count from query parameters
             const { lessonId, count: countQuery } = req.query;
+            if (!lessonId || typeof lessonId !== 'string') {
+                // Send 400 if lessonId is missing or invalid
+                return next(new BadRequestError('Missing or invalid lessonId query parameter.'));
+            }
 
-            // Parse count - Default/Max handled in service now, just need basic parse
+            // Parse count
             const DEFAULT_COUNT = 5;
             let count = DEFAULT_COUNT;
             if (countQuery && typeof countQuery === 'string') {
                 const parsedCount = parseInt(countQuery, 10);
-                // Basic check for number, range check is in service
                 if (!isNaN(parsedCount)) {
                     count = parsedCount;
+                    // Range validation is now in the service, keep basic parse here
                 }
             }
 
-            // Call the service method - validation (IDs, count range) happens inside
-            // It will handle writing errors/data to the response stream
-            await goalService.streamGoalRecommendations(String(lessonId), count, req, res, userId);
+            // Call the service method that now uses the SSE utility
+            // No need to set headers here, the utility does it.
+            await goalService.streamGoalRecommendations(lessonId, res, userId);
 
-            // NOTE: Do NOT call res.end() here. The service method is responsible
-            // for managing the stream lifecycle and ending the response.
+            // IMPORTANT: Do not call res.end() here. The streamJsonResponse utility handles it.
 
         } catch (error) {
-            // Catch errors that might occur *before* the service takes over the stream,
-            // or if the service itself throws synchronously before starting the stream.
-            console.error("Error in streamRecommendations controller (pre-service stream):", error);
-            // Use the service's helper to ensure consistent SSE error format
-            const message = error instanceof Error ? error.message : 'Unknown error setting up stream.';
-            // Check if headers already sent (likely if flushHeaders succeeded)
+            // Catch errors that occur *before* streaming starts (e.g., service validation)
+            console.error("Error setting up stream in goalController:", error);
+            // Let the central error handler manage the response if headers not sent
             if (!res.headersSent) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ message }));
-            } else {
-                // Headers sent, attempt to use SSE error format if service helper available
-                goalService._streamError(res, message, 500);
+                next(error);
             }
+            // If headers are already sent, the streamJsonResponse utility handles error reporting within the stream.
         }
     },
 }; // End of goalController export

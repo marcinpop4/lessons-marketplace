@@ -101,7 +101,35 @@ const AppRoutes: React.FC = () => {
               </Button>
             </>
           )}
-          {/* Add Student Navigation or common links here */}
+
+          {/* Conditional Student Navigation */}
+          {user && user.userType === 'STUDENT' && (
+            <>
+              <Button
+                variant={currentPath === '/student/lesson-request' ? 'primary' : 'secondary'}
+                size="sm"
+                onClick={() => navigate('/student/lesson-request')}
+              >
+                Request Lesson
+              </Button>
+              <Button
+                variant={currentPath === '/student/objectives' ? 'primary' : 'secondary'}
+                size="sm"
+                onClick={() => navigate('/student/objectives')}
+              >
+                My Objectives
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={logout}
+              >
+                Logout
+              </Button>
+            </>
+          )}
+
+          {/* Common items like ThemeSwitcher */}
           <ThemeSwitcher className="flex items-center" />
         </nav>
       </header>

@@ -43,7 +43,7 @@ const router: Router = express.Router();
  *       '403':
  *         description: Forbidden (e.g., trying to access another teacher's lessons).
  */
-router.get('/', authMiddleware, lessonController.getLessons as any);
+router.get('/', authMiddleware, lessonController.getLessons);
 
 /**
  * @openapi

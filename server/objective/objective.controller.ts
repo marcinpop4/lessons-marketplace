@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import * as ObjectiveService from './objective.service.js';
+import { objectiveService } from './objective.service.js';
 import { ObjectiveStatusValue } from '@shared/models/ObjectiveStatus.js';
 import { LessonType } from '@shared/models/LessonType.js';
 import { BadRequestError, NotFoundError, AuthorizationError } from '../errors/index.js';
@@ -40,8 +40,8 @@ class ObjectiveController {
         }
 
         try {
-            // Use the service function which likely still accepts studentId
-            const objectives = await ObjectiveService.getObjectivesByStudentId(studentId);
+            // Use the imported singleton instance
+            const objectives = await objectiveService.getObjectivesByStudentId(studentId);
             res.json(objectives);
         } catch (error) {
             next(error);
@@ -84,8 +84,8 @@ class ObjectiveController {
         }
 
         try {
-            // Pass the studentId directly to the service (which now accepts it)
-            const newObjective = await ObjectiveService.createObjective(
+            // Use the imported singleton instance
+            const newObjective = await objectiveService.createObjective(
                 studentId,
                 title,
                 description,
@@ -120,8 +120,8 @@ class ObjectiveController {
         }
 
         try {
-            // 1. Verify Ownership before attempting update
-            const objectiveToUpdate = await ObjectiveService.findObjectiveById(objectiveId);
+            // 1. Verify Ownership using the singleton instance
+            const objectiveToUpdate = await objectiveService.findObjectiveById(objectiveId);
 
             if (!objectiveToUpdate) {
                 // Use standard Error or NotFoundError - let's use NotFoundError from errors/index
@@ -133,12 +133,54 @@ class ObjectiveController {
                 return next(new AuthorizationError(`Forbidden: You do not own objective ${objectiveId}.`));
             }
 
-            // 2. If ownership verified, proceed with the status update
-            const updatedObjective = await ObjectiveService.updateObjectiveStatus(objectiveId, status, context);
+            // 2. If ownership verified, proceed with the status update using the singleton instance
+            const updatedObjective = await objectiveService.updateObjectiveStatus(objectiveId, status, context);
 
             res.json(updatedObjective); // Send back the updated objective with new status
         } catch (error) {
             next(error); // Pass errors (like invalid transitions from service) to error handler
+        }
+    }
+
+    /**
+     * GET /api/v1/objectives/recommendations/stream
+     * Stream AI-powered objective recommendations.
+     */
+    async streamRecommendations(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const authenticatedUser = req.user;
+            if (!authenticatedUser?.id) {
+                console.error("[SSE Controller] Authenticated user ID not found.");
+                res.status(401).end();
+                return;
+            }
+            const studentId = authenticatedUser.id;
+
+            // Extract optional lessonType from query parameters
+            const { lessonType: lessonTypeQuery } = req.query;
+
+            // Validate lessonType if provided
+            let lessonType: LessonType | null = null;
+            if (lessonTypeQuery && typeof lessonTypeQuery === 'string') {
+                if (isValidLessonType(lessonTypeQuery)) {
+                    lessonType = lessonTypeQuery;
+                } else {
+                    return next(new BadRequestError(`Invalid lessonType query parameter: ${lessonTypeQuery}.`));
+                }
+            }
+
+            // Call the service method using the singleton instance, without count
+            await objectiveService.streamObjectiveRecommendations(studentId, lessonType, res);
+
+            // IMPORTANT: Do not call res.end() here. The streamJsonResponse utility handles it.
+
+        } catch (error) {
+            // Catch errors that occur *before* streaming starts
+            console.error("Error setting up stream in objectiveController:", error);
+            if (!res.headersSent) {
+                next(error);
+            }
+            // If headers sent, streamJsonResponse handles internal errors.
         }
     }
 }
