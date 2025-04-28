@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 import type { Page, Response } from '@playwright/test';
+import { SEED_USER_PASSWORD } from './constants'; // Corrected import path
 
 // Seeded teacher credentials
 const SEEDED_TEACHER_EMAIL = 'emily.richardson@musicschool.com';
-const SEEDED_PASSWORD = '1234';
 
 // Helper function to login as a user
 async function loginAsUser(page: Page, email: string, password: string, userType: 'STUDENT' | 'TEACHER') {
@@ -41,7 +41,7 @@ test.describe('Teacher Goal Management', () => {
     test.beforeAll(async ({ browser }) => {
         page = await browser.newPage();
         // Login as the seeded teacher before running the tests
-        await loginAsUser(page, SEEDED_TEACHER_EMAIL, SEEDED_PASSWORD, 'TEACHER');
+        await loginAsUser(page, SEEDED_TEACHER_EMAIL, SEED_USER_PASSWORD, 'TEACHER');
         // Navigate to the teacher's lessons page
         await page.goto('/teacher/lessons');
         await waitForNetworkIdle(page);
@@ -52,10 +52,7 @@ test.describe('Teacher Goal Management', () => {
     });
 
     test('Teacher can manage goals through their lifecycle', async () => {
-        // Navigate to the specific GOAL-FREE lesson's goals page
-        // Target the LAST card in the defined section, assuming it's the goal-free one
-        const lessonCard = page.locator('#lessons-defined-section .card').last();
-        await expect(lessonCard, 'Goal-free defined lesson card should be visible').toBeVisible();
+        const lessonCard = page.locator('#lessons-accepted-section .card').last();
 
         const manageGoalsButton = lessonCard.getByRole('button', { name: /manage goals/i });
         await expect(manageGoalsButton, 'Manage goals button should be visible').toBeVisible();
@@ -73,11 +70,6 @@ test.describe('Teacher Goal Management', () => {
 
         // Use the AddGoalForm directly (assuming it's the only one)
         const addGoalForm = page.locator('.add-goal-card');
-
-        // --- Create Goal --- No need for create button, form is already there
-        // const createGoalButton = page.getByRole('button', { name: /create goal/i });
-        // await expect(createGoalButton, 'Create goal button should be visible').toBeVisible();
-        // await createGoalButton.click();
 
         await addGoalForm.getByLabel('Goal Title').fill('Test Goal 1');
         await addGoalForm.getByLabel('Goal Description').fill('This is a test goal');
@@ -130,8 +122,7 @@ test.describe('Teacher Goal Management', () => {
         await page.goto('/teacher/lessons');
         await waitForNetworkIdle(page);
         // Target the LAST card in the defined section
-        const lessonCard = page.locator('#lessons-defined-section .card').last();
-        await expect(lessonCard, 'Goal-free defined lesson card should be visible').toBeVisible();
+        const lessonCard = page.locator('#lessons-accepted-section .card').last();
 
         const manageGoalsButton = lessonCard.getByRole('button', { name: /manage goals/i });
         await expect(manageGoalsButton, 'Manage goals button should be visible').toBeVisible();

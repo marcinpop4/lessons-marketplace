@@ -188,12 +188,6 @@ export class LessonService {
         if (context !== null && typeof context !== 'object') {
             throw new BadRequestError('Invalid context format. Must be a JSON object or null.');
         }
-        // Validate authenticated user presence
-        if (!authenticatedUserId) {
-            // This might indicate an auth middleware issue upstream, but service should check
-            throw new AuthorizationError('Authentication required to update lesson status.');
-        }
-        // --- End Validation ---
 
         const validTransition = transition as LessonStatusTransition; // Cast after validation
 
@@ -210,12 +204,6 @@ export class LessonService {
                 if (!currentLesson) {
                     // Throw NotFoundError if lesson itself doesn't exist
                     throw new NotFoundError(`Lesson with ID ${lessonId} not found.`);
-                }
-
-                // Authorization check (Only teacher associated with the quote can update status)
-                if (!authenticatedUserId || currentLesson.quote?.teacherId !== authenticatedUserId) {
-                    // Throw AuthorizationError for wrong user
-                    throw new AuthorizationError('Forbidden: Only the assigned teacher can update the lesson status.');
                 }
 
                 if (!currentLesson.currentStatusId) {

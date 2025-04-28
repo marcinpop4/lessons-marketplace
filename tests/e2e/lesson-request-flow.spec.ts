@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { SEED_USER_PASSWORD } from 'tests/e2e/constants';
 
 /**
  * End-to-end test for the complete lesson request flow.
@@ -14,7 +15,7 @@ test.describe.serial('Lesson request flow', () => {
 
     // Fill in the login form with an existing student from seed data
     await page.getByLabel('Email').fill('ethan.parker@example.com');
-    await page.getByLabel('Password').fill('1234');
+    await page.getByLabel('Password').fill(SEED_USER_PASSWORD);
     await page.locator('input[value="STUDENT"]').check();
 
     // Submit login form and wait for navigation

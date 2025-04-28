@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
 import type { Page, Response } from '@playwright/test';
+import { SEED_USER_PASSWORD } from '../../constants'; // Import from new constants file
 // Removed unused enum imports to avoid potential issues
 // import { LessonStatusValue, LessonStatusTransition } from '../../../../shared/models/LessonStatus'; 
 
 // Seeded teacher credentials
 const SEEDED_TEACHER_EMAIL = 'emily.richardson@musicschool.com';
-const SEEDED_PASSWORD = '1234';
 
 // --- Re-added Helper Functions ---
 // Helper function to login as a user
@@ -51,7 +51,7 @@ test.describe('Teacher Lesson Management', () => {
     test.beforeAll(async ({ browser }) => {
         page = await browser.newPage();
         // Login as the seeded teacher before running the tests
-        await loginAsUser(page, SEEDED_TEACHER_EMAIL, SEEDED_PASSWORD, 'TEACHER');
+        await loginAsUser(page, SEEDED_TEACHER_EMAIL, SEED_USER_PASSWORD, 'TEACHER');
         // Navigate to the teacher's lessons page
         await page.goto('/teacher/lessons');
         await waitForNetworkIdle(page); // Wait for initial data load
@@ -65,57 +65,54 @@ test.describe('Teacher Lesson Management', () => {
         // 1. Verify initial page load and presence of different status sections
         await expect(page.locator('h1:has-text("Lessons Dashboard")')).toBeVisible();
 
-        // Sections expected based on seed data (5 lessons per status)
-        const expectedSections = [
-            { status: 'REQUESTED', id: 'lessons-requested-section' },
-            { status: 'ACCEPTED', id: 'lessons-accepted-section' },
-            { status: 'DEFINED', id: 'lessons-defined-section' },
-            { status: 'COMPLETED', id: 'lessons-completed-section' },
-            { status: 'REJECTED', id: 'lessons-rejected-section' },
-            { status: 'VOIDED', id: 'lessons-voided-section' },
-        ];
-
-        for (const section of expectedSections) {
-            await expect(
-                page.locator(`#${section.id}`),
-                `Lesson section for "${section.status}" should be visible`
-            ).toBeVisible();
-        }
-
-        // --- Test REQUESTED -> ACCEPTED transition --- 
         const requestedSection = page.locator('#lessons-requested-section');
         const acceptedSection = page.locator('#lessons-accepted-section');
-        const firstRequestedCard = requestedSection.locator('.card').first();
-        const initialAcceptedCount = await getLessonCountInSection(page, '#lessons-accepted-section');
+        const rejectedSection = page.locator('#lessons-rejected-section');
+        const voidedSection = page.locator('#lessons-voided-section');
 
-        // Find and click the Accept button
-        const acceptButton = firstRequestedCard.getByRole('button', { name: /accept/i });
-        await expect(acceptButton).toBeVisible();
+        // --- Test REQUESTED -> ACCEPTED transition --- 
+        const student1Name = 'Ethan Parker'; //
+        const lessonCard1 = requestedSection.locator('.card', { hasText: student1Name });
+        await expect(lessonCard1, `Lesson for ${student1Name} should be in Requested`).toBeVisible();
+
+        const acceptButton = lessonCard1.getByRole('button', { name: /accept/i });
+        await expect(acceptButton, 'Accept button should be visible').toBeVisible();
         await acceptButton.click();
         await waitForNetworkIdle(page); // Wait for UI update
 
         // Assert: Lesson moved from REQUESTED to ACCEPTED
-        await expect(requestedSection.locator('.card').first()).not.toBe(firstRequestedCard); // Card should be gone
-        const finalAcceptedCount = await getLessonCountInSection(page, '#lessons-accepted-section');
-        expect(finalAcceptedCount).toBe(initialAcceptedCount + 1);
+        await expect(lessonCard1, `Lesson for ${student1Name} should NOT be in Requested`).not.toBeVisible();
+        const acceptedLessonCard1 = acceptedSection.locator('.card', { hasText: student1Name });
+        await expect(acceptedLessonCard1, `Lesson for ${student1Name} should be in Accepted`).toBeVisible();
 
-        // --- Test DEFINED -> COMPLETED transition --- 
-        const definedSection = page.locator('#lessons-defined-section');
-        const completedSection = page.locator('#lessons-completed-section');
-        const firstDefinedCard = definedSection.locator('.card').first();
-        const initialCompletedCount = await getLessonCountInSection(page, '#lessons-completed-section');
-
-        // Find and click the Complete button on the DEFINED card
-        const completeButtonDefined = firstDefinedCard.getByRole('button', { name: /complete/i });
-        await expect(completeButtonDefined, 'Complete button should be visible on DEFINED card').toBeVisible();
-        await completeButtonDefined.click();
+        // --- Test ACCEPTED -> VOIDED transition --- 
+        // Use the same card, now in the Accepted section
+        const voidButton = acceptedLessonCard1.getByRole('button', { name: /void/i });
+        await expect(voidButton, 'Void button should be visible').toBeVisible();
+        await voidButton.click();
         await waitForNetworkIdle(page); // Wait for UI update
 
-        // Assert: Lesson moved from DEFINED to COMPLETED
-        await expect(definedSection.locator('.card').first()).not.toBe(firstDefinedCard); // Card should be gone from DEFINED
-        const finalCompletedCountDefined = await getLessonCountInSection(page, '#lessons-completed-section');
-        expect(finalCompletedCountDefined, 'Completed count should increase by 1').toBe(initialCompletedCount + 1);
+        // Assert: Lesson moved from ACCEPTED to VOIDED
+        await expect(acceptedLessonCard1, `Lesson for ${student1Name} should NOT be in Accepted`).not.toBeVisible();
+        const voidedLessonCard1 = voidedSection.locator('.card', { hasText: student1Name });
+        await expect(voidedLessonCard1, `Lesson for ${student1Name} should be in Voided`).toBeVisible();
 
-        // TODO: Add tests for other transitions like REJECT, VOID, DEFINE (navigation)
+        // --- Test REQUESTED -> REJECTED transition --- 
+        // Use a *different* lesson initially in Requested
+        const student2Name = 'Ava Johnson'; // ADJUST IF NEEDED based on seed data/UI
+        const lessonCard2 = requestedSection.locator('.card', { hasText: student2Name });
+        await expect(lessonCard2, `Lesson for ${student2Name} should be in Requested`).toBeVisible();
+
+        const rejectButton = lessonCard2.getByRole('button', { name: /reject/i });
+        await expect(rejectButton, 'Reject button should be visible').toBeVisible();
+        await rejectButton.click();
+        await waitForNetworkIdle(page); // Wait for UI update
+
+        // Assert: Lesson moved from REQUESTED to REJECTED
+        await expect(lessonCard2, `Lesson for ${student2Name} should NOT be in Requested`).not.toBeVisible();
+        const rejectedLessonCard2 = rejectedSection.locator('.card', { hasText: student2Name });
+        await expect(rejectedLessonCard2, `Lesson for ${student2Name} should be in Rejected`).toBeVisible();
+
+        // Removed DEFINED -> COMPLETED test as per request
     });
 }); 

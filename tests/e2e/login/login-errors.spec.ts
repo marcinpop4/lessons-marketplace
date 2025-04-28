@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { Page, Response } from '@playwright/test';
+import { SEED_USER_PASSWORD } from 'tests/e2e/constants';
 
 /**
  * Authentication failure tests
@@ -105,7 +106,7 @@ test('Student credentials with teacher userType shows error', async ({ page }) =
 
   // Fill the login form with student credentials but teacher type
   await page.getByLabel('Email').fill('ethan.parker@example.com');
-  await page.getByLabel('Password').fill('1234');
+  await page.getByLabel('Password').fill(SEED_USER_PASSWORD);
   await page.locator('input[value="TEACHER"]').check();
 
   // Submit the form
@@ -126,7 +127,7 @@ test('Teacher credentials with student userType shows error', async ({ page }) =
 
   // Fill the login form with teacher credentials but student type
   await page.getByLabel('Email').fill('emily.richardson@musicschool.com');
-  await page.getByLabel('Password').fill('1234');
+  await page.getByLabel('Password').fill(SEED_USER_PASSWORD);
   await page.locator('input[value="STUDENT"]').check();
 
   // Submit the form
@@ -150,7 +151,7 @@ test('should show error for empty email', async ({ page }) => {
   const form = page.locator('form');
 
   // Try to submit without email
-  await page.getByLabel('Password').fill('1234'); // Fill password to focus on email validation
+  await page.getByLabel('Password').fill(SEED_USER_PASSWORD); // Fill password to focus on email validation
   await form.evaluate((f: HTMLFormElement) => f.requestSubmit()); // Use requestSubmit to trigger form validation
 
   // Verify the input is invalid using HTML5 validation state

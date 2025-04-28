@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { SEED_USER_PASSWORD } from '../constants';
 
 /**
  * Simple authentication tests
@@ -35,7 +36,7 @@ test('Student login form submission', async ({ page }) => {
       await emailInput.clear();
       await passwordInput.clear();
       await emailInput.fill('ethan.parker@example.com');
-      await passwordInput.fill('1234');
+      await passwordInput.fill(SEED_USER_PASSWORD);
       await studentRadio.check();
 
       // Set up response and navigation promises before clicking
@@ -102,7 +103,7 @@ test('Teacher login form submission', async ({ page }) => {
   await emailInput.clear(); // Clear potential pre-filled values
   await passwordInput.clear();
   await emailInput.fill('emily.richardson@musicschool.com');
-  await passwordInput.fill('1234');
+  await passwordInput.fill(SEED_USER_PASSWORD);
   await teacherRadio.check();
 
   // Set up response and navigation promises before clicking

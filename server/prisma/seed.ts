@@ -13,7 +13,7 @@ import chalk from 'chalk'; // Import chalk
 
 // Import shared models and enums
 import { LessonType } from '@shared/models/LessonType.js';
-import { LessonStatusValue } from '@shared/models/LessonStatus.js';
+import { LessonStatusTransition, LessonStatusValue } from '@shared/models/LessonStatus.js';
 import { LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus.js'; // Added
 import { GoalStatusValue, GoalStatusTransition } from '@shared/models/GoalStatus.js';
 import { Goal } from '@shared/models/Goal.js';
@@ -38,6 +38,7 @@ import { teacherLessonHourlyRateService } from '../teacher-lesson-hourly-rate/te
 import { goalService } from '../goal/goal.service.js';
 import authService from '../auth/auth.service.js'; // Default import
 import { utilService } from '../util/util.service.js'; // Import new util service
+import { SEED_USER_PASSWORD } from '../../tests/e2e/constants.js';
 
 // Initialize Prisma client (not used directly except by UtilService)
 import { PrismaClient } from '@prisma/client';
@@ -90,7 +91,7 @@ function getSampleGoalData(lessonType: LessonType) {
 // --- Main Seeding Logic ---
 
 async function main() {
-  const commonPassword = "12345678"; // Use updated password
+  const commonPassword = SEED_USER_PASSWORD
   const NUM_STUDENTS = 4;
   const NUM_TEACHERS = 4;
   const NUM_ADDRESSES = 4;
@@ -272,6 +273,12 @@ async function main() {
 
     console.log(chalk.green(`✓ ${createdLessons.length} Lessons created.`)); // Summary log
 
+    // 7.1 Move the last lesson to the Accepted state
+    const lastLesson = createdLessons[createdLessons.length - 1];
+    if (lastLesson) {
+      await lessonService.updateStatus(lastLesson.id, LessonStatusTransition.ACCEPT);
+    }
+
     // 7. Create Goals for Lessons
     let goalsCreatedCount = 0;
     for (const lesson of createdLessons) {
@@ -316,6 +323,7 @@ async function main() {
       }
     }
     console.log(chalk.green(`✓ ${goalsCreatedCount} Goals created.`)); // Summary log
+
 
   } catch (e) { // Ensure catch block exists
     console.error(chalk.red("Seeding script failed:"), e);

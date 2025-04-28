@@ -8,18 +8,7 @@ import { Teacher } from '@shared/models/Teacher'; // Needed for user util type
 // Import user utilities
 import { createTestStudent, loginTestUser, createTestTeacher } from './utils/user.utils';
 // Import address utilities
-import { createAddress, getAddressById, createAddressUnauthenticated, getAddressByIdUnauthenticated } from './utils/address.utils'; // Corrected import path
-
-// REMOVED: Seeded user credentials no longer needed
-// const SEEDED_STUDENT_EMAIL = 'ethan.parker@example.com';
-// const SEEDED_PASSWORD = '1234';
-
-// API Base URL check moved to utils, removed from here
-// const API_BASE_URL = process.env.VITE_API_BASE_URL;
-
-// if (!API_BASE_URL) {
-//    throw new Error('Missing required environment variable: VITE_API_BASE_URL. Ensure .env.api-test is loaded correctly.');
-// }
+import { createAddress, getAddressById, createAddressUnauthenticated, getAddressByIdUnauthenticated } from './utils/address.utils'; // Corrected import pat
 
 // Main describe block for the Address resource
 describe('API Integration: /api/v1/addresses', () => {
@@ -28,9 +17,6 @@ describe('API Integration: /api/v1/addresses', () => {
     let student1AccessToken: string;
     let testTeacher1: Teacher; // Use Teacher type
     let teacher1AccessToken: string; // Add teacher token variable
-
-    // REMOVED: Address ID created in old beforeAll
-    // let createdAddressIdForGetTest: string | null = null;
 
     // Shared setup: Create and log in users
     beforeAll(async () => {
