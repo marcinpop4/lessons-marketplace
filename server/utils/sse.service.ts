@@ -99,10 +99,12 @@ export const streamJsonResponse = async (
             }
         }
         // Signal end of stream ONLY if no error occurred and client still connected
-        if (!streamError && !res.writableEnded) {
-            console.log('[SSE Service] Stream generation complete, sending done event.');
-            sendSseEvent(res, 'done', { message: 'Stream completed successfully.' });
-        }
+        // REMOVED: Explicit 'done' event sending is potentially causing timing issues.
+        // The finally block will handle calling res.end() for clean closure.
+        // if (!streamError && !res.writableEnded) {
+        //     console.log('[SSE Service] Stream generation complete, sending done event.');
+        //     sendSseEvent(res, 'done', { message: 'Stream completed successfully.' });
+        // }
     } catch (error: any) {
         streamError = error; // Capture the error
         console.error('[SSE Service] Error during stream generation:', error); // Log the full error server-side
@@ -115,8 +117,13 @@ export const streamJsonResponse = async (
         }
     } finally {
         if (!res.writableEnded) {
-            console.log(`[SSE Service] Finally block reached. Stream errored: ${!!streamError}`);
-            // Do not send 'done' event here if an error occurred or was already sent
+            // Log whether we are ending cleanly or after an error
+            if (!streamError) {
+                console.log('[SSE Service] Stream finished successfully, closing connection.');
+            } else {
+                console.log(`[SSE Service] Stream finished with error, closing connection.`);
+            }
+            // Always end the stream if the client is still connected
             endSseStream(res);
         }
     }

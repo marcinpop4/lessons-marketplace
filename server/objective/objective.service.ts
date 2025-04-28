@@ -11,6 +11,11 @@ import { streamJsonResponse } from '../utils/sse.service.js';
 import { ObjectiveRecommendation } from '@shared/models/ObjectiveRecommendation.js';
 import { isUuid } from '../utils/validation.utils.js';
 import prisma from '../prisma.js'; // Import shared prisma instance
+import { logAndYieldAiStream } from '../utils/aiStream.utils.js'; // Import the AI stream utility
+import { ChatCompletionChunk } from 'openai/resources/chat/completions'; // Import necessary type
+import { lessonService } from '../lesson/lesson.service.js'; // Import lessonService
+import { Lesson } from '@shared/models/Lesson.js'; // Import Lesson model
+import { LessonStatusValue } from '@shared/models/LessonStatus.js';
 
 // Define the recommendation count constant
 const DEFAULT_RECOMMENDATION_COUNT = 6;
@@ -30,18 +35,30 @@ const objectiveInclude = Prisma.validator<Prisma.ObjectiveInclude>()({
  * Prepares prompts for OpenAI objective generation.
  */
 const _prepareObjectivePrompts = (
-    student: Pick<Student, 'id' | 'firstName' | 'lastName'>, // Use the simpler Pick type
-    lessonType: LessonType | null,
-    currentObjectives: Objective[],
+    student: Pick<Student, 'id' | 'firstName' | 'lastName'>,
+    lessonType: LessonType, // Now required
+    currentObjectives: Objective[], // Should be pre-filtered
+    pastLessons: Lesson[] // Add past lessons context
 ): { systemPrompt: string, userPrompt: string } => {
-    const systemPrompt = `You are an assistant helping a student set learning objectives. Based on the student's profile and their current objectives, suggest ${DEFAULT_RECOMMENDATION_COUNT} new potential objectives. Consider the optional lesson type filter. Each objective should have a title, description, targetDate (suggest a reasonable future date like 1 month from now in YYYY-MM-DD format), and potentially relate to the given lessonType if provided. Respond ONLY with a valid JSON array of these objective objects, like this: [{ "title": "Objective 1", "description": "Desc 1", "lessonType": "GUITAR" | null, "targetDate": "YYYY-MM-DD" }, { ... }]`;
+    // Updated System Prompt
+    const systemPrompt = `You are an assistant helping a student set learning objectives for a specific lesson type. Based on the student's profile, their current objectives *for this lesson type*, and their past lesson history *for this lesson type*, suggest ${DEFAULT_RECOMMENDATION_COUNT} new potential objectives relevant to the lesson type: ${lessonType}. Each objective must have a title, description, targetDate (suggest a reasonable future date like 1 month from now in YYYY-MM-DD format), and a difficulty (Beginner, Intermediate, Advanced). Respond ONLY with a valid JSON array of these objective objects, like this: [{ "title": "Objective 1", "description": "Desc 1", "lessonType": "${lessonType}", "targetDate": "YYYY-MM-DD", "difficulty": "Beginner" }, { ... }]`;
+
     const futureDate = new Date();
     futureDate.setMonth(futureDate.getMonth() + 1);
     const suggestedTargetDate = futureDate.toISOString().split('T')[0];
+
     const studentInfo = `Student: ${student.firstName} ${student.lastName}.`;
-    const lessonTypeInfo = lessonType ? `Focus Lesson Type: ${lessonType}` : 'No specific lesson type focus.';
-    const currentObjectivesInfo = `Current Objectives (${currentObjectives.length}):\n${currentObjectives.map(o => `- ${o.title} (Type: ${o.lessonType}, Status: ${o.currentStatus.status}, Target: ${o.targetDate.toISOString().split('T')[0]})`).join('\n') || 'None'}`;
-    const userPrompt = `Please generate ${DEFAULT_RECOMMENDATION_COUNT} objectives for the student based on this context. Remember the suggested target date is ${suggestedTargetDate} but adjust if sensible. Only generate the JSON array.\nContext:\n${studentInfo}\n${lessonTypeInfo}\n${currentObjectivesInfo}`;
+    const lessonTypeInfo = `Target Lesson Type: ${lessonType}`; // Lesson type is now mandatory context
+
+    // Current objectives are pre-filtered, so the count reflects relevance
+    const currentObjectivesInfo = `Current Objectives for ${lessonType} (${currentObjectives.length}):\n${currentObjectives.map(o => `- ${o.title} (Status: ${o.currentStatus.status}, Target: ${o.targetDate.toISOString().split('T')[0]})`).join('\n') || 'None'}`;
+
+    // Format past lesson information relevant to the lesson type
+    const pastLessonsInfo = `Past ${lessonType} Lessons Summary (${pastLessons.length}):\n${pastLessons.map(l => `- Date: ${l.getStartTime().toISOString().split('T')[0]}, Status: ${l.currentStatus?.status ?? 'N/A'}`).join('\n') || 'None'}`;
+
+    // Updated User Prompt
+    const userPrompt = `Please generate ${DEFAULT_RECOMMENDATION_COUNT} objectives for the student focused on ${lessonType}. Remember the suggested target date is ${suggestedTargetDate} but adjust if sensible. Ensure each objective includes a difficulty level (Beginner, Intermediate, Advanced). Only generate the JSON array.\nContext:\n${studentInfo}\n${lessonTypeInfo}\n${currentObjectivesInfo}\n${pastLessonsInfo}`;
+
     return { systemPrompt, userPrompt };
 };
 
@@ -56,11 +73,17 @@ const _parseAndValidateObjectiveRecommendations = (responseText: string | null |
         const recommendations: ObjectiveRecommendation[] = [];
         for (const item of parsed) {
             if (item && typeof item.title === 'string' && typeof item.description === 'string') {
+                // Determine difficulty, defaulting if missing or invalid
+                const difficultyValue = ['Beginner', 'Intermediate', 'Advanced'].includes(item?.difficulty)
+                    ? item.difficulty
+                    : 'Intermediate';
+
                 recommendations.push({
                     title: item.title,
                     description: item.description,
                     lessonType: Object.values(LessonType).includes(item.lessonType as LessonType) ? item.lessonType as LessonType : null,
                     targetDate: typeof item.targetDate === 'string' && /\d{4}-\d{2}-\d{2}/.test(item.targetDate) ? item.targetDate : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    difficulty: difficultyValue as ('Beginner' | 'Intermediate' | 'Advanced') // Add difficulty
                 });
             }
         }
@@ -73,13 +96,37 @@ class ObjectiveService {
     private readonly prisma = prisma;
 
     /**
-     * Fetches all objectives for a specific student.
+     * Fetches objectives for a specific student, optionally filtered by lesson type and status.
+     * @param studentId The ID of the student.
+     * @param lessonType Optional lesson type to filter by.
+     * @param statuses Optional array of objective statuses to filter by.
+     * @returns Promise resolving to an array of Objective shared models.
      */
-    async getObjectivesByStudentId(studentId: string): Promise<Objective[]> {
+    async getObjectivesByStudentId(
+        studentId: string,
+        lessonType?: LessonType,
+        statuses?: ObjectiveStatusValue[]
+    ): Promise<Objective[]> {
         type ObjectiveWithStatus = Prisma.ObjectiveGetPayload<{ include: typeof objectiveInclude }>;
 
+        // Build the where clause dynamically
+        const whereClause: Prisma.ObjectiveWhereInput = {
+            studentId: studentId,
+        };
+        if (lessonType) {
+            whereClause.lessonType = lessonType;
+        }
+        // Add status filtering if statuses array is provided and not empty
+        if (statuses && statuses.length > 0) {
+            whereClause.currentStatus = {
+                status: {
+                    in: statuses,
+                },
+            };
+        }
+
         const prismaObjectives: ObjectiveWithStatus[] = await this.prisma.objective.findMany({
-            where: { studentId: studentId },
+            where: whereClause, // Use dynamic where clause
             include: objectiveInclude,
             orderBy: { createdAt: 'desc' },
         });
@@ -208,75 +255,150 @@ class ObjectiveService {
     // === AI Objective Recommendation Methods ===
 
     /**
-     * Async generator function for generating objective recommendations.
+     * Prepares and returns the async generator for streaming objective recommendations,
+     * utilizing the logAndYieldAiStream utility.
      */
-    async * _generateObjectiveRecommendationsStream(
+    _generateObjectiveRecommendationsStream(
         studentId: string,
-        lessonType: LessonType | null
+        lessonType: LessonType // Now required
     ): AsyncGenerator<ObjectiveRecommendation, void, unknown> {
-        const student = await studentService.findById(studentId);
-        if (!student) throw new NotFoundError(`Student with ID ${studentId} not found.`);
-        // Use instance method to get current objectives
-        const currentObjectives = await this.getObjectivesByStudentId(studentId);
+        const logContext = `[Objective Stream S:${studentId} T:${lessonType}]`; // Include type in context
+        console.log(`${logContext} Preparing objective stream generator.`);
 
-        // Call _prepareObjectivePrompts without count
-        const { systemPrompt, userPrompt } = _prepareObjectivePrompts(student, lessonType, currentObjectives);
+        // --- Prepare Prompts & Provider --- 
+        const preparePromptsAndProvider = async () => {
+            const student = await studentService.findById(studentId);
+            if (!student) throw new NotFoundError(`Student with ID ${studentId} not found.`);
 
-        const stream = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt },
-            ],
-            stream: true,
-            temperature: 0.7,
-            n: 1,
-        });
+            // Fetch objectives ALREADY FILTERED by lessonType and relevant statuses
+            const currentObjectivesFiltered = await this.getObjectivesByStudentId(studentId, lessonType, [
+                ObjectiveStatusValue.CREATED,
+                ObjectiveStatusValue.IN_PROGRESS,
+                ObjectiveStatusValue.ACHIEVED
+            ]);
 
-        let accumulatedJson = '';
-        let objectDepth = 0;
-        let recommendationsSent = 0;
-        for await (const chunk of stream) {
-            const content = chunk.choices[0]?.delta?.content || '';
-            accumulatedJson += content;
-            for (const char of content) { if (char === '{') objectDepth++; if (char === '}') objectDepth--; }
-            if (objectDepth === 0 && accumulatedJson.trim().startsWith('{') && accumulatedJson.trim().endsWith('}')) {
-                try {
-                    const potentialRec = JSON.parse(accumulatedJson.trim());
-                    const validatedRecs = _parseAndValidateObjectiveRecommendations(JSON.stringify([potentialRec]));
-                    if (validatedRecs.length > 0) {
-                        yield validatedRecs[0];
-                        recommendationsSent++;
-                        accumulatedJson = '';
-                        // Use constant for check
-                        if (recommendationsSent >= DEFAULT_RECOMMENDATION_COUNT) {
-                            stream.controller.abort();
-                            break;
-                        }
-                    }
-                } catch (e) { /* Incomplete JSON */ }
+            // Fetch past lessons FILTERED by lessonType and relevant statuses
+            const pastLessonsFiltered = await lessonService.findLessonsByStudentId(studentId, lessonType, [
+                LessonStatusValue.ACCEPTED,
+                LessonStatusValue.DEFINED,
+                LessonStatusValue.COMPLETED
+            ]);
+
+            // Prepare prompts using the *required* lessonType and *filtered* data
+            const { systemPrompt, userPrompt } = _prepareObjectivePrompts(
+                student,
+                lessonType,
+                currentObjectivesFiltered,
+                pastLessonsFiltered
+            );
+
+            const aiStreamProvider = () => {
+                return openai.chat.completions.create({
+                    model: "gpt-3.5-turbo",
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: userPrompt },
+                    ],
+                    stream: true,
+                    temperature: 0.7,
+                    n: 1,
+                });
+            };
+            return { systemPrompt, userPrompt, aiStreamProvider };
+        };
+
+        // --- Define Parsers/Validators --- 
+        const chunkParser = (chunk: ChatCompletionChunk): string | null => {
+            return chunk.choices[0]?.delta?.content ?? null;
+        };
+
+        const objectAssembler = (buffer: string): { parsedObject: ObjectiveRecommendation | null; remainingBuffer: string } => {
+            let startIdx = buffer.indexOf('{');
+            if (startIdx === -1) return { parsedObject: null, remainingBuffer: buffer };
+            let braceDepth = 0;
+            let endIdx = -1;
+            for (let i = startIdx; i < buffer.length; i++) {
+                if (buffer[i] === '{') braceDepth++;
+                else if (buffer[i] === '}') braceDepth--;
+                if (braceDepth === 0 && buffer[i] === '}') {
+                    endIdx = i;
+                    break;
+                }
+            }
+            if (endIdx === -1) return { parsedObject: null, remainingBuffer: buffer };
+            const jsonChunk = buffer.substring(startIdx, endIdx + 1);
+            const remainingBuffer = buffer.substring(endIdx + 1);
+            try {
+                const potentialRec: any = JSON.parse(jsonChunk);
+
+                // Explicitly determine difficulty 
+                const difficultyValue = ['Beginner', 'Intermediate', 'Advanced'].includes(potentialRec?.difficulty)
+                    ? potentialRec.difficulty
+                    : 'Intermediate';
+
+                const rec: ObjectiveRecommendation = {
+                    title: String(potentialRec?.title ?? ''),
+                    description: String(potentialRec?.description ?? ''),
+                    lessonType: potentialRec?.lessonType === lessonType ? lessonType : null,
+                    targetDate: typeof potentialRec?.targetDate === 'string' && /\d{4}-\d{2}-\d{2}/.test(potentialRec.targetDate)
+                        ? potentialRec.targetDate
+                        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    difficulty: difficultyValue as ('Beginner' | 'Intermediate' | 'Advanced') // Cast the final value
+                };
+                return { parsedObject: rec, remainingBuffer };
+            } catch (parseError) {
+                return { parsedObject: null, remainingBuffer };
+            }
+        };
+
+        const objectValidator = (obj: ObjectiveRecommendation): boolean => {
+            // Validate required fields, including difficulty
+            return !!(obj.title && obj.description && obj.targetDate && obj.difficulty);
+        };
+
+        // --- Return wrapped generator --- 
+        async function* invokeUtility(): AsyncGenerator<ObjectiveRecommendation, void, unknown> {
+            try {
+                const { systemPrompt, userPrompt, aiStreamProvider } = await preparePromptsAndProvider();
+
+                yield* logAndYieldAiStream<ObjectiveRecommendation>({
+                    logContext,
+                    systemPrompt,
+                    userPrompt,
+                    aiStreamProvider,
+                    chunkParser,
+                    objectAssembler,
+                    objectValidator,
+                    maxItems: DEFAULT_RECOMMENDATION_COUNT
+                });
+            } catch (prepError) {
+                console.error(`${logContext} Error preparing prompts for AI stream:`, prepError);
+                throw prepError;
             }
         }
+        return invokeUtility();
     }
 
     /**
      * Public method to initiate streaming objective recommendations.
+     * LessonType is now required.
      */
     async streamObjectiveRecommendations(
         studentId: string,
-        lessonType: LessonType | null,
+        lessonType: LessonType, // Changed from LessonType | null
         res: Response
     ): Promise<void> {
-        // Remove count validation, use MAX_RECOMMENDATIONS if needed elsewhere
+        // Basic validation
         if (!studentId || !isUuid(studentId)) throw new BadRequestError('Valid Student ID is required.');
-        // Removed count validation block
-        if (lessonType && !Object.values(LessonType).includes(lessonType)) throw new BadRequestError(`Invalid lesson type: ${lessonType}`);
+        // lessonType is now required, ensure it's valid
+        if (!lessonType || !Object.values(LessonType).includes(lessonType)) throw new BadRequestError(`Valid Lesson Type is required.`);
 
-        // Pass instance method as the generator function, call without count
+        // Use the generator setup (lessonType is guaranteed to be non-null)
         const generator = () => this._generateObjectiveRecommendationsStream(studentId, lessonType);
 
+        // Use the standard SSE utility
         await streamJsonResponse(res, generator, (error) => {
-            console.error(`[Objective Service] Error during objective recommendation streaming for student ${studentId}:`, error);
+            console.error(`[Objective Service] Error during objective recommendation streaming for student ${studentId}, type ${lessonType}:`, error);
         });
     }
 }

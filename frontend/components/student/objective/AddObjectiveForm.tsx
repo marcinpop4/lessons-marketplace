@@ -21,6 +21,7 @@ interface AddObjectiveFormProps {
     onGenerateRecommendations: (lessonType: LessonType | null) => Promise<void>; // Pass optional filter
     isGeneratingRecommendations: boolean;
     recommendationError: string | null;
+    setRecommendationError: (error: string | null) => void; // ADDED: Callback to set error in parent
     initialData: ObjectiveRecommendation | null; // Use ObjectiveRecommendation type
     recommendations: ObjectiveRecommendation[];
     onSelectRecommendation: (recommendation: ObjectiveRecommendation | null) => void; // Allow null for deselection
@@ -32,6 +33,7 @@ const AddObjectiveForm: React.FC<AddObjectiveFormProps> = ({
     onGenerateRecommendations,
     isGeneratingRecommendations,
     recommendationError,
+    setRecommendationError, // ADDED
     initialData,
     recommendations,
     onSelectRecommendation,
@@ -154,8 +156,17 @@ const AddObjectiveForm: React.FC<AddObjectiveFormProps> = ({
     };
 
     const handleGenerateClick = () => {
-        // Pass the currently selected lessonType (or null if none selected) as a filter
-        onGenerateRecommendations(lessonType || null);
+        // --- ADDED VALIDATION --- 
+        if (!lessonType) {
+            setRecommendationError('Please select a Lesson Type to generate AI recommendations.');
+            return; // Stop if no lesson type is selected
+        }
+        // --- END VALIDATION --- 
+
+        // Clear previous error if validation passes
+        setRecommendationError(null);
+        // Proceed with generation using the selected lessonType
+        onGenerateRecommendations(lessonType);
     };
 
     const handleRecommendationClick = (rec: ObjectiveRecommendation) => {
@@ -169,6 +180,20 @@ const AddObjectiveForm: React.FC<AddObjectiveFormProps> = ({
 
     // Calculate received count
     const receivedCount = recommendations.length;
+
+    // Helper function to get badge styles based on difficulty
+    const getDifficultyBadgeStyles = (difficulty: 'Beginner' | 'Intermediate' | 'Advanced'): string => {
+        switch (difficulty) {
+            case 'Beginner':
+                return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+            case 'Intermediate':
+                return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+            case 'Advanced':
+                return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+            default:
+                return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
+        }
+    };
 
     return (
         <Card
@@ -217,7 +242,7 @@ const AddObjectiveForm: React.FC<AddObjectiveFormProps> = ({
                 {/* Lesson Type Select */}
                 <div>
                     <label htmlFor="objective-lesson-type" className="block text-sm font-medium mb-1">
-                        Lesson Type (Optional Filter for AI)
+                        Lesson Type
                     </label>
                     <select
                         id="objective-lesson-type"
@@ -286,7 +311,7 @@ const AddObjectiveForm: React.FC<AddObjectiveFormProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                         {recommendations.map((rec, index) => (
                             <div
-                                key={index} // Use index for non-persistent list
+                                key={index}
                                 className={`p-3 rounded-md border cursor-pointer transition-all 
                                     ${initialData?.title === rec.title && initialData?.description === rec.description
                                         ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/[.3] dark:border-blue-700'
@@ -298,13 +323,23 @@ const AddObjectiveForm: React.FC<AddObjectiveFormProps> = ({
                                 onKeyDown={(e) => e.key === 'Enter' || e.key === ' ' ? handleRecommendationClick(rec) : null}
                                 aria-pressed={initialData?.title === rec.title}
                             >
-                                <h5 className="font-medium text-sm text-gray-900 dark:text-gray-100 mr-2">{rec.title}</h5>
+                                <div className="flex justify-between items-start mb-1"> {/* Flex container for title and badge */}
+                                    <h5 className="font-medium text-sm text-gray-900 dark:text-gray-100 mr-2">{rec.title}</h5>
+                                    {/* Difficulty Badge */}
+                                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${getDifficultyBadgeStyles(rec.difficulty)}`}>
+                                        {rec.difficulty}
+                                    </span>
+                                </div>
                                 <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{rec.description}</p>
                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                     Target: {rec.targetDate} {rec.lessonType ? `(${formatDisplayLabel(rec.lessonType)})` : ''}
                                 </p>
                             </div>
                         ))}
+                        {/* Render placeholders while streaming if needed */}
+                        {isStreaming && recommendations.length < 6 &&
+                            Array.from({ length: 6 - recommendations.length }).map((_, i) => <PlaceholderCard key={`placeholder-${i}`} />)
+                        }
                     </div>
                 </div>
             )}

@@ -22,14 +22,20 @@ import { LessonType } from './LessonType.js';
  *           type: string
  *           format: date # YYYY-MM-DD format
  *           description: A suggested target date for the objective.
+ *         difficulty:
+ *            type: string
+ *            enum: [Beginner, Intermediate, Advanced]
+ *            description: Suggested difficulty level for the objective.
  *       required:
  *         - title
  *         - description
  *         - targetDate # Making targetDate required for a suggestion
+ *         - difficulty # Added difficulty as required
  */
 export interface ObjectiveRecommendation {
     title: string;
     description: string;
     lessonType: LessonType | null; // Can be null if not specific
     targetDate: string; // Expecting YYYY-MM-DD string format from AI
+    difficulty: 'Beginner' | 'Intermediate' | 'Advanced'; // Added difficulty field
 } 

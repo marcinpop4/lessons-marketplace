@@ -1,7 +1,8 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, Student as PrismaStudent, Goal as PrismaGoal } from '@prisma/client';
 import { Goal, DbGoalWithStatus } from '../../shared/models/Goal.js';
 import { GoalStatus, GoalStatusTransition, GoalStatusValue } from '../../shared/models/GoalStatus.js';
 import { Lesson, DbLessonWithNestedRelations } from '../../shared/models/Lesson.js';
+import { Student } from '../../shared/models/Student.js';
 import { randomUUID } from 'crypto';
 // import { AppError } from '../utils/AppError.js'; // Old import
 import { NotFoundError, BadRequestError, AuthorizationError } from '../errors/index.js';
@@ -9,6 +10,8 @@ import OpenAI from 'openai';
 import { studentService } from '../student/student.service.js';
 import { lessonService } from '../lesson/lesson.service.js';
 import { teacherService } from '../teacher/teacher.service.js';
+import { objectiveService } from '../objective/objective.service.js';
+import { Objective } from '../../shared/models/Objective.js';
 import prisma from '../prisma.js';
 import { LessonType } from '../../shared/models/LessonType.js';
 import { GoalRecommendation } from '../../shared/models/GoalRecommendation.js';
@@ -18,6 +21,8 @@ import { isUuid } from '../utils/validation.utils.js';
 import { streamJsonResponse } from '../utils/sse.service.js'; // Import the SSE utility
 import { logAndYieldAiStream } from '../utils/aiStream.utils.js'; // Import the new utility
 import { ChatCompletionChunk } from 'openai/resources/chat/completions';
+import { LessonStatusValue } from '../../shared/models/LessonStatus.js';
+import { ObjectiveStatusValue } from '../../shared/models/ObjectiveStatus.js';
 
 // --- Configuration Constants ---
 // LOG_STREAMING_DETAILS is now handled within aiStream.utils.ts
@@ -386,29 +391,58 @@ export const goalService = {
         const student = await studentService.findById(studentId);
         if (!student) throw new NotFoundError(`Student ${studentId} not found`);
 
-        const allTeacherLessons: Lesson[] = [];
+        // Fetch past lessons for this student and lesson type, filtered by relevant statuses
+        const lessonType = currentLesson.quote.lessonRequest.type;
+        const relevantStatuses = [
+            LessonStatusValue.ACCEPTED,
+            LessonStatusValue.DEFINED,
+            LessonStatusValue.COMPLETED
+        ];
+        const fetchedPastLessons = await lessonService.findLessonsByStudentId(
+            studentId,
+            lessonType,
+            relevantStatuses
+        );
 
-        const pastLessons = allTeacherLessons
-            .filter((l: Lesson) => l.quote.lessonRequest.student.id === studentId && l.id !== lessonId)
-            .sort((a: Lesson, b: Lesson) => new Date(b.quote.lessonRequest.startTime).getTime() - new Date(a.quote.lessonRequest.startTime).getTime());
+        // Filter out the current lesson and sort by start time descending
+        const pastLessons = fetchedPastLessons
+            .filter((l: Lesson) => l.id !== lessonId)
+            .sort((a: Lesson, b: Lesson) => b.getStartTime().getTime() - a.getStartTime().getTime());
+
         const currentLessonGoals = await this.getGoalsByLessonId(lessonId, userId);
 
-        return { student, currentLesson, pastLessons, currentLessonGoals };
+        // Fetch student objectives for the same lesson type (active/achieved ones)
+        const studentObjectives = await objectiveService.getObjectivesByStudentId(studentId, lessonType, [
+            ObjectiveStatusValue.CREATED,
+            ObjectiveStatusValue.IN_PROGRESS,
+            ObjectiveStatusValue.ACHIEVED
+        ]);
+
+        return { student, currentLesson, pastLessons, currentLessonGoals, studentObjectives };
     },
 
     /** Prepares the system and user prompts for the OpenAI API call. */
-    _prepareOpenAiPrompts(context: Awaited<ReturnType<typeof this._getRecommendationContext>>): { systemPrompt: string, userPrompt: string } {
-        const { student, currentLesson, pastLessons, currentLessonGoals } = context;
+    _prepareOpenAiPrompts(
+        student: Student,
+        currentLesson: Lesson,
+        pastLessons: Lesson[],
+        currentLessonGoals: Goal[],
+        studentObjectives: Objective[]
+    ): { systemPrompt: string, userPrompt: string } {
+        const systemPrompt = `You are a helpful assistant that helps teachers come up with goals for one-on-one lessons. Based on the student info, current lesson details (including its existing goals), past lesson history, and the student's relevant learning objectives, suggest ${DEFAULT_GOAL_RECOMMENDATION_COUNT} new potential goals. Each goal should have a title, description, estimatedLessonCount (integer), and difficulty (Beginner, Intermediate, Advanced). Respond ONLY with a valid JSON array of these goal objects, like this: [{ "title": "Goal 1", "description": "Desc 1", "estimatedLessonCount": 3, "difficulty": "Beginner" }, { ... }]`;
 
-        const systemPrompt = `You are a helpful assistant that helps teachers come up with goals for one-on-one lessons. Based on the student info, current lesson details (including its existing goals), and past lesson history, suggest ${DEFAULT_GOAL_RECOMMENDATION_COUNT} new potential goals. Each goal should have a title, description, estimatedLessonCount (integer), and difficulty (Beginner, Intermediate, Advanced). Respond ONLY with a valid JSON array of these goal objects, like this: [{ "title": "Goal 1", "description": "Desc 1", "estimatedLessonCount": 3, "difficulty": "Beginner" }, { ... }]`;
-
-        const studentInfo = `Student: ${student.firstName} ${student.lastName}.`; // Add more details if available/needed
+        // Handle potentially null student and add age
+        const studentAge = student?.age;
+        const studentInfo = student
+            ? `Student: ${student.firstName} ${student.lastName}. ${studentAge !== null ? `Age: ${studentAge}.` : 'Age: N/A.'}`
+            : 'Student: Information unavailable.';
         const lessonInfo = `Current Lesson Type: ${currentLesson.quote.lessonRequest.type}. Target Time: ${currentLesson.quote.lessonRequest.startTime.toISOString()}.`;
         const currentGoalsInfo = `Current Goals for this Lesson (${currentLessonGoals.length}):\n${currentLessonGoals.map(g => `- ${g.title} (Status: ${g.currentStatus.status}, Est: ${g.estimatedLessonCount} lessons)`).join('\n') || 'None'}`;
-        // TODO: Add past lesson/goal summary if needed and available
+        // Format student objectives, now including description
+        const studentObjectivesInfo = `Student's Relevant Objectives (${studentObjectives.length}):\n${studentObjectives.map(o => `- ${o.title}: ${o.description} (Status: ${o.currentStatus.status})`).join('\n') || 'None'}`;
         const pastLessonsInfo = `Past Lessons Summary: ${pastLessons.length} relevant past lessons found.`;
 
-        const userPrompt = `Please generate ${DEFAULT_GOAL_RECOMMENDATION_COUNT} goals for the student based on this context:\n${studentInfo}\n${lessonInfo}\n${currentGoalsInfo}\n${pastLessonsInfo}\n\nGenerate ONLY the JSON array.`;
+        const userPrompt = `Please generate ${DEFAULT_GOAL_RECOMMENDATION_COUNT} goals for the student based on this context:\n${studentInfo}\n${lessonInfo}\n${currentGoalsInfo}\n${studentObjectivesInfo}\n${pastLessonsInfo}\n\nGenerate ONLY the JSON array.`;
 
         return { systemPrompt, userPrompt };
     },
@@ -454,7 +488,13 @@ export const goalService = {
         userId: string
     ): Promise<GoalRecommendation[]> {
         const context = await this._getRecommendationContext(lessonId, userId);
-        const { systemPrompt, userPrompt } = this._prepareOpenAiPrompts(context);
+        const { systemPrompt, userPrompt } = this._prepareOpenAiPrompts(
+            context.student,
+            context.currentLesson,
+            context.pastLessons,
+            context.currentLessonGoals,
+            context.studentObjectives
+        );
 
         try {
             const completion = await openai.chat.completions.create({
@@ -496,7 +536,13 @@ export const goalService = {
         // Wrap in a function to handle potential async errors during prep.
         const preparePromptsAndProvider = async () => {
             const context = await this._getRecommendationContext(lessonId, userId);
-            const { systemPrompt, userPrompt } = this._prepareOpenAiPrompts(context);
+            const { systemPrompt, userPrompt } = this._prepareOpenAiPrompts(
+                context.student,
+                context.currentLesson,
+                context.pastLessons,
+                context.currentLessonGoals,
+                context.studentObjectives
+            );
 
             // Define the provider function *after* prompts are ready
             const aiStreamProvider = () => {

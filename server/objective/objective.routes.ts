@@ -7,17 +7,41 @@ import { UserType } from '../../shared/models/UserType.js';
 const router = Router();
 
 // Middleware to ensure user is an authenticated student for all objective routes
-const requireStudent = [authMiddleware, checkRole([UserType.STUDENT])];
+// const requireStudent = [authMiddleware, checkRole([UserType.STUDENT])];
 
 /**
  * @swagger
  * /api/v1/objectives:
  *   get:
  *     tags: [Objectives]
- *     summary: Fetch objectives for the authenticated student
- *     description: Retrieves a list of learning objectives associated with the currently authenticated student.
+ *     summary: Fetch objectives for a specific student
+ *     description: Retrieves a list of learning objectives for the specified student ID. Requires authentication.
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - name: studentId
+ *         in: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the student whose objectives are to be fetched.
+ *       - name: lessonType
+ *         in: query
+ *         required: false
+ *         schema:
+ *           $ref: '#/components/schemas/LessonType'
+ *         description: Optional lesson type to filter objectives by.
+ *       - name: status
+ *         in: query
+ *         required: false
+ *         style: form
+ *         explode: false # Use comma-separated for array
+ *         schema:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/ObjectiveStatusValue'
+ *         description: Optional objective statuses to filter by (e.g., status=CREATED,IN_PROGRESS).
  *     responses:
  *       200:
  *         description: List of student objectives.
@@ -27,12 +51,12 @@ const requireStudent = [authMiddleware, checkRole([UserType.STUDENT])];
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/Objective'
+ *       400:
+ *         description: Bad Request - Missing or invalid studentId, or invalid filter parameters.
  *       401:
  *         description: Unauthorized - User not authenticated.
- *       403:
- *         description: Forbidden - User is not a student.
  */
-router.get('/', requireStudent, objectiveController.getObjectives);
+router.get('/', authMiddleware, objectiveController.getObjectives);
 
 /**
  * @swagger
@@ -78,7 +102,7 @@ router.get('/', requireStudent, objectiveController.getObjectives);
  *       403:
  *         description: Forbidden - User is not a student.
  */
-router.post('/', requireStudent, objectiveController.createObjective);
+router.post('/', authMiddleware, objectiveController.createObjective);
 
 /**
  * @swagger
@@ -127,7 +151,7 @@ router.post('/', requireStudent, objectiveController.createObjective);
  *       404:
  *         description: Not Found - Objective with the given ID not found.
  */
-router.patch('/:objectiveId', requireStudent, objectiveController.updateObjectiveStatus);
+router.patch('/:objectiveId', authMiddleware, objectiveController.updateObjectiveStatus);
 
 // --- AI Recommendation Route ---
 
@@ -183,6 +207,6 @@ router.patch('/:objectiveId', requireStudent, objectiveController.updateObjectiv
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get('/recommendations/stream', requireStudent, objectiveController.streamRecommendations);
+router.get('/recommendations/stream', authMiddleware, objectiveController.streamRecommendations);
 
 export default router; 

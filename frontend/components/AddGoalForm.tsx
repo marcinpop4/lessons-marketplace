@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Goal } from '@shared/models/Goal';
 import { createGoal } from '@frontend/api/goalApi';
 import Button from '@frontend/components/shared/Button/Button';
@@ -8,18 +8,7 @@ import { GoalRecommendation } from '@shared/models/GoalRecommendation';
 interface AddGoalFormProps {
     lessonId: string;
     onGoalAdded: (newGoal: Goal) => void; // Callback to notify parent when a goal is added
-    // Add props for AI generation
-    onGenerateRecommendations?: () => Promise<void>;
-    isGeneratingRecommendations?: boolean;
-    recommendationError?: string | null;
-    // Add prop for pre-filling form from selected recommendation
-    initialData?: { title: string; description: string; estimatedLessonCount: number | string } | null;
-    // Add props for displaying recommendations
-    recommendations?: GoalRecommendation[];
-    onSelectRecommendation?: (recommendation: GoalRecommendation) => void;
-    // Add props for placeholder logic
-    desiredCount?: number;
-    isStreaming?: boolean;
+    desiredCount?: number; // Keep this prop if needed for display
 }
 
 // Simple Placeholder Component
@@ -35,37 +24,160 @@ const PlaceholderCard: React.FC = () => (
 const AddGoalForm: React.FC<AddGoalFormProps> = ({
     lessonId,
     onGoalAdded,
-    onGenerateRecommendations,
-    isGeneratingRecommendations = false, // Default to false
-    recommendationError,
-    initialData,
-    recommendations = [], // Default to empty array
-    onSelectRecommendation,
-    desiredCount = 5, // Default desired count if not provided
-    isStreaming = false
+    desiredCount = 6, // Default desired count
 }) => {
+    // Form input state
     const [newGoalTitle, setNewGoalTitle] = useState<string>('');
     const [newGoalDescription, setNewGoalDescription] = useState<string>('');
-    const [newGoalEstimate, setNewGoalEstimate] = useState<string>(''); // State for estimate (string for input)
+    const [newGoalEstimate, setNewGoalEstimate] = useState<string>('');
     const [isAdding, setIsAdding] = useState<boolean>(false);
-    const [error, setError] = useState<string | null>(null);
+    const [formError, setFormError] = useState<string | null>(null); // Renamed from error
 
-    // Effect to pre-fill form when initialData changes
+    // AI Recommendation State (Moved from parent)
+    const [isGenerating, setIsGenerating] = useState<boolean>(false);
+    const [recommendations, setRecommendations] = useState<GoalRecommendation[]>([]);
+    const [recommendationError, setRecommendationError] = useState<string | null>(null);
+    const [selectedRecommendation, setSelectedRecommendation] = useState<GoalRecommendation | null>(null); // Internal selection state
+    const [isStreaming, setIsStreaming] = useState<boolean>(false); // Combined generating/streaming state
+
+    // Refs (Moved from parent)
+    const eventSourceRef = useRef<EventSource | null>(null);
+    const receivedAnyGoalRef = useRef<boolean>(false);
+
+    // --- Cleanup Effect (Moved from parent) ---
     useEffect(() => {
-        if (initialData) {
-            setNewGoalTitle(initialData.title);
-            setNewGoalDescription(initialData.description);
-            // Ensure estimate is a string for the input field
-            setNewGoalEstimate(String(initialData.estimatedLessonCount));
-            setError(null); // Clear local form error when pre-filling
+        return () => {
+            if (eventSourceRef.current) {
+                console.log('[SSE AddGoalForm] Closing EventSource on component unmount.');
+                eventSourceRef.current.close();
+                eventSourceRef.current = null;
+            }
+        };
+    }, []);
+
+    // Effect to pre-fill form when selectedRecommendation changes
+    useEffect(() => {
+        if (selectedRecommendation) {
+            setNewGoalTitle(selectedRecommendation.title);
+            setNewGoalDescription(selectedRecommendation.description);
+            setNewGoalEstimate(String(selectedRecommendation.estimatedLessonCount));
+            setFormError(null); // Clear local form error when pre-filling
+        } else {
+            // Optionally clear form if selection is cleared (or keep values?)
+            // setNewGoalTitle('');
+            // setNewGoalDescription('');
+            // setNewGoalEstimate('');
         }
-        // Optionally, clear fields if initialData becomes null (e.g., deselecting)
-        // else {
-        //     setNewGoalTitle('');
-        //     setNewGoalDescription('');
-        //     setNewGoalEstimate('');
-        // }
-    }, [initialData]);
+    }, [selectedRecommendation]);
+
+    // --- AI Recommendation Logic (Moved from parent) ---
+    const handleGenerateRecommendations = useCallback(async () => {
+        if (!lessonId || isGenerating) return;
+
+        if (eventSourceRef.current) {
+            console.log('[SSE AddGoalForm] Closing existing EventSource before starting new one.');
+            eventSourceRef.current.close();
+        }
+
+        setIsGenerating(true);
+        setIsStreaming(true); // Start streaming indication
+        setRecommendationError(null);
+        setRecommendations([]);
+        setSelectedRecommendation(null);
+        receivedAnyGoalRef.current = false;
+
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+            console.error('[SSE AddGoalForm] Auth token not found.');
+            setRecommendationError('Authentication error.');
+            setIsGenerating(false);
+            setIsStreaming(false);
+            return;
+        }
+
+        const sseUrl = `/api/v1/goals/recommendations/stream?lessonId=${lessonId}&token=${encodeURIComponent(token)}`;
+
+        try {
+            const newEventSource = new EventSource(sseUrl);
+            eventSourceRef.current = newEventSource;
+
+            newEventSource.onmessage = (event) => {
+                receivedAnyGoalRef.current = true;
+                try {
+                    const data = JSON.parse(event.data);
+                    setRecommendations((prev) => [...prev, data as GoalRecommendation]);
+                } catch (e) {
+                    console.error("[SSE AddGoalForm] Error parsing message:", e);
+                }
+            };
+
+            newEventSource.addEventListener('done', () => {
+                console.log('[SSE AddGoalForm] Received done event.');
+                setIsGenerating(false);
+                setIsStreaming(false);
+                if (eventSourceRef.current) {
+                    eventSourceRef.current.close();
+                    eventSourceRef.current = null;
+                }
+            });
+
+            newEventSource.addEventListener('error', (event) => {
+                const alreadyReceived = receivedAnyGoalRef.current;
+
+                console.error('[SSE AddGoalForm] Received explicit error event:', event);
+                let msg = 'An error occurred during generation.';
+                try {
+                    if ((event as MessageEvent).data) {
+                        const errorData = JSON.parse((event as MessageEvent).data);
+                        msg = errorData?.message || msg;
+                    }
+                } catch (e) { /* Ignore parse error */ }
+
+                // Only set user-facing error if no data was received
+                if (!alreadyReceived) {
+                    setRecommendationError(msg);
+                } else {
+                    console.log('[SSE AddGoalForm] Explicit error event received after data. Suppressing user message.');
+                }
+
+                // Cleanup regardless
+                setIsGenerating(false);
+                setIsStreaming(false);
+                if (eventSourceRef.current) {
+                    eventSourceRef.current.close();
+                    eventSourceRef.current = null;
+                }
+            });
+
+            newEventSource.onerror = (event) => {
+                const alreadyReceived = receivedAnyGoalRef.current;
+                if (!eventSourceRef.current) return; // Already closed
+
+                eventSourceRef.current.close();
+                eventSourceRef.current = null;
+                setIsGenerating(false);
+                setIsStreaming(false);
+
+                if (!alreadyReceived) {
+                    console.error('[SSE AddGoalForm] Generic onerror before data:', event);
+                    setRecommendationError('Connection error.');
+                } else {
+                    console.log('[SSE AddGoalForm] Generic onerror after data (ignoring).');
+                }
+            };
+
+        } catch (error) {
+            console.error("[SSE AddGoalForm] Failed to create EventSource:", error);
+            setRecommendationError('Failed to connect.');
+            setIsGenerating(false);
+            setIsStreaming(false);
+        }
+    }, [lessonId, isGenerating]); // Dependencies
+
+    // --- Form Handlers --- 
+    const handleSelectRecommendation = (recommendation: GoalRecommendation | null) => {
+        setSelectedRecommendation(recommendation);
+    };
 
     // Helper to get badge color based on difficulty
     const getDifficultyBadgeClass = (level: string): string => {
@@ -83,22 +195,22 @@ const AddGoalForm: React.FC<AddGoalFormProps> = ({
 
     const handleAddGoal = async () => {
         if (!newGoalTitle.trim()) {
-            setError('Goal title cannot be empty.');
+            setFormError('Goal title cannot be empty.');
             return;
         }
         if (!newGoalDescription.trim()) {
-            setError('Goal description cannot be empty.');
+            setFormError('Goal description cannot be empty.');
             return;
         }
         // Validate and parse estimate
         const estimateNumber = parseInt(newGoalEstimate, 10);
         if (!newGoalEstimate || isNaN(estimateNumber) || estimateNumber <= 0) {
-            setError('Please enter a valid positive number for estimated lessons.');
+            setFormError('Please enter a valid positive number for estimated lessons.');
             return;
         }
 
         setIsAdding(true);
-        setError(null);
+        setFormError(null);
         try {
             // Pass estimateNumber to the API call
             const newGoal = await createGoal(lessonId, newGoalTitle, newGoalDescription, estimateNumber);
@@ -106,18 +218,13 @@ const AddGoalForm: React.FC<AddGoalFormProps> = ({
             setNewGoalTitle('');
             setNewGoalDescription('');
             setNewGoalEstimate(''); // Clear estimate input
-            setError(null);
+            setSelectedRecommendation(null); // Deselect recommendation after adding
+            setFormError(null);
         } catch (err) {
             console.error("Error adding goal:", err);
-            setError(err instanceof Error ? err.message : 'Failed to add goal.');
+            setFormError(err instanceof Error ? err.message : 'Failed to add goal.');
         } finally {
             setIsAdding(false);
-        }
-    };
-
-    const handleGenerateClick = () => {
-        if (onGenerateRecommendations) {
-            onGenerateRecommendations();
         }
     };
 
@@ -181,22 +288,20 @@ const AddGoalForm: React.FC<AddGoalFormProps> = ({
                     />
                 </div>
                 <div className="flex flex-wrap justify-end items-center gap-3">
-                    {onGenerateRecommendations && (
-                        <Button
-                            variant="accent"
-                            onClick={handleGenerateClick}
-                            disabled={isGeneratingRecommendations || isAdding}
-                            className="whitespace-nowrap"
-                            aria-label="Generate Goals with AI"
-                        >
-                            {isGeneratingRecommendations ? 'Generating...' : '✨ Generate Goals with AI'}
-                        </Button>
-                    )}
+                    <Button
+                        variant="accent"
+                        onClick={handleGenerateRecommendations}
+                        disabled={isGenerating || isAdding}
+                        className="whitespace-nowrap"
+                        aria-label="Generate Goals with AI"
+                    >
+                        {isGenerating ? 'Generating...' : '✨ Generate Goals with AI'}
+                    </Button>
                     <Button
                         id="add-goal-button"
                         variant="primary"
                         onClick={handleAddGoal}
-                        disabled={isAdding || !newGoalTitle.trim() || !newGoalDescription.trim() || !newGoalEstimate.trim()}
+                        disabled={isAdding || !newGoalTitle.trim() || !newGoalDescription.trim() || !newGoalEstimate.trim() || isGenerating}
                         className="whitespace-nowrap"
                     >
                         {isAdding ? 'Adding...' : 'Add Goal'}
@@ -216,15 +321,15 @@ const AddGoalForm: React.FC<AddGoalFormProps> = ({
                             <div
                                 key={index}
                                 className={`p-3 rounded-md border cursor-pointer transition-all 
-                                    ${initialData?.title === rec.title && initialData?.description === rec.description && initialData?.estimatedLessonCount == rec.estimatedLessonCount
+                                    ${selectedRecommendation === rec
                                         ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/[.3] dark:border-blue-700'
                                         : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-600 bg-white dark:bg-gray-800'
                                     }`}
-                                onClick={() => onSelectRecommendation && onSelectRecommendation(rec)}
+                                onClick={() => handleSelectRecommendation(rec)}
                                 role="button"
                                 tabIndex={0}
-                                onKeyDown={(e) => e.key === 'Enter' || e.key === ' ' ? (onSelectRecommendation && onSelectRecommendation(rec)) : null}
-                                aria-pressed={initialData?.title === rec.title}
+                                onKeyDown={(e) => e.key === 'Enter' || e.key === ' ' ? (handleSelectRecommendation(rec)) : null}
+                                aria-pressed={selectedRecommendation === rec}
                             >
                                 <div className="flex justify-between items-start mb-1">
                                     <h5 className="font-medium text-sm text-gray-900 dark:text-gray-100 mr-2">{rec.title}</h5>
@@ -246,7 +351,7 @@ const AddGoalForm: React.FC<AddGoalFormProps> = ({
                 </div>
             )}
 
-            {error && <p className="text-sm text-red-500 mt-2" role="alert">Error adding goal: {error}</p>}
+            {formError && <p className="text-sm text-red-500 mt-2" role="alert">Error adding goal: {formError}</p>}
             {recommendationError && <p className="text-sm text-orange-500 mt-2" role="alert">AI Error: {recommendationError}</p>}
         </Card>
     );

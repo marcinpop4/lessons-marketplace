@@ -1,6 +1,7 @@
 import { PrismaClient, Prisma, Lesson as PrismaLesson } from '@prisma/client';
 import { LessonStatus, LessonStatusValue, LessonStatusTransition } from '../../shared/models/LessonStatus.js';
 import { Lesson, DbLessonWithNestedRelations } from '../../shared/models/Lesson.js';
+import { LessonType } from '../../shared/models/LessonType.js';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../prisma.js';
 import { LessonMapper } from './lesson.mapper.js';
@@ -382,58 +383,70 @@ export class LessonService {
     }
 
     /**
-     * Get lessons by quote ID - DEPRECATED (use findLessons)
-     * Kept temporarily for reference if needed, should be removed.
-     * @param quoteId The ID of the quote
-     * @returns Array of shared Lesson model instances
+     * Finds all lessons associated with a specific student ID, optionally filtered by lesson type and status.
+     * @param studentId The ID of the student.
+     * @param lessonType Optional lesson type to filter by.
+     * @param statuses Optional array of lesson statuses to filter by.
+     * @returns A promise resolving to an array of Lesson shared models.
      */
-    /*
-    async getLessonsByQuoteId(quoteId: string): Promise<Lesson[]> {
-        try {
-            const lessonsData = await this.prisma.lesson.findMany({
-                where: { quoteId },
-                include: lessonIncludeForMapper
-            });
-            return lessonsData
-                .map(data => LessonMapper.toModel(data as unknown as DbLessonWithNestedRelations))
-                .filter((lesson): lesson is Lesson => lesson !== null);
-        } catch (error) {
-            console.error(`Error fetching lessons for quote ${quoteId}:`, error);
-            throw new AppError(`Failed to fetch lessons by quote: ${error instanceof Error ? error.message : 'Unknown error'}`, 500);
+    async findLessonsByStudentId(
+        studentId: string,
+        lessonType?: LessonType,
+        statuses?: LessonStatusValue[] // Add statuses parameter
+    ): Promise<Lesson[]> {
+        // --- Validation ---
+        if (!studentId || !isUuid(studentId)) {
+            throw new BadRequestError('Valid Student ID is required.');
         }
-    }
-    */
+        if (lessonType && !Object.values(LessonType).includes(lessonType)) {
+            throw new BadRequestError(`Invalid lesson type provided: ${lessonType}`);
+        }
+        // Basic validation for statuses array if provided
+        if (statuses && (!Array.isArray(statuses) || statuses.some(s => !Object.values(LessonStatusValue).includes(s)))) {
+            throw new BadRequestError('Invalid statuses array provided.');
+        }
+        // --- End Validation ---
 
-    /**
-    * Find all lessons associated with a specific teacher - DEPRECATED (use findLessons)
-    * Kept temporarily for reference if needed, should be removed.
-    */
-    /*
-    async findLessonsByTeacherId(teacherId: string): Promise<Lesson[]> {
-        if (!teacherId) {
-            throw new BadRequestError('Teacher ID is required to find lessons.');
-        }
         try {
-            const prismaLessons = await this.prisma.lesson.findMany({
-                where: {
-                    quote: { 
-                        teacherId: teacherId,
+            // Build the where clause dynamically
+            const whereClause: Prisma.LessonWhereInput = {
+                quote: {
+                    lessonRequest: {
+                        studentId: studentId
                     }
-                },
-                include: lessonIncludeForMapper
+                }
+            };
+
+            // Add lessonType filter if provided
+            if (lessonType && whereClause.quote?.lessonRequest) {
+                // Type assertion needed because Prisma types don't perfectly know the structure is there
+                (whereClause.quote.lessonRequest as Prisma.LessonRequestWhereInput).type = lessonType;
+            }
+
+            // Add status filtering if statuses array is provided and not empty
+            if (statuses && statuses.length > 0) {
+                whereClause.currentStatus = {
+                    status: {
+                        in: statuses,
+                    },
+                };
+            }
+
+            const lessonsData = await this.prisma.lesson.findMany({
+                where: whereClause, // Use dynamic where clause
+                include: lessonIncludeForMapper,
+                orderBy: { createdAt: 'desc' } // Optional: Add default ordering
             });
-            const sharedLessons = prismaLessons
+
+            // Map and filter nulls
+            return lessonsData
                 .map(lesson => LessonMapper.toModel(lesson as unknown as DbLessonWithNestedRelations))
                 .filter((lesson): lesson is Lesson => lesson !== null);
-
-            return sharedLessons;
         } catch (error) {
-            console.error(`Error finding lessons for teacher ${teacherId}:`, error);
-            throw new AppError('Failed to fetch lessons by teacher ID.', 500);
+            console.error(`Error fetching lessons for student ${studentId}:`, error);
+            throw new AppError(`Failed to fetch lessons by student: ${error instanceof Error ? error.message : 'Unknown error'}`, 500);
         }
     }
-    */
-
 }
 
 // Export singleton instance

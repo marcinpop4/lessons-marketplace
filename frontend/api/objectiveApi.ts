@@ -3,21 +3,36 @@ import { Objective } from '@shared/models/Objective.js';
 import { ObjectiveStatusValue } from '@shared/models/ObjectiveStatus.js';
 import { LessonType } from '@shared/models/LessonType.js';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api/v1';
-
 /**
- * Fetches all objectives for a given student.
+ * Fetches objectives for a specific student, optionally filtered by lesson type.
  */
-export const getStudentObjectives = async (studentId: string): Promise<Objective[]> => {
+export const getStudentObjectives = async (
+    studentId: string,
+    lessonType?: LessonType
+): Promise<Objective[]> => {
+    // Construct URLSearchParams for query parameters
+    const params = new URLSearchParams();
+    params.append('studentId', studentId);
+    if (lessonType) {
+        params.append('lessonType', lessonType);
+    }
+
+    const url = `/api/v1/objectives?${params.toString()}`;
+
     try {
-        const response = await axios.get(`${API_BASE_URL}/student/${studentId}/objectives`, {
-            withCredentials: true, // Send cookies if needed for auth
+        // Use axios with withCredentials, consistent with other functions
+        const response = await axios.get(url, {
+            withCredentials: true,
         });
-        // TODO: Add proper mapping/validation if the backend doesn't return Objective instances directly
+
+        // Assuming the API returns Objective[] directly
+        // TODO: Add proper mapping/validation if needed
         return response.data as Objective[];
+
     } catch (error: any) {
-        console.error('Error fetching student objectives:', error.response?.data || error.message);
-        throw new Error(error.response?.data?.message || 'Failed to fetch objectives');
+        // Log the error and re-throw a consistent error message
+        console.error('API Error fetching student objectives:', error.response?.data || error.message);
+        throw new Error(error.response?.data?.message || 'Failed to fetch student objectives');
     }
 };
 
@@ -32,7 +47,8 @@ export const createObjective = async (
     targetDate: Date
 ): Promise<Objective> => {
     try {
-        const response = await axios.post(`${API_BASE_URL}/student/${studentId}/objectives`, {
+        // Use relative path
+        const response = await axios.post(`/api/v1/objectives`, { // Use relative path, assuming POST /objectives handles studentId from auth
             title,
             description,
             lessonType,
@@ -53,7 +69,8 @@ export const createObjective = async (
  */
 export const abandonObjective = async (objectiveId: string): Promise<Objective> => {
     try {
-        const response = await axios.patch(`${API_BASE_URL}/objectives/${objectiveId}`, {
+        // Use relative path
+        const response = await axios.patch(`/api/v1/objectives/${objectiveId}`, {
             status: ObjectiveStatusValue.ABANDONED
         }, {
             withCredentials: true,
@@ -71,7 +88,8 @@ export const abandonObjective = async (objectiveId: string): Promise<Objective> 
  */
 export const achieveObjective = async (objectiveId: string): Promise<Objective> => {
     try {
-        const response = await axios.patch(`${API_BASE_URL}/objectives/${objectiveId}`, {
+        // Use relative path
+        const response = await axios.patch(`/api/v1/objectives/${objectiveId}`, {
             status: ObjectiveStatusValue.ACHIEVED
         }, {
             withCredentials: true,

@@ -24,6 +24,7 @@ const ObjectivesPage: React.FC = () => {
     const [isStreaming, setIsStreaming] = useState<boolean>(false);
     const [generationError, setGenerationError] = useState<string | null>(null);
     const eventSourceRef = useRef<EventSource | null>(null); // Ref to hold the EventSource instance
+    const receivedAnyMessageRef = useRef<boolean>(false); // Ref to track if any message was received
 
     // Renamed function for clarity, can be called to refetch
     const fetchAndGroupObjectives = async () => {
@@ -98,6 +99,7 @@ const ObjectivesPage: React.FC = () => {
         setGenerationError(null);
         setRecommendations([]); // Clear previous recommendations
         setSelectedRecommendation(null); // Clear selection
+        receivedAnyMessageRef.current = false; // Reset the flag
 
         // Close existing connection if any
         if (eventSourceRef.current) {
@@ -127,6 +129,7 @@ const ObjectivesPage: React.FC = () => {
 
             eventSource.onmessage = (event) => {
                 if (!eventSourceRef.current) return; // Check if closed during processing
+                receivedAnyMessageRef.current = true; // Mark that we received a message
                 try {
                     const newRecommendation = JSON.parse(event.data) as ObjectiveRecommendation;
                     console.log('[SSE] Received recommendation:', newRecommendation);
@@ -135,6 +138,7 @@ const ObjectivesPage: React.FC = () => {
                     console.error('[SSE] Error parsing message data:', e, event.data);
                     setGenerationError('Failed to parse recommendation data.');
                     if (eventSourceRef.current) eventSourceRef.current.close();
+                    eventSourceRef.current = null;
                     setIsStreaming(false); // Stop streaming state on parse error
                     setIsGenerating(false);
                 }
@@ -142,7 +146,12 @@ const ObjectivesPage: React.FC = () => {
 
             eventSource.onerror = (error) => {
                 console.error('[SSE] EventSource error:', error);
-                setGenerationError('Connection error occurred while streaming recommendations.');
+                // Only set the user-facing error if no recommendations were successfully received
+                if (!receivedAnyMessageRef.current) { // Check the ref instead of state
+                    setGenerationError('Connection error occurred while streaming recommendations.');
+                } else {
+                    console.warn('[SSE] EventSource error occurred after receiving recommendations. User message suppressed.');
+                }
                 if (eventSourceRef.current) eventSourceRef.current.close();
                 eventSourceRef.current = null; // Clear ref on error
                 setIsStreaming(false);
@@ -194,6 +203,7 @@ const ObjectivesPage: React.FC = () => {
                 onGenerateRecommendations={handleGenerateRecommendations}
                 isGeneratingRecommendations={isGenerating}
                 recommendationError={generationError}
+                setRecommendationError={setGenerationError}
                 initialData={selectedRecommendation} // Pass selected recommendation
                 recommendations={recommendations}
                 onSelectRecommendation={handleSelectRecommendation}
