@@ -36,7 +36,7 @@ import { lessonQuoteService } from '../lessonQuote/lessonQuote.service.js';
 import { lessonService } from '../lesson/lesson.service.js';
 import { teacherLessonHourlyRateService } from '../teacher-lesson-hourly-rate/teacherLessonHourlyRate.service.js';
 import { goalService } from '../goal/goal.service.js';
-import * as objectiveService from '../objective/objective.service.js'; // Added objectiveService
+import { objectiveService } from '../objective/objective.service.js'; // Changed import
 import authService from '../auth/auth.service.js'; // Default import
 import { utilService } from '../util/util.service.js'; // Import new util service
 import { SEED_USER_PASSWORD } from '../../tests/e2e/constants.js';
@@ -342,7 +342,7 @@ async function main() {
 
       try {
         await objectiveService.createObjective(
-          student,
+          student.id, // Pass the student ID, not the object
           objectiveTitle,
           objectiveDescription,
           lessonType,

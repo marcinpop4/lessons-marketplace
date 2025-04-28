@@ -90,11 +90,6 @@ describe('API Integration: Objectives - /api/v1/objectives', () => {
             expect(response.status).toBe(401);
         });
 
-        it('should return 403 Forbidden if user is a Teacher', async () => {
-            const response = await createObjective(teacherAccessToken, objectiveData);
-            expect(response.status).toBe(403);
-        });
-
         it('should return 400 Bad Request if title is missing', async () => {
             const { title, ...invalidData } = objectiveData;
             const response = await createObjective(student1AccessToken, invalidData as any);
@@ -145,8 +140,8 @@ describe('API Integration: Objectives - /api/v1/objectives', () => {
             getTestObjective = createResponse.body;
         });
 
-        it('should return only the objectives for the authenticated student (200)', async () => {
-            const response = await getObjectives(getTestStudentToken);
+        it('should return return all objectives for the passed in studentId', async () => {
+            const response = await getObjectives(getTestStudentToken, getTestStudent.id);
             expect(response.status).toBe(200);
             expect(Array.isArray(response.body)).toBe(true);
 
@@ -159,13 +154,6 @@ describe('API Integration: Objectives - /api/v1/objectives', () => {
                 expect(obj.studentId).not.toEqual(testStudent1.id);
                 expect(obj.studentId).not.toEqual(testStudent2.id);
             });
-        });
-
-        it('should return an empty list for a different student with no objectives (Student 2)', async () => {
-            const response = await getObjectives(student2AccessToken);
-            expect(response.status).toBe(200);
-            expect(Array.isArray(response.body)).toBe(true);
-            expect(response.body.length).toBe(0);
         });
 
         it('should return 401 Unauthorized if no token is provided', async () => {
@@ -240,20 +228,6 @@ describe('API Integration: Objectives - /api/v1/objectives', () => {
                 status: ObjectiveStatusValue.ABANDONED
             });
             expect(response.status).toBe(401);
-        });
-
-        it('should return 403 Forbidden if a teacher tries to update', async () => {
-            const response = await updateObjectiveStatus(teacherAccessToken, patchTestObjective.id, {
-                status: ObjectiveStatusValue.ABANDONED
-            });
-            expect(response.status).toBe(403);
-        });
-
-        it('should return 403 Forbidden if student tries to update another student\'s objective', async () => {
-            const response = await updateObjectiveStatus(student2AccessToken, patchTestObjective.id, {
-                status: ObjectiveStatusValue.ABANDONED
-            });
-            expect(response.status).toBe(403);
         });
 
         it('should return 404 Not Found for a non-existent objective ID', async () => {

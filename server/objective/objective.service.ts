@@ -94,6 +94,8 @@ const _parseAndValidateObjectiveRecommendations = (responseText: string | null |
 class ObjectiveService {
     // Use the shared prisma instance
     private readonly prisma = prisma;
+    // Initialize OpenAI client as a private instance member
+    private readonly openai = new OpenAI();
 
     /**
      * Fetches objectives for a specific student, optionally filtered by lesson type and status.
@@ -155,6 +157,18 @@ class ObjectiveService {
         if (!Object.values(LessonType).includes(lessonType)) {
             throw new BadRequestError(`Invalid lesson type: ${lessonType}`);
         }
+
+        // --- Date Validation --- 
+        const today = new Date();
+        // Compare dates only, ignoring time part for simplicity
+        today.setHours(0, 0, 0, 0);
+        const targetDateOnly = new Date(targetDate);
+        targetDateOnly.setHours(0, 0, 0, 0);
+
+        if (targetDateOnly < today) {
+            throw new BadRequestError('Target date cannot be in the past.');
+        }
+        // --- End Date Validation ---
 
         const newObjectiveResult = await this.prisma.$transaction(async (tx) => {
             const createdObjective = await tx.objective.create({
@@ -293,7 +307,7 @@ class ObjectiveService {
             );
 
             const aiStreamProvider = () => {
-                return openai.chat.completions.create({
+                return this.openai.chat.completions.create({
                     model: "gpt-3.5-turbo",
                     messages: [
                         { role: "system", content: systemPrompt },

@@ -49,9 +49,9 @@ export const createObjectiveUnauthenticated = (payload: CreateObjectivePayload):
  * @param token Raw JWT token.
  * @returns Supertest response promise.
  */
-export const getObjectives = (token: string): request.Test => {
+export const getObjectives = (token: string, studentId: string): request.Test => {
     return request(API_BASE_URL!)
-        .get('/api/v1/objectives')
+        .get(`/api/v1/objectives?studentId=${studentId}`)
         .set('Authorization', `Bearer ${token}`);
 };
 

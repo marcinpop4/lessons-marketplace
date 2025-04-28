@@ -27,15 +27,20 @@ const isValidObjectiveStatusValue = (status: any): status is ObjectiveStatusValu
 class ObjectiveController {
     /**
      * GET /api/v1/objectives
-     * Get objectives for a specific student, with optional filters.
+     * Get objectives for a specific student ID provided in the query.
+     * Assumes authentication middleware has run.
      */
     async getObjectives(req: Request, res: Response, next: NextFunction) {
+        // studentId is now REQUIRED from the query
         const { studentId, lessonType: lessonTypeQuery, status: statusQuery } = req.query as GetObjectivesQuery;
 
+        // --- Validation --- 
         if (!studentId || !isUuid(studentId)) {
             return next(new BadRequestError('Missing or invalid studentId query parameter.'));
         }
+        // Authentication is still assumed to be handled by middleware, but we don't use the authenticated user ID here.
 
+        // --- Filter Processing (remains the same) ---
         let lessonTypeFilter: LessonType | undefined = undefined;
         if (lessonTypeQuery) {
             if (isValidLessonType(lessonTypeQuery)) {
@@ -44,7 +49,6 @@ class ObjectiveController {
                 return next(new BadRequestError(`Invalid lessonType query parameter: ${lessonTypeQuery}.`));
             }
         }
-
         let statusFilter: ObjectiveStatusValue[] | undefined = undefined;
         if (statusQuery) {
             const statuses = statusQuery.split(',').map(s => s.trim()).filter(s => s);
@@ -55,7 +59,9 @@ class ObjectiveController {
             }
         }
 
+        // --- Service Call --- 
         try {
+            // Use the validated studentId from the query
             const objectives = await objectiveService.getObjectivesByStudentId(studentId, lessonTypeFilter, statusFilter);
             res.json(objectives);
         } catch (error) {

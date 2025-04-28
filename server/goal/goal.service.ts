@@ -1,11 +1,11 @@
-import { Prisma, Student as PrismaStudent, Goal as PrismaGoal } from '@prisma/client';
+import { Prisma, Student as PrismaStudent, Goal as PrismaGoal, PrismaClient } from '@prisma/client';
 import { Goal, DbGoalWithStatus } from '../../shared/models/Goal.js';
 import { GoalStatus, GoalStatusTransition, GoalStatusValue } from '../../shared/models/GoalStatus.js';
 import { Lesson, DbLessonWithNestedRelations } from '../../shared/models/Lesson.js';
 import { Student } from '../../shared/models/Student.js';
 import { randomUUID } from 'crypto';
 // import { AppError } from '../utils/AppError.js'; // Old import
-import { NotFoundError, BadRequestError, AuthorizationError } from '../errors/index.js';
+import { NotFoundError, BadRequestError, AuthorizationError, AppError } from '../errors/index.js';
 import OpenAI from 'openai';
 import { studentService } from '../student/student.service.js';
 import { lessonService } from '../lesson/lesson.service.js';
@@ -42,7 +42,12 @@ const openai = new OpenAI();
 /**
  * Service layer for handling Goal-related operations.
  */
-export const goalService = {
+class GoalService {
+    // Use shared prisma instance
+    private readonly prisma = prisma;
+    // Initialize OpenAI client as a private instance member
+    private readonly openai = new OpenAI();
+
     /**
      * Creates a new Goal for a given Lesson.
      * Requires the requesting user to be the Teacher of the lesson.
@@ -74,7 +79,7 @@ export const goalService = {
         // --- End Validation ---
 
         // Check if the lesson exists and get teacher ID for authorization
-        const lesson = await prisma.lesson.findUnique({
+        const lesson = await this.prisma.lesson.findUnique({
             where: { id: lessonId },
             select: { id: true, quote: { select: { teacherId: true } } }
         });
@@ -92,7 +97,7 @@ export const goalService = {
         const initialStatusId = randomUUID();
         const initialStatusValue = GoalStatusValue.CREATED;
 
-        await prisma.$transaction(async (tx) => {
+        await this.prisma.$transaction(async (tx) => {
             const newGoal = await tx.goal.create({
                 data: {
                     id: goalId,
@@ -117,7 +122,7 @@ export const goalService = {
         });
 
         // Fetch the complete goal with status AFTER the transaction
-        const createdGoalWithStatus = await prisma.goal.findUniqueOrThrow({
+        const createdGoalWithStatus = await this.prisma.goal.findUniqueOrThrow({
             where: { id: goalId },
             include: { currentStatus: true },
         });
@@ -126,7 +131,7 @@ export const goalService = {
         const goalModel = GoalMapper.toModel(createdGoalWithStatus as DbGoalWithStatus);
 
         return goalModel;
-    },
+    }
 
     /**
      * Updates the status of an existing Goal.
@@ -157,7 +162,7 @@ export const goalService = {
         // --- End Validation ---
 
         // Fetch the goal, including lesson teacher ID for authorization check
-        const goalData = await prisma.goal.findUnique({
+        const goalData = await this.prisma.goal.findUnique({
             where: { id: goalId },
             select: {
                 id: true,
@@ -180,7 +185,7 @@ export const goalService = {
             throw new AuthorizationError('User is not authorized to update the status of this goal.');
         }
 
-        await prisma.$transaction(async (tx) => {
+        await this.prisma.$transaction(async (tx) => {
             const currentGoal = await tx.goal.findUniqueOrThrow({ where: { id: goalId } });
 
             // Explicitly check if currentStatusId is null
@@ -220,7 +225,7 @@ export const goalService = {
         });
 
         // Fetch the complete goal with status AFTER the transaction
-        const updatedGoalWithStatus = await prisma.goal.findUniqueOrThrow({
+        const updatedGoalWithStatus = await this.prisma.goal.findUniqueOrThrow({
             where: { id: goalId },
             include: { currentStatus: true },
         });
@@ -229,7 +234,7 @@ export const goalService = {
         const goalModel = GoalMapper.toModel(updatedGoalWithStatus as DbGoalWithStatus);
 
         return goalModel;
-    },
+    }
 
     /**
      * Retrieves a Goal by its ID, ensuring the requesting user is authorized.
@@ -250,7 +255,7 @@ export const goalService = {
         }
         // --- End Validation ---
 
-        const goalData = await prisma.goal.findUnique({
+        const goalData = await this.prisma.goal.findUnique({
             where: { id: goalId },
             include: {
                 currentStatus: true, // Ensure status is included
@@ -287,7 +292,7 @@ export const goalService = {
 
         // Use the factory method
         return GoalMapper.toModel(goalData as DbGoalWithStatus);
-    },
+    }
 
     /**
      * Retrieves all Goals for a specific Lesson, checking authorization.
@@ -310,7 +315,7 @@ export const goalService = {
         // --- End Validation ---
 
         // Fetch the lesson and include related IDs needed for authorization
-        const lesson = await prisma.lesson.findUnique({
+        const lesson = await this.prisma.lesson.findUnique({
             where: { id: lessonId },
             select: {
                 id: true,
@@ -340,7 +345,7 @@ export const goalService = {
         }
 
         // Fetch goals if authorized
-        const goalsData = await prisma.goal.findMany({
+        const goalsData = await this.prisma.goal.findMany({
             where: { lessonId: lessonId },
             orderBy: { createdAt: 'asc' },
             include: {
@@ -350,7 +355,7 @@ export const goalService = {
 
         // Use the mapper
         return goalsData.map(goalData => GoalMapper.toModel(goalData as DbGoalWithStatus));
-    },
+    }
 
     /**
      * Counts the number of Goals for a specific Lesson.
@@ -359,16 +364,16 @@ export const goalService = {
      */
     async getGoalCountByLessonId(lessonId: string): Promise<number> {
         try {
-            const count = await prisma.goal.count({
+            const count = await this.prisma.goal.count({
                 where: { lessonId: lessonId },
             });
             return count;
         } catch (error) {
             console.error(`Error counting goals for lesson ${lessonId}:`, error);
             // Consider specific error handling or re-throwing
-            throw new Error(`Failed to count goals: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            throw new AppError(`Failed to count goals: ${error instanceof Error ? error.message : 'Unknown error'}`, 500);
         }
-    },
+    }
 
     // === Private Helper Methods ===
 
@@ -419,7 +424,7 @@ export const goalService = {
         ]);
 
         return { student, currentLesson, pastLessons, currentLessonGoals, studentObjectives };
-    },
+    }
 
     /** Prepares the system and user prompts for the OpenAI API call. */
     _prepareOpenAiPrompts(
@@ -445,18 +450,18 @@ export const goalService = {
         const userPrompt = `Please generate ${DEFAULT_GOAL_RECOMMENDATION_COUNT} goals for the student based on this context:\n${studentInfo}\n${lessonInfo}\n${currentGoalsInfo}\n${studentObjectivesInfo}\n${pastLessonsInfo}\n\nGenerate ONLY the JSON array.`;
 
         return { systemPrompt, userPrompt };
-    },
+    }
 
     /** Parses the raw OpenAI response string, validates, and returns GoalRecommendation instances. */
     _parseAndValidateRecommendations(responseText: string | null | undefined): GoalRecommendation[] {
         if (!responseText) {
-            throw new Error('No response content received from OpenAI.');
+            throw new AppError('No response content received from OpenAI.', 500);
         }
         try {
             const parsedResponse = JSON.parse(responseText);
             if (!Array.isArray(parsedResponse)) {
                 console.error('OpenAI response is not an array:', parsedResponse);
-                throw new Error('Invalid format for goal recommendations from OpenAI: expected an array.');
+                throw new AppError('Invalid format for goal recommendations from OpenAI: expected an array.', 500);
             }
 
             const recommendations = parsedResponse.map(item => {
@@ -475,9 +480,9 @@ export const goalService = {
         } catch (parseError) {
             console.error('Error parsing OpenAI JSON response:', parseError);
             console.error('Raw OpenAI response was:', responseText);
-            throw new Error('Failed to parse goal recommendations from OpenAI response');
+            throw new AppError('Failed to parse goal recommendations from OpenAI response', 500);
         }
-    },
+    }
 
     /**
      * Generates goal recommendations (non-streaming version).
@@ -497,7 +502,7 @@ export const goalService = {
         );
 
         try {
-            const completion = await openai.chat.completions.create({
+            const completion = await this.openai.chat.completions.create({
                 model: "gpt-3.5-turbo",
                 messages: [
                     { role: "system", content: systemPrompt },
@@ -511,9 +516,9 @@ export const goalService = {
 
         } catch (error: any) {
             console.error('Error generating goal recommendations from OpenAI:', error);
-            throw new Error(`AI recommendation generation failed: ${error.message}`);
+            throw new AppError(`AI recommendation generation failed: ${error.message}`, 500);
         }
-    },
+    }
 
     /**
      * Async generator function that prepares and utilizes the AI stream logging utility.
@@ -546,7 +551,7 @@ export const goalService = {
 
             // Define the provider function *after* prompts are ready
             const aiStreamProvider = () => {
-                return openai.chat.completions.create({
+                return this.openai.chat.completions.create({
                     model: "gpt-3.5-turbo",
                     messages: [
                         { role: "system", content: systemPrompt },
@@ -629,7 +634,7 @@ export const goalService = {
         }
 
         return invokeUtility();
-    },
+    }
 
     /**
      * Public method to initiate streaming goal recommendations.
@@ -659,5 +664,8 @@ export const goalService = {
         await streamJsonResponse(res, generator, (error) => {
             console.error(`[Goal Service] Error during goal recommendation streaming for lesson ${lessonId}:`, error);
         });
-    },
-}; 
+    }
+}
+
+// Export singleton instance
+export const goalService = new GoalService(); 
