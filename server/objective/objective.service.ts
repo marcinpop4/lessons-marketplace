@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma, Objective as PrismaObjective } from '@prisma/client';
+import { PrismaClient, Prisma, Objective as PrismaObjective, Student } from '@prisma/client';
 import { Objective } from '@shared/models/Objective.js';
 import { ObjectiveStatus, ObjectiveStatusValue, ObjectiveStatusTransition } from '@shared/models/ObjectiveStatus.js';
 import { LessonType } from '@shared/models/LessonType.js';
@@ -61,7 +61,7 @@ export const createObjective = async (
     targetDate: Date
 ): Promise<Objective> => {
     // Validate input
-    if (!title || !description || !lessonType || !targetDate) {
+    if (!studentId || !title || !description || !lessonType || !targetDate) {
         throw new BadRequestError('Missing required fields for objective creation.');
     }
     if (!Object.values(LessonType).includes(lessonType)) {
@@ -77,7 +77,6 @@ export const createObjective = async (
                 description: description,
                 lessonType: lessonType,
                 targetDate: targetDate,
-                // currentStatusId and statuses omitted for now
             },
         });
 

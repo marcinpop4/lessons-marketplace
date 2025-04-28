@@ -91,7 +91,7 @@ import healthRoutes from './health/health.routes.js';
 import studentRoutes from './student/student.routes.js';
 import goalRoutes from './goal/goal.routes.js';
 import teacherLessonHourlyRateRoutes from './teacher-lesson-hourly-rate/teacherLessonHourlyRate.router.js';
-import objectiveRouter from './objective/objective.router.js';
+import objectiveRoutes from './objective/objective.routes.js';
 
 // --- Express App Setup --- 
 const app: Express = express();
@@ -145,7 +145,7 @@ app.use('/api/v1/goals', goalRoutes);
 app.use('/api/v1/health', healthRoutes);
 app.use('/api/v1/students', studentRoutes);
 app.use('/api/v1/teacher-lesson-rates', teacherLessonHourlyRateRoutes);
-app.use('/api/v1/objectives', objectiveRouter);
+app.use('/api/v1/objectives', objectiveRoutes);
 
 // --- Error Handling --- 
 app.use((err: Error | any, req: Request, res: Response, next: NextFunction) => {

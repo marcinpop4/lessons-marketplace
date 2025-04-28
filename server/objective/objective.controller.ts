@@ -58,7 +58,8 @@ class ObjectiveController {
         const { title, description, lessonType, targetDate } = req.body;
 
         if (!studentId) {
-            return next(new Error('Authentication required: User ID not found for objective creation.'));
+            // Use next for consistent error handling
+            return next(new AuthorizationError('Authentication required: User ID not found for objective creation.'));
         }
 
         // Basic validation
@@ -83,7 +84,7 @@ class ObjectiveController {
         }
 
         try {
-            // Pass the authenticated studentId to the service
+            // Pass the studentId directly to the service (which now accepts it)
             const newObjective = await ObjectiveService.createObjective(
                 studentId,
                 title,

@@ -1,4 +1,3 @@
-
 type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
 
 /**
@@ -172,7 +171,7 @@ export class ObjectiveStatus {
      */
     static getDisplayLabelForStatus(status: ObjectiveStatusValue): string {
         switch (status) {
-            case ObjectiveStatusValue.CREATED: return 'Not Started';
+            case ObjectiveStatusValue.CREATED: return 'Created';
             case ObjectiveStatusValue.IN_PROGRESS: return 'In Progress';
             case ObjectiveStatusValue.ACHIEVED: return 'Achieved';
             case ObjectiveStatusValue.ABANDONED: return 'Abandoned';

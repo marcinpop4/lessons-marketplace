@@ -12,6 +12,7 @@ import ThemeDemoPage from '@frontend/pages/common/theme-demo';
 import LessonRequestPage from '@frontend/pages/student/lesson-request';
 import TeacherQuotesPage from '@frontend/pages/student/teacher-quotes';
 import LessonConfirmation from '@frontend/pages/student/lesson-confirmation';
+import ObjectivesPage from '@frontend/pages/student/objective/ObjectivesPage';
 
 // Teacher Pages
 import TeacherProfilePage from '@frontend/pages/teacher/profile'; // Renamed from TeacherDashboard
@@ -125,6 +126,10 @@ const AppRoutes: React.FC = () => {
             <Route
               path="lesson-confirmation/:lessonId"
               element={<LessonConfirmation />} // Keep this under student?
+            />
+            <Route
+              path="objectives"
+              element={<ObjectivesPage />}
             />
           </Route>
 

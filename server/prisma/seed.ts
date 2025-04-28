@@ -36,6 +36,7 @@ import { lessonQuoteService } from '../lessonQuote/lessonQuote.service.js';
 import { lessonService } from '../lesson/lesson.service.js';
 import { teacherLessonHourlyRateService } from '../teacher-lesson-hourly-rate/teacherLessonHourlyRate.service.js';
 import { goalService } from '../goal/goal.service.js';
+import * as objectiveService from '../objective/objective.service.js'; // Added objectiveService
 import authService from '../auth/auth.service.js'; // Default import
 import { utilService } from '../util/util.service.js'; // Import new util service
 import { SEED_USER_PASSWORD } from '../../tests/e2e/constants.js';
@@ -323,6 +324,37 @@ async function main() {
       }
     }
     console.log(chalk.green(`✓ ${goalsCreatedCount} Goals created.`)); // Summary log
+
+    // 8. Create Objectives for Students (One per LessonType)
+    let objectivesCreatedCount = 0;
+    // Use the explicitly typed array for iteration
+    for (let i = 0; i < ALL_LESSON_TYPES.length; i++) {
+      const lessonType = ALL_LESSON_TYPES[i]; // Directly use the enum member
+
+      // Assign objectives round-robin to students
+      const student = students[i % students.length];
+
+
+      const targetDate = addToDate(today, 30 * (i + 1), 0); // Target date 1-4 months in the future
+      // Format title/description from the enum value (which is a string)
+      const objectiveTitle = `Learn ${lessonType.charAt(0) + lessonType.slice(1).toLowerCase()} Basics`;
+      const objectiveDescription = `Develop foundational skills in ${lessonType.toLowerCase()}.`;
+
+      try {
+        await objectiveService.createObjective(
+          student,
+          objectiveTitle,
+          objectiveDescription,
+          lessonType,
+          targetDate
+        );
+        objectivesCreatedCount++;
+        // console.log(`  Created ${lessonType} objective for student ${student.id.substring(0, 8)}.`); // Internal log
+      } catch (objectiveError) {
+        console.error(chalk.red(`Failed to create objective for student ${student.id}, type ${lessonType}:`), objectiveError);
+      }
+    }
+    console.log(chalk.green(`✓ ${objectivesCreatedCount} Objectives created.`)); // Summary log
 
 
   } catch (e) { // Ensure catch block exists
