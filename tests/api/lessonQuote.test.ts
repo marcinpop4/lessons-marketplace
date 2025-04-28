@@ -39,6 +39,8 @@ describe('API Integration: /api/v1/lesson-quotes', () => {
     let studentAuthToken: string | null = null;
     let teacherAuthToken: string | null = null;
     let teacherId: string | null = null;
+    let teacher2AuthToken: string | null = null;
+    let teacher2Id: string | null = null;
     let studentId: string | null = null;
     // Variable populated by outer beforeEach
     let createdLessonRequestId: string | null = null;
@@ -56,6 +58,13 @@ describe('API Integration: /api/v1/lesson-quotes', () => {
             ]);
             teacherId = teacher.id;
             teacherAuthToken = await loginTestUser(teacher.email, teacherPassword, UserType.TEACHER);
+
+            // Create a second teacher with a GUITAR rate
+            const { user: teacher2, password: teacher2Password } = await createTestTeacher([
+                { lessonType: LessonType.GUITAR, rateInCents: 4700 } // Different rate for variety
+            ]);
+            teacher2Id = teacher2.id;
+            teacher2AuthToken = await loginTestUser(teacher2.email, teacher2Password, UserType.TEACHER);
 
         } catch (error) {
             console.error('[Test Setup] Error in outer beforeAll for lessonQuote.test.ts:', error);
@@ -92,78 +101,105 @@ describe('API Integration: /api/v1/lesson-quotes', () => {
 
     describe('POST /', () => {
         // Payload for generating quotes
-        const validQuotePayload = {
-            lessonRequestId: '', // Will be set dynamically
-            lessonType: LessonType.GUITAR // Use a default type, or get from request
+        // Define base structure, specific tests will modify/use it
+        let basePayload: { lessonRequestId: string | null; teacherIds?: string[] } = {
+            lessonRequestId: null
         };
 
         beforeEach(() => {
-            if (createdLessonRequestId) {
-                validQuotePayload.lessonRequestId = createdLessonRequestId;
-                // TODO: Ideally, fetch the actual LessonRequest and get its type
-                // For now, assume GUITAR matches the one created in outer beforeEach
-                validQuotePayload.lessonType = LessonType.GUITAR;
-            }
+            // Reset payload before each test within this describe block
+            basePayload = { lessonRequestId: createdLessonRequestId };
         });
 
+        it('should generate quotes for available teachers when no teacherIds are provided', async () => {
+            if (!studentAuthToken) throw new Error('Student token not available');
+            if (!basePayload.lessonRequestId) throw new Error('Lesson Request ID not set in beforeEach');
+
+            // Use the base payload (only lessonRequestId)
+            const response = await createQuote(studentAuthToken, basePayload as { lessonRequestId: string });
+
+            expect(response.status).toBe(201);
+            expect(Array.isArray(response.body)).toBe(true);
+            expect(response.body.length).toBeGreaterThanOrEqual(1); // Expect at least one quote
+            // Ensure the quotes are for the correct request
+            expect(response.body[0].lessonRequest?.id).toEqual(basePayload.lessonRequestId);
+            // We can't know *which* teacher quoted, but check structure
+            expect(response.body[0].teacher?.id).toBeDefined();
+            expect(response.body[0].currentStatus?.status).toEqual(LessonQuoteStatusValue.CREATED);
+        }, 20000); // Keep timeout from original test
+
+        it('should generate quotes ONLY for specified teachers when teacherIds are provided', async () => {
+            if (!studentAuthToken || !teacherId || !teacher2Id) throw new Error('Test setup vars missing');
+            if (!basePayload.lessonRequestId) throw new Error('Lesson Request ID not set in beforeEach');
+
+            const payload = { ...basePayload, teacherIds: [teacherId, teacher2Id] };
+            const response = await createQuote(studentAuthToken, payload as { lessonRequestId: string; teacherIds: string[] });
+
+            expect(response.status).toBe(201);
+            expect(Array.isArray(response.body)).toBe(true);
+            expect(response.body.length).toBe(2); // Expect exactly two quotes
+
+            const receivedTeacherIds = response.body.map((q: LessonQuote) => q.teacher?.id);
+            expect(receivedTeacherIds).toHaveLength(2);
+            expect(receivedTeacherIds).toContain(teacherId);
+            expect(receivedTeacherIds).toContain(teacher2Id);
+        });
+
+        it('should return 400 Bad Request if teacherIds is not an array', async () => {
+            if (!studentAuthToken) throw new Error('Student token not available');
+            const payload = { ...basePayload, teacherIds: 'not-an-array' };
+            // Use raw patch utility or direct request as createQuote expects specific type
+            const response = await request(API_BASE_URL!)
+                .post('/api/v1/lesson-quotes')
+                .set('Authorization', `Bearer ${studentAuthToken}`)
+                .send(payload);
+
+            expect(response.status).toBe(400);
+            expect(response.body.error).toContain('teacherIds must be an array if provided');
+        });
+
+        it('should return 400 Bad Request if teacherIds contains invalid UUIDs', async () => {
+            if (!studentAuthToken) throw new Error('Student token not available');
+            const payload = { ...basePayload, teacherIds: [teacherId!, 'invalid-uuid'] };
+            const response = await createQuote(studentAuthToken, payload as { lessonRequestId: string; teacherIds: string[] });
+
+            expect(response.status).toBe(400);
+            expect(response.body.error).toContain('Invalid Teacher UUIDs provided');
+        });
+
+        it('should return 400 Bad Request if teacherIds is an empty array', async () => {
+            if (!studentAuthToken) throw new Error('Student token not available');
+            const payload = { ...basePayload, teacherIds: [] };
+            const response = await createQuote(studentAuthToken, payload as { lessonRequestId: string; teacherIds: string[] });
+
+            expect(response.status).toBe(400);
+            expect(response.body.error).toContain('teacherIds cannot be an empty array');
+        });
+
+        // --- Keep existing tests --- 
         it('should return 401 Unauthorized if no token is provided', async () => {
-            // Use util
-            const response = await createQuoteUnauthenticated(validQuotePayload);
+            const response = await createQuoteUnauthenticated(basePayload as { lessonRequestId: string });
             expect(response.status).toBe(401);
         });
 
-        it('should generate quotes for the lesson request when called by STUDENT (201 Created)', async () => {
-            if (!studentAuthToken || !createdLessonRequestId) throw new Error('Student token or Lesson Request ID not available');
-
-            // Use the lower-level util for the core request (Student generates)
-            const response = await createQuote(studentAuthToken, validQuotePayload);
-
-            // Assertions on the response
-            expect(response.status).toBe(201);
-            expect(Array.isArray(response.body)).toBe(true);
-            // We can't guarantee how many quotes are generated, but expect at least one if a teacher is available
-            // Check if the array is not empty (assuming setup guarantees at least one teacher)
-            expect(response.body.length).toBeGreaterThanOrEqual(1);
-
-            const quote: LessonQuote = response.body[0]; // Check the first quote
-            expect(quote.id).toBeDefined();
-            expect(quote.lessonRequest?.id).toEqual(createdLessonRequestId);
-            // Teacher ID will vary based on which teacher was available
-            expect(quote.teacher?.id).toBeDefined();
-            expect(quote.costInCents).toBeDefined(); // Cost is calculated by backend
-            expect(quote.hourlyRateInCents).toBeDefined(); // Rate is set by backend
-            expect(quote.createdAt).toBeDefined();
-            expect(quote.currentStatus?.status).toEqual(LessonQuoteStatusValue.CREATED);
-        }, 20000);
-
         it('should return 403 Forbidden if requested by a Teacher', async () => {
-            if (!teacherAuthToken || !createdLessonRequestId) throw new Error('Teacher token or Lesson Request ID not available');
-            // Teacher tries to generate quotes
-            const response = await createQuote(teacherAuthToken, validQuotePayload);
+            if (!teacherAuthToken) throw new Error('Teacher token not available');
+            const response = await createQuote(teacherAuthToken, basePayload as { lessonRequestId: string });
             expect(response.status).toBe(403);
         });
 
         it('should return 400 Bad Request if lessonRequestId is missing', async () => {
             if (!studentAuthToken) throw new Error('Student token not available');
-            const { lessonRequestId, ...invalidPayload } = validQuotePayload;
+            const { lessonRequestId, ...invalidPayload } = basePayload;
             const response = await createQuote(studentAuthToken, invalidPayload as any);
             expect(response.status).toBe(400);
             expect(response.body.error).toContain('Valid Lesson Request ID is required.');
         });
 
-        it('should return 400 Bad Request if lessonType is missing', async () => {
-            if (!studentAuthToken) throw new Error('Student token not available');
-            const { lessonType, ...invalidPayload } = validQuotePayload;
-            const response = await createQuote(studentAuthToken, invalidPayload as any);
-            expect(response.status).toBe(400);
-            expect(response.body.error).toContain('Invalid lesson type provided');
-        });
-
         it('should return 404 Not Found if lesson request ID does not exist', async () => {
             if (!studentAuthToken) throw new Error('Student token not available');
             const fakeRequestId = uuidv4();
-            // Use util
-            const response = await createQuote(studentAuthToken, { ...validQuotePayload, lessonRequestId: fakeRequestId });
+            const response = await createQuote(studentAuthToken, { lessonRequestId: fakeRequestId });
             expect(response.status).toBe(404);
         });
     });
@@ -175,10 +211,14 @@ describe('API Integration: /api/v1/lesson-quotes', () => {
             if (!studentAuthToken || !createdLessonRequestId) {
                 throw new Error('Setup failed: Student token or Lesson Request ID missing for GET suite beforeEach');
             }
-            // This should now work as the teacher created in the outer beforeEach has a GUITAR rate
+            // Ensure teacherId from outer scope is available
+            if (!teacherId) {
+                throw new Error('Setup failed: teacherId not available for GET suite beforeEach');
+            }
+            // This should now work as the teacher created in the outer beforeAll has a GUITAR rate
             const quotes = await createTestLessonQuote(studentAuthToken, {
                 lessonRequestId: createdLessonRequestId,
-                lessonType: LessonType.GUITAR
+                teacherIds: [teacherId]
             });
             if (!quotes || quotes.length === 0) {
                 throw new Error('GET suite beforeEach: Failed to generate quotes.');
@@ -267,7 +307,7 @@ describe('API Integration: /api/v1/lesson-quotes', () => {
 
                 const quotes = await createTestLessonQuote(patchStudentToken, {
                     lessonRequestId: patchLessonRequestId,
-                    lessonType: LessonType.VOICE
+                    teacherIds: [patchTeacherId]
                 });
 
                 if (!quotes || quotes.length === 0) {

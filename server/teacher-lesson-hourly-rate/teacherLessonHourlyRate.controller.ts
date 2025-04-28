@@ -53,14 +53,14 @@ export const teacherLessonHourlyRateController = {
 
     /**
      * Update the status of a lesson hourly rate (e.g., ACTIVE/INACTIVE).
+     * Expects the transition (ACTIVATE/DEACTIVATE) in the request body.
      */
     updateStatus: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const teacherId = req.user?.id;
-            // Get ID from req.params.id now
-            const { id: rateId } = req.params;
-            // Expect target status in the body
-            const { status: targetStatus, context } = req.body;
+            const { id: rateId } = req.params; // Get rate ID from URL parameter
+            // Expect the transition directly in the body now
+            const { transition, context } = req.body;
 
             if (!teacherId) {
                 res.status(401).json({ message: 'Unauthorized' });
@@ -72,41 +72,16 @@ export const teacherLessonHourlyRateController = {
                 throw new BadRequestError('Invalid or missing rate ID format in URL. Must be a valid UUID.');
             }
 
-            // Validate targetStatus value
-            if (!targetStatus || !Object.values(TeacherLessonHourlyRateStatusValue).includes(targetStatus)) {
-                throw new BadRequestError(`Invalid or missing target status. Must be one of: ${Object.values(TeacherLessonHourlyRateStatusValue).join(', ')}`);
+            // Validate the received transition
+            if (!transition || !Object.values(TeacherLessonHourlyRateStatusTransition).includes(transition)) {
+                throw new BadRequestError(`Invalid or missing transition. Must be one of: ${Object.values(TeacherLessonHourlyRateStatusTransition).join(', ')}`);
             }
 
-            // --- Determine required transition --- 
-            // Fetch current rate to determine transition needed
-            // Note: This adds an extra DB call, but keeps transition logic in service
-            const currentRate = await teacherLessonHourlyRateService.findRateById(teacherId, rateId);
-            if (!currentRate) {
-                throw new NotFoundError('Lesson rate not found or access denied.');
-            }
-
-            let requiredTransition: TeacherLessonHourlyRateStatusTransition | null = null;
-            const currentStatus = currentRate.currentStatus?.status;
-
-            if (targetStatus === TeacherLessonHourlyRateStatusValue.ACTIVE && currentStatus !== TeacherLessonHourlyRateStatusValue.ACTIVE) {
-                requiredTransition = TeacherLessonHourlyRateStatusTransition.ACTIVATE;
-            } else if (targetStatus === TeacherLessonHourlyRateStatusValue.INACTIVE && currentStatus === TeacherLessonHourlyRateStatusValue.ACTIVE) {
-                requiredTransition = TeacherLessonHourlyRateStatusTransition.DEACTIVATE;
-            }
-
-            // If no transition is needed (already in target state), maybe return current rate or 204?
-            // For now, throw error if transition is invalid/not needed
-            if (requiredTransition === null) {
-                // Consider if just returning 200/204 is better if already in the target state
-                throw new BadRequestError(`Rate is already ${targetStatus} or cannot transition directly.`);
-            }
-            // --- End Transition Determination ---
-
-            // Call the service method with the determined transition
+            // Call the service method directly with the provided transition
             const updatedRate = await teacherLessonHourlyRateService.updateLessonRateStatus(
                 teacherId,
                 rateId,
-                requiredTransition, // Use the determined transition
+                transition, // Use the transition directly from the request body
                 context // Pass context along if provided
             );
 

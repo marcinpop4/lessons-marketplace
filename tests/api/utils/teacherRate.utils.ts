@@ -62,7 +62,7 @@ export async function updateTestRateStatus(
     context?: any
 ): Promise<TeacherLessonHourlyRate> {
     const response = await request(API_BASE_URL!)
-        .patch(`/api/v1/teacher-lesson-rates/${rateId}/status`)
+        .patch(`/api/v1/teacher-lesson-rates/${rateId}`)
         .set('Authorization', authToken)
         .send({ transition, context });
 

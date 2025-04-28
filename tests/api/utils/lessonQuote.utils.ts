@@ -11,18 +11,20 @@ if (!API_BASE_URL) {
 }
 
 // Updated interface for creating quotes (via generate endpoint)
+// Now accepts optional teacherIds instead of lessonType
 interface CreateQuoteData {
     lessonRequestId: string;
-    lessonType: LessonType;
+    teacherIds?: string[]; // Optional array of teacher UUIDs
 }
 
 /**
  * Creates (generates) test lesson quotes using the API.
  * Requires the student's authentication token.
- * The API will find available teachers and generate quotes for them.
+ * If teacherIds are provided, quotes are generated ONLY for those teachers.
+ * If teacherIds is omitted, the API finds available teachers and generates quotes.
  *
  * @param studentToken - The Bearer token for the student.
- * @param quoteData - Data for generating quotes (lessonRequestId, lessonType).
+ * @param quoteData - Data for generating quotes { lessonRequestId, teacherIds? }.
  * @returns An array of the created LessonQuote objects.
  */
 export const createTestLessonQuote = async (studentToken: string, quoteData: CreateQuoteData): Promise<LessonQuote[]> => {
@@ -30,10 +32,18 @@ export const createTestLessonQuote = async (studentToken: string, quoteData: Cre
         studentToken = `Bearer ${studentToken}`;
     }
 
+    // Construct payload, including teacherIds only if present and not empty
+    const payload: { lessonRequestId: string; teacherIds?: string[] } = {
+        lessonRequestId: quoteData.lessonRequestId
+    };
+    if (quoteData.teacherIds && quoteData.teacherIds.length > 0) {
+        payload.teacherIds = quoteData.teacherIds;
+    }
+
     const response = await request(API_BASE_URL!)
         .post('/api/v1/lesson-quotes')
         .set('Authorization', studentToken)
-        .send(quoteData);
+        .send(payload); // Send the potentially modified payload
 
     if (response.status !== 201) {
         console.error('Failed to create/generate test lesson quotes via util:', response.status, response.body);
@@ -87,9 +97,11 @@ export const acceptTestLessonQuote = async (studentToken: string, quoteId: strin
 // --- POST /lesson-quotes ---
 
 // Updated payload for generating quotes
+// Mirroring the structure used in createTestLessonQuote utility
 interface CreateQuotePayload {
     lessonRequestId: string;
-    lessonType: LessonType;
+    teacherIds?: string[]; // Optional array of teacher UUIDs
+    // lessonType: LessonType; // Removed lessonType
 }
 
 /**

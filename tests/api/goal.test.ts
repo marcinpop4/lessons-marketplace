@@ -62,11 +62,10 @@ describe('API Integration: /api/v1/goals', () => {
                 60
             );
 
-            // 4. Create Lesson Quote (Generate - Student)
-            const lessonType = lessonRequest.type;
+            // 4. Create Lesson Quote (Generate - Student for specific teacher)
             const createdQuotes = await createTestLessonQuote(studentAuthToken, {
                 lessonRequestId: lessonRequest.id,
-                lessonType: lessonType,
+                teacherIds: [teacherId] // Specify the teacher ID
             });
 
             // Expect at least one quote to be generated
@@ -233,7 +232,7 @@ describe('API Integration: /api/v1/goals', () => {
             // Generate quote (Student)
             const otherQuotes = await createTestLessonQuote(studentAuthToken, {
                 lessonRequestId: otherLessonRequest.id,
-                lessonType: LessonType.VOICE
+                teacherIds: [otherTeacher.id] // Specify the other teacher
             });
             if (!otherQuotes || otherQuotes.length === 0) {
                 throw new Error('No quotes generated for other teacher test.');
@@ -330,16 +329,17 @@ describe('API Integration: /api/v1/goals', () => {
             const otherTeacherToken = await loginTestUser(otherTeacher.email, otherPassword, UserType.TEACHER);
             const newLessonRequest = await createTestLessonRequest(studentAuthToken, studentId, LessonType.BASS);
 
-            // Generate quote (Student) - Should now find otherTeacher
+            // Generate quote (Student for otherTeacher)
             const newQuotes = await createTestLessonQuote(studentAuthToken, {
                 lessonRequestId: newLessonRequest.id,
-                lessonType: LessonType.BASS // Use correct payload
+                teacherIds: [otherTeacher.id] // Specify the other teacher
             });
             if (!newQuotes || newQuotes.length === 0) throw new Error('No quotes generated for get goal auth test.');
-            const newQuote = newQuotes[0]; // Use the first quote from the array
+            const newQuote = newQuotes.find(q => q.teacher?.id === otherTeacher.id); // Find the correct quote
+            if (!newQuote) throw new Error('Could not find quote from otherTeacher.');
 
             // Accept quote (Student)
-            await acceptTestLessonQuote(studentAuthToken, newQuote.id); // Use id from selected quote
+            await acceptTestLessonQuote(studentAuthToken, newQuote.id);
 
             // Fetch the new lesson ID
             const fetchLessonResponse = await request(API_BASE_URL!)
@@ -400,14 +400,17 @@ describe('API Integration: /api/v1/goals', () => {
         it('should return 403 Forbidden if the teacher tries to get a goal for a lesson they are not part of', async () => {
             // 1. Ensure the primary test goal exists (created in POST test or beforeAll)
             if (!testGoalId) {
-                throw new Error('testGoalId is not set. Ensure POST test runs first or setup creates it.');
+                // Create the goal if the POST test didn't run or failed to set it
+                const createResp = await createGoal(teacherAuthToken, { lessonId: testLessonId, title: 'Setup Goal', description: 'For 403 test', estimatedLessonCount: 1 });
+                if (createResp.status !== 201 || !createResp.body.id) {
+                    throw new Error('Failed to create prerequisite goal for 403 test');
+                }
+                testGoalId = createResp.body.id;
             }
 
             // 2. Create a completely separate teacher
             const { user: unrelatedTeacher, password: unrelatedPassword } = await createTestTeacher();
             const unrelatedTeacherToken = await loginTestUser(unrelatedTeacher.email, unrelatedPassword, UserType.TEACHER);
-
-            // --- DEBUG REMOVED as structure is simplified ---
 
             // 3. Attempt fetch of the original goal (testGoalId) using the unrelated teacher's token
             const response = await getGoalById(unrelatedTeacherToken, testGoalId);
