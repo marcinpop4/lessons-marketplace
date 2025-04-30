@@ -42,9 +42,11 @@ if (!baseURL) {
 const timeoutStr = process.env.PLAYWRIGHT_TIMEOUT;
 const actionTimeoutStr = process.env.PLAYWRIGHT_ACTION_TIMEOUT;
 const navigationTimeoutStr = process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT;
+const expectTimeoutStr = process.env.PLAYWRIGHT_EXPECT_TIMEOUT;
 
 const configOverrides: { timeout?: number } = {};
 const useOverrides: { actionTimeout?: number; navigationTimeout?: number } = {};
+const expectOverrides: { timeout?: number } = {};
 
 if (timeoutStr) {
     const parsed = parseInt(timeoutStr, 10);
@@ -73,6 +75,15 @@ if (navigationTimeoutStr) {
     useOverrides.navigationTimeout = parsed;
 }
 
+if (expectTimeoutStr) {
+    const parsed = parseInt(expectTimeoutStr, 10);
+    if (isNaN(parsed)) {
+        console.error(`\n*** ERROR [Playwright Config]: Invalid PLAYWRIGHT_EXPECT_TIMEOUT value "${expectTimeoutStr}". Must be an integer. ***`);
+        process.exit(1);
+    }
+    expectOverrides.timeout = parsed;
+}
+
 
 export default defineConfig({
     testDir: '.',
@@ -86,6 +97,11 @@ export default defineConfig({
     ],
     // Apply timeout override if present, otherwise use default
     ...configOverrides,
+    expect: {
+        // Default timeout for expect assertions (e.g., expect().toBeVisible())
+        timeout: expectOverrides.timeout ?? 10000,
+        ...expectOverrides
+    },
     use: {
         baseURL,
         screenshot: {
