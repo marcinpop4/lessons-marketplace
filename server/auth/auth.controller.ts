@@ -4,8 +4,8 @@ import authService, { AuthMethod } from './auth.service.js';
 import { refreshTokenService } from './refreshToken.service.js';
 import { cookieOptions, REFRESH_TOKEN_COOKIE_NAME } from './auth.constants.js';
 import { UserType } from '../../shared/models/UserType.js';
-import { LoginUserDTO } from '../../shared/dtos/LoginUser.dto.js'; // Import the new DTO
-import { AppError, DuplicateEmailError } from '../errors/index.js'; // Import custom errors
+import { LoginUserDTO } from '../../shared/dtos/LoginUser.dto.js';
+import { AppError, DuplicateEmailError } from '../errors/index.js';
 
 export class AuthController {
 

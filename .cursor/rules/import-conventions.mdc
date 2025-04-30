@@ -15,23 +15,19 @@ Rely on the respective build/run tools and their configurations (`tsconfig.json`
 
 ## Specific Areas
 
-### 1. Server (`server/**/*.ts`)
+### 1. Server (`server/**/*`)
 
 -   **Local Imports (within `server/`):** Use relative paths **AND include** the `.js` extension.
     ```typescript
     // Correct:
     import { userService } from './user.service.js';
     import { authMiddleware } from '../auth/auth.middleware.js';
+    import { Lesson } from '../../models/Lesson,js';
     ```
 -   **Shared Imports (from `@shared/`):** Use the configured path alias (`@shared/`) **without** the extension.
     ```typescript
     // Correct:
-    import { Lesson } from '@shared/models/Lesson';
-    ```
--   **Node Modules:** Import from `node_modules` as usual (no extension).
-    ```typescript
-    import express from 'express';
-    ```
+
 -   **Reasoning:** Compiled server code runs in Node.js using ESM, which requires explicit `.js` extensions for relative imports. Aliases and node modules are resolved differently.
 
 ### 2. Shared (`shared/**/*.ts`)

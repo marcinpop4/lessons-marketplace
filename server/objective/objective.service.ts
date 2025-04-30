@@ -1,21 +1,21 @@
 import { PrismaClient, Prisma, Objective as PrismaObjective, Student } from '@prisma/client';
-import { Objective } from '@shared/models/Objective.js';
-import { ObjectiveStatus, ObjectiveStatusValue, ObjectiveStatusTransition } from '@shared/models/ObjectiveStatus.js';
-import { LessonType } from '@shared/models/LessonType.js';
+import { Objective } from '../../shared/models/Objective.js';
+import { ObjectiveStatus, ObjectiveStatusValue, ObjectiveStatusTransition } from '../../shared/models/ObjectiveStatus.js';
+import { LessonType } from '../../shared/models/LessonType.js';
 import { mapPrismaObjectiveToObjective, mapPrismaObjectivesToObjectives } from './objective.mapper.js';
 import { NotFoundError, BadRequestError } from '../errors/index.js';
 import { studentService } from '../student/student.service.js';
 import OpenAI from 'openai';
 import { Response } from 'express';
 import { streamJsonResponse } from '../utils/sse.service.js';
-import { ObjectiveRecommendation } from '@shared/models/ObjectiveRecommendation.js';
+import { ObjectiveRecommendation } from '../../shared/models/ObjectiveRecommendation.js';
 import { isUuid } from '../utils/validation.utils.js';
 import prisma from '../prisma.js'; // Import shared prisma instance
 import { logAndYieldAiStream } from '../utils/aiStream.utils.js'; // Import the AI stream utility
 import { ChatCompletionChunk } from 'openai/resources/chat/completions'; // Import necessary type
 import { lessonService } from '../lesson/lesson.service.js'; // Import lessonService
-import { Lesson } from '@shared/models/Lesson.js'; // Import Lesson model
-import { LessonStatusValue } from '@shared/models/LessonStatus.js';
+import { Lesson } from '../../shared/models/Lesson.js'; // Import Lesson model
+import { LessonStatusValue } from '../../shared/models/LessonStatus.js';
 
 // Define the recommendation count constant
 const DEFAULT_RECOMMENDATION_COUNT = 6;

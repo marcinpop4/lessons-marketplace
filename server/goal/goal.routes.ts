@@ -2,7 +2,7 @@ import express, { Router } from 'express';
 import { goalController } from './goal.controller.js';
 import { authMiddleware } from '../auth/auth.middleware.js';
 import { checkRole } from '../auth/role.middleware.js';
-import { UserType } from '@shared/models/UserType';
+import { UserType } from '../../shared/models/UserType.js';
 
 const router: Router = express.Router();
 

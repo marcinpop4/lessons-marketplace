@@ -11,16 +11,16 @@ import { Prisma } from '@prisma/client';
 import { LessonQuoteMapper } from './lessonQuote.mapper.js';
 import { TeacherMapper } from '../teacher/teacher.mapper.js';
 import { LessonRequestMapper } from '../lessonRequest/lessonRequest.mapper.js';
-import { LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus.js';
-import { TeacherLessonHourlyRateStatusValue } from '@shared/models/TeacherLessonHourlyRateStatus.js';
+import { LessonQuoteStatusValue } from '../../shared/models/LessonQuoteStatus.js';
+import { TeacherLessonHourlyRateStatusValue } from '../../shared/models/TeacherLessonHourlyRateStatus.js';
 import { BadRequestError, NotFoundError, AuthorizationError, ConflictError, AppError } from '../errors/index.js';
 import { isUuid } from '../utils/validation.utils.js';
 import { lessonService } from '../lesson/lesson.service.js';
 import { UserType as PrismaUserType } from '@prisma/client';
-import { UserType as SharedUserType } from '@shared/models/UserType.js';
+import { UserType as SharedUserType } from '../../shared/models/UserType.js';
 import { teacherService } from '../teacher/teacher.service.js';
 import { v4 as uuidv4 } from 'uuid';
-import { LessonQuoteStatus } from '@shared/models/LessonQuoteStatus.js';
+import { LessonQuoteStatus } from '../../shared/models/LessonQuoteStatus.js';
 
 // Define Prisma types for includes required by mapper methods
 // Type for Teacher with nested rates

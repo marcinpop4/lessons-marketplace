@@ -11,7 +11,7 @@ import { UserType as SharedUserType } from '../../shared/models/UserType.js';
 import { AuthMethodType as SharedAuthMethodType } from '../../shared/models/AuthMethodType.js';
 import { authMethodService } from './auth-method.service.js'; // Import the new auth method service
 import { UserType as PrismaUserType, Teacher as DbTeacher, Student as DbStudent, Prisma } from '@prisma/client';
-import { UserType } from '@shared/models/UserType.js';
+import { UserType } from '../../shared/models/UserType.js';
 import { isUuid } from '../utils/validation.utils.js';
 
 // Define AuthMethod as an enum

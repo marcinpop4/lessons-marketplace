@@ -1,7 +1,7 @@
-import { LessonQuoteStatus, LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus.js';
+import { LessonQuoteStatus, LessonQuoteStatusValue } from '../../shared/models/LessonQuoteStatus.js';
 // Import the specific Prisma type directly with an alias
 import { LessonQuoteStatus as PrismaLessonQuoteStatus } from '@prisma/client';
-import { JsonValue } from '@shared/types/JsonTypes.js';
+import { JsonValue } from '../../shared/types/JsonTypes.js';
 
 /**
  * Maps between database LessonQuoteStatus objects and shared LessonQuoteStatus models.

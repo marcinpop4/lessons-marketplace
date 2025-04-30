@@ -1,16 +1,16 @@
 import { PrismaClient, Prisma, Teacher as DbTeacher, TeacherLessonHourlyRate as DbTeacherLessonHourlyRate, Lesson as DbLesson, Student as DbStudent, Address as DbAddress, LessonRequest as DbLessonRequestPrisma, LessonQuote as DbLessonQuote, LessonStatus as DbLessonStatus, Goal as DbGoal, AuthMethod, UserType } from '@prisma/client';
 // Import shared models using alias and no extension
-import { Teacher } from '@shared/models/Teacher';
-import { Student } from '@shared/models/Student';
-import { Address } from '@shared/models/Address';
-import { Lesson, DbLessonWithNestedRelations } from '@shared/models/Lesson';
-import { LessonQuote } from '@shared/models/LessonQuote';
-import { LessonRequest } from '@shared/models/LessonRequest';
-import { LessonStatus, LessonStatusValue } from '@shared/models/LessonStatus';
-import { Goal } from '@shared/models/Goal';
-import { TeacherLessonHourlyRate } from '@shared/models/TeacherLessonHourlyRate';
-import { LessonType } from '@shared/models/LessonType';
-import { TeacherLessonHourlyRateStatusValue } from '@shared/models/TeacherLessonHourlyRateStatus';
+import { Teacher } from '../../shared/models/Teacher.js';
+import { Student } from '../../shared/models/Student.js';
+import { Address } from '../../shared/models/Address.js';
+import { Lesson, DbLessonWithNestedRelations } from '../../shared/models/Lesson.js';
+import { LessonQuote } from '../../shared/models/LessonQuote.js';
+import { LessonRequest } from '../../shared/models/LessonRequest.js';
+import { LessonStatus, LessonStatusValue } from '../../shared/models/LessonStatus.js';
+import { Goal } from '../../shared/models/Goal.js';
+import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourlyRate.js';
+import { LessonType } from '../../shared/models/LessonType.js';
+import { TeacherLessonHourlyRateStatusValue } from '../../shared/models/TeacherLessonHourlyRateStatus.js';
 
 // Local imports with .js extension
 import prisma from '../prisma.js';

@@ -10,7 +10,7 @@ import compression from 'compression';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
-import { AppError } from './errors/index'; // Import base error
+import { AppError } from './errors/index.js'; // Import base error
 // Import ZodError
 import { ZodError } from 'zod';
 

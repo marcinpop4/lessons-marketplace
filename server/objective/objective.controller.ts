@@ -5,7 +5,7 @@ import { LessonType } from '../../shared/models/LessonType.js'; // Import Lesson
 import { ObjectiveStatusValue } from '../../shared/models/ObjectiveStatus.js'; // Import Status enum
 import { BadRequestError, AuthorizationError, NotFoundError } from '../errors/index.js';
 import { UserType as PrismaUserType } from '@prisma/client'; // Keep if needed elsewhere
-import { Objective } from '@shared/models/Objective.js';
+import { Objective } from '../../shared/models/Objective.js';
 
 // Type helper for parsed query parameters
 interface GetObjectivesQuery {

@@ -1,12 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { lessonQuoteService } from './lessonQuote.service.js';
-import { LessonType as SharedLessonType } from '@shared/models/LessonType.js';
-import { LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus.js';
-import { UserType as SharedUserType } from '@shared/models/UserType.js';
+import { LessonType as SharedLessonType } from '../../shared/models/LessonType.js';
+import { LessonQuoteStatusValue } from '../../shared/models/LessonQuoteStatus.js';
+import { UserType as SharedUserType } from '../../shared/models/UserType.js';
 import { AuthorizationError, BadRequestError } from '../errors/index.js';
-import { lessonRequestService } from '@server/lessonRequest/lessonRequest.service.js';
-import { Teacher } from '@shared/models/Teacher.js';
-import { teacherService } from '@server/teacher/teacher.service.js';
+import { lessonRequestService } from '../lessonRequest/lessonRequest.service.js';
+import { Teacher } from '../../shared/models/Teacher.js';
+import { teacherService } from '../teacher/teacher.service.js';
 import { isUuid } from '../utils/validation.utils.js';
 /**
  * Controller for lesson quote-related operations

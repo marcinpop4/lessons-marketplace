@@ -1,8 +1,8 @@
 import { Objective as PrismaObjective, ObjectiveStatus as PrismaObjectiveStatus, LessonType as PrismaLessonType } from '@prisma/client';
-import { Objective, ObjectiveProps } from '@shared/models/Objective.js';
-import { ObjectiveStatus, ObjectiveStatusValue } from '@shared/models/ObjectiveStatus.js';
-import { LessonType } from '@shared/models/LessonType.js';
-import { JsonValue } from '@shared/types/JsonTypes.js';
+import { Objective, ObjectiveProps } from '../../shared/models/Objective.js';
+import { ObjectiveStatus, ObjectiveStatusValue } from '../../shared/models/ObjectiveStatus.js';
+import { LessonType } from '../../shared/models/LessonType.js';
+import { JsonValue } from '../../shared/types/JsonTypes.js';
 
 // Updated type alias: student relation is no longer required here
 type PrismaObjectiveWithStatus = PrismaObjective & {

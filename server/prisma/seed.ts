@@ -12,11 +12,11 @@ import { v4 as uuidv4 } from 'uuid';
 import chalk from 'chalk'; // Import chalk
 
 // Import shared models and enums
-import { LessonType } from '@shared/models/LessonType.js';
-import { LessonStatusTransition, LessonStatusValue } from '@shared/models/LessonStatus.js';
-import { LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus.js'; // Added
-import { GoalStatusValue, GoalStatusTransition } from '@shared/models/GoalStatus.js';
-import { Goal } from '@shared/models/Goal.js';
+import { LessonType } from '../../shared/models/LessonType.js';
+import { LessonStatusTransition, LessonStatusValue } from '../../shared/models/LessonStatus.js';
+import { LessonQuoteStatusValue } from '../../shared/models/LessonQuoteStatus.js'; // Added
+import { GoalStatusValue, GoalStatusTransition } from '../../shared/models/GoalStatus.js';
+import { Goal } from '../../shared/models/Goal.js';
 import { Address, AddressDTO } from '../../shared/models/Address.js';
 import { Student } from '../../shared/models/Student.js';
 import { Teacher } from '../../shared/models/Teacher.js';
