@@ -6,6 +6,7 @@ import { Lesson } from '@shared/models/Lesson';
 import { LessonStatusValue, LessonStatusTransition, LessonStatus } from '@shared/models/LessonStatus';
 import Card from '@frontend/components/shared/Card/Card'; // Import shared Card
 import Button from '@frontend/components/shared/Button/Button'; // Import shared Button
+import { formatDisplayLabel } from '@shared/models/LessonType'; // <-- Import added
 // Removed unused import: import { updateLessonStatus } from '@frontend/api/lessonApi';
 
 // Define props for the Notes Modal (can be moved to a separate Modal component later)
@@ -130,44 +131,42 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
     return (
         <Card
             title={lessonTitle}
-            className="mb-4"
-            headingLevel="h4"
+            className="mb-4 lesson-card"
+            headingLevel="h2"
         >
-            {/* Refactored body content using simple <p> tags */}
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-                <span className="font-semibold mr-1">Start Time:</span>
-                {request?.startTime ? new Date(request.startTime).toLocaleString() : 'N/A'}
-            </p>
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-                <span className="font-semibold mr-1">Duration:</span>
-                {request?.durationMinutes || 'N/A'} minutes
-            </p>
-            {/* Add Lesson Type */}
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-                <span className="font-semibold mr-1">Type:</span>
-                {lesson.quote.lessonRequest.type || 'N/A'}
-            </p>
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-                <span className="font-semibold mr-1">Address:</span>
-                {request?.address?.toString() || 'N/A'}
-            </p>
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-                <span className="font-semibold mr-1">Cost:</span>
-                {lesson.quote?.getFormattedCost() || 'N/A'}
-            </p>
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-                <span className="font-semibold mr-1">Status:</span>
-                {LessonStatus.getDisplayLabelForStatus(currentStatus)}
-            </p>
-            {/* Conditionally display goal count below status */}
-            {canManageGoals && (
-                <p className="text-sm text-gray-700 dark:text-gray-300">
-                    <span className="font-semibold mr-1">Goals:</span>
-                    {goalCount}
+            <div className="card-body space-y-2">
+                <p className="text-sm text-gray-700 dark:text-gray-300 card-attribute">
+                    <span className="font-semibold mr-1">Start Time:</span>
+                    {request?.startTime ? new Date(request.startTime).toLocaleString() : 'N/A'}
                 </p>
-            )}
+                <p className="text-sm text-gray-700 dark:text-gray-300 card-attribute">
+                    <span className="font-semibold mr-1">Duration:</span>
+                    {request?.durationMinutes || 'N/A'} minutes
+                </p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 card-attribute">
+                    <span className="font-semibold mr-1">Type:</span>
+                    {lesson.quote.lessonRequest.type ? formatDisplayLabel(lesson.quote.lessonRequest.type) : 'N/A'}
+                </p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 card-attribute">
+                    <span className="font-semibold mr-1">Address:</span>
+                    {request?.address?.toString() || 'N/A'}
+                </p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 card-attribute">
+                    <span className="font-semibold mr-1">Cost:</span>
+                    {lesson.quote?.getFormattedCost() || 'N/A'}
+                </p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 card-attribute">
+                    <span className="font-semibold mr-1">Status:</span>
+                    {LessonStatus.getDisplayLabelForStatus(currentStatus)}
+                </p>
+                {canManageGoals && (
+                    <p className="text-sm text-gray-700 dark:text-gray-300 card-attribute">
+                        <span className="font-semibold mr-1">Goals:</span>
+                        {goalCount}
+                    </p>
+                )}
+            </div>
 
-            {/* Updated Action Buttons based on transitions */}
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-2 flex-wrap gap-y-2">
                 {isUpdating ? (
                     <Button variant="secondary" size="sm" disabled>
@@ -175,11 +174,10 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
                     </Button>
                 ) : (
                     <>
-                        {/* Render standard transition buttons */}
                         {availableTransitions.map(transition => (
                             <Button
                                 key={transition}
-                                onClick={() => handleButtonClick(transition)} // Uses reverted handler
+                                onClick={() => handleButtonClick(transition)}
                                 variant={getButtonVariant(transition)}
                                 size="sm"
                                 disabled={isUpdating}
@@ -188,12 +186,11 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
                             </Button>
                         ))}
 
-                        {/* Render Manage Goals button conditionally with goal count */}
                         {canManageGoals && (
                             <Button
                                 key="manage-goals"
                                 onClick={handleManageGoalsClick}
-                                variant="accent" // Change variant to accent
+                                variant="accent"
                                 size="sm"
                                 disabled={isUpdating}
                             >
@@ -201,7 +198,6 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
                             </Button>
                         )}
 
-                        {/* Handle case where no actions are available at all */}
                         {availableTransitions.length === 0 && !canManageGoals && (
                             <span className="text-sm text-gray-500 italic">No actions available</span>
                         )}

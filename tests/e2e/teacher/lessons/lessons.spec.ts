@@ -71,9 +71,17 @@ test.describe('Teacher Lesson Management', () => {
         const voidedSection = page.locator('#lessons-voided-section');
 
         // --- Test REQUESTED -> ACCEPTED transition --- 
-        const student1Name = 'Ethan Parker'; //
-        const lessonCard1 = requestedSection.locator('.card', { hasText: student1Name });
-        await expect(lessonCard1, `Lesson for ${student1Name} should be in Requested`).toBeVisible();
+        const student1Name = 'Ethan Parker';
+        const specificType = 'Type:Voice'; // Removed space to match rendered HTML
+
+        // Locate the card containing both pieces of text using chained filters with hasText
+        const lessonCard1 = requestedSection
+            .locator('.lesson-card')
+            .filter({ hasText: student1Name })
+            .filter({ hasText: specificType });
+
+        // Assert the card itself is visible
+        await expect(lessonCard1, `Lesson card for ${student1Name} (${specificType}) should be visible`).toBeVisible();
 
         const acceptButton = lessonCard1.getByRole('button', { name: /accept/i });
         await expect(acceptButton, 'Accept button should be visible').toBeVisible();
@@ -81,26 +89,35 @@ test.describe('Teacher Lesson Management', () => {
         await waitForNetworkIdle(page); // Wait for UI update
 
         // Assert: Lesson moved from REQUESTED to ACCEPTED
-        await expect(lessonCard1, `Lesson for ${student1Name} should NOT be in Requested`).not.toBeVisible();
-        const acceptedLessonCard1 = acceptedSection.locator('.card', { hasText: student1Name });
-        await expect(acceptedLessonCard1, `Lesson for ${student1Name} should be in Accepted`).toBeVisible();
+        await expect(lessonCard1, `Lesson card for ${student1Name} (${specificType}) should NOT be in Requested section`).not.toBeVisible();
+        // Update the locator for the accepted card similarly
+        const acceptedLessonCard1 = acceptedSection
+            .locator('.lesson-card')
+            .filter({ hasText: student1Name })
+            .filter({ hasText: specificType });
+        await expect(acceptedLessonCard1, `Lesson card for ${student1Name} (${specificType}) should be in Accepted section`).toBeVisible();
 
         // --- Test ACCEPTED -> VOIDED transition --- 
-        // Use the same card, now in the Accepted section
         const voidButton = acceptedLessonCard1.getByRole('button', { name: /void/i });
         await expect(voidButton, 'Void button should be visible').toBeVisible();
         await voidButton.click();
         await waitForNetworkIdle(page); // Wait for UI update
 
         // Assert: Lesson moved from ACCEPTED to VOIDED
-        await expect(acceptedLessonCard1, `Lesson for ${student1Name} should NOT be in Accepted`).not.toBeVisible();
-        const voidedLessonCard1 = voidedSection.locator('.card', { hasText: student1Name });
-        await expect(voidedLessonCard1, `Lesson for ${student1Name} should be in Voided`).toBeVisible();
+        await expect(acceptedLessonCard1, `Lesson card for ${student1Name} (${specificType}) should NOT be in Accepted section`).not.toBeVisible();
+        // Update the locator for the voided card similarly
+        const voidedLessonCard1 = voidedSection
+            .locator('.lesson-card')
+            .filter({ hasText: student1Name })
+            .filter({ hasText: specificType });
+        await expect(voidedLessonCard1, `Lesson card for ${student1Name} (${specificType}) should be in Voided section`).toBeVisible();
 
         // --- Test REQUESTED -> REJECTED transition --- 
-        // Use a *different* lesson initially in Requested
         const student2Name = 'Ava Johnson'; // ADJUST IF NEEDED based on seed data/UI
-        const lessonCard2 = requestedSection.locator('.card', { hasText: student2Name });
+        // Keep simple filter for Ava as it was likely unique
+        const lessonCard2 = requestedSection
+            .locator('.lesson-card')
+            .filter({ hasText: `Lesson with ${student2Name}` }); // More specific text match
         await expect(lessonCard2, `Lesson for ${student2Name} should be in Requested`).toBeVisible();
 
         const rejectButton = lessonCard2.getByRole('button', { name: /reject/i });
@@ -110,7 +127,9 @@ test.describe('Teacher Lesson Management', () => {
 
         // Assert: Lesson moved from REQUESTED to REJECTED
         await expect(lessonCard2, `Lesson for ${student2Name} should NOT be in Requested`).not.toBeVisible();
-        const rejectedLessonCard2 = rejectedSection.locator('.card', { hasText: student2Name });
+        const rejectedLessonCard2 = rejectedSection
+            .locator('.lesson-card')
+            .filter({ hasText: `Lesson with ${student2Name}` }); // More specific text match
         await expect(rejectedLessonCard2, `Lesson for ${student2Name} should be in Rejected`).toBeVisible();
 
         // Removed DEFINED -> COMPLETED test as per request

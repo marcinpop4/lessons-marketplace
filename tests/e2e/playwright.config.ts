@@ -98,9 +98,10 @@ export default defineConfig({
     // Apply timeout override if present, otherwise use default
     ...configOverrides,
     expect: {
-        // Default timeout for expect assertions (e.g., expect().toBeVisible())
-        timeout: expectOverrides.timeout ?? 10000,
-        ...expectOverrides
+        // Only apply the expect timeout override if PLAYWRIGHT_EXPECT_TIMEOUT is set
+        ...(expectOverrides.timeout !== undefined && { timeout: expectOverrides.timeout }),
+        // Add other default expect properties here if needed, e.g.:
+        // toHaveScreenshot: { maxDiffPixels: 10 },
     },
     use: {
         baseURL,
