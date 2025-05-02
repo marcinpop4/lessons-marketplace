@@ -46,8 +46,8 @@ export async function* logAndYieldAiStream<T>(
     const logPrefix = chalk.cyan(logContext);
 
     if (LOG_STREAMING_DETAILS) {
-        console.log(`${logPrefix} ${chalk.blue('System Prompt:')}\n${chalk.gray(systemPrompt)}`);
-        console.log(`${logPrefix} ${chalk.blue('User Prompt:')}\n${chalk.gray(userPrompt)}`);
+        console.log(`${logPrefix} ${chalk.blue('System Prompt:')}\n${chalk.greenBright(systemPrompt)}`);
+        console.log(`${logPrefix} ${chalk.blue('User Prompt:')}\n${chalk.greenBright(userPrompt)}`);
     }
 
     console.log(`${logPrefix} Requesting stream from OpenAI.`);

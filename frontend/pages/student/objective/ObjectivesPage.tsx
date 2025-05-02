@@ -5,11 +5,15 @@ import StudentObjective from '../../../components/student/objective/StudentObjec
 import AddObjectiveForm from '../../../components/student/objective/AddObjectiveForm'; // Import the new form
 import { ObjectiveRecommendation } from '@shared/models/ObjectiveRecommendation.js'; // Import recommendation type
 import { LessonType } from '@shared/models/LessonType.js'; // Import LessonType for filtering
+import { useAuth } from '../../../contexts/AuthContext'; // Import useAuth
 
 // Define the structure for grouped objectives
 type GroupedObjectives = { [key in ObjectiveStatusValue]?: Objective[] };
 
 const ObjectivesPage: React.FC = () => {
+    // Get auth context
+    const { user } = useAuth();
+
     // Keep the original flat list for fetching
     // const [objectives, setObjectives] = useState<Objective[]>([]); 
     // State to hold grouped objectives
@@ -38,11 +42,25 @@ const ObjectivesPage: React.FC = () => {
                 throw new Error('Authentication token not found.');
             }
 
+            // Get studentId from auth context
+            const studentId = user?.id;
+            if (!studentId) {
+                // Handle case where user is not loaded yet or not logged in
+                // You might want to show a different loading state or error
+                console.error('Student ID not available from auth context.');
+                setFetchError('User data not available. Please ensure you are logged in.');
+                setLoading(false); // Stop loading if we can't proceed
+                return; // Exit the function
+            }
+
             const headers: HeadersInit = {
                 'Authorization': `Bearer ${token}`,
             };
 
-            const response = await fetch('/api/v1/objectives', {
+            // Append studentId as a query parameter
+            const url = `/api/v1/objectives?studentId=${encodeURIComponent(studentId)}`;
+
+            const response = await fetch(url, { // Use the updated URL
                 method: 'GET',
                 headers: headers,
                 credentials: 'include',
