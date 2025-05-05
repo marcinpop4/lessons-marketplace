@@ -2,7 +2,6 @@ import * as dotenv from 'dotenv';
 // Use require for built-in Node modules in Jest setup
 const path = require('path');
 const fs = require('fs');
-import { cleanupDatabase } from './globalTeardown';
 
 
 
@@ -45,13 +44,3 @@ if (result.error) {
         // Potentially add a check here if needed, but no console output
     }
 }
-
-// Optionally load general polyfills or setup mocks here
-
-// Hook to run after all tests in each file
-afterAll(async () => {
-    await cleanupDatabase();
-});
-
-// Example: Extending expect (if needed)
-// expect.extend({ ... }); 
