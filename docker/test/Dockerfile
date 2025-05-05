@@ -18,10 +18,6 @@ COPY env/.env.* ./env/
 # Test directories with all configurations
 COPY tests/ ./tests/
 
-# Copy tsconfig.test.json to root as a backup
-# Some Jest configs might look for it here
-COPY tests/tsconfig.test.json ./tsconfig.test.json
-
 # Frontend code (needed for some tests)
 COPY frontend/ ./frontend/
 
