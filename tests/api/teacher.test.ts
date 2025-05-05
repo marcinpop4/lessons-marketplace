@@ -1,6 +1,6 @@
-import { Teacher, Student, Address, LessonRequest, LessonQuote, Lesson, LessonStatus, LessonType } from '@prisma/client';
 import { LessonStatusValue } from '@shared/models/LessonStatus'; // Import LessonStatusValue enum
 import { UserType } from '@shared/models/UserType'; // Import UserType enum
+import { LessonType } from '@shared/models/LessonType'; // Import SHARED LessonType
 import axios from 'axios'; // Import axios
 import { Teacher as SharedTeacher } from '@shared/models/Teacher'; // Import shared model for GET /:id
 
@@ -28,8 +28,8 @@ describe('API Integration: /api/v1/teachers', () => {
         try {
             // Create teacher using utility - Use LessonType enum members
             const { user: teacher, password } = await createTestTeacher([
-                { lessonType: LessonType.GUITAR, rateInCents: 5000 }, // Explicitly use enum member
-                { lessonType: LessonType.DRUMS, rateInCents: 6000 }  // Explicitly use enum member
+                { lessonType: LessonType.GUITAR, rateInCents: 5000 }, // Use shared LessonType
+                { lessonType: LessonType.DRUMS, rateInCents: 6000 }  // Use shared LessonType
             ]);
             if (!teacher || !teacher.id || !teacher.email || !password) {
                 throw new Error('Test setup failed: Could not create test teacher or get credentials.');
@@ -66,7 +66,7 @@ describe('API Integration: /api/v1/teachers', () => {
         it('should return a list of teachers (public access)', async () => {
             // This endpoint is public, no token needed
             const response = await axios.get(`${API_BASE_URL}/api/v1/teachers`, {
-                params: { lessonType: LessonType.GUITAR, limit: 10 } // Query requires rates exist
+                params: { lessonType: LessonType.GUITAR, limit: 10 } // Use shared LessonType for query
             });
             // Note: This test might become less useful without predictable seed data
             // unless we ensure teachers with specific rates are created in setup.
@@ -97,7 +97,7 @@ describe('API Integration: /api/v1/teachers', () => {
             // Case 1: Missing limit
             try {
                 await axios.get(`${API_BASE_URL}/api/v1/teachers`, {
-                    params: { lessonType: LessonType.GUITAR } // Missing limit
+                    params: { lessonType: LessonType.GUITAR } // Use shared LessonType
                 });
                 throw new Error('Request (missing limit) should have failed with 400');
             } catch (error: any) {
