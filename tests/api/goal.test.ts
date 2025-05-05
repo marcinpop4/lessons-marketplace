@@ -6,9 +6,9 @@ import { Lesson } from '@shared/models/Lesson'; // <-- Added missing import
 import axios from 'axios'; // Import axios for direct calls and error checking
 
 // Import test utilities
-import { createTestStudent, createTestTeacher, loginTestUser } from './utils/user.utils';
-import { createTestLessonRequest } from './utils/lessonRequest.utils';
-import { createTestLessonQuote, acceptTestLessonQuote } from './utils/lessonQuote.utils';
+import { createTestStudent, createTestTeacher, loginTestUser } from '../utils/user.utils';
+import { createTestLessonRequest } from '../utils/lessonRequest.utils';
+import { createTestLessonQuote, acceptTestLessonQuote } from '../utils/lessonQuote.utils';
 // Import Goal utilities
 import {
     createGoal,
@@ -20,7 +20,7 @@ import {
     updateGoalStatus,
     updateGoalStatusUnauthenticated,
     patchGoalRaw,
-} from './utils/goal.utils';
+} from '../utils/goal.utils';
 import { v4 as uuidv4 } from 'uuid';
 
 // Reintroduce API_BASE_URL constant specifically for the direct request test

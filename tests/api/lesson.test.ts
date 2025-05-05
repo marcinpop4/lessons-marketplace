@@ -6,9 +6,9 @@ import { v4 as uuidv4 } from 'uuid'; // Import uuid
 import axios from 'axios'; // Import axios
 
 // Import ALL necessary test utilities
-import { createTestStudent, createTestTeacher, loginTestUser } from './utils/user.utils';
-import { createTestLessonRequest } from './utils/lessonRequest.utils';
-import { createTestLessonQuote, acceptTestLessonQuote } from './utils/lessonQuote.utils';
+import { createTestStudent, createTestTeacher, loginTestUser } from '../utils/user.utils';
+import { createTestLessonRequest } from '../utils/lessonRequest.utils';
+import { createTestLessonQuote, acceptTestLessonQuote } from '../utils/lessonQuote.utils';
 // Import Lesson utilities
 import {
     getLessons,
@@ -20,7 +20,7 @@ import {
     updateLessonStatus,
     updateLessonStatusUnauthenticated,
     patchLessonRaw,
-} from './utils/lesson.utils';
+} from '../utils/lesson.utils';
 
 // Get API_BASE_URL from environment (still needed for direct requests)
 const API_BASE_URL = process.env.VITE_API_BASE_URL;

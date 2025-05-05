@@ -8,7 +8,7 @@ import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import axios from 'axios'; // Import axios for direct calls and error checking
 
 // Test Utilities
-import { createTestStudent, createTestTeacher, loginTestUser } from './utils/user.utils';
+import { createTestStudent, createTestTeacher, loginTestUser } from '../utils/user.utils';
 // Import both the higher-level helper and lower-level utils
 import {
     createTestLessonRequest,
@@ -18,7 +18,7 @@ import {
     getLessonRequestsByStudentIdUnauthenticated,
     getLessonRequestByIdRaw,
     getLessonRequestByIdRawUnauthenticated
-} from './utils/lessonRequest.utils';
+} from '../utils/lessonRequest.utils';
 
 // REMOVED: Seed data constants
 

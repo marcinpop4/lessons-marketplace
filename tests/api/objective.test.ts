@@ -6,7 +6,7 @@ import { UserType } from '@shared/models/UserType';
 import axios from 'axios'; // Import axios
 
 // Import user utils
-import { createTestStudent, createTestTeacher, loginTestUser } from './utils/user.utils';
+import { createTestStudent, createTestTeacher, loginTestUser } from '../utils/user.utils';
 // Import objective utils
 import {
     createObjective,
@@ -17,7 +17,7 @@ import {
     updateObjectiveStatusUnauthenticated,
     patchObjectiveRaw,
     CreateObjectivePayload // Import payload type
-} from './utils/objective.utils';
+} from '../utils/objective.utils';
 
 // Keep API_BASE_URL - needed for some direct calls if necessary (though maybe not here)
 const API_BASE_URL = process.env.VITE_API_BASE_URL;

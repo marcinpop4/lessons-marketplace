@@ -5,11 +5,11 @@ import { Student } from '@shared/models/Student';
 import {
     createTestStudent,
     loginTestUser
-} from './utils/user.utils';
+} from '../utils/user.utils';
 import {
     getStudentById,
     getStudentByIdUnauthenticated
-} from './utils/student.utils';
+} from '../utils/student.utils';
 import axios from 'axios'; // Import axios
 
 describe('API Integration: /api/v1/students', () => {

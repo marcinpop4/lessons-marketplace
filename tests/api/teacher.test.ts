@@ -5,7 +5,7 @@ import axios from 'axios'; // Import axios
 import { Teacher as SharedTeacher } from '@shared/models/Teacher'; // Import shared model for GET /:id
 
 // Import test utilities
-import { createTestTeacher, loginTestUser, createTestStudent } from './utils/user.utils';
+import { createTestTeacher, loginTestUser, createTestStudent } from '../utils/user.utils';
 import { v4 as uuidv4 } from 'uuid';
 
 // Base URL for the running server (Loaded via jest.setup.api.ts)

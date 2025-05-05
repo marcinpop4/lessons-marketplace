@@ -6,10 +6,10 @@ import { Student } from '@shared/models/Student'; // Needed for user util type
 import { Teacher } from '@shared/models/Teacher'; // Needed for user util type
 import axios from 'axios'; // Import axios
 
-// Import user utilities
-import { createTestStudent, loginTestUser, createTestTeacher } from './utils/user.utils';
-// Import address utilities
-import { createAddress, getAddressById, createAddressUnauthenticated, getAddressByIdUnauthenticated } from './utils/address.utils'; // Corrected import pat
+// Import user utilities from the correct path
+import { createTestStudent, loginTestUser, createTestTeacher } from '../utils/user.utils';
+// Import address utilities from the correct path
+import { createAddress, getAddressById, createAddressUnauthenticated, getAddressByIdUnauthenticated } from '../utils/address.utils';
 
 // Main describe block for the Address resource
 describe('API Integration: /api/v1/addresses', () => {

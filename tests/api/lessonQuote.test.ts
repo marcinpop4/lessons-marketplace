@@ -13,8 +13,8 @@ import { UserType } from '@shared/models/UserType';
 import axios from 'axios'; // Import axios
 
 // Import test utilities
-import { createTestStudent, createTestTeacher, loginTestUser } from './utils/user.utils';
-import { createTestLessonRequest } from './utils/lessonRequest.utils';
+import { createTestStudent, createTestTeacher, loginTestUser } from '../utils/user.utils';
+import { createTestLessonRequest } from '../utils/lessonRequest.utils';
 // Import the new lesson quote utilities AND keep the test helpers
 import {
     createTestLessonQuote,
@@ -26,7 +26,7 @@ import {
     updateQuoteStatus,
     updateQuoteStatusUnauthenticated,
     patchQuoteRaw,
-} from './utils/lessonQuote.utils';
+} from '../utils/lessonQuote.utils';
 
 const API_BASE_URL = process.env.VITE_API_BASE_URL;
 

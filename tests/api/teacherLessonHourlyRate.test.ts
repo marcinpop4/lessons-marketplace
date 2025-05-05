@@ -5,8 +5,8 @@ import { TeacherLessonHourlyRate } from '@shared/models/TeacherLessonHourlyRate'
 import axios from 'axios'; // Import axios
 
 // Import test utilities
-import { createTestTeacher, loginTestUser, createTestStudent } from './utils/user.utils';
-import { createTestTeacherRate, updateTestRateStatus } from './utils/teacherRate.utils';
+import { createTestTeacher, loginTestUser, createTestStudent } from '../utils/user.utils';
+import { createTestTeacherRate, updateTestRateStatus } from '../utils/teacherRate.utils';
 import { v4 as uuidv4 } from 'uuid';
 
 // Base URL for the running server (Loaded via jest.setup.api.ts)
