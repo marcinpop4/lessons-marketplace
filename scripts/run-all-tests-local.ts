@@ -170,7 +170,7 @@ async function main() {
             throw new Error('Services failed to start'); // Throw to trigger finally block and exit
         }
 
-        // 4. Setup Database (Reset & Seed)
+        // 4. Setup Database (Reset)
         // These scripts already use dotenv-cli, so NODE_ENV=development will be picked up
         await runCommand('pnpm', ['prisma:reset', '--force'], { title: 'Prisma Reset' });
 
@@ -179,7 +179,6 @@ async function main() {
 
         // 6. Run E2E Tests
         // Don't exit immediately on E2E failure, allow cleanup first
-        await runCommand('pnpm', ['prisma:seed'], { title: 'Prisma Seed' });
         const e2eResult = await runCommand('pnpm', ['test:e2e'], { title: 'E2E Tests', exitOnError: false });
         if (e2eResult.failed) {
             finalExitCode = e2eResult.exitCode ?? 1; // Use E2E exit code if failed
