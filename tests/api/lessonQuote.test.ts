@@ -1,4 +1,3 @@
-import request from 'supertest';
 import { LessonRequest } from '@shared/models/LessonRequest';
 import { LessonQuote } from '@shared/models/LessonQuote';
 import { Lesson } from '@shared/models/Lesson';
@@ -11,6 +10,7 @@ import { LessonStatusValue } from '@shared/models/LessonStatus';
 // Import status value enum for patching
 import { LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus';
 import { UserType } from '@shared/models/UserType';
+import axios from 'axios'; // Import axios
 
 // Import test utilities
 import { createTestStudent, createTestTeacher, loginTestUser } from './utils/user.utils';
@@ -119,13 +119,14 @@ describe('API Integration: /api/v1/lesson-quotes', () => {
             const response = await createQuote(studentAuthToken, basePayload as { lessonRequestId: string });
 
             expect(response.status).toBe(201);
-            expect(Array.isArray(response.body)).toBe(true);
-            expect(response.body.length).toBeGreaterThanOrEqual(1); // Expect at least one quote
+            const quotes: LessonQuote[] = response.data; // Use response.data
+            expect(Array.isArray(quotes)).toBe(true);
+            expect(quotes.length).toBeGreaterThanOrEqual(1); // Expect at least one quote
             // Ensure the quotes are for the correct request
-            expect(response.body[0].lessonRequest?.id).toEqual(basePayload.lessonRequestId);
+            expect(quotes[0].lessonRequest?.id).toEqual(basePayload.lessonRequestId);
             // We can't know *which* teacher quoted, but check structure
-            expect(response.body[0].teacher?.id).toBeDefined();
-            expect(response.body[0].currentStatus?.status).toEqual(LessonQuoteStatusValue.CREATED);
+            expect(quotes[0].teacher?.id).toBeDefined();
+            expect(quotes[0].currentStatus?.status).toEqual(LessonQuoteStatusValue.CREATED);
         }, 20000); // Keep timeout from original test
 
         it('should generate quotes ONLY for specified teachers when teacherIds are provided', async () => {
@@ -136,10 +137,11 @@ describe('API Integration: /api/v1/lesson-quotes', () => {
             const response = await createQuote(studentAuthToken, payload as { lessonRequestId: string; teacherIds: string[] });
 
             expect(response.status).toBe(201);
-            expect(Array.isArray(response.body)).toBe(true);
-            expect(response.body.length).toBe(2); // Expect exactly two quotes
+            const quotes: LessonQuote[] = response.data; // Use response.data
+            expect(Array.isArray(quotes)).toBe(true);
+            expect(quotes.length).toBe(2); // Expect exactly two quotes
 
-            const receivedTeacherIds = response.body.map((q: LessonQuote) => q.teacher?.id);
+            const receivedTeacherIds = quotes.map((q: LessonQuote) => q.teacher?.id);
             expect(receivedTeacherIds).toHaveLength(2);
             expect(receivedTeacherIds).toContain(teacherId);
             expect(receivedTeacherIds).toContain(teacher2Id);
@@ -148,59 +150,90 @@ describe('API Integration: /api/v1/lesson-quotes', () => {
         it('should return 400 Bad Request if teacherIds is not an array', async () => {
             if (!studentAuthToken) throw new Error('Student token not available');
             const payload = { ...basePayload, teacherIds: 'not-an-array' };
-            // Use raw patch utility or direct request as createQuote expects specific type
-            const response = await request(API_BASE_URL!)
-                .post('/api/v1/lesson-quotes')
-                .set('Authorization', `Bearer ${studentAuthToken}`)
-                .send(payload);
-
-            expect(response.status).toBe(400);
-            expect(response.body.error).toContain('teacherIds must be an array if provided');
+            try {
+                // Use axios directly as createQuote expects specific type
+                await axios.post(`${API_BASE_URL}/api/v1/lesson-quotes`, payload, {
+                    headers: { 'Authorization': `Bearer ${studentAuthToken}` }
+                });
+                throw new Error('Request should have failed with 400');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(400);
+                expect(error.response?.data?.error).toContain('teacherIds must be an array if provided');
+            }
         });
 
         it('should return 400 Bad Request if teacherIds contains invalid UUIDs', async () => {
             if (!studentAuthToken) throw new Error('Student token not available');
             const payload = { ...basePayload, teacherIds: [teacherId!, 'invalid-uuid'] };
-            const response = await createQuote(studentAuthToken, payload as { lessonRequestId: string; teacherIds: string[] });
-
-            expect(response.status).toBe(400);
-            expect(response.body.error).toContain('Invalid Teacher UUIDs provided');
+            try {
+                await createQuote(studentAuthToken, payload as { lessonRequestId: string; teacherIds: string[] });
+                throw new Error('Request should have failed with 400');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(400);
+                expect(error.response?.data?.error).toContain('Invalid Teacher UUIDs provided');
+            }
         });
 
         it('should return 400 Bad Request if teacherIds is an empty array', async () => {
             if (!studentAuthToken) throw new Error('Student token not available');
             const payload = { ...basePayload, teacherIds: [] };
-            const response = await createQuote(studentAuthToken, payload as { lessonRequestId: string; teacherIds: string[] });
-
-            expect(response.status).toBe(400);
-            expect(response.body.error).toContain('teacherIds cannot be an empty array');
+            try {
+                await createQuote(studentAuthToken, payload as { lessonRequestId: string; teacherIds: string[] });
+                throw new Error('Request should have failed with 400');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(400);
+                expect(error.response?.data?.error).toContain('teacherIds cannot be an empty array');
+            }
         });
 
-        // --- Keep existing tests --- 
+        // --- Keep existing tests ---
         it('should return 401 Unauthorized if no token is provided', async () => {
-            const response = await createQuoteUnauthenticated(basePayload as { lessonRequestId: string });
-            expect(response.status).toBe(401);
+            try {
+                await createQuoteUnauthenticated(basePayload as { lessonRequestId: string });
+                throw new Error('Request should have failed with 401');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(401);
+            }
         });
 
         it('should return 403 Forbidden if requested by a Teacher', async () => {
             if (!teacherAuthToken) throw new Error('Teacher token not available');
-            const response = await createQuote(teacherAuthToken, basePayload as { lessonRequestId: string });
-            expect(response.status).toBe(403);
+            try {
+                await createQuote(teacherAuthToken, basePayload as { lessonRequestId: string });
+                throw new Error('Request should have failed with 403');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(403);
+            }
         });
 
         it('should return 400 Bad Request if lessonRequestId is missing', async () => {
             if (!studentAuthToken) throw new Error('Student token not available');
             const { lessonRequestId, ...invalidPayload } = basePayload;
-            const response = await createQuote(studentAuthToken, invalidPayload as any);
-            expect(response.status).toBe(400);
-            expect(response.body.error).toContain('Valid Lesson Request ID is required.');
+            try {
+                await createQuote(studentAuthToken, invalidPayload as any);
+                throw new Error('Request should have failed with 400');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(400);
+                expect(error.response?.data?.error).toContain('Valid Lesson Request ID is required.');
+            }
         });
 
         it('should return 404 Not Found if lesson request ID does not exist', async () => {
             if (!studentAuthToken) throw new Error('Student token not available');
             const fakeRequestId = uuidv4();
-            const response = await createQuote(studentAuthToken, { lessonRequestId: fakeRequestId });
-            expect(response.status).toBe(404);
+            try {
+                await createQuote(studentAuthToken, { lessonRequestId: fakeRequestId });
+                throw new Error('Request should have failed with 404');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(404);
+            }
         });
     });
 
@@ -228,8 +261,13 @@ describe('API Integration: /api/v1/lesson-quotes', () => {
 
         it('should return 401 Unauthorized if no token is provided', async () => {
             if (!createdLessonRequestId) throw new Error('Lesson Request ID not available');
-            const response = await getQuotesByLessonRequestIdUnauthenticated(createdLessonRequestId);
-            expect(response.status).toBe(401);
+            try {
+                await getQuotesByLessonRequestIdUnauthenticated(createdLessonRequestId);
+                throw new Error('Request should have failed with 401');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(401);
+            }
         });
 
         it('should return quotes for the specific lesson request when queried by STUDENT', async () => {
@@ -237,13 +275,14 @@ describe('API Integration: /api/v1/lesson-quotes', () => {
             const response = await getQuotesByLessonRequestId(studentAuthToken, createdLessonRequestId);
 
             expect(response.status).toBe(200);
-            expect(response.body).toBeInstanceOf(Array);
-            expect(response.body.length).toBeGreaterThan(0);
-            const foundQuote = response.body.find((q: LessonQuote) => q.id === quoteIdForGetTests);
+            const quotes: LessonQuote[] = response.data; // Use response.data
+            expect(quotes).toBeInstanceOf(Array);
+            expect(quotes.length).toBeGreaterThan(0);
+            const foundQuote = quotes.find((q: LessonQuote) => q.id === quoteIdForGetTests);
             expect(foundQuote).toBeDefined();
-            expect(foundQuote.lessonRequest?.id).toEqual(createdLessonRequestId);
+            expect(foundQuote!.lessonRequest?.id).toEqual(createdLessonRequestId);
             // Can't easily assert teacherId as it depends on who was available
-            expect(foundQuote.teacher?.id).toBeDefined();
+            expect(foundQuote!.teacher?.id).toBeDefined();
         });
 
         it('should return quotes for the specific lesson request when queried by TEACHER', async () => {
@@ -251,27 +290,38 @@ describe('API Integration: /api/v1/lesson-quotes', () => {
             const response = await getQuotesByLessonRequestId(teacherAuthToken, createdLessonRequestId);
 
             expect(response.status).toBe(200);
-            expect(response.body).toBeInstanceOf(Array);
-            expect(response.body.length).toBeGreaterThan(0);
-            const foundQuote = response.body.find((q: LessonQuote) => q.id === quoteIdForGetTests);
+            const quotes: LessonQuote[] = response.data; // Use response.data
+            expect(quotes).toBeInstanceOf(Array);
+            expect(quotes.length).toBeGreaterThan(0);
+            const foundQuote = quotes.find((q: LessonQuote) => q.id === quoteIdForGetTests);
             expect(foundQuote).toBeDefined();
         });
 
         it('should return 400 Bad Request if lessonRequestId query parameter is missing', async () => {
             if (!studentAuthToken) throw new Error('Auth token not available');
-            const response = await request(API_BASE_URL!)
-                .get(`/api/v1/lesson-quotes`) // No query
-                .set('Authorization', `Bearer ${studentAuthToken}`);
-            expect(response.status).toBe(400);
-            expect(response.body.error).toContain('lessonRequestId query parameter is required');
+            try {
+                await axios.get(`${API_BASE_URL}/api/v1/lesson-quotes`, { // No query
+                    headers: { 'Authorization': `Bearer ${studentAuthToken}` }
+                });
+                throw new Error('Request should have failed with 400');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(400);
+                expect(error.response?.data?.error).toContain('lessonRequestId query parameter is required');
+            }
         });
 
         it('should return 404 Not Found for a non-existent lesson request ID in query param', async () => {
             if (!studentAuthToken) throw new Error('Auth token not available for test');
             const fakeRequestId = uuidv4();
-            const response = await getQuotesByLessonRequestId(studentAuthToken, fakeRequestId);
-            expect(response.status).toBe(404);
-            expect(response.body.error).toContain(`Lesson request with ID ${fakeRequestId} not found.`);
+            try {
+                await getQuotesByLessonRequestId(studentAuthToken, fakeRequestId);
+                throw new Error('Request should have failed with 404');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(404);
+                expect(error.response?.data?.error).toContain(`Lesson request with ID ${fakeRequestId} not found.`);
+            }
         });
     });
 
@@ -327,53 +377,89 @@ describe('API Integration: /api/v1/lesson-quotes', () => {
             // Use local student token
             const response = await updateQuoteStatus(patchStudentToken, quoteToAcceptId, payload);
             expect(response.status).toBe(200);
-            expect(response.body.id).toBe(quoteToAcceptId);
-            expect(response.body.currentStatus.status).toBe(LessonQuoteStatusValue.ACCEPTED);
+            const quote: LessonQuote = response.data; // Use response.data
+            expect(quote.id).toBe(quoteToAcceptId);
+            expect(quote.currentStatus?.status).toBe(LessonQuoteStatusValue.ACCEPTED);
             // TODO: Add check that a Lesson was created? (Requires fetching lesson by quoteId)
         });
 
         it('should return 401 Unauthorized if no token is provided', async () => {
             const payload = { status: LessonQuoteStatusValue.ACCEPTED };
-            const response = await updateQuoteStatusUnauthenticated(quoteToAcceptId, payload);
-            expect(response.status).toBe(401);
+            try {
+                await updateQuoteStatusUnauthenticated(quoteToAcceptId, payload);
+                throw new Error('Request should have failed with 401');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(401);
+            }
         });
 
         it('should return 403 Forbidden if the TEACHER tries to accept the quote', async () => {
             const payload = { status: LessonQuoteStatusValue.ACCEPTED };
-            // Use local teacher token
-            const response = await updateQuoteStatus(patchTeacherToken, quoteToAcceptId, payload);
-            expect(response.status).toBe(403);
+            try {
+                // Use local teacher token
+                await updateQuoteStatus(patchTeacherToken, quoteToAcceptId, payload);
+                throw new Error('Request should have failed with 403');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(403);
+            }
         });
 
         it('should return 403 Forbidden if an unrelated STUDENT tries to accept the quote', async () => {
             // Use the student token from the outer scope (different from the local one)
             const payload = { status: LessonQuoteStatusValue.ACCEPTED };
-            const response = await updateQuoteStatus(studentAuthToken!, quoteToAcceptId, payload);
-            expect(response.status).toBe(403);
+            try {
+                await updateQuoteStatus(studentAuthToken!, quoteToAcceptId, payload);
+                throw new Error('Request should have failed with 403');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(403);
+            }
         });
 
         it('should return 400 Bad Request for an invalid status transition (e.g., ACCEPTED -> CREATED)', async () => {
             await updateQuoteStatus(patchStudentToken, quoteToAcceptId, { status: LessonQuoteStatusValue.ACCEPTED });
-            const response = await patchQuoteRaw(patchStudentToken, quoteToAcceptId, { status: LessonQuoteStatusValue.CREATED });
-            expect(response.status).toBe(400);
-            expect(response.body.error).toContain('Invalid target status');
+            try {
+                await patchQuoteRaw(patchStudentToken, quoteToAcceptId, { status: LessonQuoteStatusValue.CREATED });
+                throw new Error('Request should have failed with 400');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(400);
+                expect(error.response?.data?.error).toContain('Invalid target status');
+            }
         });
 
         it('should return 400 Bad Request if status is missing', async () => {
-            const response = await patchQuoteRaw(patchStudentToken, quoteToAcceptId, {}); // Empty payload
-            expect(response.status).toBe(400);
+            try {
+                await patchQuoteRaw(patchStudentToken, quoteToAcceptId, {}); // Empty payload
+                throw new Error('Request should have failed with 400');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(400);
+            }
         });
 
         it('should return 400 Bad Request if status value is invalid', async () => {
-            const response = await patchQuoteRaw(patchStudentToken, quoteToAcceptId, { status: 'INVALID_STATUS' });
-            expect(response.status).toBe(400);
+            try {
+                await patchQuoteRaw(patchStudentToken, quoteToAcceptId, { status: 'INVALID_STATUS' });
+                throw new Error('Request should have failed with 400');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(400);
+            }
         });
 
         it('should return 404 Not Found if quote ID does not exist', async () => {
             const fakeQuoteId = uuidv4();
             const payload = { status: LessonQuoteStatusValue.ACCEPTED };
-            const response = await updateQuoteStatus(patchStudentToken, fakeQuoteId, payload);
-            expect(response.status).toBe(404);
+            try {
+                await updateQuoteStatus(patchStudentToken, fakeQuoteId, payload);
+                throw new Error('Request should have failed with 404');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(404);
+            }
         });
     });
 }); 

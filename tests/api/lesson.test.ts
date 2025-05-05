@@ -1,9 +1,9 @@
-import request from 'supertest';
 import { Lesson } from '../../shared/models/Lesson';
 import { LessonStatusValue, LessonStatusTransition } from '../../shared/models/LessonStatus';
 import { UserType } from '../../shared/models/UserType'; // Import UserType
 import { LessonType } from '../../shared/models/LessonType'; // Import LessonType
 import { v4 as uuidv4 } from 'uuid'; // Import uuid
+import axios from 'axios'; // Import axios
 
 // Import ALL necessary test utilities
 import { createTestStudent, createTestTeacher, loginTestUser } from './utils/user.utils';
@@ -74,22 +74,28 @@ describe('API Integration: /api/v1/lessons', () => {
             // Accept quote to create lesson (Student)
             await acceptTestLessonQuote(studentAuthToken!, quote.id);
 
-            // Fetch the newly created Lesson using the quoteId
-            const fetchLessonResponse = await request(API_BASE_URL!)
-                .get('/api/v1/lessons')
-                .set('Authorization', `Bearer ${studentAuthToken}`)
-                .query({ quoteId: createdQuoteId });
+            // Fetch the newly created Lesson using the quoteId (using axios)
+            let createdLesson: Lesson;
+            try {
+                const fetchLessonResponse = await axios.get(`${API_BASE_URL}/api/v1/lessons`, {
+                    headers: { 'Authorization': `Bearer ${studentAuthToken}` },
+                    params: { quoteId: createdQuoteId }
+                });
 
-            if (fetchLessonResponse.status !== 200 || !Array.isArray(fetchLessonResponse.body) || fetchLessonResponse.body.length !== 1) {
-                console.error("Failed to fetch created lesson in lesson setup:", fetchLessonResponse.status, fetchLessonResponse.body);
-                throw new Error(`Failed to fetch lesson associated with quote ${createdQuoteId} in setup.`);
+                if (fetchLessonResponse.status !== 200 || !Array.isArray(fetchLessonResponse.data) || fetchLessonResponse.data.length !== 1) {
+                    console.error("Failed to fetch created lesson in lesson setup:", fetchLessonResponse.status, fetchLessonResponse.data);
+                    throw new Error(`Failed to fetch lesson associated with quote ${createdQuoteId} in setup.`);
+                }
+                createdLesson = fetchLessonResponse.data[0] as Lesson;
+                if (!createdLesson || !createdLesson.id) {
+                    console.error("Fetched lesson object is invalid in setup:", createdLesson);
+                    throw new Error('Fetched lesson object is invalid in setup.');
+                }
+                createdLessonId = createdLesson.id;
+            } catch (error: any) {
+                console.error("Error fetching lesson in beforeAll:", axios.isAxiosError(error) ? error.response?.data : error);
+                throw new Error(`Failed to fetch lesson associated with quote ${createdQuoteId} in setup: ${error.message}`);
             }
-            const createdLesson = fetchLessonResponse.body[0];
-            if (!createdLesson || !createdLesson.id) {
-                console.error("Fetched lesson object is invalid in setup:", createdLesson);
-                throw new Error('Fetched lesson object is invalid in setup.');
-            }
-            createdLessonId = createdLesson.id;
 
         } catch (error) {
             console.error('[Lesson Test Setup Error]', error);
@@ -97,85 +103,109 @@ describe('API Integration: /api/v1/lessons', () => {
         }
     }, 60000);
 
-    // --- GET /lessons (Combined Filters) --- 
+    // --- GET /lessons (Combined Filters) ---
     describe('GET /lessons (Combined Filters)', () => {
 
         it('should return 401 Unauthorized if no token is provided', async () => {
             // Use unauthenticated util
-            const response = await getLessonsUnauthenticated({ teacherId: teacherId! });
-            expect(response.status).toBe(401);
+            try {
+                await getLessonsUnauthenticated({ teacherId: teacherId! });
+                throw new Error('Request should have failed with 401');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(401);
+            }
         });
 
         it('should return 400 Bad Request if NEITHER teacherId NOR quoteId is provided', async () => {
-            // Keep direct request: Testing specific lack of query params
-            const response = await request(API_BASE_URL!)
-                .get('/api/v1/lessons')
-                .set('Authorization', `Bearer ${teacherAuthToken}`)
-            expect(response.status).toBe(400);
-            expect(response.body.error).toContain('Exactly one of teacherId or quoteId');
+            try {
+                await axios.get(`${API_BASE_URL}/api/v1/lessons`, {
+                    headers: { 'Authorization': `Bearer ${teacherAuthToken}` }
+                });
+                throw new Error('Request should have failed with 400');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(400);
+                expect(error.response?.data?.error).toContain('Exactly one of teacherId or quoteId');
+            }
         });
 
         it('should return 400 Bad Request if BOTH teacherId AND quoteId are provided', async () => {
-            // Keep direct request: Testing specific combination of query params
-            const response = await request(API_BASE_URL!)
-                .get('/api/v1/lessons')
-                .query({ teacherId: teacherId!, quoteId: createdQuoteId! })
-                .set('Authorization', `Bearer ${teacherAuthToken}`)
-            expect(response.status).toBe(400);
-            expect(response.body.error).toContain('Exactly one of teacherId or quoteId');
+            try {
+                await axios.get(`${API_BASE_URL}/api/v1/lessons`, {
+                    headers: { 'Authorization': `Bearer ${teacherAuthToken}` },
+                    params: { teacherId: teacherId!, quoteId: createdQuoteId! }
+                });
+                throw new Error('Request should have failed with 400');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(400);
+                expect(error.response?.data?.error).toContain('Exactly one of teacherId or quoteId');
+            }
         });
 
-        // --- Tests for teacherId filter --- 
+        // --- Tests for teacherId filter ---
         describe('using ?teacherId=...', () => {
             it('should return 403 Forbidden if requesting as the wrong role (STUDENT)', async () => {
-                // Use util
-                const response = await getLessons(studentAuthToken!, { teacherId: teacherId! });
-                expect(response.status).toBe(403);
-                expect(response.body.error).toContain('Only teachers can filter by teacherId');
+                try {
+                    await getLessons(studentAuthToken!, { teacherId: teacherId! });
+                    throw new Error('Request should have failed with 403');
+                } catch (error: any) {
+                    expect(axios.isAxiosError(error)).toBe(true);
+                    expect(error.response?.status).toBe(403);
+                    expect(error.response?.data?.error).toContain('Only teachers can filter by teacherId');
+                }
             });
 
             it('should return 403 Forbidden if requesting lessons for a different teacher ID', async () => {
                 const otherTeacherId = 'some-other-teacher-id-not-created';
-                // Use util
-                const response = await getLessons(teacherAuthToken!, { teacherId: otherTeacherId });
-                expect(response.status).toBe(403);
-                expect(response.body.error).toContain('Teachers can only retrieve their own lessons');
+                try {
+                    await getLessons(teacherAuthToken!, { teacherId: otherTeacherId });
+                    throw new Error('Request should have failed with 403');
+                } catch (error: any) {
+                    expect(axios.isAxiosError(error)).toBe(true);
+                    expect(error.response?.status).toBe(403);
+                    expect(error.response?.data?.error).toContain('Teachers can only retrieve their own lessons');
+                }
             });
 
             it('should return lessons for the authenticated teacher', async () => {
                 // Use util
                 const response = await getLessons(teacherAuthToken!, { teacherId: teacherId! });
                 expect(response.status).toBe(200);
-                expect(response.body).toBeInstanceOf(Array);
-                expect(response.body.length).toBeGreaterThan(0);
-                const foundLesson = response.body.find((l: Lesson) => l.id === createdLessonId);
+                const lessons: Lesson[] = response.data; // Use response.data
+                expect(lessons).toBeInstanceOf(Array);
+                expect(lessons.length).toBeGreaterThan(0);
+                const foundLesson = lessons.find((l: Lesson) => l.id === createdLessonId);
                 expect(foundLesson).toBeDefined();
-                expect(foundLesson.quote?.teacher?.id).toEqual(teacherId);
+                expect(foundLesson!.quote?.teacher?.id).toEqual(teacherId);
             });
         });
 
-        // --- Tests for quoteId filter --- 
+        // --- Tests for quoteId filter ---
         describe('using ?quoteId=...', () => {
             it('should return lessons for the TEACHER associated with the quote', async () => {
                 // Use util
                 const response = await getLessons(teacherAuthToken!, { quoteId: createdQuoteId! });
                 expect(response.status).toBe(200);
-                expect(response.body).toBeInstanceOf(Array);
-                expect(response.body.length).toBeGreaterThan(0);
-                const foundLesson = response.body.find((l: Lesson) => l.id === createdLessonId);
+                const lessons: Lesson[] = response.data; // Use response.data
+                expect(lessons).toBeInstanceOf(Array);
+                expect(lessons.length).toBeGreaterThan(0);
+                const foundLesson = lessons.find((l: Lesson) => l.id === createdLessonId);
                 expect(foundLesson).toBeDefined();
-                expect(foundLesson.quote?.id).toEqual(createdQuoteId);
+                expect(foundLesson!.quote?.id).toEqual(createdQuoteId);
             });
 
             it('should return lessons for the STUDENT associated with the quote', async () => {
                 // Use util
                 const response = await getLessons(studentAuthToken!, { quoteId: createdQuoteId! });
                 expect(response.status).toBe(200);
-                expect(response.body).toBeInstanceOf(Array);
-                expect(response.body.length).toBeGreaterThan(0);
-                const foundLesson = response.body.find((l: Lesson) => l.id === createdLessonId);
+                const lessons: Lesson[] = response.data; // Use response.data
+                expect(lessons).toBeInstanceOf(Array);
+                expect(lessons.length).toBeGreaterThan(0);
+                const foundLesson = lessons.find((l: Lesson) => l.id === createdLessonId);
                 expect(foundLesson).toBeDefined();
-                expect(foundLesson.quote?.id).toEqual(createdQuoteId);
+                expect(foundLesson!.quote?.id).toEqual(createdQuoteId);
             });
 
             it('should return 403 Forbidden for an unrelated user', async () => {
@@ -183,10 +213,14 @@ describe('API Integration: /api/v1/lessons', () => {
                 const { user: otherStudent, password: otherPassword } = await createTestStudent();
                 const otherToken = await loginTestUser(otherStudent.email, otherPassword, UserType.STUDENT);
 
-                // Use util
-                const response = await getLessons(otherToken, { quoteId: createdQuoteId! });
-                expect(response.status).toBe(403);
-                expect(response.body.error).toContain('User is not authorized to view lessons for this quote');
+                try {
+                    await getLessons(otherToken, { quoteId: createdQuoteId! });
+                    throw new Error('Request should have failed with 403');
+                } catch (error: any) {
+                    expect(axios.isAxiosError(error)).toBe(true);
+                    expect(error.response?.status).toBe(403);
+                    expect(error.response?.data?.error).toContain('User is not authorized to view lessons for this quote');
+                }
             });
 
             it('should return empty array for a non-existent quoteId', async () => {
@@ -194,13 +228,14 @@ describe('API Integration: /api/v1/lessons', () => {
                 // Use util
                 const response = await getLessons(teacherAuthToken!, { quoteId: fakeQuoteId });
                 expect(response.status).toBe(200);
-                expect(response.body).toBeInstanceOf(Array);
-                expect(response.body.length).toBe(0);
+                const lessons: Lesson[] = response.data; // Use response.data
+                expect(lessons).toBeInstanceOf(Array);
+                expect(lessons.length).toBe(0);
             });
         });
     });
 
-    // --- POST /lessons --- 
+    // --- POST /lessons ---
     describe('POST /', () => {
         let anotherQuoteId: string; // For testing creation
 
@@ -210,7 +245,7 @@ describe('API Integration: /api/v1/lessons', () => {
             const { user: postTeacher, password: postPassword } = await createTestTeacher([
                 { lessonType: LessonType.GUITAR, rateInCents: 4800 }
             ]);
-            const postTeacherToken = await loginTestUser(postTeacher.email, postPassword, UserType.TEACHER);
+            // No need for postTeacherToken
             // Use the main student from the outer scope
             const request = await createTestLessonRequest(studentAuthToken!, studentId!, LessonType.GUITAR);
 
@@ -235,89 +270,130 @@ describe('API Integration: /api/v1/lessons', () => {
             const response = await createLesson(studentAuthToken!, { quoteId: anotherQuoteId });
 
             expect(response.status).toBe(201);
-            expect(response.body.id).toBeDefined();
-            expect(response.body.quote.id).toBe(anotherQuoteId);
-            expect(response.body.currentStatus.status).toBe(LessonStatusValue.REQUESTED);
+            const createdLesson: Lesson = response.data; // Use response.data
+            expect(createdLesson.id).toBeDefined();
+            expect(createdLesson.quote.id).toBe(anotherQuoteId);
+            expect(createdLesson.currentStatus?.status).toBe(LessonStatusValue.REQUESTED);
         });
 
         it('should return 400 if quoteId is missing', async () => {
-            // Use util with incorrect type (empty object)
-            const response = await createLesson(studentAuthToken!, {} as any);
-            expect(response.status).toBe(400);
-            expect(response.body.error).toContain('Valid Quote ID is required.');
+            try {
+                // Use util with incorrect type (empty object)
+                await createLesson(studentAuthToken!, {} as any);
+                throw new Error('Request should have failed with 400');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(400);
+                expect(error.response?.data?.error).toContain('Valid Quote ID is required.');
+            }
         });
 
         it('should return 404 if quoteId does not exist', async () => {
             const fakeQuoteId = uuidv4();
-            // Use util
-            const response = await createLesson(studentAuthToken!, { quoteId: fakeQuoteId });
-            expect(response.status).toBe(404);
+            try {
+                await createLesson(studentAuthToken!, { quoteId: fakeQuoteId });
+                throw new Error('Request should have failed with 404');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(404);
+            }
         });
 
         it('should return 409 if quote is already used for another lesson', async () => {
-            // Use util
-            const response = await createLesson(studentAuthToken!, { quoteId: createdQuoteId! });
-            expect(response.status).toBe(409);
-            expect(response.body.error).toContain('already associated with lesson');
+            try {
+                // Use util
+                await createLesson(studentAuthToken!, { quoteId: createdQuoteId! });
+                throw new Error('Request should have failed with 409');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(409);
+                expect(error.response?.data?.error).toContain('already associated with lesson');
+            }
         });
 
         it('should return 401 if unauthenticated', async () => {
-            // Use unauthenticated util
-            const response = await createLessonUnauthenticated({ quoteId: anotherQuoteId });
-            expect(response.status).toBe(401);
+            try {
+                // Use unauthenticated util
+                await createLessonUnauthenticated({ quoteId: anotherQuoteId });
+                throw new Error('Request should have failed with 401');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(401);
+            }
         });
     });
 
-    // --- GET /lessons/:id --- 
+    // --- GET /lessons/:id ---
     describe('GET /:id', () => {
         it('should return the lesson details for the associated student', async () => {
             if (!studentAuthToken || !createdLessonId) {
                 throw new Error('Test setup incomplete: studentAuthToken or createdLessonId is missing.');
             }
-            const response = await getLessonById(studentAuthToken!, createdLessonId!);
+            const response = await getLessonById(studentAuthToken!, createdLessonId!); // Use util
             expect(response.status).toBe(200);
-            expect(response.body.id).toBe(createdLessonId);
-            expect(response.body.quote.lessonRequest.student.id).toBe(studentId);
+            const lesson: Lesson = response.data; // Use response.data
+            expect(lesson.id).toBe(createdLessonId);
+            expect(lesson.quote.lessonRequest.student.id).toBe(studentId);
         });
 
         it('should return the lesson details for the associated teacher', async () => {
             if (!teacherAuthToken || !createdLessonId) {
                 throw new Error('Test setup incomplete: teacherAuthToken or createdLessonId is missing.');
             }
-            const response = await getLessonById(teacherAuthToken!, createdLessonId!);
+            const response = await getLessonById(teacherAuthToken!, createdLessonId!); // Use util
             expect(response.status).toBe(200);
-            expect(response.body.id).toBe(createdLessonId);
-            expect(response.body.quote.teacher.id).toBe(teacherId);
+            const lesson: Lesson = response.data; // Use response.data
+            expect(lesson.id).toBe(createdLessonId);
+            expect(lesson.quote.teacher.id).toBe(teacherId);
         });
 
         it('should return 401 Unauthorized if no token is provided', async () => {
             if (!createdLessonId) throw new Error('Test setup incomplete: createdLessonId is missing.');
-            const response = await getLessonByIdUnauthenticated(createdLessonId!); // Added assertion
-            expect(response.status).toBe(401);
+            try {
+                await getLessonByIdUnauthenticated(createdLessonId!); // Use util
+                throw new Error('Request should have failed with 401');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(401);
+            }
         });
 
-        it('should return 403 Forbidden if requested by an unrelated user', async () => {
+        it('should return 403/404 Forbidden/Not Found if requested by an unrelated user', async () => {
             const { user: unrelatedUser, password: unrelatedPassword } = await createTestStudent();
             const unrelatedToken = await loginTestUser(unrelatedUser.email, unrelatedPassword, UserType.STUDENT);
             if (!createdLessonId) throw new Error('Test setup incomplete: createdLessonId is missing.');
-            const response = await getLessonById(unrelatedToken, createdLessonId!);
-            // Update assertion: Expect 404 because the service checks existence before auth
-            expect(response.status).toBe(404);
+            try {
+                await getLessonById(unrelatedToken, createdLessonId!); // Use util
+                throw new Error('Request should have failed with 403/404');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(404); // Expect 404 based on service logic
+            }
         });
 
         it('should return 404 Not Found if lesson ID does not exist', async () => {
             const fakeLessonId = uuidv4();
-            const response = await getLessonById(studentAuthToken!, fakeLessonId); // Added assertion
-            expect(response.status).toBe(404);
+            try {
+                await getLessonById(studentAuthToken!, fakeLessonId); // Use util
+                throw new Error('Request should have failed with 404');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(404);
+            }
         });
 
         it('should return 400 Bad Request if lesson ID is invalid', async () => {
-            const response = await getLessonById(studentAuthToken!, 'invalid-uuid'); // Added assertion
-            expect(response.status).toBe(400);
+            try {
+                await getLessonById(studentAuthToken!, 'invalid-uuid'); // Use util
+                throw new Error('Request should have failed with 400');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(400);
+            }
         });
     });
 
-    // --- PATCH /lessons/:id --- 
+    // --- PATCH /lessons/:id ---
     describe('PATCH /:id', () => {
         let lessonToUpdateId: string;
         let quoteForUpdateId: string;
@@ -325,44 +401,55 @@ describe('API Integration: /api/v1/lessons', () => {
         let patchTeacherId: string; // ID for the teacher specific to this suite
         let patchStudentAuthToken: string; // Token for student (needed for one test)
 
-        beforeAll(async () => {
-            // Create a separate teacher, student, and lesson specifically for update tests
-            const { user: patchStudent, password: patchStudentPassword } = await createTestStudent();
-            const studentIdForPatch = patchStudent.id;
-            patchStudentAuthToken = await loginTestUser(patchStudent.email, patchStudentPassword, UserType.STUDENT);
+        // Use beforeEach to create a fresh lesson for each test in this suite
+        beforeEach(async () => {
+            try {
+                // Create a separate teacher, student, and lesson specifically for update tests
+                // Student
+                const { user: patchStudent, password: patchStudentPassword } = await createTestStudent();
+                const studentIdForPatch = patchStudent.id;
+                patchStudentAuthToken = await loginTestUser(patchStudent.email, patchStudentPassword, UserType.STUDENT);
 
-            // Create teacher with VOICE rate needed for this lesson
-            const { user: patchTeacher, password: patchTeacherPassword } = await createTestTeacher([
-                { lessonType: LessonType.VOICE, rateInCents: 5000 }
-            ]);
-            patchTeacherId = patchTeacher.id;
-            patchTeacherAuthToken = await loginTestUser(patchTeacher.email, patchTeacherPassword, UserType.TEACHER);
+                // Teacher with VOICE rate
+                const { user: patchTeacher, password: patchTeacherPassword } = await createTestTeacher([
+                    { lessonType: LessonType.VOICE, rateInCents: 5000 }
+                ]);
+                patchTeacherId = patchTeacher.id;
+                patchTeacherAuthToken = await loginTestUser(patchTeacher.email, patchTeacherPassword, UserType.TEACHER);
 
-            const req = await createTestLessonRequest(patchStudentAuthToken!, studentIdForPatch!, LessonType.VOICE);
-            // Use the teacherIds array with the specific teacher ID
-            const quotes = await createTestLessonQuote(patchStudentAuthToken!, { lessonRequestId: req.id, teacherIds: [patchTeacherId] });
-            if (!quotes || quotes.length === 0) throw new Error('PATCH Setup: No quotes generated.');
-            // Find the specific quote from the teacher created *in this block*
-            const quote = quotes.find(q => q.teacher?.id === patchTeacherId);
-            if (!quote) throw new Error('PATCH setup: Quote from specific teacher not found.');
-            quoteForUpdateId = quote.id;
+                // Request
+                const req = await createTestLessonRequest(patchStudentAuthToken!, studentIdForPatch!, LessonType.VOICE);
 
-            await acceptTestLessonQuote(patchStudentAuthToken!, quoteForUpdateId);
-            const fetchResp = await request(API_BASE_URL!).get('/api/v1/lessons')
-                .set('Authorization', `Bearer ${patchStudentAuthToken}`)
-                .query({ quoteId: quoteForUpdateId });
-            if (fetchResp.status !== 200 || !Array.isArray(fetchResp.body) || fetchResp.body.length !== 1) {
-                throw new Error('PATCH Setup: Failed to fetch created lesson.');
+                // Quote
+                const quotes = await createTestLessonQuote(patchStudentAuthToken!, { lessonRequestId: req.id, teacherIds: [patchTeacherId] });
+                if (!quotes || quotes.length === 0) throw new Error('PATCH beforeEach: No quotes generated.');
+                const quote = quotes.find(q => q.teacher?.id === patchTeacherId);
+                if (!quote) throw new Error('PATCH beforeEach: Quote from specific teacher not found.');
+                quoteForUpdateId = quote.id; // Store quote ID if needed, though maybe not used directly in tests
+
+                // Accept Quote (creates Lesson implicitly)
+                await acceptTestLessonQuote(patchStudentAuthToken!, quoteForUpdateId);
+
+                // Fetch the newly created Lesson ID
+                const fetchResp = await axios.get(`${API_BASE_URL}/api/v1/lessons`, {
+                    headers: { 'Authorization': `Bearer ${patchStudentAuthToken}` },
+                    params: { quoteId: quoteForUpdateId }
+                });
+                if (fetchResp.status !== 200 || !Array.isArray(fetchResp.data) || fetchResp.data.length !== 1) {
+                    throw new Error('PATCH beforeEach: Failed to fetch created lesson.');
+                }
+                lessonToUpdateId = fetchResp.data[0].id; // Assign the ID for the current test
+            } catch (error: any) {
+                console.error("Error in PATCH /:id beforeEach:", axios.isAxiosError(error) ? error.response?.data : error);
+                throw new Error(`PATCH beforeEach Failed: ${error.message}`);
             }
-            lessonToUpdateId = fetchResp.body[0].id;
         });
 
         it('should update the lesson status (e.g., Teacher marks COMPLETE)', async () => {
-            // Follow the valid transition path from the likely initial state (REQUESTED -> ACCEPTED -> DEFINED -> COMPLETED)
-            // NOTE: Assuming the initial state after beforeAll is REQUESTED due to potential issue in lesson creation logic
-            // Step 1: ACCEPT (Student Action - but for testing, teacher might need temp permission or use student token if applicable)
-            // Forcing ACCEPT with teacher token for test simplicity, assuming permissions allow or are mocked.
-            // If this fails, indicates a deeper permission/state issue not fixable here.
+            // Lesson is now guaranteed to be in REQUESTED state initially
+            // Follow the valid transition path: REQUESTED -> ACCEPTED -> DEFINED -> COMPLETED
+
+            // Step 1: ACCEPT (Teacher Action - assuming roles allow this for testing)
             await updateLessonStatus(patchTeacherAuthToken!, lessonToUpdateId, { transition: LessonStatusTransition.ACCEPT });
 
             // Step 2: DEFINE (Teacher Action)
@@ -370,44 +457,62 @@ describe('API Integration: /api/v1/lessons', () => {
 
             // Step 3: COMPLETE (Teacher Action)
             const payload = { transition: LessonStatusTransition.COMPLETE };
-            const response = await updateLessonStatus(patchTeacherAuthToken!, lessonToUpdateId, payload);
+            const response = await updateLessonStatus(patchTeacherAuthToken!, lessonToUpdateId, payload); // Use util
             expect(response.status).toBe(200);
-            expect(response.body.id).toBe(lessonToUpdateId);
-            expect(response.body.currentStatus.status).toBe(LessonStatusValue.COMPLETED);
+            const updatedLesson: Lesson = response.data; // Use response.data
+            expect(updatedLesson.id).toBe(lessonToUpdateId);
+            expect(updatedLesson.currentStatus?.status).toBe(LessonStatusValue.COMPLETED); // Optional chaining kept
         });
 
         it('should return 401 Unauthorized if no token is provided', async () => {
             const payload = { transition: LessonStatusTransition.VOID };
-            const response = await updateLessonStatusUnauthenticated(lessonToUpdateId, payload);
-            expect(response.status).toBe(401);
+            try {
+                await updateLessonStatusUnauthenticated(lessonToUpdateId, payload); // Use util
+                throw new Error('Request should have failed with 401');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(401);
+            }
         });
 
         it('should return 400 Bad Request for invalid status transition', async () => {
-            // Follow the valid transition path to get to COMPLETED state first
-            // Assume starting state is REQUESTED
-            await updateLessonStatus(patchTeacherAuthToken!, lessonToUpdateId, { transition: LessonStatusTransition.ACCEPT });
-            await updateLessonStatus(patchTeacherAuthToken!, lessonToUpdateId, { transition: LessonStatusTransition.DEFINE });
-            await updateLessonStatus(patchTeacherAuthToken!, lessonToUpdateId, { transition: LessonStatusTransition.COMPLETE });
+            // Lesson starts in REQUESTED state due to beforeEach
 
-            // Now try COMPLETE again from COMPLETED state
+            // Try an invalid transition directly: REQUESTED -> COMPLETE
             const payload = { transition: LessonStatusTransition.COMPLETE };
-            const response = await updateLessonStatus(patchTeacherAuthToken!, lessonToUpdateId, payload);
-            expect(response.status).toBe(400);
-            expect(response.body.error).toContain('Invalid transition: Cannot transition from COMPLETED using COMPLETE');
+            try {
+                await updateLessonStatus(patchTeacherAuthToken!, lessonToUpdateId, payload); // Use util
+                throw new Error('Request should have failed with 400');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(400);
+                // Updated expectation for the specific invalid transition from REQUESTED
+                expect(error.response?.data?.error).toContain('Invalid transition: Cannot transition from REQUESTED using COMPLETE');
+            }
         });
 
         it('should return 400 Bad Request if transition is missing', async () => {
-            // Use the correct teacher token
-            const response = await patchLessonRaw(patchTeacherAuthToken!, lessonToUpdateId, {});
-            expect(response.status).toBe(400);
-            expect(response.body.error).toMatch(/Invalid transition value|Transition is required/);
+            try {
+                // Use the correct teacher token
+                await patchLessonRaw(patchTeacherAuthToken!, lessonToUpdateId, {}); // Use util
+                throw new Error('Request should have failed with 400');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(400);
+                expect(error.response?.data?.error).toMatch(/Invalid transition value|Transition is required/);
+            }
         });
 
         it('should return 400 Bad Request if transition is invalid', async () => {
-            // Use the correct teacher token
-            const response = await patchLessonRaw(patchTeacherAuthToken!, lessonToUpdateId, { transition: 'INVALID_TRANSITION' });
-            expect(response.status).toBe(400);
-            expect(response.body.error).toMatch(/Invalid transition value|Invalid enum value/);
+            try {
+                // Use the correct teacher token
+                await patchLessonRaw(patchTeacherAuthToken!, lessonToUpdateId, { transition: 'INVALID_TRANSITION' }); // Use util
+                throw new Error('Request should have failed with 400');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(400);
+                expect(error.response?.data?.error).toMatch(/Invalid transition value|Invalid enum value/);
+            }
         });
 
         it('should return 403 Forbidden if student tries an action only teacher can do', async () => {
@@ -415,25 +520,35 @@ describe('API Integration: /api/v1/lessons', () => {
             const studentToken = patchStudentAuthToken!;
             const lessonId = lessonToUpdateId; // Use the lesson ID from the suite's setup
 
-            // Need to ensure the lesson is in a state where COMPLETE is a valid *next* step IF the user were allowed
-            // Assume starting REQUESTED -> ACCEPT -> DEFINE (teacher)
-            await updateLessonStatus(patchTeacherAuthToken!, lessonId, { transition: LessonStatusTransition.ACCEPT });
-            await updateLessonStatus(patchTeacherAuthToken!, lessonId, { transition: LessonStatusTransition.DEFINE });
+            // Lesson starts in REQUESTED state. Student tries to ACCEPT (which might be allowed)
+            // Let's test a transition only a teacher can do, e.g., DEFINE
+            // First, get it to ACCEPTED state (can be done by student or teacher usually)
+            await updateLessonStatus(patchTeacherAuthToken!, lessonId, { transition: LessonStatusTransition.ACCEPT }); // Use teacher for setup
 
-            // Student tries to mark COMPLETE
-            const payload = { transition: LessonStatusTransition.COMPLETE };
-            const response = await updateLessonStatus(studentToken, lessonId, payload);
-            expect(response.status).toBe(403);
-            // Update assertion to match the expected error from checkRole middleware
-            expect(response.body.error).toMatch(/Forbidden|Insufficient permissions/);
+            // Now, student tries to DEFINE (Teacher-only action)
+            const payload = { transition: LessonStatusTransition.DEFINE };
+            try {
+                await updateLessonStatus(studentToken, lessonId, payload); // Use util
+                throw new Error('Request should have failed with 403');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(403);
+                // Update assertion to match the expected error from checkRole middleware
+                expect(error.response?.data?.error).toMatch(/Forbidden|Insufficient permissions/);
+            }
         });
 
         it('should return 404 Not Found if lesson ID does not exist', async () => {
             const fakeLessonId = uuidv4();
             const payload = { transition: LessonStatusTransition.COMPLETE };
-            // Use the correct teacher token
-            const response = await updateLessonStatus(patchTeacherAuthToken!, fakeLessonId, payload);
-            expect(response.status).toBe(404);
+            try {
+                // Use the correct teacher token
+                await updateLessonStatus(patchTeacherAuthToken!, fakeLessonId, payload); // Use util
+                throw new Error('Request should have failed with 404');
+            } catch (error: any) {
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(404);
+            }
         });
     });
 });

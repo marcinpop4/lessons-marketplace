@@ -1,5 +1,3 @@
-import request from 'supertest';
-// Shared Models
 import { LessonRequest } from '@shared/models/LessonRequest';
 import { Student } from '@shared/models/Student';
 import { Address } from '@shared/models/Address';
@@ -7,7 +5,7 @@ import { LessonType } from '@shared/models/LessonType'; // Use shared enum
 import { UserType } from '@shared/models/UserType'; // Use shared enum
 import { v4 as uuidv4 } from 'uuid';
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
-import axios from 'axios'; // Import axios to check for AxiosError
+import axios from 'axios'; // Import axios for direct calls and error checking
 
 // Test Utilities
 import { createTestStudent, createTestTeacher, loginTestUser } from './utils/user.utils';
@@ -98,7 +96,7 @@ describe('API Integration: /api/v1/lesson-requests', () => {
             expect(createdRequest.student?.id).toEqual(student1.id);
             expect(createdRequest.type).toEqual(testRequestPayload.type);
             expect(createdRequest.address?.street).toEqual(testRequestPayload.addressObj.street);
-            expect(createdRequest.startTime).toEqual(new Date(testRequestPayload.startTime)); // Compare Date objects
+            expect(createdRequest.startTime).toEqual(testRequestPayload.startTime);
         });
 
         it('should return 401 Unauthorized if no token is provided', async () => {
@@ -120,12 +118,12 @@ describe('API Integration: /api/v1/lesson-requests', () => {
             } catch (error: any) {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(403);
-                expect(error.response?.data?.error).toContain('Forbidden: Authenticated user does not match studentId');
+                expect(error.response?.data?.error).toContain('Forbidden: You can only create lesson requests for yourself.');
             }
         });
 
         it('should return 403 Forbidden if a Teacher tries to create a request', async () => {
-            // Modify payload to potentially use teacher ID if needed by endpoint, 
+            // Modify payload to potentially use teacher ID if needed by endpoint,
             // but the core check is using the teacher token
             const payloadForTeacher = { ...testRequestPayload, studentId: 'some-student-id' }; // Use a placeholder or teacher ID if logic requires
             try {
@@ -172,9 +170,10 @@ describe('API Integration: /api/v1/lesson-requests', () => {
         it('should return lesson requests for the authenticated student specified in query (200)', async () => {
             const response = await getLessonRequestsByStudentId(student1Token, student1.id);
             expect(response.status).toBe(200);
-            expect(Array.isArray(response.data)).toBe(true); // Use response.data
+            const requests: LessonRequest[] = response.data; // Use response.data
+            expect(Array.isArray(requests)).toBe(true);
             // Ensure at least the created request is present
-            const found = response.data.find((req: LessonRequest) => req.id === createdRequestId);
+            const found = requests.find((req: LessonRequest) => req.id === createdRequestId);
             expect(found).toBeDefined();
             expect(found?.student?.id).toBe(student1.id);
         });
@@ -220,7 +219,7 @@ describe('API Integration: /api/v1/lesson-requests', () => {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(400);
                 // Check specific error if needed
-                expect(error.response?.data?.error).toContain('Student ID query parameter is required');
+                expect(error.response?.data?.error).toContain('Missing or invalid studentId query parameter');
             }
         });
 
