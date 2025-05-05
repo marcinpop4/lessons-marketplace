@@ -5,9 +5,6 @@ import { fileURLToPath } from 'url';
 
 const projectRoot = process.cwd();
 
-// --- Direct path resolution ---
-const tsConfigPath = path.resolve(projectRoot, 'tests/tsconfig.test.json');
-
 export default {
   preset: 'ts-jest',
   testEnvironment: 'node',
@@ -20,8 +17,6 @@ export default {
   // ADD the 'transform' section
   transform: {
     '^.+\.tsx?$': ['ts-jest', {
-      // Replicate the settings previously under globals
-      tsconfig: tsConfigPath,
       diagnostics: {
         warnOnly: true, // Log but don't fail on TS errors
         pretty: true,

@@ -24,18 +24,17 @@ export async function createTestTeacherRate(
     authToken: string,
     lessonType: LessonType,
     rateInCents: number
-): Promise<TeacherLessonHourlyRate> {
+): Promise<TeacherLessonHourlyRate | { error: any, status: number }> {
     try {
         const response = await axios.post(`${API_BASE_URL}/api/v1/teacher-lesson-rates`,
             { lessonType, rateInCents },
             { headers: { 'Authorization': `Bearer ${authToken}` } }
         );
 
-        // Axios throws for non-2xx, so we check for expected success status (200 or 201)
-        // If we reach here, status is 2xx. We primarily expect 201 (created) or potentially 200 (updated).
-        if (response.status !== 201 && response.status !== 200) {
+        // Expect 201 Created
+        if (response.status !== 201) {
             console.warn(`Util createTestTeacherRate received unexpected success status: ${response.status} for rate ${lessonType}. Body:`, response.data);
-            // Still treat as success if 2xx, but warn.
+            // Treat as success if 2xx, but warn. Consider throwing if strict 201 is needed.
         }
 
         // Basic check for expected properties
@@ -46,10 +45,19 @@ export async function createTestTeacherRate(
 
         return response.data as TeacherLessonHourlyRate;
     } catch (error: any) {
-        console.error('Failed to create/update test rate via util:', error.response?.status, error.response?.data || error.message);
-        const status = error.response?.status || 'N/A';
-        const body = error.response?.data ? JSON.stringify(error.response.data) : error.message;
-        throw new Error(`Util failed to create/update rate ${lessonType}. Status: ${status}, Body: ${body}`);
+        if (axios.isAxiosError(error) && error.response?.status === 409) {
+            // Specific handling for 409 Conflict
+            console.warn(`Util createTestTeacherRate encountered expected 409 conflict for ${lessonType}.`, error.response.data);
+            // Return the error response data and status
+            return { error: error.response.data, status: 409 };
+        } else {
+            // Log and re-throw other unexpected errors
+            console.error('Failed to create/update test rate via util:', error.response?.status, error.response?.data || error.message);
+            const status = error.response?.status || 'N/A';
+            const body = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+            // Re-throw a more specific error or the original error if preferred
+            throw new Error(`Util failed unexpectedly during rate creation for ${lessonType}. Status: ${status}, Body: ${body}`);
+        }
     }
 }
 

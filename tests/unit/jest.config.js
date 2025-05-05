@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 const projectRoot = process.cwd();
 
 // --- Direct path resolution ---
-const tsConfigPath = path.resolve(projectRoot, 'tests/tsconfig.test.json');
+const tsConfigPath = path.resolve(projectRoot, 'tsconfig.json');
 console.log(`[Unit Config] Using tsconfig path: ${tsConfigPath}`);
 
 export default {
@@ -18,7 +18,6 @@ export default {
   ],
   transform: {
     '^.+\.tsx?$': ['ts-jest', {
-      tsconfig: tsConfigPath,
       diagnostics: {
         warnOnly: true,
         pretty: true,

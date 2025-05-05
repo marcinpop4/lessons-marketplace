@@ -11,7 +11,7 @@ router.use(authMiddleware);
 router.use(checkRole([UserType.TEACHER]));
 
 // Routes
-router.post('/', teacherLessonHourlyRateController.createOrUpdate);
+router.post('/', teacherLessonHourlyRateController.create);
 // Change route for updating status
 router.patch('/:id', teacherLessonHourlyRateController.updateStatus);
 

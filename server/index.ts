@@ -90,7 +90,7 @@ import addressRoutes from './address/address.routes.js';
 import healthRoutes from './health/health.routes.js';
 import studentRoutes from './student/student.routes.js';
 import goalRoutes from './goal/goal.routes.js';
-import teacherLessonHourlyRateRoutes from './teacher-lesson-hourly-rate/teacherLessonHourlyRate.router.js';
+import teacherLessonHourlyRateRoutes from './teacher-lesson-hourly-rate/teacherLessonHourlyRate.routes.js'; // Updated import
 import objectiveRoutes from './objective/objective.routes.js';
 
 // --- Express App Setup --- 

@@ -25,28 +25,28 @@ const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}
 export const teacherLessonHourlyRateController = {
 
     /**
-     * Create or update a lesson hourly rate for the authenticated teacher.
+     * Create a new lesson hourly rate for the authenticated teacher.
+     * Throws ConflictError if a rate for the type already exists.
      */
-    createOrUpdate: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    create: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const teacherId = req.user?.id;
             if (!teacherId) {
-                // Using throw new AuthError() pattern might be better with central handler
+                // Consider throwing AuthError for consistency
                 res.status(401).json({ message: 'Unauthorized' });
                 return;
             }
 
             const { lessonType, rateInCents } = req.body;
 
-            // Use service layer for all validation as per architecture rules
-            const result = await teacherLessonHourlyRateService.createOrUpdateLessonRate(teacherId, lessonType, rateInCents);
+            // Call the new service method which handles validation and creation
+            const createdRate = await teacherLessonHourlyRateService.createLessonRate(teacherId, lessonType, rateInCents);
 
-            // Set status code based on whether the rate was created or updated
-            const statusCode = result.wasCreated ? 201 : 200;
-            res.status(statusCode).json(result.rate);
+            // Always return 201 Created on success
+            res.status(201).json(createdRate);
 
         } catch (error) {
-            // Pass errors to the central error handler
+            // Pass errors (BadRequestError, NotFoundError, ConflictError etc.) to central handler
             next(error);
         }
     },

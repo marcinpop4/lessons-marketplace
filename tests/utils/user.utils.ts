@@ -70,28 +70,29 @@ export const createTestTeacher = async (ratesToCreate?: RateCreationInfo[]) => {
         });
 
         if (registerResponse.status !== 201 || !registerResponse.data?.user) {
-            console.error('Failed to create test teacher via util:', registerResponse.data);
+            console.error('Failed to create test teacher via util (non-201 or missing user):', registerResponse.status, registerResponse.data);
             throw new Error(`Util failed to create test teacher. Status: ${registerResponse.status}`);
         }
         createdTeacher = registerResponse.data.user as Teacher;
 
     } catch (error: any) {
-        console.error('Error during test teacher registration via util:', error.response?.data || error.message);
-        throw new Error(`Util failed during test teacher registration: ${error.message}`);
+        // Log the whole error object for detailed debugging
+        console.error('Error during test teacher registration API call via util:', error);
+        // Also log specific parts if available, falling back to the full error
+        console.error('Detailed Registration Error:', error?.response?.data || error?.message || error);
+        throw new Error(`Util failed during test teacher registration: ${error?.message || 'Unknown error'}`);
     }
 
     try {
-        // 2. Log in the new teacher to get their token (using the now axios-based loginTestUser)
+        // 2. Log in the new teacher to get their token
         const teacherToken = await loginTestUser(createdTeacher.email, password, UserType.TEACHER);
 
-        // 3. Determine which rates to create (default or provided)
+        // 3. Determine which rates to create
         const rates = ratesToCreate && ratesToCreate.length > 0
             ? ratesToCreate
-            : [{ lessonType: LessonType.VOICE, rateInCents: 4500 }]; // Default rate
+            : [{ lessonType: LessonType.VOICE, rateInCents: 4500 }];
 
-        // 4. Create the rates using the token and utility
-        // IMPORTANT: createTestTeacherRate still uses supertest and needs refactoring!
-        // This part will likely fail until teacherRate.utils.ts is updated.
+        // 4. Create the rates
         for (const rateInfo of rates) {
             await createTestTeacherRate(
                 teacherToken,
@@ -100,9 +101,11 @@ export const createTestTeacher = async (ratesToCreate?: RateCreationInfo[]) => {
             );
         }
     } catch (setupError: any) {
-        console.error(`Util failed during post-registration setup (login/rate creation) for teacher ${createdTeacher.id}:`, setupError.message);
-        // Decide if failure to create rates should prevent teacher creation from succeeding
-        throw new Error(`Util failed during rate creation/login for teacher ${createdTeacher.id}. Error: ${setupError.message}`);
+        // Log the whole setup error object
+        console.error(`Util failed during post-registration setup (login/rate creation) for teacher ${createdTeacher?.id}:`, setupError);
+        // Also log specific parts if available
+        console.error('Detailed Setup Error:', setupError?.response?.data || setupError?.message || setupError);
+        throw new Error(`Util failed during rate creation/login for teacher ${createdTeacher?.id}. Error: ${setupError?.message || 'Unknown setup error'}`);
     }
 
     // 5. Return the teacher object and password

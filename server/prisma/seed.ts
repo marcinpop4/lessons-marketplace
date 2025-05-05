@@ -166,10 +166,10 @@ async function main() {
       for (const lessonType of ALL_LESSON_TYPES) {
         const rateInCents = getBaseRateInCents(lessonType); // Use fixed base rate
         try {
-          await teacherLessonHourlyRateService.createOrUpdateLessonRate(teacher.id, lessonType, rateInCents);
+          await teacherLessonHourlyRateService.createLessonRate(teacher.id, lessonType, rateInCents);
           ratesCreatedCount++;
-        } catch (rateError) {
-          console.error(chalk.red(`Failed to create rate for teacher ${teacher.id}, type ${lessonType}:`), rateError);
+        } catch (e: any) {
+          console.error(`Failed to create rate for teacher ${teacher.id}, type ${lessonType}: ${e.message}`);
         }
       }
     }
