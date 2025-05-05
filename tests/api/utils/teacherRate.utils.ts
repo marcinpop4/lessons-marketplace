@@ -1,4 +1,5 @@
-import request from 'supertest';
+import axios from 'axios';
+import { AxiosResponse } from 'axios';
 import { LessonType } from '@prisma/client';
 import { TeacherLessonHourlyRateStatusTransition } from '@shared/models/TeacherLessonHourlyRateStatus.js';
 import { TeacherLessonHourlyRate } from '@shared/models/TeacherLessonHourlyRate.js';
@@ -13,7 +14,7 @@ if (!API_BASE_URL) {
  * Utility function to create a teacher lesson hourly rate via API.
  * Assumes the provided authToken belongs to a TEACHER.
  * 
- * @param authToken Teacher's Bearer token.
+ * @param authToken Teacher's Bearer token (excluding 'Bearer ').
  * @param lessonType The type of lesson for the rate.
  * @param rateInCents The rate amount in cents.
  * @returns The created TeacherLessonHourlyRate shared model.
@@ -24,36 +25,44 @@ export async function createTestTeacherRate(
     lessonType: LessonType,
     rateInCents: number
 ): Promise<TeacherLessonHourlyRate> {
-    const response = await request(API_BASE_URL!)
-        .post('/api/v1/teacher-lesson-rates')
-        .set('Authorization', authToken)
-        .send({ lessonType, rateInCents });
+    try {
+        const response = await axios.post(`${API_BASE_URL}/api/v1/teacher-lesson-rates`,
+            { lessonType, rateInCents },
+            { headers: { 'Authorization': `Bearer ${authToken}` } }
+        );
 
-    if (response.status !== 201 && response.status !== 200) { // Allow 200 for updates
-        console.error('Failed to create/update test rate via util:', response.status, response.body);
-        throw new Error(`Util failed to create/update rate ${lessonType}. Status: ${response.status}, Body: ${JSON.stringify(response.body)}`);
+        // Axios throws for non-2xx, so we check for expected success status (200 or 201)
+        // If we reach here, status is 2xx. We primarily expect 201 (created) or potentially 200 (updated).
+        if (response.status !== 201 && response.status !== 200) {
+            console.warn(`Util createTestTeacherRate received unexpected success status: ${response.status} for rate ${lessonType}. Body:`, response.data);
+            // Still treat as success if 2xx, but warn.
+        }
+
+        // Basic check for expected properties
+        if (!response.data || !response.data.id || !response.data.currentStatus) {
+            console.error('Util createTestTeacherRate received invalid response body:', response.data);
+            throw new Error('Util createTestTeacherRate received invalid response body.');
+        }
+
+        return response.data as TeacherLessonHourlyRate;
+    } catch (error: any) {
+        console.error('Failed to create/update test rate via util:', error.response?.status, error.response?.data || error.message);
+        const status = error.response?.status || 'N/A';
+        const body = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+        throw new Error(`Util failed to create/update rate ${lessonType}. Status: ${status}, Body: ${body}`);
     }
-
-    // Basic check for expected properties (can be expanded)
-    if (!response.body || !response.body.id || !response.body.currentStatus) {
-        throw new Error('Util createTestTeacherRate received invalid response body.');
-    }
-
-    // Return the body which should match the shared model structure
-    // No explicit mapping needed here if API returns the shared model directly
-    return response.body as TeacherLessonHourlyRate;
 }
 
 /**
  * Utility function to update the status of a teacher lesson hourly rate via API.
  * Assumes the provided authToken belongs to the TEACHER owning the rate.
  * 
- * @param authToken Teacher's Bearer token.
+ * @param authToken Teacher's Bearer token (excluding 'Bearer ').
  * @param rateId The ID of the rate to update.
  * @param transition The status transition to apply (ACTIVATE/DEACTIVATE).
  * @param context Optional context for the transition.
  * @returns The updated TeacherLessonHourlyRate shared model.
- * @throws Error if API call fails or returns unexpected status (excluding idempotent 409 conflicts).
+ * @throws Error if API call fails unexpectedly (excluding expected 409 conflicts).
  */
 export async function updateTestRateStatus(
     authToken: string,
@@ -61,34 +70,32 @@ export async function updateTestRateStatus(
     transition: TeacherLessonHourlyRateStatusTransition,
     context?: any
 ): Promise<TeacherLessonHourlyRate> {
-    const response = await request(API_BASE_URL!)
-        .patch(`/api/v1/teacher-lesson-rates/${rateId}`)
-        .set('Authorization', authToken)
-        .send({ transition, context });
+    try {
+        const response = await axios.patch(`${API_BASE_URL}/api/v1/teacher-lesson-rates/${rateId}`,
+            { transition, context },
+            { headers: { 'Authorization': `Bearer ${authToken}` } }
+        );
 
-    // Allow 200 OK or 409 Conflict (for idempotent calls), but throw for other errors.
-    if (response.status !== 200 && response.status !== 409) {
-        console.error(`Util updateTestRateStatus failed unexpectedly for rate ${rateId} with transition ${transition}. Status: ${response.status}`, response.body);
-        throw new Error(`Util failed to update rate status ${rateId}. Status: ${response.status}, Body: ${JSON.stringify(response.body)}`);
-    }
-
-    // If it was 409, the body might be an error object, not the rate object.
-    // Only validate/return the body if the status was 200.
-    if (response.status === 200) {
-        // Basic check for expected properties on successful update
-        if (!response.body || !response.body.id || !response.body.currentStatus) {
+        // Axios throws for non-2xx, so if we reach here, it must be 200 OK.
+        if (!response.data || !response.data.id || !response.data.currentStatus) {
+            console.error('Util updateTestRateStatus received invalid response body on 200 OK:', response.data);
             throw new Error('Util updateTestRateStatus received invalid response body on 200 OK.');
         }
-        return response.body as TeacherLessonHourlyRate;
-    } else {
-        // For 409, we don't have the updated rate object in the response body.
-        // Return a placeholder or fetch the rate again if needed, 
-        // but for setup purposes, returning a simplified object might be sufficient.
-        // Alternatively, could modify the test not to rely on the return value in this case.
-        // For now, let's return just the ID and a signal it was a conflict.
-        // NOTE: This return type might need adjustment based on how tests use it.
-        console.warn(`Util updateTestRateStatus encountered expected 409 conflict for rate ${rateId}, transition ${transition}.`);
-        // Returning a minimal object; tests relying on the full object after a 409 might need adjustment.
-        return { id: rateId } as TeacherLessonHourlyRate;
+        return response.data as TeacherLessonHourlyRate;
+
+    } catch (error: any) {
+        // Check specifically for the expected 409 Conflict error
+        if (axios.isAxiosError(error) && error.response?.status === 409) {
+            console.warn(`Util updateTestRateStatus encountered expected 409 conflict for rate ${rateId}, transition ${transition}.`);
+            // Return a minimal object as the update didn't actually happen (was already in target state)
+            // Tests using this should be aware of this possibility.
+            return { id: rateId } as TeacherLessonHourlyRate;
+        } else {
+            // Re-throw unexpected errors
+            console.error(`Util updateTestRateStatus failed unexpectedly for rate ${rateId} with transition ${transition}. Status: ${error.response?.status}`, error.response?.data || error.message);
+            const status = error.response?.status || 'N/A';
+            const body = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+            throw new Error(`Util failed to update rate status ${rateId}. Status: ${status}, Body: ${body}`);
+        }
     }
 } 

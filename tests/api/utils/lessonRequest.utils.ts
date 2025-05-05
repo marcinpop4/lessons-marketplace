@@ -1,4 +1,5 @@
-import request from 'supertest';
+import axios from 'axios';
+import { AxiosResponse } from 'axios';
 import { LessonRequest } from '@shared/models/LessonRequest';
 import { LessonType } from '@shared/models/LessonType'; // Use shared enum
 import { Address } from '@shared/models/Address';
@@ -15,7 +16,7 @@ if (!API_BASE_URL) {
  * Creates a test lesson request using the API and returns the parsed response body.
  * Assumes the request is successful (status 201).
  * 
- * @param studentToken Raw JWT token for the student.
+ * @param studentToken Raw JWT token for the student (excluding 'Bearer ').
  * @param studentId The ID of the student creating the request.
  * @param type The type of lesson requested.
  * @param startTime Optional start time (defaults to 1 day from now).
@@ -43,19 +44,24 @@ export const createTestLessonRequest = async (
         durationMinutes: durationMinutes
     };
 
-    const response = await request(API_BASE_URL!)
-        .post('/api/v1/lesson-requests')
-        .set('Authorization', `Bearer ${studentToken}`)
-        .send(requestData);
+    try {
+        const response = await axios.post(`${API_BASE_URL}/api/v1/lesson-requests`, requestData, {
+            headers: { 'Authorization': `Bearer ${studentToken}` }
+        });
 
-    // Check for success and if the response body is the lesson request object directly
-    if (response.status !== 201 || !response.body || !response.body.id) { // Check for body and an ID property
-        console.error('Create Test Lesson Request failed:', response.status, response.body);
-        throw new Error(`Util failed to create lesson request. Status: ${response.status}, Body: ${JSON.stringify(response.body)}`);
+        // Axios throws on non-2xx, check for 201 specifically if needed, otherwise check body
+        if (response.status !== 201 || !response.data || !response.data.id) { // Check for body and an ID property
+            console.error('Create Test Lesson Request failed:', response.status, response.data);
+            throw new Error(`Util failed to create lesson request. Status: ${response.status}, Body: ${JSON.stringify(response.data)}`);
+        }
+
+        return response.data as LessonRequest;
+    } catch (error: any) {
+        console.error('Error creating Test Lesson Request:', error.response?.status, error.response?.data || error.message);
+        const status = error.response?.status || 'N/A';
+        const body = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+        throw new Error(`Util failed to create lesson request. Status: ${status}, Body: ${body}`);
     }
-
-    // Return the response body directly as LessonRequest
-    return response.body as LessonRequest;
 };
 
 // --- Lower-level API Call Utilities ---
@@ -74,24 +80,21 @@ interface CreateLessonRequestPayload {
  * Creates a lesson request via API.
  * @param token Raw JWT token (Student).
  * @param payload Request data.
- * @returns Supertest response promise.
+ * @returns Axios response promise.
  */
-export const createLessonRequestRaw = (token: string, payload: CreateLessonRequestPayload): request.Test => {
-    return request(API_BASE_URL!)
-        .post('/api/v1/lesson-requests')
-        .set('Authorization', `Bearer ${token}`)
-        .send(payload);
+export const createLessonRequestRaw = (token: string, payload: CreateLessonRequestPayload): Promise<AxiosResponse<LessonRequest>> => {
+    return axios.post(`${API_BASE_URL}/api/v1/lesson-requests`, payload, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
 };
 
 /**
  * Creates a lesson request without authentication.
  * @param payload Request data.
- * @returns Supertest response promise.
+ * @returns Axios response promise.
  */
-export const createLessonRequestRawUnauthenticated = (payload: CreateLessonRequestPayload): request.Test => {
-    return request(API_BASE_URL!)
-        .post('/api/v1/lesson-requests')
-        .send(payload);
+export const createLessonRequestRawUnauthenticated = (payload: CreateLessonRequestPayload): Promise<AxiosResponse> => {
+    return axios.post(`${API_BASE_URL}/api/v1/lesson-requests`, payload);
 };
 
 // --- GET /lesson-requests?studentId=... ---
@@ -100,24 +103,24 @@ export const createLessonRequestRawUnauthenticated = (payload: CreateLessonReque
  * Fetches lesson requests by student ID.
  * @param token Raw JWT token.
  * @param studentId ID of the student.
- * @returns Supertest response promise.
+ * @returns Axios response promise.
  */
-export const getLessonRequestsByStudentId = (token: string, studentId: string): request.Test => {
-    return request(API_BASE_URL!)
-        .get('/api/v1/lesson-requests')
-        .set('Authorization', `Bearer ${token}`)
-        .query({ studentId });
+export const getLessonRequestsByStudentId = (token: string, studentId: string): Promise<AxiosResponse<LessonRequest[]>> => {
+    return axios.get(`${API_BASE_URL}/api/v1/lesson-requests`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        params: { studentId } // Use params for query string
+    });
 };
 
 /**
  * Fetches lesson requests by student ID without authentication.
  * @param studentId ID of the student.
- * @returns Supertest response promise.
+ * @returns Axios response promise.
  */
-export const getLessonRequestsByStudentIdUnauthenticated = (studentId: string): request.Test => {
-    return request(API_BASE_URL!)
-        .get('/api/v1/lesson-requests')
-        .query({ studentId });
+export const getLessonRequestsByStudentIdUnauthenticated = (studentId: string): Promise<AxiosResponse> => {
+    return axios.get(`${API_BASE_URL}/api/v1/lesson-requests`, {
+        params: { studentId } // Use params for query string
+    });
 };
 
 // --- GET /lesson-requests/:id ---
@@ -126,20 +129,19 @@ export const getLessonRequestsByStudentIdUnauthenticated = (studentId: string): 
  * Fetches a specific lesson request by ID.
  * @param token Raw JWT token.
  * @param requestId ID of the lesson request.
- * @returns Supertest response promise.
+ * @returns Axios response promise.
  */
-export const getLessonRequestByIdRaw = (token: string, requestId: string): request.Test => {
-    return request(API_BASE_URL!)
-        .get(`/api/v1/lesson-requests/${requestId}`)
-        .set('Authorization', `Bearer ${token}`);
+export const getLessonRequestByIdRaw = (token: string, requestId: string): Promise<AxiosResponse<LessonRequest>> => {
+    return axios.get(`${API_BASE_URL}/api/v1/lesson-requests/${requestId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
 };
 
 /**
  * Fetches a specific lesson request by ID without authentication.
  * @param requestId ID of the lesson request.
- * @returns Supertest response promise.
+ * @returns Axios response promise.
  */
-export const getLessonRequestByIdRawUnauthenticated = (requestId: string): request.Test => {
-    return request(API_BASE_URL!)
-        .get(`/api/v1/lesson-requests/${requestId}`);
+export const getLessonRequestByIdRawUnauthenticated = (requestId: string): Promise<AxiosResponse> => {
+    return axios.get(`${API_BASE_URL}/api/v1/lesson-requests/${requestId}`);
 }; 

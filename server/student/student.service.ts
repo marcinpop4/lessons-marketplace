@@ -3,6 +3,7 @@ import { Student } from '../../shared/models/Student.js';
 import { DuplicateEmailError, BadRequestError } from '../errors/index.js';
 import { StudentMapper } from './student.mapper.js';
 import prisma from '../prisma.js'; // Import shared prisma instance
+import { isUuid } from '../utils/validation.utils.js'; // Import UUID validation util
 
 // Define the type for the Prisma client or transaction client
 // Use Prisma.TransactionClient for the interactive transaction type
@@ -42,9 +43,10 @@ class StudentService {
         }
 
         // Phone number format validation
-        const phoneRegex = /^[\d\s\(\)\-\+]+$/; // Allows digits, spaces, (), -, +
+        // Stricter regex: requires at least 7 digits, allows optional formatting chars
+        const phoneRegex = /^(?=(?:\D*\d){7,})[\d\s\(\)\-\+]+$/;
         if (typeof phoneNumber !== 'string' || !phoneRegex.test(phoneNumber)) {
-            throw new BadRequestError('Invalid phone number format.');
+            throw new BadRequestError('Invalid phone number format. Requires at least 7 digits.'); // Updated error message
         }
 
         // Date of Birth validation (ensure it's a valid Date object)
@@ -95,6 +97,12 @@ class StudentService {
      * @returns Shared Student model instance or null if not found
      */
     async findById(id: string): Promise<Student | null> {
+        // --- Add Input Validation --- 
+        if (!id || !isUuid(id)) {
+            throw new BadRequestError('Valid Student ID is required.');
+        }
+        // --- End Input Validation --- 
+
         try {
             const dbStudent = await this.prisma.student.findUnique({
                 where: { id }

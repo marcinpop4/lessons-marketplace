@@ -1,4 +1,5 @@
-import request from 'supertest';
+import axios from 'axios';
+import { AxiosResponse } from 'axios';
 import { Lesson } from '@shared/models/Lesson';
 import { LessonStatusTransition } from '@shared/models/LessonStatus';
 
@@ -14,24 +15,24 @@ if (!API_BASE_URL) {
  * Fetches lessons based on query parameters.
  * @param token Raw JWT token.
  * @param queryParams Query parameters (e.g., { teacherId: '...' } or { quoteId: '...' }).
- * @returns Supertest response promise.
+ * @returns Axios response promise.
  */
-export const getLessons = (token: string, queryParams: Record<string, string>): request.Test => {
-    return request(API_BASE_URL!)
-        .get('/api/v1/lessons')
-        .set('Authorization', `Bearer ${token}`)
-        .query(queryParams);
+export const getLessons = (token: string, queryParams: Record<string, string>): Promise<AxiosResponse<Lesson[]>> => {
+    return axios.get(`${API_BASE_URL}/api/v1/lessons`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        params: queryParams // Use params for query string
+    });
 };
 
 /**
  * Fetches lessons based on query parameters without authentication.
  * @param queryParams Query parameters.
- * @returns Supertest response promise.
+ * @returns Axios response promise.
  */
-export const getLessonsUnauthenticated = (queryParams: Record<string, string>): request.Test => {
-    return request(API_BASE_URL!)
-        .get('/api/v1/lessons')
-        .query(queryParams);
+export const getLessonsUnauthenticated = (queryParams: Record<string, string>): Promise<AxiosResponse> => {
+    return axios.get(`${API_BASE_URL}/api/v1/lessons`, {
+        params: queryParams // Use params for query string
+    });
 };
 
 // --- POST /lessons --- 
@@ -44,24 +45,21 @@ interface CreateLessonPayload {
  * Creates a new lesson by accepting a quote.
  * @param token Raw JWT token.
  * @param payload Payload containing quoteId.
- * @returns Supertest response promise.
+ * @returns Axios response promise.
  */
-export const createLesson = (token: string, payload: CreateLessonPayload): request.Test => {
-    return request(API_BASE_URL!)
-        .post('/api/v1/lessons')
-        .set('Authorization', `Bearer ${token}`)
-        .send(payload);
+export const createLesson = (token: string, payload: CreateLessonPayload): Promise<AxiosResponse<Lesson>> => {
+    return axios.post(`${API_BASE_URL}/api/v1/lessons`, payload, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
 };
 
 /**
  * Creates a new lesson without authentication.
  * @param payload Payload containing quoteId.
- * @returns Supertest response promise.
+ * @returns Axios response promise.
  */
-export const createLessonUnauthenticated = (payload: CreateLessonPayload): request.Test => {
-    return request(API_BASE_URL!)
-        .post('/api/v1/lessons')
-        .send(payload);
+export const createLessonUnauthenticated = (payload: CreateLessonPayload): Promise<AxiosResponse> => {
+    return axios.post(`${API_BASE_URL}/api/v1/lessons`, payload);
 };
 
 // --- GET /lessons/:id --- 
@@ -70,22 +68,21 @@ export const createLessonUnauthenticated = (payload: CreateLessonPayload): reque
  * Fetches a specific lesson by its ID.
  * @param token Raw JWT token.
  * @param lessonId The ID of the lesson.
- * @returns Supertest response promise.
+ * @returns Axios response promise.
  */
-export const getLessonById = (token: string, lessonId: string): request.Test => {
-    return request(API_BASE_URL!)
-        .get(`/api/v1/lessons/${lessonId}`)
-        .set('Authorization', `Bearer ${token}`);
+export const getLessonById = (token: string, lessonId: string): Promise<AxiosResponse<Lesson>> => {
+    return axios.get(`${API_BASE_URL}/api/v1/lessons/${lessonId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
 };
 
 /**
  * Fetches a specific lesson by its ID without authentication.
  * @param lessonId The ID of the lesson.
- * @returns Supertest response promise.
+ * @returns Axios response promise.
  */
-export const getLessonByIdUnauthenticated = (lessonId: string): request.Test => {
-    return request(API_BASE_URL!)
-        .get(`/api/v1/lessons/${lessonId}`);
+export const getLessonByIdUnauthenticated = (lessonId: string): Promise<AxiosResponse> => {
+    return axios.get(`${API_BASE_URL}/api/v1/lessons/${lessonId}`);
 };
 
 // --- PATCH /lessons/:lessonId --- 
@@ -100,25 +97,22 @@ interface UpdateLessonStatusPayload {
  * @param token Raw JWT token.
  * @param lessonId The ID of the lesson.
  * @param payload Payload containing the status transition.
- * @returns Supertest response promise.
+ * @returns Axios response promise.
  */
-export const updateLessonStatus = (token: string, lessonId: string, payload: UpdateLessonStatusPayload): request.Test => {
-    return request(API_BASE_URL!)
-        .patch(`/api/v1/lessons/${lessonId}`)
-        .set('Authorization', `Bearer ${token}`)
-        .send(payload);
+export const updateLessonStatus = (token: string, lessonId: string, payload: UpdateLessonStatusPayload): Promise<AxiosResponse<Lesson>> => {
+    return axios.patch(`${API_BASE_URL}/api/v1/lessons/${lessonId}`, payload, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
 };
 
 /**
  * Updates the status of a specific lesson without authentication.
  * @param lessonId The ID of the lesson.
  * @param payload Payload containing the status transition.
- * @returns Supertest response promise.
+ * @returns Axios response promise.
  */
-export const updateLessonStatusUnauthenticated = (lessonId: string, payload: UpdateLessonStatusPayload): request.Test => {
-    return request(API_BASE_URL!)
-        .patch(`/api/v1/lessons/${lessonId}`)
-        .send(payload);
+export const updateLessonStatusUnauthenticated = (lessonId: string, payload: UpdateLessonStatusPayload): Promise<AxiosResponse> => {
+    return axios.patch(`${API_BASE_URL}/api/v1/lessons/${lessonId}`, payload);
 };
 
 /**
@@ -126,11 +120,10 @@ export const updateLessonStatusUnauthenticated = (lessonId: string, payload: Upd
  * @param token Raw JWT token.
  * @param lessonId The ID of the lesson.
  * @param payload The raw payload object to send.
- * @returns Supertest response promise.
+ * @returns Axios response promise.
  */
-export const patchLessonRaw = (token: string, lessonId: string, payload: any): request.Test => {
-    return request(API_BASE_URL!)
-        .patch(`/api/v1/lessons/${lessonId}`)
-        .set('Authorization', `Bearer ${token}`)
-        .send(payload);
+export const patchLessonRaw = (token: string, lessonId: string, payload: any): Promise<AxiosResponse> => {
+    return axios.patch(`${API_BASE_URL}/api/v1/lessons/${lessonId}`, payload, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
 }; 
