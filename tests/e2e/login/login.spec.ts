@@ -1,12 +1,20 @@
 import { test, expect } from '@playwright/test';
-import { SEED_USER_PASSWORD } from '../constants';
+import { createTestStudent, createTestTeacher } from '../../utils/user.utils';
 
 /**
  * Simple authentication tests
  * These tests fill the login form, submit it, and verify successful login
+ * They now create their own users via API utilities.
  */
 
 test('Student login form submission', async ({ page }) => {
+  // --- Test Setup: Create a unique student for this test ---
+  const { user: student, password } = await createTestStudent();
+  if (!student || !student.email || !password) {
+    throw new Error('Failed to create test student in E2E setup');
+  }
+  // --- End Test Setup ---
+
   let attempts = 0;
   const maxAttempts = 3;
 
@@ -32,11 +40,11 @@ test('Student login form submission', async ({ page }) => {
         expect(submitButton).toBeEnabled()
       ]);
 
-      // Clear any existing values and fill the form
+      // Clear any existing values and fill the form with dynamic credentials
       await emailInput.clear();
       await passwordInput.clear();
-      await emailInput.fill('ethan.parker@example.com');
-      await passwordInput.fill(SEED_USER_PASSWORD);
+      await emailInput.fill(student.email);
+      await passwordInput.fill(password);
       await studentRadio.check();
 
       // Set up response and navigation promises before clicking
@@ -79,6 +87,13 @@ test('Student login form submission', async ({ page }) => {
 });
 
 test('Teacher login form submission', async ({ page }) => {
+  // --- Test Setup: Create a unique teacher for this test ---
+  const { user: teacher, password } = await createTestTeacher();
+  if (!teacher || !teacher.email || !password) {
+    throw new Error('Failed to create test teacher in E2E setup');
+  }
+  // --- End Test Setup ---
+
   // Go to the login page and wait for network idle
   await page.goto('/login', { waitUntil: 'networkidle' });
 
@@ -99,11 +114,11 @@ test('Teacher login form submission', async ({ page }) => {
     expect(submitButton).toBeEnabled() // Ensure button is enabled
   ]);
 
-  // Fill the login form
+  // Fill the login form with dynamic credentials
   await emailInput.clear(); // Clear potential pre-filled values
   await passwordInput.clear();
-  await emailInput.fill('emily.richardson@musicschool.com');
-  await passwordInput.fill(SEED_USER_PASSWORD);
+  await emailInput.fill(teacher.email);
+  await passwordInput.fill(password);
   await teacherRadio.check();
 
   // Set up response and navigation promises before clicking
@@ -132,4 +147,4 @@ test('Teacher login form submission', async ({ page }) => {
     await expect(errorMessage, `Login failed with status ${status}, expected error message`).toBeVisible();
     throw new Error(`Login failed with status ${status}`);
   }
-}); 
+});

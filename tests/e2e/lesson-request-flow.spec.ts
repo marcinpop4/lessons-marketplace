@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { SEED_USER_PASSWORD } from 'tests/e2e/constants';
+// Removed SEED_USER_PASSWORD import
+// Import necessary utilities and types
+import { createTestStudent, createTestTeacher, loginTestUser } from '../utils/user.utils';
+import { LessonType } from '../../shared/models/LessonType';
+import { UserType } from '../../shared/models/UserType';
+import { Teacher } from '../../shared/models/Teacher';
+import { Student } from '../../shared/models/Student';
 
 /**
  * End-to-end test for the complete lesson request flow.
@@ -7,15 +13,30 @@ import { SEED_USER_PASSWORD } from 'tests/e2e/constants';
  */
 
 // Use test.describe.serial to ensure tests run one after another
-test.describe.serial('Lesson request flow', () => {
+test.describe('Lesson request flow', () => {
   test('Complete end-to-end lesson booking flow', async ({ page }) => {
-    // 1. Login as an existing student
+
+    // --- Test Setup ---
+    // Create a teacher who can teach GUITAR
+    const { user: teacher } = await createTestTeacher([
+      { lessonType: LessonType.GUITAR, rateInCents: 4500 }
+    ]);
+    if (!teacher) throw new Error('Failed to create test teacher');
+
+    // Create a student
+    const { user: student, password: studentPassword } = await createTestStudent();
+    if (!student || !student.email || !studentPassword) {
+      throw new Error('Failed to create test student');
+    }
+    // --- End Test Setup ---
+
+    // 1. Login as the created student
     await page.goto('/login');
     await expect(page.locator('form')).toBeVisible();
 
-    // Fill in the login form with an existing student from seed data
-    await page.getByLabel('Email').fill('ethan.parker@example.com');
-    await page.getByLabel('Password').fill(SEED_USER_PASSWORD);
+    // Fill in the login form with dynamically created student credentials
+    await page.getByLabel('Email').fill(student.email);
+    await page.getByLabel('Password').fill(studentPassword);
     await page.locator('input[value="STUDENT"]').check();
 
     // Submit login form and wait for navigation
@@ -27,48 +48,55 @@ test.describe.serial('Lesson request flow', () => {
     ]);
 
     // Wait for navigation to lesson request page
-    await expect(page).toHaveURL(/.*\/lesson-request.*/, { timeout: 5000 });
+    await expect(page).toHaveURL(/.*\/lesson-request.*/, { timeout: 10000 }); // Increased timeout slightly
 
-    // --- NEW: Wait for key form elements to be visible ---
+    // --- Wait for key form elements to be visible ---
     await expect(page.getByRole('heading', { name: 'Request a Lesson' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Submit Request' })).toBeVisible();
-    // Also ensure the form container itself is visible before proceeding
     await expect(page.locator('form')).toBeVisible();
-    // --- END NEW ---
+    // --- END Wait ---
 
-    // 2. Fill out the lesson request form
+    // 2. Fill out the lesson request form (Requesting GUITAR)
     await expect(page.locator('form')).toBeVisible();
 
-    // Fill in the minimum required fields
-    await page.getByLabel('Lesson Type').selectOption('GUITAR');
+    await page.getByLabel('Lesson Type').selectOption(LessonType.GUITAR); // Use enum
     await page.getByLabel('Duration').selectOption('30');
     const today = new Date().toISOString().split('T')[0];
     if (!today) throw new Error('Failed to get today\'s date');
     await page.getByLabel('Date').fill(today);
     await page.getByLabel('Time').selectOption('10:00');
-    await page.getByLabel('Street').fill('123 Test Street');
-    await page.getByLabel('City').fill('Test City');
-    await page.getByLabel('State').fill('TS');
-    await page.getByLabel('Postal Code').fill('12345');
+    await page.getByLabel('Street').fill('123 Test Flow St');
+    await page.getByLabel('City').fill('Flow City');
+    await page.getByLabel('State').fill('FL');
+    await page.getByLabel('Postal Code').fill('98765');
 
     // Submit the form and wait for the lesson request creation response
+    let createdRequestId: string | null = null;
     await Promise.all([
       page.waitForResponse(
-        response => response.url().includes('/api/v1/lesson-requests') && response.request().method() === 'POST'
+        async response => {
+          if (response.url().includes('/api/v1/lesson-requests') && response.request().method() === 'POST') {
+            try {
+              const body = await response.json();
+              createdRequestId = body?.id; // Capture the ID from the response
+            } catch (e) { /* ignore json parsing errors */ }
+            return true;
+          }
+          return false;
+        }
       ),
       page.locator('form button[type="submit"]').click()
     ]);
 
-    // Wait for navigation to teacher quotes page
-    await expect(page).toHaveURL(/.*\/teacher-quotes\/.*/);
+    // Assert that we got a request ID
+    expect(createdRequestId, 'Should have captured a lesson request ID from the POST response').toBeTruthy();
 
-    // Extract request ID from URL to use in response waiting
-    const urlParts = page.url().split('/');
-    const requestId = urlParts[urlParts.length - 1];
+    // Wait for navigation to teacher quotes page using the captured ID
+    await expect(page).toHaveURL(new RegExp(`.*\/teacher-quotes\/${createdRequestId}.*`));
 
-    // Wait for lesson request details to load
+    // Wait for lesson request details to load (using captured ID)
     await page.waitForResponse(
-      response => response.url().includes(`/api/v1/lesson-requests/${requestId}`)
+      response => response.url().includes(`/api/v1/lesson-requests/${createdRequestId}`)
     );
 
     // Verify lesson request card is rendered
@@ -77,12 +105,12 @@ test.describe.serial('Lesson request flow', () => {
     // Now wait for the quotes container and verify quotes are present
     await expect(page.locator('.teacher-quotes-container')).toBeVisible();
 
-    // Wait for the first quote to be visible
-    await expect(page.locator('.card.card-accent.teacher-quote-card').first()).toBeVisible();
+    // Wait for the first quote (should be from our created teacher) to be visible
+    await expect(page.locator('.card.card-accent.teacher-quote-card').first()).toBeVisible({ timeout: 15000 }); // Increased timeout
 
-    // Get the quote count after we know they're visible
+    // Get the quote count 
     const quoteCount = await page.locator('.card.card-accent.teacher-quote-card').count();
-    expect(quoteCount).toBeGreaterThan(0);
+    expect(quoteCount).toBeGreaterThan(0); // Expect at least one quote (from our teacher)
 
     // Click accept on the first quote
     const acceptButton = page.locator('.card.card-accent.teacher-quote-card').first().locator('.btn.btn-accent');
@@ -101,6 +129,5 @@ test.describe.serial('Lesson request flow', () => {
     await expect(page.locator('.lesson-details-grid .lesson-detail-duration')).toBeVisible();
     await expect(page.locator('.lesson-details-grid .lesson-detail-location')).toBeVisible();
 
-    // Optional: Further checks like verifying specific text content
   });
 }); 

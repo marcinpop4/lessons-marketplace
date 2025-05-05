@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { AxiosResponse } from 'axios';
-import { Student } from '@shared/models/Student';
+import { Student } from '../../shared/models/Student';
 
 const API_BASE_URL = process.env.VITE_API_BASE_URL;
 

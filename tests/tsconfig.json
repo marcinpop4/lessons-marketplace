@@ -1,6 +1,0 @@
-{
-  // This file tells ts-jest running within the tests/ dir
-  // to use the main tsconfig.test.json located in the same directory.
-  "extends": "./tsconfig.test.json"
-  // No other overrides needed, just inherit everything.
-} 

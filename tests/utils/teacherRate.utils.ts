@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { AxiosResponse } from 'axios';
-import { LessonType } from '@prisma/client';
-import { TeacherLessonHourlyRateStatusTransition } from '@shared/models/TeacherLessonHourlyRateStatus.js';
-import { TeacherLessonHourlyRate } from '@shared/models/TeacherLessonHourlyRate.js';
+import { TeacherLessonHourlyRateStatusTransition } from '../../shared/models/TeacherLessonHourlyRateStatus.js';
+import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourlyRate.js';
+import { LessonType } from '../../shared/models/LessonType';
 
 const API_BASE_URL = process.env.VITE_API_BASE_URL;
 

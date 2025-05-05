@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { AxiosResponse } from 'axios';
-import { LessonRequest } from '@shared/models/LessonRequest';
-import { LessonType } from '@shared/models/LessonType'; // Use shared enum
-import { Address } from '@shared/models/Address';
+import { LessonRequest } from '../../shared/models/LessonRequest';
+import { LessonType } from '../../shared/models/LessonType'; // Use shared enum
+import { Address } from '../../shared/models/Address';
 
 // Base URL
 const API_BASE_URL = process.env.VITE_API_BASE_URL;

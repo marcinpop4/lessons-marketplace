@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { AxiosResponse } from 'axios';
-import { Goal } from '@shared/models/Goal';
-import { GoalStatusTransition } from '@shared/models/GoalStatus';
+import { Goal } from '../../shared/models/Goal';
+import { GoalStatusTransition } from '../../shared/models/GoalStatus';
 
 const API_BASE_URL = process.env.VITE_API_BASE_URL;
 

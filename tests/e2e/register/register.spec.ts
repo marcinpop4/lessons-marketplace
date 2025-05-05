@@ -1,11 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-
-// Helper function to generate a unique email
-const generateUniqueEmail = (): string => {
-  const timestamp = new Date().getTime();
-  return `test.user.${timestamp}@example.com`;
-};
+// Import user creation utility
+import { createTestStudent } from '../../utils/user.utils';
 
 // Helper function to attempt registration
 async function attemptRegistration(page: Page, email: string, password: string, userType: 'STUDENT' | 'TEACHER') {
@@ -76,25 +72,24 @@ async function attemptRegistration(page: Page, email: string, password: string, 
 }
 
 test('Student registration with new credentials succeeds', async ({ page }) => {
-  // Generate unique email
+  // This test already uses a unique email, no changes needed here regarding seeding
   const uniqueEmail = `student${Date.now()}@example.com`;
-
-  // Attempt registration with valid password (8+ characters)
   const result = await attemptRegistration(page, uniqueEmail, 'password123', 'STUDENT');
-
-  // Registration should succeed
   expect(result.success).toBe(true);
-
-  // Should be redirected to lesson request page
   await expect(page).toHaveURL(/.*\/lesson-request.*/);
 });
 
 test('Student registration with existing email fails', async ({ page }) => {
-  // Use an email that already exists in seed data
-  const existingEmail = 'ethan.parker@example.com';
+  // --- Test Setup: Create a student first to ensure the email exists ---
+  const { user: existingStudent } = await createTestStudent();
+  if (!existingStudent || !existingStudent.email) {
+    throw new Error('Failed to create initial test student for conflict test');
+  }
+  const existingEmail = existingStudent.email;
+  // --- End Test Setup ---
 
-  // Attempt registration with valid password (8+ characters)
-  const result = await attemptRegistration(page, existingEmail, 'password123', 'STUDENT');
+  // Attempt registration again with the *same* email
+  const result = await attemptRegistration(page, existingEmail, 'password456', 'STUDENT'); // Use a different password just in case
 
   // Registration should fail with appropriate error
   expect(result.success).toBe(false);
@@ -106,15 +101,9 @@ test('Student registration with existing email fails', async ({ page }) => {
 });
 
 test('Teacher registration with new credentials succeeds', async ({ page }) => {
-  // Generate unique email
+  // This test already uses a unique email, no changes needed here regarding seeding
   const uniqueEmail = `teacher${Date.now()}@musicschool.com`;
-
-  // Attempt registration with valid password (8+ characters)
   const result = await attemptRegistration(page, uniqueEmail, 'password123', 'TEACHER');
-
-  // Registration should succeed
   expect(result.success).toBe(true);
-
-  // Should be redirected to teacher profile page
   await expect(page).toHaveURL(/.*\/teacher\/lessons.*/);
 }); 

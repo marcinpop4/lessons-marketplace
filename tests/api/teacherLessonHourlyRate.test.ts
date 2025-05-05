@@ -2,6 +2,7 @@ import { LessonType, Prisma } from '@prisma/client';
 import { UserType } from '@shared/models/UserType';
 import { TeacherLessonHourlyRateStatusValue, TeacherLessonHourlyRateStatusTransition } from '@shared/models/TeacherLessonHourlyRateStatus';
 import { TeacherLessonHourlyRate } from '@shared/models/TeacherLessonHourlyRate'; // Import shared model
+import { LessonType as SharedLessonType } from '@shared/models/LessonType'; // Ensure shared enum is imported
 import axios from 'axios'; // Import axios
 
 // Import test utilities
@@ -41,7 +42,7 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
 
     describe('POST /', () => {
         let createdRateId: string | null = null;
-        const testRateType = LessonType.BASS;
+        const testRateType = SharedLessonType.BASS;
         const testRateAmount = 7500;
 
         it('should return 401 Unauthorized if no token is provided', async () => {
@@ -77,7 +78,7 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
         it('should ADD a new lesson rate for the authenticated teacher (status ACTIVE)', async () => {
             if (!testTeacherAuthToken) throw new Error('Test teacher auth token not available');
 
-            // Use utility
+            // Use utility with enum member
             const createdRate: TeacherLessonHourlyRate = await createTestTeacherRate(testTeacherAuthToken, testRateType, testRateAmount);
 
             expect(createdRate).toBeDefined();
@@ -94,7 +95,7 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
             if (!testTeacherAuthToken || !createdRateId) throw new Error('Auth token or created rate ID not available');
             const newRateAmount = testRateAmount + 1000;
 
-            // Use utility
+            // Use utility with enum member
             const updatedRate: TeacherLessonHourlyRate = await createTestTeacherRate(testTeacherAuthToken, testRateType, newRateAmount);
 
             expect(updatedRate).toBeDefined();
@@ -128,11 +129,11 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
     describe('PATCH /:rateId/status', () => {
         it('should create an active rate and return 200', async () => {
             if (!testTeacherAuthToken) throw new Error('Auth token missing');
-            // Use utility - returns shared model
-            const rate: TeacherLessonHourlyRate = await createTestTeacherRate(testTeacherAuthToken, LessonType.DRUMS, 8000);
+            // Use utility with enum member
+            const rate: TeacherLessonHourlyRate = await createTestTeacherRate(testTeacherAuthToken, SharedLessonType.DRUMS, 8000);
             expect(rate.teacherId).toBe(testTeacherId);
             expect(rate.currentStatus?.status).toBe(TeacherLessonHourlyRateStatusValue.ACTIVE);
-            expect(rate.type).toBe(LessonType.DRUMS);
+            expect(rate.type).toBe(SharedLessonType.DRUMS);
             expect(rate.rateInCents).toBe(8000);
         });
 
@@ -140,8 +141,8 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
             if (!testTeacherAuthToken) throw new Error('Auth token missing');
 
             // --- Create and Deactivate within the test ---
-            // 1. Create the rate directly within this test
-            const rate: TeacherLessonHourlyRate = await createTestTeacherRate(testTeacherAuthToken, LessonType.DRUMS, 8000);
+            // 1. Create the rate directly within this test using enum member
+            const rate: TeacherLessonHourlyRate = await createTestTeacherRate(testTeacherAuthToken, SharedLessonType.DRUMS, 8000);
             if (!rate || !rate.id) {
                 throw new Error('Failed to create rate within the test');
             }
@@ -159,9 +160,9 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
 
         it('should return 409 Conflict if trying to DEACTIVATE an already inactive rate', async () => {
             if (!testTeacherAuthToken) throw new Error('Auth token missing');
-            const rateType = LessonType.BASS; // Use a valid type like BASS
+            const rateType = SharedLessonType.BASS; // Use enum member
 
-            // 1. Create the rate
+            // 1. Create the rate using enum member
             const rate: TeacherLessonHourlyRate = await createTestTeacherRate(testTeacherAuthToken, rateType, 7000);
             if (!rate || !rate.id) throw new Error('Failed to create rate for test');
             const rateId = rate.id;
@@ -186,9 +187,9 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
 
         it('should return 400 Bad Request if transition is missing or invalid', async () => {
             if (!testTeacherAuthToken) throw new Error('Auth token missing');
-            const rateType = LessonType.VOICE; // Use a valid type like VOICE
+            const rateType = SharedLessonType.VOICE; // Use enum member
 
-            // 1. Create the rate
+            // 1. Create the rate using enum member
             const rate: TeacherLessonHourlyRate = await createTestTeacherRate(testTeacherAuthToken, rateType, 6500);
             if (!rate || !rate.id) throw new Error('Failed to create rate for test');
             const rateId = rate.id;
@@ -259,7 +260,7 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
         // --- Reactivate ---
         it('should ACTIVATE an inactive lesson rate', async () => {
             if (!testTeacherAuthToken) throw new Error('Auth token missing');
-            const rateType = LessonType.GUITAR;
+            const rateType = SharedLessonType.GUITAR;
 
             // 1. Create the rate
             const rate: TeacherLessonHourlyRate = await createTestTeacherRate(testTeacherAuthToken, rateType, 5500);
@@ -279,7 +280,7 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
 
         it('should return 409 Conflict if trying to ACTIVATE an already active rate', async () => {
             if (!testTeacherAuthToken) throw new Error('Auth token missing');
-            const rateType = LessonType.BASS; // Reuse type from POST tests
+            const rateType = SharedLessonType.BASS; // Reuse type from POST tests
 
             // 1. Create the rate (it starts ACTIVE)
             const rate: TeacherLessonHourlyRate = await createTestTeacherRate(testTeacherAuthToken, rateType, 7500);
@@ -303,7 +304,7 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
 
         it('should return 409 Conflict if trying to ACTIVATE a rate when another rate of the same type is already active', async () => {
             if (!testTeacherAuthToken) throw new Error('Auth token missing for conflict test');
-            const conflictRateType = LessonType.DRUMS; // Use the same type
+            const conflictRateType = SharedLessonType.DRUMS; // Use the same type
 
             // 1. Create the primary rate (rateToModifyId) and ensure INACTIVE
             const rate1: TeacherLessonHourlyRate = await createTestTeacherRate(testTeacherAuthToken, conflictRateType, 8000);
@@ -337,4 +338,57 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
             // await updateTestRateStatus(testTeacherAuthToken, rate2Id, TeacherLessonHourlyRateStatusTransition.DEACTIVATE);
         });
     });
-}); 
+
+    // --- Test for Rate History (GET /:rateId/history) ---
+    describe('GET /:rateId/history', () => {
+        let rateForHistoryTestId: string | null = null;
+
+        beforeAll(async () => {
+            if (!testTeacherAuthToken) throw new Error('Auth token needed for history setup');
+            // Create a base rate
+            const rate1 = await createTestTeacherRate(testTeacherAuthToken, SharedLessonType.GUITAR, 5500);
+            await updateTestRateStatus(testTeacherAuthToken, rate1.id, TeacherLessonHourlyRateStatusTransition.DEACTIVATE); // Deactivate it
+            // Create a new rate for the same type (update)
+            const rate2 = await createTestTeacherRate(testTeacherAuthToken, SharedLessonType.GUITAR, 6000);
+            rateForHistoryTestId = rate2.id; // Test history for the latest active rate
+        });
+
+        // ... tests ...
+    });
+
+    // Test for GET /active
+    describe('GET /active', () => {
+        beforeAll(async () => {
+            if (!testTeacherAuthToken) throw new Error('Auth token needed for active rates setup');
+            // Ensure at least one rate exists and is active (re-use setup logic if possible)
+            await createTestTeacherRate(testTeacherAuthToken, SharedLessonType.BASS, 7500);
+        });
+
+        // ... tests ...
+    });
+
+    // Test Deactivation/Reactivation Logic More Thoroughly
+    describe('Advanced Status Transitions', () => {
+        it('should handle conflict when creating a rate for an already active type', async () => {
+            if (!testTeacherAuthToken) throw new Error('Auth token missing');
+            const conflictRateType = SharedLessonType.DRUMS; // Use enum member
+
+            // 1. Ensure rate exists and is active
+            const rate1: TeacherLessonHourlyRate = await createTestTeacherRate(testTeacherAuthToken, conflictRateType, 8000);
+            expect(rate1.currentStatus?.status).toBe(TeacherLessonHourlyRateStatusValue.ACTIVE);
+
+            // 2. Try to create another rate for the same type (expect 409)
+            try {
+                await createTestTeacherRate(testTeacherAuthToken, conflictRateType, 9000); // Different rate
+                throw new Error('Rate creation should have conflicted');
+            } catch (error: any) {
+                // Utility might throw specific error, or test raw endpoint if needed
+                // For now, assume utility handles or lets Axios error bubble up
+                expect(axios.isAxiosError(error)).toBe(true);
+                expect(error.response?.status).toBe(409); // Expect Conflict
+                expect(error.response?.data?.error).toContain('already exists');
+            }
+        });
+    });
+
+}); // End Main Describe 

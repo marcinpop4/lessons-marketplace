@@ -1,11 +1,16 @@
 import { test, expect } from '@playwright/test';
 import type { Page, Response } from '@playwright/test';
-import { SEED_USER_PASSWORD } from '../../constants'; // Import from new constants file
-// Removed unused enum imports to avoid potential issues
-// import { LessonStatusValue, LessonStatusTransition } from '../../../../shared/models/LessonStatus'; 
-
-// Seeded teacher credentials
-const SEEDED_TEACHER_EMAIL = 'emily.richardson@musicschool.com';
+// Removed SEED_USER_PASSWORD import
+// Removed unused enum imports
+// Import necessary utilities and types
+import { createTestStudent, createTestTeacher, loginTestUser } from '../../../utils/user.utils';
+import { createTestLessonRequest } from '../../../utils/lessonRequest.utils';
+import { createTestLessonQuote } from '../../../utils/lessonQuote.utils';
+import { createLesson } from '../../../utils/lesson.utils';
+import { Student } from '../../../../shared/models/Student';
+import { Teacher } from '../../../../shared/models/Teacher';
+import { LessonType } from '../../../../shared/models/LessonType';
+import { UserType } from '../../../../shared/models/UserType';
 
 // --- Re-added Helper Functions ---
 // Helper function to login as a user
@@ -46,92 +51,157 @@ const getLessonCountInSection = async (page: Page, sectionId: string): Promise<n
 };
 
 test.describe('Teacher Lesson Management', () => {
+    // Variables accessible to beforeEach and tests
     let page: Page;
+    let teacher: Teacher;
+    let teacherPassword: string;
+    // Define lesson types here for use in setup
+    const lessonType1 = LessonType.VOICE;
+    const lessonType2 = LessonType.GUITAR;
 
-    test.beforeAll(async ({ browser }) => {
-        page = await browser.newPage();
-        // Login as the seeded teacher before running the tests
-        await loginAsUser(page, SEEDED_TEACHER_EMAIL, SEED_USER_PASSWORD, 'TEACHER');
-        // Navigate to the teacher's lessons page
+    test.beforeEach(async ({ browser }) => {
+        page = await browser.newPage(); // Use new page for each test
+
+        // Create a UNIQUE teacher for THIS test run
+        const teacherResult = await createTestTeacher([
+            { lessonType: lessonType1, rateInCents: 5000 },
+            { lessonType: lessonType2, rateInCents: 4500 }
+        ]);
+        teacher = teacherResult.user;
+        teacherPassword = teacherResult.password;
+        if (!teacher || !teacher.email || !teacherPassword) {
+            throw new Error('Failed to create test teacher in beforeEach');
+        }
+
+        // Login as this unique teacher
+        await loginAsUser(page, teacher.email, teacherPassword, 'TEACHER');
+
+        // Navigate to the lessons page (can be done here or at start of each test)
         await page.goto('/teacher/lessons');
-        await waitForNetworkIdle(page); // Wait for initial data load
+        await waitForNetworkIdle(page); // Wait for base page load
     });
 
-    test.afterAll(async () => {
-        await page.close();
+    test.afterEach(async () => {
+        await page.close(); // Close page after each test
     });
 
-    test('Teacher can view lessons and manage their statuses', async () => {
-        // 1. Verify initial page load and presence of different status sections
+    // --- Test 1: Accept and Void --- 
+    test('Teacher handles Requested -> Accepted -> Voided flow', async () => {
+        // --- Test-specific Data Setup ---
+        // Create student 
+        const { user: student1, password: student1Password } = await createTestStudent();
+        if (!student1 || !student1.email || !student1Password) throw new Error('Test 1: Failed to create student');
+        const student1Token = await loginTestUser(student1.email, student1Password, UserType.STUDENT);
+
+        // Create request
+        const request1 = await createTestLessonRequest(student1Token, student1.id, lessonType1);
+        if (!request1 || !request1.id) throw new Error('Test 1: Failed to create request');
+
+        // Create quote
+        const quotes1 = await createTestLessonQuote(student1Token, { lessonRequestId: request1.id, teacherIds: [teacher.id] });
+        if (!quotes1 || quotes1.length === 0 || !quotes1[0].id) throw new Error('Test 1: Failed to create quote');
+        const quote1Id = quotes1[0].id;
+
+        // Create lesson
+        await createLesson(student1Token, { quoteId: quote1Id });
+        // --- End Test-specific Data Setup ---
+
+        // Reload page to see newly created data
+        await page.reload();
+        await waitForNetworkIdle(page);
+
+        // --- Test Execution ---
         await expect(page.locator('h1:has-text("Lessons Dashboard")')).toBeVisible();
-
         const requestedSection = page.locator('#lessons-requested-section');
         const acceptedSection = page.locator('#lessons-accepted-section');
-        const rejectedSection = page.locator('#lessons-rejected-section');
         const voidedSection = page.locator('#lessons-voided-section');
 
-        // --- Test REQUESTED -> ACCEPTED transition --- 
-        const student1Name = 'Ethan Parker';
-        const specificType = 'Type:Voice'; // Removed space to match rendered HTML
+        const student1Name = `${student1.firstName} ${student1.lastName}`;
+        const specificType1 = `Type:${lessonType1}`;
 
-        // Locate the card containing both pieces of text using chained filters with hasText
+        // Locate lesson 1 in Requested
         const lessonCard1 = requestedSection
             .locator('.lesson-card')
             .filter({ hasText: student1Name })
-            .filter({ hasText: specificType });
+            .filter({ hasText: specificType1 });
+        await expect(lessonCard1, `Lesson card for ${student1Name} (${specificType1}) should be visible in Requested`).toBeVisible({ timeout: 10000 }); // Increased timeout slightly
 
-        // Assert the card itself is visible
-        await expect(lessonCard1, `Lesson card for ${student1Name} (${specificType}) should be visible`).toBeVisible();
-
+        // Accept lesson 1
         const acceptButton = lessonCard1.getByRole('button', { name: /accept/i });
         await expect(acceptButton, 'Accept button should be visible').toBeVisible();
         await acceptButton.click();
-        await waitForNetworkIdle(page); // Wait for UI update
+        await waitForNetworkIdle(page);
 
-        // Assert: Lesson moved from REQUESTED to ACCEPTED
-        await expect(lessonCard1, `Lesson card for ${student1Name} (${specificType}) should NOT be in Requested section`).not.toBeVisible();
-        // Update the locator for the accepted card similarly
+        // Assert: Lesson moved from Requested to Accepted
+        await expect(lessonCard1, `Lesson card for ${student1Name} (${specificType1}) should NOT be in Requested section`).not.toBeVisible();
         const acceptedLessonCard1 = acceptedSection
             .locator('.lesson-card')
             .filter({ hasText: student1Name })
-            .filter({ hasText: specificType });
-        await expect(acceptedLessonCard1, `Lesson card for ${student1Name} (${specificType}) should be in Accepted section`).toBeVisible();
+            .filter({ hasText: specificType1 });
+        await expect(acceptedLessonCard1, `Lesson card for ${student1Name} (${specificType1}) should be in Accepted section`).toBeVisible();
 
-        // --- Test ACCEPTED -> VOIDED transition --- 
+        // Void lesson 1
         const voidButton = acceptedLessonCard1.getByRole('button', { name: /void/i });
         await expect(voidButton, 'Void button should be visible').toBeVisible();
         await voidButton.click();
-        await waitForNetworkIdle(page); // Wait for UI update
+        await waitForNetworkIdle(page);
 
-        // Assert: Lesson moved from ACCEPTED to VOIDED
-        await expect(acceptedLessonCard1, `Lesson card for ${student1Name} (${specificType}) should NOT be in Accepted section`).not.toBeVisible();
-        // Update the locator for the voided card similarly
+        // Assert: Lesson moved from Accepted to Voided
+        await expect(acceptedLessonCard1, `Lesson card for ${student1Name} (${specificType1}) should NOT be in Accepted section`).not.toBeVisible();
         const voidedLessonCard1 = voidedSection
             .locator('.lesson-card')
             .filter({ hasText: student1Name })
-            .filter({ hasText: specificType });
-        await expect(voidedLessonCard1, `Lesson card for ${student1Name} (${specificType}) should be in Voided section`).toBeVisible();
+            .filter({ hasText: specificType1 });
+        await expect(voidedLessonCard1, `Lesson card for ${student1Name} (${specificType1}) should be in Voided section`).toBeVisible();
+    });
 
-        // --- Test REQUESTED -> REJECTED transition --- 
-        const student2Name = 'Ava Johnson'; // ADJUST IF NEEDED based on seed data/UI
-        // Keep simple filter for Ava as it was likely unique
+    // --- Test 2: Reject --- 
+    test('Teacher handles Requested -> Rejected flow', async () => {
+        // --- Test-specific Data Setup ---
+        const { user: student2, password: student2Password } = await createTestStudent();
+        if (!student2 || !student2.email || !student2Password) throw new Error('Test 2: Failed to create student');
+        const student2Token = await loginTestUser(student2.email, student2Password, UserType.STUDENT);
+
+        const request2 = await createTestLessonRequest(student2Token, student2.id, lessonType2);
+        if (!request2 || !request2.id) throw new Error('Test 2: Failed to create request');
+
+        const quotes2 = await createTestLessonQuote(student2Token, { lessonRequestId: request2.id, teacherIds: [teacher.id] });
+        if (!quotes2 || quotes2.length === 0 || !quotes2[0].id) throw new Error('Test 2: Failed to create quote');
+        const quote2Id = quotes2[0].id;
+
+        await createLesson(student2Token, { quoteId: quote2Id });
+        // --- End Test-specific Data Setup ---
+
+        // Reload page to see newly created data
+        await page.reload();
+        await waitForNetworkIdle(page);
+
+        // --- Test Execution ---
+        const requestedSection = page.locator('#lessons-requested-section');
+        const rejectedSection = page.locator('#lessons-rejected-section');
+
+        const student2Name = `${student2.firstName} ${student2.lastName}`;
+        const specificType2 = `Type:${lessonType2}`;
+
+        // Locate lesson 2 in Requested
         const lessonCard2 = requestedSection
             .locator('.lesson-card')
-            .filter({ hasText: `Lesson with ${student2Name}` }); // More specific text match
-        await expect(lessonCard2, `Lesson for ${student2Name} should be in Requested`).toBeVisible();
+            .filter({ hasText: student2Name })
+            .filter({ hasText: specificType2 });
+        await expect(lessonCard2, `Lesson for ${student2Name} (${specificType2}) should be in Requested`).toBeVisible({ timeout: 10000 }); // Increased timeout slightly
 
+        // Reject lesson 2
         const rejectButton = lessonCard2.getByRole('button', { name: /reject/i });
         await expect(rejectButton, 'Reject button should be visible').toBeVisible();
         await rejectButton.click();
-        await waitForNetworkIdle(page); // Wait for UI update
+        await waitForNetworkIdle(page);
 
-        // Assert: Lesson moved from REQUESTED to REJECTED
-        await expect(lessonCard2, `Lesson for ${student2Name} should NOT be in Requested`).not.toBeVisible();
+        // Assert: Lesson moved from Requested to Rejected
+        await expect(lessonCard2, `Lesson for ${student2Name} (${specificType2}) should NOT be in Requested`).not.toBeVisible();
         const rejectedLessonCard2 = rejectedSection
             .locator('.lesson-card')
-            .filter({ hasText: `Lesson with ${student2Name}` }); // More specific text match
-        await expect(rejectedLessonCard2, `Lesson for ${student2Name} should be in Rejected`).toBeVisible();
-
-        // Removed DEFINED -> COMPLETED test as per request
+            .filter({ hasText: student2Name })
+            .filter({ hasText: specificType2 });
+        await expect(rejectedLessonCard2, `Lesson for ${student2Name} (${specificType2}) should be in Rejected`).toBeVisible();
     });
 }); 

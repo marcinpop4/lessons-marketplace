@@ -51,7 +51,7 @@
     "swagger:server": "pnpm swagger:generate && node dist/swagger/api-docs/serve-swagger.js",
     "test:api": "jest --config tests/api/jest.config.js --runInBand",
     "test:api:local": "pnpm test:api",
-    "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
+    "test:e2e": "tsc && playwright test --config tests/e2e/playwright.config.ts",
     "test:unit": "jest --config tests/unit/jest.config.js",
     "test:e2e:local": "pnpm test:e2e",
     "test:local": "tsx scripts/run-all-tests-local.ts",

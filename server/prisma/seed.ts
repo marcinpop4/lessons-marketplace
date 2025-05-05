@@ -39,7 +39,6 @@ import { goalService } from '../goal/goal.service.js';
 import { objectiveService } from '../objective/objective.service.js'; // Changed import
 import authService from '../auth/auth.service.js'; // Default import
 import { utilService } from '../util/util.service.js'; // Import new util service
-import { SEED_USER_PASSWORD } from '../../tests/e2e/constants.js';
 
 // Initialize Prisma client (not used directly except by UtilService)
 import { PrismaClient } from '@prisma/client';
@@ -92,7 +91,7 @@ function getSampleGoalData(lessonType: LessonType) {
 // --- Main Seeding Logic ---
 
 async function main() {
-  const commonPassword = SEED_USER_PASSWORD
+  const commonPassword = '12345678' // Define a fallback password directly IN the seed script if needed
   const NUM_STUDENTS = 4;
   const NUM_TEACHERS = 4;
   const NUM_ADDRESSES = 4;

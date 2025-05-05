@@ -1,8 +1,8 @@
 import axios from 'axios';
-import { UserType } from '@shared/models/UserType';
-import { Student } from '@shared/models/Student'; // Assuming Teacher model might also be needed if return type is specific
-import { Teacher } from '@shared/models/Teacher';
-import { LessonType } from '@shared/models/LessonType';
+import { UserType } from '../../shared/models/UserType';
+import { Student } from '../../shared/models/Student'; // Assuming Teacher model might also be needed if return type is specific
+import { Teacher } from '../../shared/models/Teacher';
+import { LessonType } from '../../shared/models/LessonType';
 import { createTestTeacherRate } from './teacherRate.utils';
 
 // Assuming the API base URL is available via environment variable

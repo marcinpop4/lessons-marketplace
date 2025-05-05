@@ -1,9 +1,16 @@
 import { test, expect } from '@playwright/test';
 import type { Page, Response } from '@playwright/test';
-import { SEED_USER_PASSWORD } from './constants'; // Corrected import path
-
-// Seeded teacher credentials
-const SEEDED_TEACHER_EMAIL = 'emily.richardson@musicschool.com';
+// Removed SEEDED_TEACHER_EMAIL
+// Import necessary utilities and types
+import { createTestStudent, createTestTeacher, loginTestUser } from '../utils/user.utils';
+import { createTestLessonRequest } from '../utils/lessonRequest.utils';
+import { createTestLessonQuote } from '../utils/lessonQuote.utils';
+import { createLesson } from '../utils/lesson.utils';
+import { Student } from '../../shared/models/Student';
+import { Teacher } from '../../shared/models/Teacher';
+import { Lesson } from '../../shared/models/Lesson';
+import { LessonType } from '../../shared/models/LessonType';
+import { UserType } from '../../shared/models/UserType';
 
 // Helper function to login as a user
 async function loginAsUser(page: Page, email: string, password: string, userType: 'STUDENT' | 'TEACHER') {
@@ -37,49 +44,67 @@ async function waitForNetworkIdle(page: Page) {
 
 test.describe('Teacher Goal Management', () => {
     let page: Page;
+    let teacher: Teacher;
+    let teacherPassword: string;
 
-    test.beforeAll(async ({ browser }) => {
+    test.beforeEach(async ({ browser }) => {
         page = await browser.newPage();
-        // Login as the seeded teacher before running the tests
-        await loginAsUser(page, SEEDED_TEACHER_EMAIL, SEED_USER_PASSWORD, 'TEACHER');
-        // Navigate to the teacher's lessons page
-        await page.goto('/teacher/lessons');
-        await waitForNetworkIdle(page);
+
+        // Create a UNIQUE teacher for THIS test run
+        // Ensure the teacher offers types used in tests (e.g., VOICE, GUITAR)
+        const teacherResult = await createTestTeacher([
+            { lessonType: LessonType.VOICE, rateInCents: 5000 },
+            { lessonType: LessonType.GUITAR, rateInCents: 4500 }
+        ]);
+        teacher = teacherResult.user;
+        teacherPassword = teacherResult.password;
+        if (!teacher || !teacher.email || !teacherPassword) {
+            throw new Error('Failed to create test teacher in beforeEach');
+        }
+
+        // Login as this unique teacher
+        await loginAsUser(page, teacher.email, teacherPassword, 'TEACHER');
+        // DO NOT navigate here, tests will navigate to specific lesson page
     });
 
-    test.afterAll(async () => {
+    test.afterEach(async () => {
         await page.close();
     });
 
     test('Teacher can manage goals through their lifecycle', async () => {
-        const lessonCard = page.locator('#lessons-accepted-section .card').last();
+        // --- Test-specific Data Setup ---
+        const lessonType = LessonType.VOICE; // Use a specific type
+        const { user: student, password: studentPassword } = await createTestStudent();
+        if (!student || !student.email || !studentPassword) throw new Error('Test 1: Failed to create student');
+        const studentToken = await loginTestUser(student.email, studentPassword, UserType.STUDENT);
+        const request = await createTestLessonRequest(studentToken, student.id, lessonType);
+        if (!request || !request.id) throw new Error('Test 1: Failed to create request');
+        const quotes = await createTestLessonQuote(studentToken, { lessonRequestId: request.id, teacherIds: [teacher.id] });
+        if (!quotes || quotes.length === 0 || !quotes[0].id) throw new Error('Test 1: Failed to create quote');
+        const quoteId = quotes[0].id;
+        const lessonResponse = await createLesson(studentToken, { quoteId: quoteId }); // Capture response
+        const lesson: Lesson = lessonResponse.data;
+        if (!lesson || !lesson.id) throw new Error('Test 1: Failed to create lesson');
+        // --- End Test-specific Data Setup ---
 
-        const manageGoalsButton = lessonCard.getByRole('button', { name: /manage goals/i });
-        await expect(manageGoalsButton, 'Manage goals button should be visible').toBeVisible();
-        await manageGoalsButton.click();
+        // Navigate directly to the lesson's goal page
+        await page.goto(`/teacher/lessons/${lesson.id}`);
+        await waitForNetworkIdle(page);
 
-        // Verify navigation to the lesson detail/goal page (URL might vary)
-        await expect(page).toHaveURL(/.*\/teacher\/lessons\/[^/]+$/); // Check for UUID in URL
-        await waitForNetworkIdle(page); // Wait after navigation
-
-        // Verify the goal management section is visible by checking for the Add Goal Card
-        await expect(
-            page.locator('.add-goal-card'), // Locate the card using its class
-            'Add goal card should be visible'
-        ).toBeVisible();
-
-        // Use the AddGoalForm directly (assuming it's the only one)
+        // --- Test Execution ---
+        await expect(page.locator('.add-goal-card')).toBeVisible();
         const addGoalForm = page.locator('.add-goal-card');
 
-        await addGoalForm.getByLabel('Goal Title').fill('Test Goal 1');
-        await addGoalForm.getByLabel('Goal Description').fill('This is a test goal');
+        const goalTitle = 'Test Goal Lifecycle';
+        await addGoalForm.getByLabel('Goal Title').fill(goalTitle);
+        await addGoalForm.getByLabel('Goal Description').fill('Lifecycle description');
         await addGoalForm.getByLabel('Lessons to Achieve').fill('3');
-        await addGoalForm.locator('#add-goal-button').click(); // Use the new ID
+        await addGoalForm.locator('#add-goal-button').click();
         await waitForNetworkIdle(page);
 
         // Verify goal appears in Ready to Start section
         const readySection = page.locator('section.goal-status-section:has(h3:has-text("Ready to Start"))');
-        const newGoalCard = readySection.locator('.goal-card', { has: page.locator('.card-header h3:has-text("Test Goal 1")') });
+        const newGoalCard = readySection.locator('.goal-card', { has: page.locator(`.card-header h3:has-text("${goalTitle}")`) }); // Template literal for title
         await expect(newGoalCard, 'New goal should appear in Ready to Start section').toBeVisible();
 
         // Start the goal
@@ -90,51 +115,52 @@ test.describe('Teacher Goal Management', () => {
 
         // Verify goal moved to In Progress section
         const inProgressSection = page.locator('section.goal-status-section:has(h3:has-text("In Progress"))');
-        // Target the specific section heading using more classes
-        const inProgressGoalCard = inProgressSection.locator('.goal-card', { has: page.locator('.card-header h3:has-text("Test Goal 1")') });
+        const inProgressGoalCard = inProgressSection.locator('.goal-card', { has: page.locator(`.card-header h3:has-text("${goalTitle}")`) });
         await expect(inProgressGoalCard, 'Goal should appear in In Progress section').toBeVisible();
-        await expect(readySection, 'Ready to Start section should be empty or not contain the goal').not.toContainText('Test Goal 1'); // Check goal is gone
+        await expect(readySection, 'Ready to Start section should be empty or not contain the goal').not.toContainText(goalTitle);
 
         // Complete the goal
         const completeButton = inProgressGoalCard.getByRole('button', { name: /complete/i });
         await expect(completeButton, 'Complete button should be visible').toBeVisible();
         await completeButton.click();
 
-        // Fill completion form using the new data-testid
-        const completionModal = page.locator('[data-testid="goal-completion-modal"]'); // Use data-testid
+        const completionModal = page.locator('[data-testid="goal-completion-modal"]');
         await expect(completionModal, 'Completion modal should appear').toBeVisible();
-        // Target textarea by placeholder
         await completionModal.locator('textarea[placeholder*="Student successfully"]').fill('Goal completed successfully');
-        // Target button by its exact text
         await completionModal.getByRole('button', { name: 'Confirm Completion' }).click();
         await waitForNetworkIdle(page);
 
         // Verify goal moved to Achieved section
         const achievedSection = page.locator('section.goal-status-section:has(h3:has-text("Achieved"))');
-        // Target the specific section heading using more classes
-        const completedGoalCard = achievedSection.locator('.goal-card', { has: page.locator('.card-header h3:has-text("Test Goal 1")') });
+        const completedGoalCard = achievedSection.locator('.goal-card', { has: page.locator(`.card-header h3:has-text("${goalTitle}")`) });
         await expect(completedGoalCard, 'Goal should appear in Achieved section').toBeVisible();
-        await expect(inProgressSection, 'In Progress section should be empty or not contain the goal').not.toContainText('Test Goal 1'); // Check goal is gone
+        await expect(inProgressSection, 'In Progress section should be empty or not contain the goal').not.toContainText(goalTitle);
     });
 
     test('Teacher can complete a goal and define the lesson', async () => {
-        // Navigate to the specific GOAL-FREE lesson's goals page again for isolation
-        await page.goto('/teacher/lessons');
-        await waitForNetworkIdle(page);
-        // Target the LAST card in the defined section
-        const lessonCard = page.locator('#lessons-accepted-section .card').last();
+        // --- Test-specific Data Setup ---
+        const lessonType = LessonType.GUITAR; // Use a different type
+        const { user: student, password: studentPassword } = await createTestStudent();
+        if (!student || !student.email || !studentPassword) throw new Error('Test 2: Failed to create student');
+        const studentToken = await loginTestUser(student.email, studentPassword, UserType.STUDENT);
+        const request = await createTestLessonRequest(studentToken, student.id, lessonType);
+        if (!request || !request.id) throw new Error('Test 2: Failed to create request');
+        const quotes = await createTestLessonQuote(studentToken, { lessonRequestId: request.id, teacherIds: [teacher.id] });
+        if (!quotes || quotes.length === 0 || !quotes[0].id) throw new Error('Test 2: Failed to create quote');
+        const quoteId = quotes[0].id;
+        const lessonResponse = await createLesson(studentToken, { quoteId: quoteId }); // Capture response
+        const lesson: Lesson = lessonResponse.data;
+        if (!lesson || !lesson.id) throw new Error('Test 2: Failed to create lesson');
+        // --- End Test-specific Data Setup ---
 
-        const manageGoalsButton = lessonCard.getByRole('button', { name: /manage goals/i });
-        await expect(manageGoalsButton, 'Manage goals button should be visible').toBeVisible();
-        await manageGoalsButton.click();
-        await expect(page).toHaveURL(/.*\/teacher\/lessons\/[^/]+$/);
+        // Navigate directly to the lesson's goal page
+        await page.goto(`/teacher/lessons/${lesson.id}`);
         await waitForNetworkIdle(page);
 
-        // Verify the goal management section is visible
+        // --- Test Execution ---
         await expect(page.locator('.add-goal-card')).toBeVisible();
         const addGoalForm = page.locator('.add-goal-card');
 
-        // Create a goal with a descriptive title
         const goalTitle = "Goal to Define Lesson";
         await addGoalForm.getByLabel('Goal Title').fill(goalTitle);
         await addGoalForm.getByLabel('Goal Description').fill('Complete this to define the lesson');
@@ -156,12 +182,9 @@ test.describe('Teacher Goal Management', () => {
 
         await inProgressGoalToComplete.getByRole('button', { name: /complete/i }).click();
 
-        // Fill completion form using the new data-testid
-        const completionModal = page.locator('[data-testid="goal-completion-modal"]'); // Use data-testid
+        const completionModal = page.locator('[data-testid="goal-completion-modal"]');
         await expect(completionModal, 'Completion modal should appear').toBeVisible();
-        // Target textarea by placeholder
         await completionModal.locator('textarea[placeholder*="Student successfully"]').fill('Goal completed, ready for lesson definition');
-        // Target button by its exact text
         await completionModal.getByRole('button', { name: 'Confirm Completion' }).click();
         await waitForNetworkIdle(page);
 
@@ -169,6 +192,5 @@ test.describe('Teacher Goal Management', () => {
         const achievedSection = page.locator('section.goal-status-section:has(h3:has-text("Achieved"))');
         const achievedGoal = achievedSection.locator('.goal-card', { has: page.locator(`.card-header h3:has-text("${goalTitle}")`) });
         await expect(achievedGoal, `Goal '${goalTitle}' should be in Achieved section`).toBeVisible();
-
     });
 }); 

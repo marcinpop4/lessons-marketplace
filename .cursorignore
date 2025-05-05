@@ -3,11 +3,9 @@ node_modules/
 .pnpm-store/
 
 # Next.js build output
-!dist/swagger/swagger.yaml
 .next/
 out/
 build/
-dist/
 
 # Environment files
 

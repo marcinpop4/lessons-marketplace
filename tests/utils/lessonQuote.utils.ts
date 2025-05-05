@@ -1,9 +1,9 @@
 import axios from 'axios';
 import { AxiosResponse } from 'axios';
-import { LessonQuote } from '@shared/models/LessonQuote';
-import { Lesson } from '@shared/models/Lesson';
-import { LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus';
-import { LessonType } from '@shared/models/LessonType';
+import { LessonQuote } from '../../shared/models/LessonQuote';
+import { Lesson } from '../../shared/models/Lesson';
+import { LessonQuoteStatusValue } from '../../shared/models/LessonQuoteStatus';
+import { LessonType } from '../../shared/models/LessonType';
 
 // Base URL
 const API_BASE_URL = process.env.VITE_API_BASE_URL;

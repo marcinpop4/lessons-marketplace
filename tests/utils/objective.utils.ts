@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { AxiosResponse } from 'axios';
-import { Objective } from '@shared/models/Objective';
-import { LessonType } from '@shared/models/LessonType';
-import { ObjectiveStatusValue } from '@shared/models/ObjectiveStatus';
+import { Objective } from '../../shared/models/Objective';
+import { LessonType } from '../../shared/models/LessonType';
+import { ObjectiveStatusValue } from '../../shared/models/ObjectiveStatus';
 
 const API_BASE_URL = process.env.VITE_API_BASE_URL;
 
