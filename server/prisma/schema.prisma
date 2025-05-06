@@ -223,7 +223,6 @@ model Lesson {
   currentStatusId String?        @unique
   currentStatus   LessonStatus?  @relation("CurrentStatus", fields: [currentStatusId], references: [id])
   lessonStatuses  LessonStatus[] @relation("LessonStatuses")
-  goals           Goal[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -252,41 +251,6 @@ model LessonStatus {
   currentLesson Lesson? @relation("CurrentStatus")
 
   @@index([lessonId])
-  @@index([status])
-}
-
-// --- Goal Models ---
-
-model Goal {
-  id            String   @id @default(uuid())
-  lessonId      String
-  lesson        Lesson   @relation(fields: [lessonId], references: [id])
-  title         String
-  description   String
-  estimatedLessonCount Int      // Required estimate of lessons needed
-  currentStatusId String?  @unique // Link to the current status record (Must be unique, but optional on Goal itself)
-  currentStatus   GoalStatus?  @relation("CurrentStatus", fields: [currentStatusId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  statuses GoalStatus[] // Relation to status history
-
-  // Maybe a unique constraint on lessonId + description if needed?
-  @@index([lessonId])
-}
-
-model GoalStatus {
-  id        String   @id @default(uuid())
-  goalId    String
-  goal      Goal     @relation(fields: [goalId], references: [id])
-  status    String
-  context   Json?
-  createdAt DateTime @default(now())
-
-  // Add the missing opposite relation field for the current status
-  currentGoal Goal? @relation("CurrentStatus")
-
-  @@index([goalId])
   @@index([status])
 }
 

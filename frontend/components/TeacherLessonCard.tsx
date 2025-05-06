@@ -57,7 +57,6 @@ const NotesModal: React.FC<NotesModalProps> = ({ isOpen, onClose, onConfirm, les
 interface TeacherLessonCardProps {
     lesson: Lesson; // Use actual Lesson type
     currentStatus: LessonStatusValue; // Pass current status explicitly
-    goalCount: number; // Added goal count prop
     onUpdateStatus: (lessonId: string, currentStatus: LessonStatusValue, transition: LessonStatusTransition) => void;
     isUpdating: boolean; // Use loading state from parent
 }
@@ -65,7 +64,6 @@ interface TeacherLessonCardProps {
 const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
     lesson,
     currentStatus,
-    goalCount, // Destructure goalCount
     onUpdateStatus,
     isUpdating
 }) => {
@@ -79,8 +77,6 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
     const possibleTransitionsMap = LessonStatus.StatusTransitions[currentStatus] || {};
     // Extract the transition names (keys) from the map
     const availableTransitions = (Object.keys(possibleTransitionsMap) as LessonStatusTransition[])
-        // Filter out the DEFINE transition, we'll handle it separately
-        .filter(t => t !== LessonStatusTransition.DEFINE);
 
     // Helper to format transition enum keys (e.g., ACCEPT -> Accept)
     const formatTransition = (transition: LessonStatusTransition): string => {
@@ -94,7 +90,6 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
         switch (transition) {
             case LessonStatusTransition.ACCEPT:
             case LessonStatusTransition.COMPLETE: // COMPLETE uses primary
-            case LessonStatusTransition.DEFINE: // Define uses primary
                 return 'primary';
             case LessonStatusTransition.REJECT:
             case LessonStatusTransition.VOID:
@@ -106,23 +101,8 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
 
     // Function to handle button click - Reverted logic
     const handleButtonClick = (transition: LessonStatusTransition) => {
-
-        if (transition === LessonStatusTransition.DEFINE) {
-            navigate(`/teacher/lessons/${lesson.id}`);
-        } else {
-            onUpdateStatus(lesson.id, currentStatus, transition);
-        }
+        onUpdateStatus(lesson.id, currentStatus, transition);
     };
-
-    // Function to specifically handle navigation for managing goals
-    const handleManageGoalsClick = () => {
-        navigate(`/teacher/lessons/${lesson.id}`);
-    };
-
-    // Check if goal management should be enabled
-    const canManageGoals = currentStatus === LessonStatusValue.ACCEPTED ||
-        currentStatus === LessonStatusValue.DEFINED ||
-        currentStatus === LessonStatusValue.COMPLETED; // Add COMPLETED status
 
     // Use original studentName logic if needed for title
     const studentName = `${student?.firstName || 'N/A'} ${student?.lastName || ''}`;
@@ -159,12 +139,6 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
                     <span className="font-semibold mr-1">Status:</span>
                     {LessonStatus.getDisplayLabelForStatus(currentStatus)}
                 </p>
-                {canManageGoals && (
-                    <p className="text-sm text-gray-700 dark:text-gray-300 card-attribute">
-                        <span className="font-semibold mr-1">Goals:</span>
-                        {goalCount}
-                    </p>
-                )}
             </div>
 
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-2 flex-wrap gap-y-2">
@@ -186,19 +160,7 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
                             </Button>
                         ))}
 
-                        {canManageGoals && (
-                            <Button
-                                key="manage-goals"
-                                onClick={handleManageGoalsClick}
-                                variant="accent"
-                                size="sm"
-                                disabled={isUpdating}
-                            >
-                                Manage Goals
-                            </Button>
-                        )}
-
-                        {availableTransitions.length === 0 && !canManageGoals && (
+                        {availableTransitions.length === 0 && (
                             <span className="text-sm text-gray-500 italic">No actions available</span>
                         )}
                     </>

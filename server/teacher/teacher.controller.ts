@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { LessonType } from '../../shared/models/LessonType.js';
 import { teacherService } from './teacher.service.js';
-import { goalService } from '../goal/goal.service.js';
 import { Lesson } from '../../shared/models/Lesson.js';
 import { NotFoundError, BadRequestError } from '../errors/index.js';
 

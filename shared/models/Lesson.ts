@@ -1,6 +1,5 @@
 import { LessonStatus, LessonStatusValue } from './LessonStatus.js';
 import { LessonQuote } from './LessonQuote.js';
-import { Goal } from './Goal.js';
 import { LessonType } from './LessonType.js';
 import { Teacher } from './Teacher.js';
 import { Student } from './Student.js';
@@ -27,11 +26,6 @@ import { Address } from './Address.js';
  *           items:
  *             $ref: '#/components/schemas/LessonStatus'
  *           description: History of status changes for this lesson.
- *         goals:
- *           type: array
- *           items:
- *             $ref: '#/components/schemas/Goal'
- *           description: Goals associated with this lesson.
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -44,7 +38,6 @@ import { Address } from './Address.js';
  *         - id
  *         - quote
  *         - statuses
- *         - goals
  *         - createdAt
  *         - updatedAt
  */
@@ -84,7 +77,6 @@ export interface LessonProps {
   quote: LessonQuote;
   currentStatus?: LessonStatus | null;
   statuses?: LessonStatus[];
-  goals?: Goal[];
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -97,7 +89,6 @@ export class Lesson implements LessonProps {
   quote: LessonQuote;
   currentStatus: LessonStatus | null;
   statuses: LessonStatus[];
-  goals: Goal[];
   createdAt: Date;
   updatedAt: Date;
 
@@ -106,7 +97,6 @@ export class Lesson implements LessonProps {
     quote,
     currentStatus = null,
     statuses = [],
-    goals = [],
     createdAt = new Date(),
     updatedAt = new Date()
   }: LessonProps) {
@@ -114,7 +104,6 @@ export class Lesson implements LessonProps {
     this.quote = quote;
     this.currentStatus = currentStatus;
     this.statuses = statuses;
-    this.goals = goals;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }
@@ -146,17 +135,8 @@ export class Lesson implements LessonProps {
       id,
       quote,
       currentStatus: initialStatus,
-      statuses: [initialStatus],
-      goals: []
+      statuses: [initialStatus]
     });
-  }
-
-  /**
-   * Adds a goal to the lesson
-   * @param goal The goal to add
-   */
-  addGoal(goal: Goal): void {
-    this.goals.push(goal);
   }
 
   /**

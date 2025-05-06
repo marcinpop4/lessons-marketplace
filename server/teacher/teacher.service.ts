@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma, Teacher as DbTeacher, TeacherLessonHourlyRate as DbTeacherLessonHourlyRate, Lesson as DbLesson, Student as DbStudent, Address as DbAddress, LessonRequest as DbLessonRequestPrisma, LessonQuote as DbLessonQuote, LessonStatus as DbLessonStatus, Goal as DbGoal, AuthMethod, UserType } from '@prisma/client';
+import { PrismaClient, Prisma, Teacher as DbTeacher, TeacherLessonHourlyRate as DbTeacherLessonHourlyRate, Lesson as DbLesson, Student as DbStudent, Address as DbAddress, LessonRequest as DbLessonRequestPrisma, LessonQuote as DbLessonQuote, LessonStatus as DbLessonStatus, AuthMethod, UserType } from '@prisma/client';
 // Import shared models using alias and no extension
 import { Teacher } from '../../shared/models/Teacher.js';
 import { Student } from '../../shared/models/Student.js';
@@ -7,7 +7,6 @@ import { Lesson, DbLessonWithNestedRelations } from '../../shared/models/Lesson.
 import { LessonQuote } from '../../shared/models/LessonQuote.js';
 import { LessonRequest } from '../../shared/models/LessonRequest.js';
 import { LessonStatus, LessonStatusValue } from '../../shared/models/LessonStatus.js';
-import { Goal } from '../../shared/models/Goal.js';
 import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourlyRate.js';
 import { LessonType } from '../../shared/models/LessonType.js';
 import { TeacherLessonHourlyRateStatusValue } from '../../shared/models/TeacherLessonHourlyRateStatus.js';
@@ -140,11 +139,6 @@ class TeacherService {
                 },
                 include: {
                     currentStatus: true, // Needed for completedLessons count & totalEarnings
-                    goals: {
-                        include: {
-                            currentStatus: true // Needed for completedGoals count
-                        }
-                    },
                     quote: { // Needed for totalEarnings
                         select: {
                             costInCents: true,
@@ -177,22 +171,14 @@ class TeacherService {
             });
 
             const totalLessons = lessons.length;
-            const totalGoals = lessons.reduce((sum, lesson) => sum + lesson.goals.length, 0);
-            const completedGoals = lessons.reduce((sum, lesson) =>
-                sum + lesson.goals.filter(g => g.currentStatus?.status === 'COMPLETED').length, 0
-            );
 
             // Return all calculated stats
             return {
                 totalLessons,
                 completedLessons,
-                totalGoals,
-                completedGoals,
-                upcomingLessons, // Added
-                totalEarnings,   // Added (in cents)
+                upcomingLessons,
+                totalEarnings,
                 completionRate: totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0,
-                goalsPerLesson: totalLessons > 0 ? totalGoals / totalLessons : 0,
-                goalCompletionRate: totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 0
             };
         });
 

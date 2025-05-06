@@ -14,14 +14,12 @@ class UtilService {
             await this.prisma.$transaction([
                 // Delete records that depend on others first
                 // Status tables
-                this.prisma.goalStatus.deleteMany(),
                 this.prisma.lessonStatus.deleteMany(),
                 this.prisma.lessonQuoteStatus.deleteMany(),
                 this.prisma.teacherLessonHourlyRateStatus.deleteMany(), // Added this
                 this.prisma.objectiveStatus.deleteMany(), // Keep if objectives exist
 
                 // Core dependency chain
-                this.prisma.goal.deleteMany(),         // Depends on Lesson
                 this.prisma.objective.deleteMany(),   // Keep if objectives exist
                 this.prisma.lesson.deleteMany(),       // Depends on LessonQuote
                 this.prisma.lessonQuote.deleteMany(),    // Depends on LessonRequest, Teacher

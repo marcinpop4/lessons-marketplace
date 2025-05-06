@@ -452,9 +452,6 @@ describe('API Integration: /api/v1/lessons', () => {
             // Step 1: ACCEPT (Teacher Action - assuming roles allow this for testing)
             await updateLessonStatus(patchTeacherAuthToken!, lessonToUpdateId, { transition: LessonStatusTransition.ACCEPT });
 
-            // Step 2: DEFINE (Teacher Action)
-            await updateLessonStatus(patchTeacherAuthToken!, lessonToUpdateId, { transition: LessonStatusTransition.DEFINE });
-
             // Step 3: COMPLETE (Teacher Action)
             const payload = { transition: LessonStatusTransition.COMPLETE };
             const response = await updateLessonStatus(patchTeacherAuthToken!, lessonToUpdateId, payload); // Use util
@@ -526,7 +523,7 @@ describe('API Integration: /api/v1/lessons', () => {
             await updateLessonStatus(patchTeacherAuthToken!, lessonId, { transition: LessonStatusTransition.ACCEPT }); // Use teacher for setup
 
             // Now, student tries to DEFINE (Teacher-only action)
-            const payload = { transition: LessonStatusTransition.DEFINE };
+            const payload = { transition: LessonStatusTransition.COMPLETE };
             try {
                 await updateLessonStatus(studentToken, lessonId, payload); // Use util
                 throw new Error('Request should have failed with 403');

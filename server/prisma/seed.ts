@@ -15,8 +15,6 @@ import chalk from 'chalk'; // Import chalk
 import { LessonType } from '../../shared/models/LessonType.js';
 import { LessonStatusTransition, LessonStatusValue } from '../../shared/models/LessonStatus.js';
 import { LessonQuoteStatusValue } from '../../shared/models/LessonQuoteStatus.js'; // Added
-import { GoalStatusValue, GoalStatusTransition } from '../../shared/models/GoalStatus.js';
-import { Goal } from '../../shared/models/Goal.js';
 import { Address, AddressDTO } from '../../shared/models/Address.js';
 import { Student } from '../../shared/models/Student.js';
 import { Teacher } from '../../shared/models/Teacher.js';
@@ -35,7 +33,6 @@ import { lessonRequestService } from '../lessonRequest/lessonRequest.service.js'
 import { lessonQuoteService } from '../lessonQuote/lessonQuote.service.js';
 import { lessonService } from '../lesson/lesson.service.js';
 import { teacherLessonHourlyRateService } from '../teacher-lesson-hourly-rate/teacherLessonHourlyRate.service.js';
-import { goalService } from '../goal/goal.service.js';
 import { objectiveService } from '../objective/objective.service.js'; // Changed import
 import authService from '../auth/auth.service.js'; // Default import
 import { utilService } from '../util/util.service.js'; // Import new util service
@@ -73,19 +70,6 @@ function addToDate(date: Date, days: number, hours: number): Date {
   newDate.setDate(newDate.getDate() + days);
   newDate.setHours(newDate.getHours() + hours);
   return newDate;
-}
-
-// Sample Goal Data Generator (kept from original)
-function getSampleGoalData(lessonType: LessonType) {
-  const goals = [
-    { title: 'Understand Basic Theory', description: 'Learn fundamental concepts.', estimatedLessonCount: 2 },
-    { title: 'Practice Basic Scales', description: 'Practice major/minor scales.', estimatedLessonCount: 4 },
-    { title: 'Play Simple Song', description: 'Learn a simple song.', estimatedLessonCount: 3 }
-  ];
-  // Simple selection for now
-  if (lessonType === LessonType.DRUMS) return goals[1]; // Practice scales (rudiments)
-  if (lessonType === LessonType.GUITAR) return goals[2]; // Play song
-  return goals[0]; // Basic theory for others
 }
 
 // --- Main Seeding Logic ---
@@ -278,51 +262,6 @@ async function main() {
     if (lastLesson) {
       await lessonService.updateStatus(lastLesson.id, LessonStatusTransition.ACCEPT);
     }
-
-    // 7. Create Goals for Lessons
-    let goalsCreatedCount = 0;
-    for (const lesson of createdLessons) {
-      // Refetch the lesson WITH necessary relations for goal creation, as lessonService.create might not return them
-      let lessonForGoal: Lesson | null = null;
-      try {
-        lessonForGoal = lesson; // Use the lesson we already have
-
-      } catch (fetchError) {
-        // This catch block might not be needed if we use the existing lesson object
-        console.error(chalk.red(`  Error potentially occurred while trying to refetch lesson ${lesson.id}:`), fetchError);
-        lessonForGoal = null; // Ensure it's null if fetch fails
-      }
-
-      if (!lessonForGoal) {
-        console.warn(chalk.yellow(`Warning: Skipping goal creation for lesson ${lesson.id.substring(0, 8)} because lesson data is unavailable.`));
-        continue;
-      }
-
-
-      const teacherId = lessonForGoal.quote?.teacher?.id;
-      const lessonType = lessonForGoal.quote?.lessonRequest?.type;
-
-      if (!teacherId || !lessonType) {
-        console.warn(chalk.yellow(`Warning: Skipping goal creation for lesson ${lessonForGoal.id.substring(0, 8)} due to missing teacher/type info in the lesson object.`));
-        continue;
-      }
-
-      const goalData = getSampleGoalData(lessonType);
-      try {
-        await goalService.createGoal(
-          teacherId,
-          lessonForGoal.id,
-          goalData.title,
-          goalData.description,
-          goalData.estimatedLessonCount
-        );
-        goalsCreatedCount++;
-        // console.log(`  Created goal for lesson ${lessonForGoal.id.substring(0, 8)} by teacher ${teacherId.substring(0, 8)}.`); // Removed internal log
-      } catch (goalError) {
-        console.error(chalk.red(`Failed to create goal for lesson ${lessonForGoal.id}:`), goalError);
-      }
-    }
-    console.log(chalk.green(`✓ ${goalsCreatedCount} Goals created.`)); // Summary log
 
     // 8. Create Objectives for Students (One per LessonType)
     let objectivesCreatedCount = 0;

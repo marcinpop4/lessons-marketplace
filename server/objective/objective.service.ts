@@ -281,20 +281,19 @@ class ObjectiveService {
 
         // --- Prepare Prompts & Provider --- 
         const preparePromptsAndProvider = async () => {
-            const student = await studentService.findById(studentId);
+            const student = await studentService.findById(studentId); // Use studentService
             if (!student) throw new NotFoundError(`Student with ID ${studentId} not found.`);
 
             // Fetch objectives ALREADY FILTERED by lessonType and relevant statuses
-            const currentObjectivesFiltered = await this.getObjectivesByStudentId(studentId, lessonType, [
-                ObjectiveStatusValue.CREATED,
-                ObjectiveStatusValue.IN_PROGRESS,
-                ObjectiveStatusValue.ACHIEVED
-            ]);
+            const currentObjectivesFiltered = await this.getObjectivesByStudentId(
+                studentId,
+                lessonType, // Use the required lessonType
+                [ObjectiveStatusValue.CREATED, ObjectiveStatusValue.IN_PROGRESS]
+            );
 
             // Fetch past lessons FILTERED by lessonType and relevant statuses
             const pastLessonsFiltered = await lessonService.findLessonsByStudentId(studentId, lessonType, [
                 LessonStatusValue.ACCEPTED,
-                LessonStatusValue.DEFINED,
                 LessonStatusValue.COMPLETED
             ]);
 

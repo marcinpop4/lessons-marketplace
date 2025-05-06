@@ -13,10 +13,6 @@ describe('LessonStatus Model', () => {
             expect(LessonStatus.isValidTransition(LessonStatusValue.REQUESTED, LessonStatusTransition.REJECT)).toBe(true);
         });
 
-        it('should allow COMPLETE transition from DEFINED', () => {
-            expect(LessonStatus.isValidTransition(LessonStatusValue.DEFINED, LessonStatusTransition.COMPLETE)).toBe(true);
-        });
-
         it('should allow VOID transition from ACCEPTED', () => {
             expect(LessonStatus.isValidTransition(LessonStatusValue.ACCEPTED, LessonStatusTransition.VOID)).toBe(true);
         });
@@ -86,10 +82,6 @@ describe('LessonStatus Model', () => {
 
         it('should return REJECTED when REJECT is applied to REQUESTED', () => {
             expect(LessonStatus.getResultingStatus(LessonStatusValue.REQUESTED, LessonStatusTransition.REJECT)).toBe(LessonStatusValue.REJECTED);
-        });
-
-        it('should return COMPLETED when COMPLETE is applied to DEFINED', () => {
-            expect(LessonStatus.getResultingStatus(LessonStatusValue.DEFINED, LessonStatusTransition.COMPLETE)).toBe(LessonStatusValue.COMPLETED);
         });
 
         it('should return VOIDED when VOID is applied to ACCEPTED', () => {

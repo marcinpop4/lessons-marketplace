@@ -10,7 +10,6 @@ type JsonValue = string | number | boolean | null | { [key: string]: JsonValue }
  *       enum:
  *         - REQUESTED
  *         - ACCEPTED
- *         - DEFINED
  *         - REJECTED
  *         - COMPLETED
  *         - VOIDED
@@ -19,7 +18,6 @@ type JsonValue = string | number | boolean | null | { [key: string]: JsonValue }
 export enum LessonStatusValue {
     REQUESTED = 'REQUESTED',
     ACCEPTED = 'ACCEPTED',
-    DEFINED = 'DEFINED',
     REJECTED = 'REJECTED',
     COMPLETED = 'COMPLETED',
     VOIDED = 'VOIDED'
@@ -33,7 +31,6 @@ export enum LessonStatusValue {
  *       type: string
  *       enum:
  *         - ACCEPT
- *         - DEFINE
  *         - REJECT
  *         - COMPLETE
  *         - VOID
@@ -41,7 +38,6 @@ export enum LessonStatusValue {
  */
 export enum LessonStatusTransition {
     ACCEPT = 'ACCEPT',
-    DEFINE = 'DEFINE',
     REJECT = 'REJECT',
     COMPLETE = 'COMPLETE',
     VOID = 'VOID'
@@ -190,10 +186,6 @@ export class LessonStatus {
             [LessonStatusTransition.REJECT]: LessonStatusValue.REJECTED
         },
         [LessonStatusValue.ACCEPTED]: {
-            [LessonStatusTransition.DEFINE]: LessonStatusValue.DEFINED,
-            [LessonStatusTransition.VOID]: LessonStatusValue.VOIDED
-        },
-        [LessonStatusValue.DEFINED]: {
             [LessonStatusTransition.COMPLETE]: LessonStatusValue.COMPLETED,
             [LessonStatusTransition.VOID]: LessonStatusValue.VOIDED
         },
@@ -238,10 +230,6 @@ export class LessonStatus {
      */
     static getDisplayLabelForTransition(transition: LessonStatusTransition): string {
         if (!transition) return 'Unknown Action';
-        // Special case for DEFINE
-        if (transition === LessonStatusTransition.DEFINE) {
-            return 'Define Goals';
-        }
         // Simple conversion: Capitalize first letter, rest lowercase
         return transition.charAt(0).toUpperCase() + transition.slice(1).toLowerCase();
     }

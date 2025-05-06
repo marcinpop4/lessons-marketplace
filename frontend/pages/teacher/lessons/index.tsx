@@ -16,7 +16,6 @@ import { LessonQuoteStatus, LessonQuoteStatusValue } from '@shared/models/Lesson
 // Interface to hold both lesson model and extra display data
 interface LessonDisplayData {
     lesson: Lesson;
-    goalCount: number;
 }
 
 // Helper function to instantiate models from the API data structure
@@ -119,7 +118,7 @@ const instantiateLessonFromData = (data: TeacherLessonApiResponseItem): LessonDi
         });
 
         // Return the combined object for display
-        return { lesson, goalCount: data.goalCount };
+        return { lesson };
 
     } catch (instantiationError) {
         console.error(`Error instantiating lesson data for ID ${data?.id}:`, instantiationError, "Data:", data);
@@ -225,7 +224,6 @@ const TeacherLessonsPage: React.FC = () => {
         const grouped: Record<string, LessonDisplayData[]> = {
             [LessonStatusValue.REQUESTED]: [],
             [LessonStatusValue.ACCEPTED]: [],
-            [LessonStatusValue.DEFINED]: [],
             [LessonStatusValue.COMPLETED]: [],
             [LessonStatusValue.REJECTED]: [],
             [LessonStatusValue.VOIDED]: [],
@@ -284,7 +282,6 @@ const TeacherLessonsPage: React.FC = () => {
                                 <TeacherLessonCard
                                     key={item.lesson.id}
                                     lesson={item.lesson}
-                                    goalCount={item.goalCount}
                                     currentStatus={item.lesson.currentStatus?.status || LessonStatusValue.ACCEPTED}
                                     onUpdateStatus={handleUpdateStatus}
                                     isUpdating={updatingLessonId === item.lesson.id}
