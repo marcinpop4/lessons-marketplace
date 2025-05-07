@@ -7,6 +7,7 @@ import { toSharedMilestone, PrismaMilestoneWithRelations } from './milestone.map
 import {
     NotFoundError,
     BadRequestError,
+    AppError
 } from '../errors/index.js';
 import { AuthorizationError } from '../errors/authorization.error.js';
 import prismaClientInstance from '../prisma.js';
@@ -60,37 +61,51 @@ export class MilestoneService {
         const milestoneId = uuidv4();
         const initialStatusId = uuidv4();
 
-        const createdPrismaMilestone = await this.prisma.$transaction(async (tx) => {
-            // 1. Create the initial status
-            await tx.milestoneStatus.create({
-                data: {
-                    id: initialStatusId,
-                    status: MilestoneStatusValue.CREATED,
-                    milestone: { connect: { id: milestoneId } }
-                }
-            });
-
-            // 2. Create the milestone
-            const newMilestone = await tx.milestone.create({
+        await this.prisma.$transaction(async (tx) => {
+            // Step 1: Create the Milestone (without currentStatus initially)
+            await tx.milestone.create({
                 data: {
                     id: milestoneId,
                     title,
                     description,
                     dueDate,
                     lessonPlan: { connect: { id: lessonPlanId } },
-                    currentStatus: { connect: { id: initialStatusId } },
-                },
-                include: { // Include relations needed by mapper
-                    currentStatus: true,
-                    statuses: true,
-                    lessons: true,
-                    lessonPlan: true,
-                },
+                    // currentStatusId is not set here initially
+                }
             });
-            return newMilestone;
+
+            // Step 2: Create the initial MilestoneStatus, linking it via milestoneId
+            await tx.milestoneStatus.create({
+                data: {
+                    id: initialStatusId,
+                    status: MilestoneStatusValue.CREATED,
+                    milestoneId: milestoneId, // Link to the Milestone created in Step 1
+                }
+            });
+
+            // Step 3: Update the Milestone to set its currentStatusId
+            await tx.milestone.update({
+                where: { id: milestoneId },
+                data: { currentStatusId: initialStatusId },
+            });
         });
 
-        return toSharedMilestone(createdPrismaMilestone as PrismaMilestoneWithRelations);
+        // After transaction, fetch the complete Milestone to ensure all relations are present
+        const completePrismaMilestone = await this.prisma.milestone.findUnique({
+            where: { id: milestoneId },
+            include: { // Include relations needed by mapper
+                currentStatus: true,
+                statuses: true,
+                lessons: true,
+                lessonPlan: true, // Or more specific include if needed
+            },
+        });
+
+        if (!completePrismaMilestone) {
+            throw new AppError('Failed to retrieve milestone after creation.', 500);
+        }
+
+        return toSharedMilestone(completePrismaMilestone as PrismaMilestoneWithRelations);
     }
 
     /**

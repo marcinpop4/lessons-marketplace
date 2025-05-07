@@ -498,40 +498,60 @@ export class LessonService {
         lessonId: string,
         newMilestoneId: string | null // DTO ensures it's string (UUID) or null
     ): Promise<void> {
-        // Validate newMilestoneId format if it's not null
-        if (newMilestoneId !== null && !isUuid(newMilestoneId)) {
-            throw new BadRequestError('Milestone ID must be a valid UUID or null.');
+        if (newMilestoneId === undefined) { // Explicit check if it was passed in DTO
+            return; // No change to milestone requested
         }
 
-        if (newMilestoneId) { // If assigning or changing a milestone
-            // Find the LessonPlan associated with this Lesson
-            const associatedLessonPlan = await tx.lessonPlan.findUnique({
-                where: { lessonId: lessonId }, // Assuming LessonPlan has a unique constraint on lessonId
-                select: { id: true }
+        if (newMilestoneId === null) {
+            // Setting milestone to null (unassigning)
+            await tx.lesson.update({
+                where: { id: lessonId },
+                data: { milestoneId: null },
             });
-
-            if (!associatedLessonPlan) {
-                throw new BadRequestError('Cannot assign milestone: Lesson is not associated with any lesson plan.');
-            }
-
-            const milestoneToAssign = await tx.milestone.findUnique({
-                where: { id: newMilestoneId },
-                select: { lessonPlanId: true }
-            });
-
-            if (!milestoneToAssign) {
-                throw new NotFoundError(`Milestone with ID ${newMilestoneId} not found.`);
-            }
-
-            // Integrity check: Milestone must belong to the lesson's current plan
-            if (milestoneToAssign.lessonPlanId !== associatedLessonPlan.id) {
-                throw new BadRequestError('Milestone does not belong to the lesson\'s current lesson plan.');
-            }
+            return;
         }
-        // If newMilestoneId is null, it will unassign. If it's a valid UUID that passed checks, it will assign.
+
+        // newMilestoneId is a string (UUID) here, meaning we are assigning/changing a milestone
+        if (!isUuid(newMilestoneId)) {
+            throw new BadRequestError('Invalid Milestone ID format provided.');
+        }
+
+        // Fetch the lesson to get its teacher
+        const lessonBeingUpdated = await tx.lesson.findUnique({
+            where: { id: lessonId },
+            select: { quote: { select: { teacherId: true } } }
+        });
+
+        if (!lessonBeingUpdated?.quote?.teacherId) {
+            throw new AppError(`Lesson ${lessonId} or its associated teacher not found for milestone assignment validation.`, 500);
+        }
+        const lessonTeacherId = lessonBeingUpdated.quote.teacherId;
+
+        // Fetch the milestone to ensure it exists and belongs to the same teacher
+        const milestoneToAssign = await tx.milestone.findUnique({
+            where: { id: newMilestoneId },
+            select: {
+                id: true,
+                lessonPlan: {
+                    select: {
+                        teacherId: true
+                    }
+                }
+            }
+        });
+
+        if (!milestoneToAssign) {
+            throw new NotFoundError(`Milestone with ID ${newMilestoneId} not found.`);
+        }
+
+        // Check if milestone's lesson plan teacherId matches the lesson's teacherId
+        if (milestoneToAssign.lessonPlan?.teacherId !== lessonTeacherId) {
+            throw new AuthorizationError('Cannot assign milestone: Milestone does not belong to a lesson plan owned by the lesson\'s teacher.');
+        }
+
         await tx.lesson.update({
             where: { id: lessonId },
-            data: { milestoneId: newMilestoneId }
+            data: { milestoneId: newMilestoneId },
         });
     }
 
@@ -548,50 +568,67 @@ export class LessonService {
         actor: AuthenticatedActor
     ): Promise<Lesson | null> {
         if (!isUuid(lessonId)) {
-            throw new BadRequestError('Valid Lesson ID is required.');
-        }
-        if (!actor || !actor.id || !actor.userType) {
-            throw new AuthorizationError('Authentication is required to update lesson details.');
+            throw new BadRequestError('Invalid Lesson ID format.');
         }
 
-        // Fetch the lesson for authorization check first
-        const lessonDataForAuth = await this.prisma.lesson.findUnique({
-            where: { id: lessonId },
-            select: { quote: { select: { teacherId: true } } }
-        });
-
-        if (!lessonDataForAuth) {
-            throw new NotFoundError(`Lesson with ID ${lessonId} not found.`);
-        }
-
-        if (actor.userType !== PrismaUserType.TEACHER || lessonDataForAuth.quote.teacherId !== actor.id) {
-            throw new AuthorizationError('You are not authorized to update this lesson.');
-        }
-
-        const hasStatusUpdate = updateDto.transition !== undefined;
-        const hasMilestoneUpdate = Object.prototype.hasOwnProperty.call(updateDto, 'milestoneId');
-
-        if (!hasStatusUpdate && !hasMilestoneUpdate) {
+        if (Object.keys(updateDto).length === 0) {
             throw new BadRequestError('No update information provided. Please provide a status transition or a milestone ID.');
         }
+        if (updateDto.milestoneId !== undefined && updateDto.milestoneId !== null && !isUuid(updateDto.milestoneId)) {
+            throw new BadRequestError('Invalid Milestone ID format in DTO.');
+        }
 
-        return this.prisma.$transaction(async (tx) => {
-            if (hasStatusUpdate && updateDto.transition) { // Extra check for transition value due to optional chaining
-                await this._handleStatusUpdateInTransaction(tx, lessonId, updateDto.transition, updateDto.context);
-            }
-
-            if (hasMilestoneUpdate) {
-                // Pass updateDto.milestoneId directly; its type is string | null | undefined.
-                // The DTO makes milestoneId: string | null, so if hasOwnProperty is true, it's string | null.
-                await this._handleMilestoneAssignmentInTransaction(tx, lessonId, updateDto.milestoneId === undefined ? null : updateDto.milestoneId);
-            }
-
-            const updatedLessonData = await tx.lesson.findUniqueOrThrow({
+        const updatedLesson = await this.prisma.$transaction(async (tx) => {
+            const lesson = await tx.lesson.findUnique({
                 where: { id: lessonId },
-                include: lessonIncludeForMapper
+                include: {
+                    currentStatus: { select: { status: true } },
+                    quote: {
+                        select: {
+                            teacherId: true,
+                            lessonRequest: { select: { studentId: true } } // Corrected: studentId is nested
+                        }
+                    },
+                }
             });
-            return LessonMapper.toModel(updatedLessonData as unknown as DbLessonWithNestedRelations);
+
+            if (!lesson) {
+                throw new NotFoundError(`Lesson with ID ${lessonId} not found.`);
+            }
+
+            // Authorization: Only the teacher who owns the lesson can update it
+            // Assuming lesson.quote.teacherId is now correctly typed due to the select fix
+            if (actor.userType !== PrismaUserType.TEACHER || lesson.quote?.teacherId !== actor.id) {
+                throw new AuthorizationError('You are not authorized to update this lesson.');
+            }
+
+            // Handle status update if present in DTO
+            if (updateDto.transition) {
+                if (!lesson.currentStatus) { // Assuming lesson.currentStatus is now correctly typed
+                    throw new AppError(`Lesson ${lessonId} is missing current status information.`, 500);
+                }
+                // Corrected: _handleStatusUpdateInTransaction fetches current status itself.
+                await this._handleStatusUpdateInTransaction(
+                    tx,
+                    lessonId,
+                    updateDto.transition,
+                    updateDto.context
+                );
+            }
+
+            if (Object.prototype.hasOwnProperty.call(updateDto, 'milestoneId')) {
+                // Explicitly handle undefined for the function call that expects string | null
+                const milestoneIdToAssign = updateDto.milestoneId === undefined ? null : updateDto.milestoneId;
+                await this._handleMilestoneAssignmentInTransaction(tx, lessonId, milestoneIdToAssign);
+            }
+
+            return tx.lesson.findUniqueOrThrow({
+                where: { id: lessonId },
+                include: lessonIncludeForMapper,
+            });
         });
+
+        return LessonMapper.toModel(updatedLesson as unknown as DbLessonWithNestedRelations);
     }
 }
 
