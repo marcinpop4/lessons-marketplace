@@ -77,6 +77,7 @@ model Teacher {
   // Relations
   lessonQuotes             LessonQuote[]
   teacherLessonHourlyRates TeacherLessonHourlyRate[]
+  lessonPlans              LessonPlan[]
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime                   @updatedAt
 }
@@ -222,9 +223,14 @@ model Lesson {
   quote           LessonQuote    @relation(fields: [quoteId], references: [id])
   currentStatusId String?        @unique
   currentStatus   LessonStatus?  @relation("CurrentStatus", fields: [currentStatusId], references: [id])
-  lessonStatuses  LessonStatus[] @relation("LessonStatuses")
+  statuses        LessonStatus[] @relation("statuses")
+  lessonPlan      LessonPlan?    @relation("PlanForLesson")
+  milestoneId     String?        // Foreign key to Milestone
+  milestone       Milestone?     @relation(fields: [milestoneId], references: [id]) // Relation to Milestone
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+
+  @@index([milestoneId]) // Add index for the new foreign key
 }
 
 // Model for storing refresh tokens
@@ -242,16 +248,15 @@ model RefreshToken {
 model LessonStatus {
   id        String   @id @default(uuid())
   lessonId  String
-  status    String
+  status    String // Corresponds to LessonStatusValue in shared/models
   context   Json?
   createdAt DateTime @default(now())
 
   // Reference to the lesson - both for current status and history
-  lesson        Lesson? @relation("LessonStatuses", fields: [lessonId], references: [id])
+  lesson        Lesson? @relation("statuses", fields: [lessonId], references: [id])
   currentLesson Lesson? @relation("CurrentStatus")
 
   @@index([lessonId])
-  @@index([status])
 }
 
 // --- Password Credential Model --- 
@@ -294,3 +299,86 @@ enum AuthMethodType {
   FACEBOOK
   // Add other methods as needed
 }
+
+// --- Lesson Plan Models ---
+
+enum LessonPlanStatusValue {
+  DRAFT
+  PENDING_APPROVAL
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  REJECTED
+}
+
+model LessonPlan {
+  id              String                @id @default(uuid())
+  title           String
+  description     String
+  dueDate         DateTime?
+  lessonId        String?               @unique @db.Text
+  lesson          Lesson?               @relation("PlanForLesson", fields: [lessonId], references: [id])
+  teacherId       String                // Added teacher ID
+  teacher         Teacher               @relation(fields: [teacherId], references: [id]) // Added teacher relation
+  currentStatusId String?               @unique
+  currentStatus   LessonPlanStatus?     @relation("CurrentLessonPlanStatus", fields: [currentStatusId], references: [id])
+  statuses        LessonPlanStatus[]    @relation("LessonPlanStatusHistory")
+  milestones      Milestone[]
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@index([lessonId])
+  @@index([teacherId]) // Added index for teacherId
+}
+
+model LessonPlanStatus {
+  id             String                @id @default(uuid())
+  lessonPlanId   String
+  lessonPlan     LessonPlan            @relation("LessonPlanStatusHistory", fields: [lessonPlanId], references: [id])
+  status         LessonPlanStatusValue
+  context        Json?
+  createdAt      DateTime              @default(now())
+  currentForPlan LessonPlan?           @relation("CurrentLessonPlanStatus")
+
+  @@index([lessonPlanId])
+  @@index([status])
+}
+
+enum MilestoneStatusValue {
+  CREATED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Milestone {
+  id              String                @id @default(uuid())
+  title           String
+  description     String
+  dueDate         DateTime
+  lessonPlanId    String
+  lessonPlan      LessonPlan            @relation(fields: [lessonPlanId], references: [id])
+  currentStatusId String?               @unique
+  currentStatus   MilestoneStatus?      @relation("CurrentMilestoneStatus", fields: [currentStatusId], references: [id])
+  statuses        MilestoneStatus[]     @relation("MilestoneStatusHistory")
+  lessons         Lesson[]              // A milestone can have many lessons
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@index([lessonPlanId])
+}
+
+model MilestoneStatus {
+  id                String             @id @default(uuid())
+  milestoneId       String
+  milestone         Milestone          @relation("MilestoneStatusHistory", fields: [milestoneId], references: [id])
+  status            MilestoneStatusValue
+  context           Json?
+  createdAt         DateTime           @default(now())
+  currentForMilestone Milestone?       @relation("CurrentMilestoneStatus")
+
+  @@index([milestoneId])
+  @@index([status])
+}
+
+// --- End Lesson Plan Models ---

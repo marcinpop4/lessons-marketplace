@@ -55,7 +55,11 @@ class TeacherService {
             // Use the provided client (tx or default prisma)
             const dbTeacher = await client.teacher.create({
                 data: {
-                    ...teacherCreateDTO, // Save only profile data
+                    firstName: teacherCreateDTO.firstName,
+                    lastName: teacherCreateDTO.lastName,
+                    email: teacherCreateDTO.email,
+                    phoneNumber: teacherCreateDTO.phoneNumber,
+                    dateOfBirth: teacherCreateDTO.dateOfBirth,
                 }
             });
 

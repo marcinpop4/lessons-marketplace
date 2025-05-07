@@ -19,6 +19,13 @@ import { AppError } from './app.error.js';
  *         message:
  *           type: string
  *           example: Bad request
+ *   responses:
+ *     BadRequestError:
+ *       description: Bad Request. The request could not be understood by the server due to malformed syntax or invalid data.
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/BadRequestError'
  */
 export class BadRequestError extends AppError {
     /**

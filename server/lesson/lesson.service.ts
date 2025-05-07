@@ -7,6 +7,8 @@ import prisma from '../prisma.js';
 import { LessonMapper } from './lesson.mapper.js';
 import { BadRequestError, NotFoundError, AppError, AuthorizationError, ConflictError } from '../errors/index.js';
 import { isUuid } from '../utils/validation.utils.js';
+import { UpdateLessonDto } from './lesson.dto.js';
+import { UserType as PrismaUserType } from '@prisma/client';
 
 // Define the includes needed for transforming to a Lesson model via LessonMapper
 const lessonIncludeForMapper = {
@@ -39,6 +41,11 @@ interface FindLessonsOptions {
     teacherId?: string;
     quoteId?: string;
     requestingUserId?: string; // Needed for quoteId authorization
+}
+
+interface AuthenticatedActor {
+    id: string;
+    userType: PrismaUserType;
 }
 
 export class LessonService {
@@ -446,6 +453,145 @@ export class LessonService {
             console.error(`Error fetching lessons for student ${studentId}:`, error);
             throw new AppError(`Failed to fetch lessons by student: ${error instanceof Error ? error.message : 'Unknown error'}`, 500);
         }
+    }
+
+    private async _handleStatusUpdateInTransaction(
+        tx: Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">,
+        lessonId: string,
+        transition: LessonStatusTransition,
+        context?: Record<string, any>
+    ): Promise<void> {
+        if (typeof transition !== 'string' || !(transition in LessonStatusTransition)) {
+            throw new BadRequestError(`Invalid transition value: ${transition}.`);
+        }
+
+        const currentLessonForStatus = await tx.lesson.findUnique({
+            where: { id: lessonId },
+            select: { currentStatusId: true }
+        });
+
+        if (!currentLessonForStatus || !currentLessonForStatus.currentStatusId) {
+            // This indicates a data integrity issue or lesson not found by this point (should be caught earlier)
+            throw new AppError(`Lesson ${lessonId} or its status information is missing for status update.`, 500);
+        }
+
+        const currentStatusRecord = await tx.lessonStatus.findUnique({
+            where: { id: currentLessonForStatus.currentStatusId }
+        });
+
+        if (!currentStatusRecord) {
+            throw new AppError(`Lesson ${lessonId} has invalid current status information.`, 500);
+        }
+
+        const currentStatusValue = currentStatusRecord.status as LessonStatusValue;
+        const newStatusValue = LessonStatus.getResultingStatus(currentStatusValue, transition);
+
+        if (!newStatusValue) {
+            throw new BadRequestError(`Invalid transition: Cannot transition from ${currentStatusValue} using ${transition}.`);
+        }
+
+        await this.updateStatusInternal(tx, lessonId, newStatusValue, context || {});
+    }
+
+    private async _handleMilestoneAssignmentInTransaction(
+        tx: Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">,
+        lessonId: string,
+        newMilestoneId: string | null // DTO ensures it's string (UUID) or null
+    ): Promise<void> {
+        // Validate newMilestoneId format if it's not null
+        if (newMilestoneId !== null && !isUuid(newMilestoneId)) {
+            throw new BadRequestError('Milestone ID must be a valid UUID or null.');
+        }
+
+        if (newMilestoneId) { // If assigning or changing a milestone
+            // Find the LessonPlan associated with this Lesson
+            const associatedLessonPlan = await tx.lessonPlan.findUnique({
+                where: { lessonId: lessonId }, // Assuming LessonPlan has a unique constraint on lessonId
+                select: { id: true }
+            });
+
+            if (!associatedLessonPlan) {
+                throw new BadRequestError('Cannot assign milestone: Lesson is not associated with any lesson plan.');
+            }
+
+            const milestoneToAssign = await tx.milestone.findUnique({
+                where: { id: newMilestoneId },
+                select: { lessonPlanId: true }
+            });
+
+            if (!milestoneToAssign) {
+                throw new NotFoundError(`Milestone with ID ${newMilestoneId} not found.`);
+            }
+
+            // Integrity check: Milestone must belong to the lesson's current plan
+            if (milestoneToAssign.lessonPlanId !== associatedLessonPlan.id) {
+                throw new BadRequestError('Milestone does not belong to the lesson\'s current lesson plan.');
+            }
+        }
+        // If newMilestoneId is null, it will unassign. If it's a valid UUID that passed checks, it will assign.
+        await tx.lesson.update({
+            where: { id: lessonId },
+            data: { milestoneId: newMilestoneId }
+        });
+    }
+
+    /**
+     * Update lesson details, including status and/or milestone assignment.
+     * @param lessonId The ID of the lesson to update.
+     * @param updateDto DTO containing updates (milestoneId, status transition, context).
+     * @param actor The authenticated user performing the action.
+     * @returns The updated Lesson shared model instance.
+     */
+    async updateLessonDetails(
+        lessonId: string,
+        updateDto: UpdateLessonDto,
+        actor: AuthenticatedActor
+    ): Promise<Lesson | null> {
+        if (!isUuid(lessonId)) {
+            throw new BadRequestError('Valid Lesson ID is required.');
+        }
+        if (!actor || !actor.id || !actor.userType) {
+            throw new AuthorizationError('Authentication is required to update lesson details.');
+        }
+
+        // Fetch the lesson for authorization check first
+        const lessonDataForAuth = await this.prisma.lesson.findUnique({
+            where: { id: lessonId },
+            select: { quote: { select: { teacherId: true } } }
+        });
+
+        if (!lessonDataForAuth) {
+            throw new NotFoundError(`Lesson with ID ${lessonId} not found.`);
+        }
+
+        if (actor.userType !== PrismaUserType.TEACHER || lessonDataForAuth.quote.teacherId !== actor.id) {
+            throw new AuthorizationError('You are not authorized to update this lesson.');
+        }
+
+        const hasStatusUpdate = updateDto.transition !== undefined;
+        const hasMilestoneUpdate = Object.prototype.hasOwnProperty.call(updateDto, 'milestoneId');
+
+        if (!hasStatusUpdate && !hasMilestoneUpdate) {
+            throw new BadRequestError('No update information provided. Please provide a status transition or a milestone ID.');
+        }
+
+        return this.prisma.$transaction(async (tx) => {
+            if (hasStatusUpdate && updateDto.transition) { // Extra check for transition value due to optional chaining
+                await this._handleStatusUpdateInTransaction(tx, lessonId, updateDto.transition, updateDto.context);
+            }
+
+            if (hasMilestoneUpdate) {
+                // Pass updateDto.milestoneId directly; its type is string | null | undefined.
+                // The DTO makes milestoneId: string | null, so if hasOwnProperty is true, it's string | null.
+                await this._handleMilestoneAssignmentInTransaction(tx, lessonId, updateDto.milestoneId === undefined ? null : updateDto.milestoneId);
+            }
+
+            const updatedLessonData = await tx.lesson.findUniqueOrThrow({
+                where: { id: lessonId },
+                include: lessonIncludeForMapper
+            });
+            return LessonMapper.toModel(updatedLessonData as unknown as DbLessonWithNestedRelations);
+        });
     }
 }
 

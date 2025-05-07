@@ -4,6 +4,7 @@ import { LessonType } from './LessonType.js';
 import { Teacher } from './Teacher.js';
 import { Student } from './Student.js';
 import { Address } from './Address.js';
+import { Milestone } from './Milestone.js';
 
 /**
  * @openapi
@@ -34,6 +35,15 @@ import { Address } from './Address.js';
  *           type: string
  *           format: date-time
  *           description: Timestamp when the lesson was last updated.
+ *         milestoneId:
+ *           type: string
+ *           format: uuid
+ *           nullable: true
+ *           description: Optional ID of the milestone this lesson belongs to.
+ *         milestone:
+ *           $ref: '#/components/schemas/Milestone'
+ *           nullable: true
+ *           description: Optional milestone this lesson belongs to.
  *       required:
  *         - id
  *         - quote
@@ -77,6 +87,8 @@ export interface LessonProps {
   quote: LessonQuote;
   currentStatus?: LessonStatus | null;
   statuses?: LessonStatus[];
+  milestoneId?: string | null;
+  milestone?: Milestone | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -89,6 +101,8 @@ export class Lesson implements LessonProps {
   quote: LessonQuote;
   currentStatus: LessonStatus | null;
   statuses: LessonStatus[];
+  milestoneId: string | null;
+  milestone: Milestone | null;
   createdAt: Date;
   updatedAt: Date;
 
@@ -97,6 +111,8 @@ export class Lesson implements LessonProps {
     quote,
     currentStatus = null,
     statuses = [],
+    milestoneId = null,
+    milestone = null,
     createdAt = new Date(),
     updatedAt = new Date()
   }: LessonProps) {
@@ -104,6 +120,8 @@ export class Lesson implements LessonProps {
     this.quote = quote;
     this.currentStatus = currentStatus;
     this.statuses = statuses;
+    this.milestoneId = milestoneId;
+    this.milestone = milestone;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }

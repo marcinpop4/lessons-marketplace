@@ -10,6 +10,7 @@ import { LessonStatusValue, LessonStatus, LessonStatusTransition } from '../../s
 import { v4 as uuidv4 } from 'uuid';
 import { lessonService } from './lesson.service.js';
 import { AuthorizationError, BadRequestError, NotFoundError, AppError } from '../errors/index.js';
+import { UpdateLessonDto } from './lesson.dto.js'; // Import the consolidated DTO
 
 // Define AuthenticatedRequest interface using Prisma UserType
 interface AuthenticatedRequest extends Request {
@@ -124,35 +125,34 @@ export const lessonController = {
   },
 
   /**
-   * Update the status of a specific lesson
+   * Update lesson details (status, milestoneId, etc.)
    * @route PATCH /api/lessons/:lessonId
-   * @param req Request with lessonId in params and { transition, context } in body
+   * @param req Request with lessonId in params and UpdateLessonDto in body
    * @param res Express response
    */
-  updateLessonStatus: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  updateLesson: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      // Extract params and body data
       const { lessonId } = req.params;
-      const { transition, context } = req.body;
-      const authenticatedUserId = req.user?.id; // Added by authMiddleware
-      const authenticatedUserType = req.user?.userType; // Added by authMiddleware
+      const updateDto: UpdateLessonDto = req.body;
+      const actor = req.user;
 
-      // Still check authenticated user from middleware
-      if (!authenticatedUserId || !authenticatedUserType) {
+      if (!actor?.id || !actor?.userType) {
         throw new AuthorizationError('Authentication required.');
       }
 
-      // Call service - validation of lessonId, transition, context, and userId happens inside
-      const updatedLesson = await lessonService.updateStatus(
+      // Basic validation: ensure at least one updatable field is present if needed, or rely on service
+      // For now, service will handle validation of DTO content (e.g., if both transition and milestoneId are missing)
+      // Or if specific combinations are invalid.
+
+      const updatedLesson = await lessonService.updateLessonDetails(
         lessonId,
-        transition, // Pass raw value, service validates
-        context,
-        authenticatedUserId
+        updateDto,
+        actor
       );
 
       res.status(200).json(updatedLesson);
     } catch (error) {
-      next(error); // Pass error (Auth from controller, NotFound, BadRequest, AppError from service) to central handler
+      next(error);
     }
   }
 }; 

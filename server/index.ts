@@ -80,17 +80,19 @@ async function testDatabaseConnection() {
 }
 
 // --- Route Imports --- 
-import lessonRequestRoutes from './lessonRequest/lessonRequest.routes.js';
-import teacherRoutes from './teacher/teacher.routes.js';
-import lessonRoutes from './lesson/lesson.routes.js';
-import authRoutes from './auth/auth.routes.js';
-import refreshTokenRoutes from './auth/refreshToken.routes.js';
-import lessonQuoteRoutes from './lessonQuote/lessonQuote.routes.js';
 import addressRoutes from './address/address.routes.js';
+import authRoutes from './auth/auth.routes.js';
 import healthRoutes from './health/health.routes.js';
-import studentRoutes from './student/student.routes.js';
-import teacherLessonHourlyRateRoutes from './teacher-lesson-hourly-rate/teacherLessonHourlyRate.routes.js'; // Updated import
+import lessonPlanRoutes from './lessonPlan/lessonPlan.routes.js';
+import lessonQuoteRoutes from './lessonQuote/lessonQuote.routes.js';
+import lessonRequestRoutes from './lessonRequest/lessonRequest.routes.js';
+import lessonRoutes from './lesson/lesson.routes.js';
+import milestoneRoutes from './milestone/milestone.routes.js';
 import objectiveRoutes from './objective/objective.routes.js';
+import refreshTokenRoutes from './auth/refreshToken.routes.js';
+import studentRoutes from './student/student.routes.js';
+import teacherLessonHourlyRateRoutes from './teacher-lesson-hourly-rate/teacherLessonHourlyRate.routes.js';
+import teacherRoutes from './teacher/teacher.routes.js';
 
 // --- Express App Setup --- 
 const app: Express = express();
@@ -133,17 +135,19 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // API Routes
-app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/refresh-token', refreshTokenRoutes);
-app.use('/api/v1/lesson-requests', lessonRequestRoutes);
-app.use('/api/v1/teachers', teacherRoutes);
-app.use('/api/v1/lessons', lessonRoutes);
-app.use('/api/v1/lesson-quotes', lessonQuoteRoutes);
 app.use('/api/v1/addresses', addressRoutes);
+app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/health', healthRoutes);
+app.use('/api/v1/lesson-plans', lessonPlanRoutes);
+app.use('/api/v1/lesson-quotes', lessonQuoteRoutes);
+app.use('/api/v1/lesson-requests', lessonRequestRoutes);
+app.use('/api/v1/lessons', lessonRoutes);
+app.use('/api/v1/milestones', milestoneRoutes);
+app.use('/api/v1/objectives', objectiveRoutes);
+app.use('/api/v1/refresh-token', refreshTokenRoutes);
 app.use('/api/v1/students', studentRoutes);
 app.use('/api/v1/teacher-lesson-rates', teacherLessonHourlyRateRoutes);
-app.use('/api/v1/objectives', objectiveRoutes);
+app.use('/api/v1/teachers', teacherRoutes);
 
 // --- Error Handling --- 
 app.use((err: Error | any, req: Request, res: Response, next: NextFunction) => {

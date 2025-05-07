@@ -1,4 +1,4 @@
-import { UserType } from '../models/UserType.js';
+import { UserType } from '@shared/models/UserType.js';
 
 /**
  * @openapi
@@ -11,26 +11,20 @@ import { UserType } from '../models/UserType.js';
  *         email:
  *           type: string
  *           format: email
- *           description: The user's email address.
- *           example: ethan.parker@example.com
+ *           description: User's email address.
+ *           example: user@example.com
  *         password:
  *           type: string
  *           format: password
- *           description: The user's password.
- *           writeOnly: true # Mark password as writeOnly for security
- *           example: yourSecurePassword123
+ *           description: User's password.
+ *           example: Pa$$w0rd!
  *         userType:
  *           $ref: '#/components/schemas/UserType'
- *           description: The type of user logging in (STUDENT or TEACHER).
- *           example: STUDENT
+ *           description: Specify whether logging in as STUDENT or TEACHER.
  *       required:
  *         - email
  *         - password
  *         - userType
- *       example:
- *         email: ethan.parker@example.com
- *         password: 1234
- *         userType: STUDENT
  */
 export interface LoginUserDTO {
     email: string;

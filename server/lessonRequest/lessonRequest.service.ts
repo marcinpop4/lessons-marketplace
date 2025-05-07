@@ -10,15 +10,7 @@ import { LessonRequestMapper } from './lessonRequest.mapper.js';
 // Import errors and validation utils
 import { BadRequestError, NotFoundError, AuthorizationError } from '../errors/index.js';
 import { isUuid } from '../utils/validation.utils.js';
-
-export interface LessonRequestDTO {
-  type: LessonType;
-  startTime: Date;
-  durationMinutes: number;
-  addressDTO: AddressDTO; // Use imported AddressDTO
-  studentId: string;
-}
-
+import { CreateLessonRequestDTO } from './lessonRequest.dto.js'; // Import the new DTO
 
 export class LessonRequestService {
   private readonly prisma = prisma;
@@ -28,7 +20,7 @@ export class LessonRequestService {
    * @param data - Lesson request data DTO
    * @returns Created LessonRequest shared model instance
    */
-  async createLessonRequest(lessonRequestDTO: LessonRequestDTO): Promise<LessonRequest> {
+  async createLessonRequest(lessonRequestDTO: CreateLessonRequestDTO): Promise<LessonRequest> {
     // --- Validation ---
     if (!lessonRequestDTO) {
       throw new BadRequestError('Lesson request data is required.');

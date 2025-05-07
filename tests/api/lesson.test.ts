@@ -496,7 +496,7 @@ describe('API Integration: /api/v1/lessons', () => {
             } catch (error: any) {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(400);
-                expect(error.response?.data?.error).toMatch(/Invalid transition value|Transition is required/);
+                expect(error.response?.data?.error).toMatch(/No update information provided. Please provide a status transition or a milestone ID./);
             }
         });
 

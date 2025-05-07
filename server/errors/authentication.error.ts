@@ -19,6 +19,13 @@ import { AppError } from './app.error.js';
  *         message:
  *           type: string
  *           example: Authentication failed
+ *   responses:
+ *     UnauthorizedError:
+ *       description: Unauthorized. Authentication is required and has failed or has not yet been provided.
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AuthenticationError'
  */
 export class AuthenticationError extends AppError {
     constructor(message = "Authentication failed") {

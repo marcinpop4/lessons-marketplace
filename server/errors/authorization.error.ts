@@ -19,6 +19,13 @@ import { AppError } from './app.error.js';
  *         message:
  *           type: string
  *           example: Authorization failed
+ *   responses:
+ *     ForbiddenError:
+ *       description: Forbidden. The server understood the request but refuses to authorize it.
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AuthorizationError'
  */
 export class AuthorizationError extends AppError {
     constructor(message = "Authorization failed") {

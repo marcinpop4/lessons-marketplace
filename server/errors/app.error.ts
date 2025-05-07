@@ -2,7 +2,7 @@
  * @openapi
  * components:
  *   schemas:
- *     Error:
+ *     AppError:
  *       type: object
  *       properties:
  *         error:

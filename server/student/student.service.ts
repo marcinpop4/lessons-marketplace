@@ -65,10 +65,12 @@ class StudentService {
             // Use the provided client (tx or default prisma)
             const dbStudent = await client.student.create({
                 data: {
-                    ...studentCreateDTO,
-                    // REMOVED password and authMethods fields
-                    // password: hashedPassword,
-                    // authMethods: ['PASSWORD'], 
+                    // Explicitly list fields instead of spreading
+                    firstName: studentCreateDTO.firstName,
+                    lastName: studentCreateDTO.lastName,
+                    email: studentCreateDTO.email,
+                    phoneNumber: studentCreateDTO.phoneNumber,
+                    dateOfBirth: studentCreateDTO.dateOfBirth,
                     isActive: true // Explicitly set default if needed
                 }
             });

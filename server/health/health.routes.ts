@@ -5,7 +5,7 @@ const router: Router = express.Router();
 
 /**
  * @openapi
- * /api/v1/health:
+ * /health:
  *   get:
  *     summary: Health check
  *     description: Checks if the server is running and can connect to the database.

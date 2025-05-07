@@ -11,7 +11,7 @@ const router = Router();
 
 /**
  * @swagger
- * /api/v1/objectives:
+ * /objectives:
  *   get:
  *     tags: [Objectives]
  *     summary: Fetch objectives for a specific student
@@ -60,7 +60,7 @@ router.get('/', authMiddleware, objectiveController.getObjectives);
 
 /**
  * @swagger
- * /api/v1/objectives:
+ * /objectives:
  *   post:
  *     tags: [Objectives]
  *     summary: Create a new objective for the authenticated student
@@ -106,7 +106,7 @@ router.post('/', authMiddleware, objectiveController.createObjective);
 
 /**
  * @swagger
- * /api/v1/objectives/{objectiveId}:
+ * /objectives/{objectiveId}:
  *   patch:
  *     tags: [Objectives]
  *     summary: Update the status of an objective
@@ -157,7 +157,7 @@ router.patch('/:objectiveId', authMiddleware, objectiveController.updateObjectiv
 
 /**
  * @openapi
- * /api/v1/objectives/recommendations/stream:
+ * /objectives/recommendations/stream:
  *   get:
  *     tags: [Objectives]
  *     summary: Stream AI-generated objective recommendations

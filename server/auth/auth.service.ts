@@ -99,7 +99,7 @@ class AuthService {
     }
 
     if (!userProfile) {
-      throw new Error('Authentication failed: User not found.');
+      throw new Error('Authentication failed: Invalid credentials.');
     }
 
     // 2. Check if user has PASSWORD auth method enabled

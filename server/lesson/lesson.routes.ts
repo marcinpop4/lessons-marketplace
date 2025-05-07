@@ -112,8 +112,8 @@ router.get('/:id', authMiddleware, lessonController.getLessonById);
  * @openapi
  * /lessons/{lessonId}:
  *   patch:
- *     summary: Update lesson status (Teacher only)
- *     description: Allows a teacher to update the status of a lesson (e.g., mark as completed).
+ *     summary: Update lesson details
+ *     description: Allows a teacher to update lesson details, such as its status or assigned milestone.
  *     tags:
  *       - Lessons
  *     security:
@@ -124,34 +124,34 @@ router.get('/:id', authMiddleware, lessonController.getLessonById);
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid # Ensure format is uuid for consistency
  *         description: The ID of the lesson to update.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               status:
- *                 $ref: '#/components/schemas/LessonStatus' # Adjust schema ref if needed
- *             required:
- *               - status
+ *             $ref: '#/components/schemas/UpdateLessonDto' # Using the consolidated DTO
+ *           example:
+ *             milestoneId: "new-milestone-uuid-123"
+ *             # transition: "COMPLETE" # Example for status update
+ *             # context: { reason: "Completed ahead of schedule" }
  *     responses:
  *       '200':
- *         description: Lesson status updated successfully.
+ *         description: Lesson updated successfully.
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Lesson'
  *       '400':
- *         description: Bad request (e.g., invalid status).
+ *         $ref: '#/components/responses/BadRequestError' # Updated ref
  *       '401':
- *         description: Unauthorized.
+ *         $ref: '#/components/responses/UnauthorizedError' # Updated ref
  *       '403':
- *         description: Forbidden (User is not the teacher of this lesson).
+ *         $ref: '#/components/responses/ForbiddenError' # Updated ref
  *       '404':
- *         description: Lesson not found.
+ *         $ref: '#/components/responses/NotFoundError' # Updated ref
  */
-router.patch('/:lessonId', authMiddleware, checkRole([UserType.TEACHER]), lessonController.updateLessonStatus);
+router.patch('/:lessonId', authMiddleware, checkRole([UserType.TEACHER]), lessonController.updateLesson);
 
 export default router; 

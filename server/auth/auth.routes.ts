@@ -17,6 +17,14 @@ const router: Router = express.Router();
  *         application/json:
  *           schema:
  *             $ref: '#/components/schemas/RegisterUserDTO'
+ *           example:
+ *             firstName: "Jane"
+ *             lastName: "Doe"
+ *             email: "jane.doe@example.com"
+ *             password: "SecureP@ss123"
+ *             phoneNumber: "555-987-6543"
+ *             dateOfBirth: "1992-05-20"
+ *             userType: "STUDENT"
  *     responses:
  *       '201':
  *         description: User registered successfully
@@ -25,11 +33,9 @@ const router: Router = express.Router();
  *             schema:
  *               $ref: '#/components/schemas/User'
  *       '400':
- *         description: Bad request (e.g., validation error, duplicate email)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         $ref: '#/components/responses/BadRequestError'
+ *       '409':
+ *         $ref: '#/components/responses/ConflictError'
  */
 router.post('/register', authController.register);
 
@@ -47,6 +53,19 @@ router.post('/register', authController.register);
  *         application/json:
  *           schema:
  *             $ref: '#/components/schemas/LoginUserDTO'
+ *           examples:
+ *             studentLogin:
+ *               summary: Example login for a student
+ *               value:
+ *                 email: "ethan.parker@example.com"
+ *                 password: "12345678"
+ *                 userType: "STUDENT"
+ *             teacherLogin:
+ *               summary: Example login for a teacher
+ *               value:
+ *                 email: "emily.richardson@musicschool.com"
+ *                 password: "12345678"
+ *                 userType: "TEACHER"
  *     responses:
  *       '200':
  *         description: Login successful
@@ -59,24 +78,27 @@ router.post('/register', authController.register);
  *                   type: string
  *                   description: Authentication token (JWT)
  *                 user:
- *                   $ref: '#/components/schemas/User'
+ *                   description: The authenticated user's profile (either Student or Teacher).
+ *                   oneOf: # Use oneOf to specify possible user types
+ *                     - $ref: '#/components/schemas/Student'
+ *                     - $ref: '#/components/schemas/Teacher'
+ *                   discriminator: # Optional: Helps tools differentiate schemas
+ *                      propertyName: userType # Assuming Student/Teacher schemas include userType
+ *                      mapping:
+ *                          STUDENT: '#/components/schemas/Student'
+ *                          TEACHER: '#/components/schemas/Teacher'
+ *               required: # Add required properties for the response object
+ *                 - token
+ *                 - user
  *         headers:
  *           Set-Cookie:
  *             description: Contains the auth token cookie (HttpOnly).
  *             schema:
  *               type: string
  *       '400':
- *         description: Bad request (e.g., missing fields)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         $ref: '#/components/responses/BadRequestError'
  *       '401':
- *         description: Unauthorized (e.g., invalid credentials)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         $ref: '#/components/responses/UnauthorizedError'
  */
 router.post('/login', authController.login);
 
@@ -107,11 +129,7 @@ router.post('/login', authController.login);
  *             schema:
  *               type: string
  *       '401':
- *         description: Unauthorized (User not logged in)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         $ref: '#/components/responses/UnauthorizedError'
  */
 router.post('/logout', authController.logout);
 
@@ -133,11 +151,7 @@ router.post('/logout', authController.logout);
  *             schema:
  *               $ref: '#/components/schemas/User'
  *       '401':
- *         description: Unauthorized (User not logged in)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         $ref: '#/components/responses/UnauthorizedError'
  */
 router.get('/me', authController.getCurrentUser);
 
