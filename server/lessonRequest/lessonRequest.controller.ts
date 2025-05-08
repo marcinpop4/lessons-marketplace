@@ -27,10 +27,13 @@ export class LessonRequestController {
       const { type, startTime, durationMinutes, addressObj, studentId } = req.body;
       const authenticatedUser = req.user;
 
-      // --- Authorization Check (Controller Level - user must match studentId) ---
-      if (!authenticatedUser?.id || studentId !== authenticatedUser.id) {
-        // Use next for consistent error handling
-        return next(new AuthorizationError('Forbidden: You can only create lesson requests for yourself.'));
+      // --- Authorization Check --- //
+      // Allow if:
+      // 1. The authenticated user is the student for whom the request is being created.
+      // 2. The authenticated user is a TEACHER (creating on behalf of a student for a plan).
+      if (!authenticatedUser?.id ||
+        (studentId !== authenticatedUser.id && authenticatedUser.userType !== UserType.TEACHER)) {
+        return next(new AuthorizationError('Forbidden: You can only create lesson requests for yourself or if you are a teacher creating a planned lesson.'));
       }
       // --- End Authorization Check --- 
 

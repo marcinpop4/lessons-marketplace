@@ -10,10 +10,11 @@ const formatDateForInput = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-// Helper function to generate time options
+// Helper function to generate time options - EXPANDED RANGE
 const generateTimeOptions = (): string[] => {
   const options: string[] = [];
-  for (let hour = 9; hour < 21; hour++) {
+  // Expanded range, e.g., from 7 AM to 10 PM (exclusive of 10 PM)
+  for (let hour = 7; hour < 22; hour++) {
     const formattedHour = hour.toString().padStart(2, '0');
     options.push(`${formattedHour}:00`);
     options.push(`${formattedHour}:30`);
@@ -27,9 +28,10 @@ interface LessonDetailsFormProps {
   selectedDate: string;
   selectedTime: string;
   onTypeChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  onDurationChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  onDurationChange: (e: React.ChangeEvent<HTMLSelectElement> | React.ChangeEvent<HTMLInputElement>) => void;
   onDateChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onTimeChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  disableType?: boolean;
 }
 
 const LessonDetailsForm: React.FC<LessonDetailsFormProps> = ({
@@ -40,16 +42,22 @@ const LessonDetailsForm: React.FC<LessonDetailsFormProps> = ({
   onTypeChange,
   onDurationChange,
   onDateChange,
-  onTimeChange
+  onTimeChange,
+  disableType = false
 }) => {
   const timeOptions = generateTimeOptions();
 
+  const cardProps = {
+    title: "Lesson Details",
+    variant: "primary" as const,
+    className: "lesson-request-card"
+  }
+
+  // Log the selectedTime prop as received by this component
+  console.log(`[LessonDetailsForm] Rendering with selectedTime: "${selectedTime}"`);
+
   return (
-    <Card
-      title="Lesson Details"
-      variant="primary"
-      className="lesson-request-card"
-    >
+    <Card {...cardProps}>
       <div className="form-row">
         <div className="form-group">
           <label htmlFor="type">Lesson Type</label>
@@ -59,27 +67,28 @@ const LessonDetailsForm: React.FC<LessonDetailsFormProps> = ({
             value={type}
             onChange={onTypeChange}
             required
+            disabled={disableType}
+            className={disableType ? 'bg-gray-100 dark:bg-gray-700 opacity-70 cursor-not-allowed' : ''}
           >
-            {Object.values(LessonType).map(type => (
-              <option key={type} value={type}>{formatDisplayLabel(type)}</option>
+            {Object.values(LessonType).map(lt => (
+              <option key={lt} value={lt}>{formatDisplayLabel(lt)}</option>
             ))}
           </select>
         </div>
 
         <div className="form-group">
           <label htmlFor="durationMinutes">Duration (minutes)</label>
-          <select
+          <input
             id="durationMinutes"
             name="durationMinutes"
+            type="number"
             value={durationMinutes}
             onChange={onDurationChange}
             required
-          >
-            <option value={30}>30</option>
-            <option value={45}>45</option>
-            <option value={60}>60</option>
-            <option value={90}>90</option>
-          </select>
+            min="15"
+            step="15"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+          />
         </div>
       </div>
 
@@ -93,6 +102,7 @@ const LessonDetailsForm: React.FC<LessonDetailsFormProps> = ({
             onChange={onDateChange}
             min={formatDateForInput(new Date())}
             required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
           />
         </div>
 
@@ -103,6 +113,7 @@ const LessonDetailsForm: React.FC<LessonDetailsFormProps> = ({
             value={selectedTime}
             onChange={onTimeChange}
             required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
           >
             <option value="">Select a time</option>
             {timeOptions.map(time => (

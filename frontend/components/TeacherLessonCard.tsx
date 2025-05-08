@@ -141,30 +141,47 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
                 </p>
             </div>
 
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-2 flex-wrap gap-y-2">
-                {isUpdating ? (
-                    <Button variant="secondary" size="sm" disabled>
-                        Updating...
-                    </Button>
-                ) : (
-                    <>
-                        {availableTransitions.map(transition => (
-                            <Button
-                                key={transition}
-                                onClick={() => handleButtonClick(transition)}
-                                variant={getButtonVariant(transition)}
-                                size="sm"
-                                disabled={isUpdating}
-                            >
-                                {formatTransition(transition)}
-                            </Button>
-                        ))}
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <div className="flex space-x-2 flex-wrap gap-y-2">
+                    {isUpdating ? (
+                        <Button variant="secondary" size="sm" disabled>
+                            Updating...
+                        </Button>
+                    ) : (
+                        <>
+                            {availableTransitions.map(transition => (
+                                <Button
+                                    key={transition}
+                                    onClick={() => handleButtonClick(transition)}
+                                    variant={getButtonVariant(transition)}
+                                    size="sm"
+                                    disabled={isUpdating}
+                                >
+                                    {formatTransition(transition)}
+                                </Button>
+                            ))}
 
-                        {availableTransitions.length === 0 && (
-                            <span className="text-sm text-gray-500 italic">No actions available</span>
-                        )}
-                    </>
-                )}
+                            {availableTransitions.length === 0 && (
+                                <span className="text-sm text-gray-500 italic">No status actions available</span>
+                            )}
+                        </>
+                    )}
+                </div>
+                <div>
+                    {/* Add Create Lesson Plan button - visible if lesson status allows planning or no plan exists yet */}
+                    {/* Assuming currentStatus needs to be checked, e.g., only for ACCEPTED lessons or similar logic */}
+                    {/* For now, let's make it simple and always show if not VOIDED/COMPLETED */}
+                    {currentStatus !== LessonStatusValue.VOIDED && currentStatus !== LessonStatusValue.COMPLETED && (
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => navigate(`/teacher/lessons/${lesson.id}/create-plan`)}
+                            className="ml-2" // Add some margin if needed
+                        >
+                            Create Lesson Plan
+                        </Button>
+                    )}
+                </div>
             </div>
         </Card>
     );

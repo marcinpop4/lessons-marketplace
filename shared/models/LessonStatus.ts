@@ -13,6 +13,7 @@ type JsonValue = string | number | boolean | null | { [key: string]: JsonValue }
  *         - REJECTED
  *         - COMPLETED
  *         - VOIDED
+ *         - PLANNED
  *       description: Possible status values for a lesson.
  */
 export enum LessonStatusValue {
@@ -20,7 +21,8 @@ export enum LessonStatusValue {
     ACCEPTED = 'ACCEPTED',
     REJECTED = 'REJECTED',
     COMPLETED = 'COMPLETED',
-    VOIDED = 'VOIDED'
+    VOIDED = 'VOIDED',
+    PLANNED = 'PLANNED'
 }
 
 /**
@@ -195,7 +197,10 @@ export class LessonStatus {
         [LessonStatusValue.COMPLETED]: {
             [LessonStatusTransition.VOID]: LessonStatusValue.VOIDED
         },
-        [LessonStatusValue.VOIDED]: {}
+        [LessonStatusValue.VOIDED]: {},
+        [LessonStatusValue.PLANNED]: {
+            [LessonStatusTransition.ACCEPT]: LessonStatusValue.ACCEPTED
+        }
     } as const;
 
     /**

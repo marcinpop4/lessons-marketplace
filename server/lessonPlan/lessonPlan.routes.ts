@@ -156,4 +156,43 @@ router.patch(
     lessonPlanController.updateLessonPlanStatus
 );
 
+/**
+ * @swagger
+ * /lesson-plans/ai-recommendations/stream:
+ *   get:
+ *     tags: [Lesson Plans AI]
+ *     summary: Stream AI-generated lesson plan recommendations
+ *     description: Streams AI-powered lesson plan recommendations tailored to a student, based on a source lesson. Requires TEACHER role.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: sourceLessonId
+ *         in: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the source lesson to provide context for recommendations.
+ *     responses:
+ *       '200':
+ *         description: Stream of lesson plan recommendations (text/event-stream)
+ *         content:
+ *           text/event-stream:
+ *             schema:
+ *               type: string
+ *               description: Server-sent events stream containing AiGeneratedLessonPlan objects.
+ *       '400':
+ *         description: Bad Request (e.g., missing or invalid sourceLessonId)
+ *       '401':
+ *         description: Unauthorized
+ *       '403':
+ *         description: Forbidden - User is not a teacher
+ */
+router.get(
+    '/ai-recommendations/stream',
+    authMiddleware,
+    checkRole([UserType.TEACHER]), // Only teachers can access
+    lessonPlanController.streamAiLessonPlanRecommendations
+);
+
 export default router; 

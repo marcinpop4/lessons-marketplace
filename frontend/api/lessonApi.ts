@@ -210,4 +210,35 @@ export const updateLessonStatus = async (lessonId: string, transition: LessonSta
     // Rethrow the original error to be handled by the calling component
     throw error;
   }
+};
+
+// Interface for the payload to create a planned lesson associated with a milestone
+export interface CreatePlannedLessonPayload {
+  milestoneId: string;
+  studentId: string;
+  teacherId: string;
+  lessonType: string; // e.g., Guitar, Piano - from LessonType model if available
+  startTime: string; // ISO-like string (YYYY-MM-DDTHH:MM:SS)
+  durationMinutes: number;
+  addressId: string; // ID of the address for the lesson
+  status?: string; // Explicit status, e.g., "PLANNED". Backend needs to handle this.
+}
+
+/**
+ * Creates a new planned lesson associated with a milestone.
+ * This will likely involve creating a LessonRequest, LessonQuote (auto-accepted), and Lesson.
+ * The backend will need a specific endpoint to handle this creation logic.
+ * @param payload The planned lesson data.
+ * @returns The created Lesson object.
+ */
+export const createPlannedLesson = async (payload: CreatePlannedLessonPayload): Promise<Lesson> => {
+  try {
+    // Use the existing /api/v1/lessons endpoint
+    const response = await apiClient.post('/api/v1/lessons', payload);
+    // TODO: Adapt parsing if backend returns something different than Lesson model directly
+    return response.data as Lesson;
+  } catch (error) {
+    console.error('Error creating planned lesson:', error);
+    throw error;
+  }
 }; 

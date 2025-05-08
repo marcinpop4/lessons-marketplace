@@ -27,8 +27,8 @@ export const lessonQuoteController = {
       if (!studentId) {
         throw new AuthorizationError('Student ID not found on authenticated request.');
       }
-      if (req.user?.userType !== SharedUserType.STUDENT) {
-        throw new AuthorizationError('Only students can initiate quote generation.');
+      if (req.user?.userType !== SharedUserType.STUDENT && req.user?.userType !== SharedUserType.TEACHER) {
+        throw new AuthorizationError('Only students or teachers can generate quotes.');
       }
 
       if (!lessonRequestId || !isUuid(lessonRequestId)) {

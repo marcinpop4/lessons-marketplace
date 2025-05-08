@@ -4,6 +4,7 @@ import { LessonPlanService } from './lessonPlan.service.js';
 import { CreateLessonPlanDto, UpdateLessonPlanStatusDto } from './lessonPlan.dto.js';
 import { AuthorizationError, BadRequestError } from '../errors/index.js';
 import prismaClientInstance from '../prisma.js'; // Your Prisma client instance
+import { isUuid } from '../utils/validation.utils.js';
 
 // Assuming AuthenticatedRequest is defined similarly to lesson.controller.ts
 interface AuthenticatedRequest extends Request {
@@ -16,12 +17,12 @@ interface AuthenticatedRequest extends Request {
 // Instantiate the service with the Prisma client
 const lessonPlanService = new LessonPlanService(prismaClientInstance);
 
-export const lessonPlanController = {
+class LessonPlanController {
     /**
      * POST /plans
      * Create a new lesson plan.
      */
-    createLessonPlan: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    async createLessonPlan(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
         try {
             const createDto: CreateLessonPlanDto = req.body;
             const actor = req.user;
@@ -42,13 +43,13 @@ export const lessonPlanController = {
         } catch (error) {
             next(error);
         }
-    },
+    }
 
     /**
      * GET /lesson-plans/:lessonPlanId
      * Get a specific lesson plan by its ID.
      */
-    getLessonPlanById: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    async getLessonPlanById(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
         try {
             const { lessonPlanId } = req.params;
             const actor = req.user;
@@ -66,13 +67,13 @@ export const lessonPlanController = {
         } catch (error) {
             next(error);
         }
-    },
+    }
 
     /**
      * GET /lesson-plans
      * Get lesson plans for the authenticated user (teacher or student).
      */
-    getLessonPlansForUser: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    async getLessonPlansForUser(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
         try {
             const actor = req.user;
 
@@ -85,13 +86,13 @@ export const lessonPlanController = {
         } catch (error) {
             next(error);
         }
-    },
+    }
 
     /**
      * PATCH /lesson-plans
      * Update the status of a lesson plan.
      */
-    updateLessonPlanStatus: async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    async updateLessonPlanStatus(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
         try {
             const updateDto: UpdateLessonPlanStatusDto = req.body;
             const actor = req.user;
@@ -112,5 +113,31 @@ export const lessonPlanController = {
         } catch (error) {
             next(error);
         }
-    },
-}; 
+    }
+
+    async streamAiLessonPlanRecommendations(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const teacherId = req.user?.id;
+            if (!teacherId) {
+                // This should ideally be caught by authMiddleware, but good to double-check
+                return next(new BadRequestError('Teacher ID not found in authenticated user.'));
+            }
+
+            const { sourceLessonId } = req.query;
+
+            if (!sourceLessonId || typeof sourceLessonId !== 'string' || !isUuid(sourceLessonId)) {
+                return next(new BadRequestError('Valid sourceLessonId query parameter is required.'));
+            }
+
+            // Delegate to the service layer to handle the streaming logic
+            // The service will directly write to the response object (res)
+            await lessonPlanService.generateAndStreamLessonPlanRecommendations(teacherId, sourceLessonId, res);
+
+        } catch (error) {
+            // Catch any synchronous errors from initial checks or if service throws before streaming
+            next(error);
+        }
+    }
+}
+
+export const lessonPlanController = new LessonPlanController(); 

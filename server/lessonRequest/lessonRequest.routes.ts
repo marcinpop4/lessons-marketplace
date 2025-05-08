@@ -36,7 +36,7 @@ const router: Router = express.Router();
  *       '403':
  *         description: Forbidden (User is not a Student).
  */
-router.post('/', authMiddleware, checkRole([UserType.STUDENT]), lessonRequestController.createLessonRequest);
+router.post('/', authMiddleware, checkRole([UserType.STUDENT, UserType.TEACHER]), lessonRequestController.createLessonRequest);
 
 /**
  * @openapi
