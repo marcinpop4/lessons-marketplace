@@ -147,7 +147,20 @@ const ObjectivesPage: React.FC = () => {
 
             eventSource.onmessage = (event) => {
                 if (!eventSourceRef.current) return; // Check if closed during processing
-                receivedAnyMessageRef.current = true; // Mark that we received a message
+
+                // Check for the [DONE] sentinel string
+                if (event.data === '[DONE]') {
+                    console.log('[SSE] Received [DONE] sentinel. Stream complete.');
+                    if (eventSourceRef.current) {
+                        eventSourceRef.current.close();
+                        eventSourceRef.current = null;
+                    }
+                    setIsStreaming(false);
+                    setIsGenerating(false);
+                    return; // Do not process as a recommendation
+                }
+
+                receivedAnyMessageRef.current = true; // Mark that we received a data message
                 try {
                     const newRecommendation = JSON.parse(event.data) as ObjectiveRecommendation;
                     console.log('[SSE] Received recommendation:', newRecommendation);
@@ -155,8 +168,10 @@ const ObjectivesPage: React.FC = () => {
                 } catch (e) {
                     console.error('[SSE] Error parsing message data:', e, event.data);
                     setGenerationError('Failed to parse recommendation data.');
-                    if (eventSourceRef.current) eventSourceRef.current.close();
-                    eventSourceRef.current = null;
+                    if (eventSourceRef.current) {
+                        eventSourceRef.current.close();
+                        eventSourceRef.current = null;
+                    }
                     setIsStreaming(false); // Stop streaming state on parse error
                     setIsGenerating(false);
                 }

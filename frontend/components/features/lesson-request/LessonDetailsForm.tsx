@@ -53,9 +53,6 @@ const LessonDetailsForm: React.FC<LessonDetailsFormProps> = ({
     className: "lesson-request-card"
   }
 
-  // Log the selectedTime prop as received by this component
-  console.log(`[LessonDetailsForm] Rendering with selectedTime: "${selectedTime}"`);
-
   return (
     <Card {...cardProps}>
       <div className="form-row">

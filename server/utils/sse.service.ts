@@ -119,7 +119,11 @@ export const streamJsonResponse = async (
         if (!res.writableEnded) {
             // Log whether we are ending cleanly or after an error
             if (!streamError) {
-                console.log('[SSE Service] Stream finished successfully, closing connection.');
+                console.log('[SSE Service] Stream finished successfully, sending done event and closing connection.');
+                // Send the [DONE] sentinel as a raw string for the data field
+                res.write('event: message\n');
+                res.write('data: [DONE]\n\n');
+                // res.flush(); // REVERTED: Causing TypeError: res.flush is not a function in some contexts
             } else {
                 console.log(`[SSE Service] Stream finished with error, closing connection.`);
             }

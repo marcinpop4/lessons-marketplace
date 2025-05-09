@@ -235,24 +235,27 @@ export const fetchAiLessonPlanRecommendationsStream = (
 
     eventSource.onmessage = (event) => {
         if (streamEnded) return; // Ignore messages after stream has ended
-        try {
-            if (event.data === '[DONE]') {
-                console.log('[API] SSE stream indicated completion ([DONE] message).');
-                if (!streamEnded) {
-                    streamEnded = true;
-                    onComplete();
-                    eventSource.close();
-                }
-                return;
-            }
-            const planData = JSON.parse(event.data) as AiGeneratedLessonPlan;
-            onData(planData);
-        } catch (error) {
-            console.error('[API] Error parsing SSE data:', error, 'Raw data:', event.data);
+
+        if (event.data === '[DONE]') {
+            console.log('[API] SSE stream indicated completion ([DONE] message).');
             if (!streamEnded) {
                 streamEnded = true;
-                onError(error instanceof Error ? error.message : 'Failed to parse stream data');
+                onComplete(); // Call page's onComplete
                 eventSource.close();
+            }
+            // Explicitly do nothing more for the [DONE] message.
+        } else {
+            // Only if it's NOT [DONE], try to parse and pass to onData
+            try {
+                const planData = JSON.parse(event.data) as AiGeneratedLessonPlan;
+                onData(planData); // Call page's onData callback
+            } catch (error) {
+                console.error('[API] Error parsing SSE data:', error, 'Raw data:', event.data);
+                if (!streamEnded) {
+                    streamEnded = true;
+                    onError(error instanceof Error ? error.message : 'Failed to parse stream data');
+                    eventSource.close();
+                }
             }
         }
     };
