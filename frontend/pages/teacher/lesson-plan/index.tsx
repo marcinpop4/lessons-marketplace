@@ -13,6 +13,8 @@ import { AiGeneratedLessonPlan, AiPlannedLesson, AiMilestone } from '@shared/mod
 import LessonPlanDetailsForm from '@frontend/components/features/lesson-plan/LessonPlanDetailsForm';
 import MilestonesSection from '@frontend/components/features/lesson-plan/MilestonesSection';
 import { UIMilestone, UIPlannedLesson } from '@frontend/components/features/lesson-plan/MilestoneForm';
+import LessonPlanSummary from '@frontend/components/features/lesson-plan/LessonPlanSummary';
+import RecommendationSkeletonCard from '@frontend/components/features/lesson-plan/RecommendationSkeletonCard';
 import Button from '@frontend/components/shared/Button/Button';
 
 // Sleep utility
@@ -90,6 +92,7 @@ const CreateLessonPlanPage: React.FC = () => {
     const [aiRecommendations, setAiRecommendations] = useState<AiGeneratedLessonPlan[]>([]);
     const [isStreamingRecommendations, setIsStreamingRecommendations] = useState<boolean>(false);
     const [recommendationError, setRecommendationError] = useState<string | null>(null);
+    const [aiLoadingMessage, setAiLoadingMessage] = useState<string | null>(null);
     const eventSourceRef = useRef<(() => void) | null>(null);
 
     useEffect(() => {
@@ -210,37 +213,35 @@ const CreateLessonPlanPage: React.FC = () => {
         setIsStreamingRecommendations(true);
         setAiRecommendations([]);
         setRecommendationError(null);
+        setAiLoadingMessage("✨ Connecting to AI Assistant...");
 
-        // Close previous connection if any
         eventSourceRef.current?.();
 
-        // Call the EventSource-based stream function
         const closeStream = fetchAiLessonPlanRecommendationsStream(
             sourceLesson.id,
             (plan) => {
                 console.log('[UI] Received AI plan recommendation:', plan);
+                setAiLoadingMessage("↪️ Streaming recommendations...");
                 setAiRecommendations(prev => [...prev, plan]);
             },
             (error) => {
                 console.error('[UI] AI stream error:', error);
-                // Handle string or Event error object
                 const message = (typeof error === 'string')
                     ? error
                     : (error instanceof Event ? 'SSE connection error' : 'An unknown stream error occurred');
-                // Don't set error if it was an abort - not applicable to EventSource like fetch AbortError
                 setRecommendationError(message);
                 setIsStreamingRecommendations(false);
+                setAiLoadingMessage(null);
                 eventSourceRef.current = null;
             },
             () => {
                 console.log('[UI] AI stream completed.');
                 setIsStreamingRecommendations(false);
+                setAiLoadingMessage(null);
                 eventSourceRef.current = null;
             }
         );
-        // Store the close function provided by the API function
         eventSourceRef.current = closeStream;
-
     }, [sourceLesson?.id, isStreamingRecommendations]);
 
     const handleApplyRecommendation = useCallback(async (plan: AiGeneratedLessonPlan) => {
@@ -414,7 +415,6 @@ const CreateLessonPlanPage: React.FC = () => {
             await createFullLessonPlanSequentially(apiPayload);
             console.log('Page: Lesson Plan and all components created successfully!');
 
-            alert('Lesson Plan and all components created successfully!');
             navigate('/teacher/lessons');
 
         } catch (err) {
@@ -445,80 +445,119 @@ const CreateLessonPlanPage: React.FC = () => {
 
     return (
         <div className="container mx-auto p-4 space-y-6">
-            <div className="flex justify-between items-center">
+            {/* Page Header */}
+            <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold">
                     Create Lesson Plan for: {sourceLesson?.quote.lessonRequest.type} with {sourceLesson?.quote.lessonRequest.student?.fullName}
                 </h1>
                 <Button onClick={() => navigate(-1)} variant="secondary" disabled={isSaving}>Back</Button>
             </div>
 
-            <LessonPlanDetailsForm
-                title={lessonPlanTitle}
-                onTitleChange={setLessonPlanTitle}
-                description={lessonPlanDescription}
-                onDescriptionChange={setLessonPlanDescription}
-                dueDate={lessonPlanDueDate}
-                onDueDateChange={setLessonPlanDueDate}
-            />
+            {/* Main Content Layout: Form on Left, Summary on Right */}
+            <div className="flex flex-col lg:flex-row gap-6">
+                {/* Left Column: Form Sections */}
+                <div className="lg:w-2/3 space-y-6">
+                    <LessonPlanDetailsForm
+                        title={lessonPlanTitle}
+                        onTitleChange={setLessonPlanTitle}
+                        description={lessonPlanDescription}
+                        onDescriptionChange={setLessonPlanDescription}
+                        dueDate={lessonPlanDueDate}
+                        onDueDateChange={setLessonPlanDueDate}
+                    />
 
-            <MilestonesSection
-                milestones={milestones}
-                lessonType={sourceLesson?.quote.lessonRequest.type} // Pass lessonType
-                onAddMilestone={handleAddMilestone}
-                onMilestoneChange={handleMilestoneChange}
-                onRemoveMilestone={handleRemoveMilestone}
-                onAddPlannedLesson={handleAddPlannedLesson}
-                onPlannedLessonChange={handlePlannedLessonChange}
-                onRemovePlannedLesson={handleRemovePlannedLesson}
-            />
+                    <MilestonesSection
+                        milestones={milestones}
+                        lessonType={sourceLesson?.quote.lessonRequest.type}
+                        onAddMilestone={handleAddMilestone}
+                        onMilestoneChange={handleMilestoneChange}
+                        onRemoveMilestone={handleRemoveMilestone}
+                        onAddPlannedLesson={handleAddPlannedLesson}
+                        onPlannedLessonChange={handlePlannedLessonChange}
+                        onRemovePlannedLesson={handleRemovePlannedLesson}
+                    />
 
-            <div className="flex justify-end mt-8 space-x-3">
-                <Button
-                    onClick={() => navigate(-1)}
-                    variant="secondary"
-                    disabled={isSaving}
-                >
-                    Cancel
-                </Button>
-                <Button
-                    onClick={handleSaveLessonPlan}
-                    disabled={isSaving || !lessonPlanTitle || !lessonPlanDescription || milestones.some(m => !m.title || !m.description || !m.dueDate)}
-                    variant="primary"
-                >
-                    {isSaving ? 'Saving...' : 'Save Lesson Plan'}
-                </Button>
-            </div>
+                    {/* AI Generation Section - UPDATED */}
+                    <div className="bg-blue-50 p-6 rounded-lg border border-blue-200 space-y-4 shadow">
+                        <h2 className="text-xl font-semibold text-blue-800">Lesson Plan AI Assistant</h2>
+                        <Button
+                            onClick={handleGenerateAiPlan}
+                            disabled={isStreamingRecommendations || !sourceLesson?.id}
+                            variant="accent"
+                            className="w-full sm:w-auto"
+                        >
+                            {isStreamingRecommendations && !aiLoadingMessage?.startsWith("✨")
+                                ? '✨ Receiving Plans...'
+                                : (isStreamingRecommendations
+                                    ? '✨ Connecting...'
+                                    : '✨ Generate Plan with AI')}
+                        </Button>
 
-            {/* AI Generation Section */}
-            <div className="bg-blue-50 p-4 rounded-md border border-blue-200 space-y-3">
-                <h2 className="text-lg font-semibold text-blue-800">Lesson Plan AI Assistant</h2>
-                <Button
-                    onClick={handleGenerateAiPlan}
-                    disabled={isStreamingRecommendations || !sourceLesson?.id}
-                    variant="secondary"
-                >
-                    {isStreamingRecommendations ? 'Generating...' : 'Generate Plan with AI'}
-                </Button>
-                {isStreamingRecommendations && <p className="text-blue-600">Streaming recommendations...</p>}
-                {recommendationError && <p className="text-red-600">Error: {recommendationError}</p>}
-                {aiRecommendations.length > 0 && (
-                    <div className="mt-4 space-y-2">
-                        <h3 className="font-medium text-blue-700">Select a generated plan to pre-fill the form:</h3>
-                        {aiRecommendations.map((plan, index) => (
-                            <div
-                                key={index}
-                                className="p-3 border rounded cursor-pointer hover:bg-blue-100 border-blue-300"
-                                onClick={() => handleApplyRecommendation(plan)}
-                            >
-                                <p className="font-semibold">Option {index + 1}: {plan.objective.title}</p>
-                                {/* Add more summary details if desired */}
+                        {aiLoadingMessage && <p className="text-blue-600 text-sm animate-pulse py-2 text-center">{aiLoadingMessage}</p>}
+
+                        {isStreamingRecommendations && aiRecommendations.length === 0 && aiLoadingMessage && !aiLoadingMessage.startsWith("✨ Connecting") && (
+                            <div className="mt-4 space-y-3">
+                                <p className="text-sm text-gray-500 text-center pb-2">Waiting for first recommendation...</p>
+                                {[...Array(2)].map((_, i) => <RecommendationSkeletonCard key={`skel-${i}`} />)}
                             </div>
-                        ))}
-                    </div>
-                )}
-            </div>
+                        )}
 
-            {error && <p className="text-red-500 text-sm mt-2 text-right">Error: {error}</p>}
+                        {recommendationError && <p className="text-red-600 bg-red-50 p-3 rounded-md text-sm">Error: {recommendationError}</p>}
+
+                        {aiRecommendations.length > 0 && (
+                            <div className="mt-4 space-y-3">
+                                <h3 className="font-semibold text-blue-700 text-md">
+                                    {isStreamingRecommendations ? "Select an option (more may arrive...)" : "Select a generated plan to pre-fill the form:"}
+                                </h3>
+                                {aiRecommendations.map((plan, index) => (
+                                    <div
+                                        key={plan.objective.title + index}
+                                        className="p-4 border rounded-lg cursor-pointer hover:bg-blue-100 hover:shadow-md border-blue-300 bg-white shadow-sm transition-all duration-150 ease-in-out transform hover:scale-[1.01]"
+                                        onClick={() => handleApplyRecommendation(plan)}
+                                    >
+                                        <p className="font-semibold text-blue-800 text-md">Option {index + 1}: {plan.objective.title}</p>
+                                        <p className="text-sm text-gray-600 mt-1 truncate">
+                                            {plan.objective.description.substring(0, 120)}{plan.objective.description.length > 120 ? '...' : ''}
+                                        </p>
+                                        <p className="text-xs text-gray-500 mt-2">
+                                            {plan.milestones.length} milestone{plan.milestones.length !== 1 ? 's' : ''}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Save/Cancel Buttons - At the bottom of the left column */}
+                    <div className="flex justify-end mt-8 space-x-3">
+                        <Button
+                            onClick={() => navigate(-1)}
+                            variant="secondary"
+                            disabled={isSaving}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleSaveLessonPlan}
+                            disabled={isSaving || !lessonPlanTitle || !lessonPlanDescription || milestones.some(m => !m.title || !m.description || !m.dueDate)}
+                            variant="primary"
+                        >
+                            {isSaving ? 'Saving...' : 'Save Lesson Plan'}
+                        </Button>
+                    </div>
+                    {error && <p className="text-red-500 text-sm mt-2 text-right">Error: {error}</p>}
+                </div>
+
+                {/* Right Column: Summary Panel */}
+                <div className="lg:w-1/3">
+                    <LessonPlanSummary
+                        objectiveTitle={lessonPlanTitle}
+                        objectiveDescription={lessonPlanDescription}
+                        objectiveDueDate={lessonPlanDueDate}
+                        milestones={milestones}
+                    />
+                </div>
+            </div>
         </div>
     );
 };

@@ -47,7 +47,7 @@ const MilestonesSection: React.FC<MilestonesSectionProps> = ({
                 )}
                 <div className="flex justify-start mt-4"> {/* Changed to justify-start for left alignment */}
                     <Button
-                        variant="accent"
+                        variant="primary"
                         onClick={onAddMilestone}
                         size="md"
                         disabled={!lessonType} // Disable adding milestones until lesson type is loaded

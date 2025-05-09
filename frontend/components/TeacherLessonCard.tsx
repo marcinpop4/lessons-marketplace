@@ -173,12 +173,12 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
                     {/* For now, let's make it simple and always show if not VOIDED/COMPLETED */}
                     {currentStatus !== LessonStatusValue.VOIDED && currentStatus !== LessonStatusValue.COMPLETED && (
                         <Button
-                            variant="secondary"
+                            variant="accent"
                             size="sm"
                             onClick={() => navigate(`/teacher/lessons/${lesson.id}/create-plan`)}
-                            className="ml-2" // Add some margin if needed
+                            className="ml-2"
                         >
-                            Create Lesson Plan
+                            Plan
                         </Button>
                     )}
                 </div>

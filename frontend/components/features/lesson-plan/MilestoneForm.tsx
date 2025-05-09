@@ -140,7 +140,7 @@ const MilestoneForm: React.FC<MilestoneFormProps> = ({
                 ))}
                 <div className="mt-2">
                     <Button
-                        variant="accent"
+                        variant="primary"
                         size="sm"
                         onClick={() => onAddPlannedLesson(milestone.id)}
                     >

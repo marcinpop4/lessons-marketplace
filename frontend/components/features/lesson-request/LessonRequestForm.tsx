@@ -116,7 +116,7 @@ const LessonRequestForm: React.FC<LessonRequestFormProps> = ({ onSubmitSuccess }
     }));
   };
 
-  const handleDurationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLSelectElement>) => {
     const { value } = e.target;
     const durationValue = parseInt(value, 10);
 
