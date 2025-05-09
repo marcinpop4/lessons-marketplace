@@ -5,8 +5,11 @@ import fs from 'fs'
 import chalk from 'chalk';
 import url from 'url'; // Import the url module
 
+// --- Unified list of keys to scrub (all lowercase) ---
+const GLOBAL_KEYS_TO_SCRUB = ['password', 'email', 'token', 'accesstoken', 'authorization', 'apikey', 'secret'];
+
 // --- Helper function to scrub sensitive data --- 
-const scrubSensitiveData = (obj: any, keysToScrub: string[] = ['password', 'email', 'token', 'accessToken', 'authorization', 'apiKey', 'secret']): any => {
+const scrubSensitiveData = (obj: any, keysToScrub: string[] = GLOBAL_KEYS_TO_SCRUB): any => {
   if (obj === null || typeof obj !== 'object') {
     return obj; // Return non-objects as is
   }
@@ -34,7 +37,7 @@ const scrubSensitiveData = (obj: any, keysToScrub: string[] = ['password', 'emai
 // --- End Helper function --- 
 
 // --- Helper function to scrub URL parameters ---
-const scrubUrlParams = (urlString: string | undefined, keysToScrub: string[] = ['password', 'email', 'token', 'authorization', 'apiKey', 'secret']): string => {
+const scrubUrlParams = (urlString: string | undefined, keysToScrub: string[] = GLOBAL_KEYS_TO_SCRUB): string => {
   if (!urlString) return '';
   try {
     const parsedUrl = url.parse(urlString, true); // Parse URL and query string

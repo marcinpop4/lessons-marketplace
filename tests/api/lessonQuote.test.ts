@@ -200,16 +200,6 @@ describe('API Integration: /api/v1/lesson-quotes', () => {
             }
         });
 
-        it('should return 403 Forbidden if requested by a Teacher', async () => {
-            if (!teacherAuthToken) throw new Error('Teacher token not available');
-            try {
-                await createQuote(teacherAuthToken, basePayload as { lessonRequestId: string });
-                throw new Error('Request should have failed with 403');
-            } catch (error: any) {
-                expect(axios.isAxiosError(error)).toBe(true);
-                expect(error.response?.status).toBe(403);
-            }
-        });
 
         it('should return 400 Bad Request if lessonRequestId is missing', async () => {
             if (!studentAuthToken) throw new Error('Student token not available');
@@ -234,6 +224,23 @@ describe('API Integration: /api/v1/lesson-quotes', () => {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(404);
             }
+        });
+
+        it('should allow a Teacher to generate quotes (201)', async () => {
+            if (!teacherAuthToken) throw new Error('Teacher token not available');
+            if (!basePayload.lessonRequestId) throw new Error('Lesson Request ID not set in beforeEach');
+
+            // Teacher uses their token to generate quotes for the student's lesson request
+            const response = await createQuote(teacherAuthToken, basePayload as { lessonRequestId: string });
+
+            expect(response.status).toBe(201);
+            const quotes: LessonQuote[] = response.data;
+            expect(Array.isArray(quotes)).toBe(true);
+            expect(quotes.length).toBeGreaterThanOrEqual(1);
+            expect(quotes[0].lessonRequest?.id).toEqual(basePayload.lessonRequestId);
+            // Check that the quote is associated with a teacher (could be any available teacher if teacherIds not specified)
+            expect(quotes[0].teacher?.id).toBeDefined();
+            expect(quotes[0].currentStatus?.status).toEqual(LessonQuoteStatusValue.CREATED);
         });
     });
 

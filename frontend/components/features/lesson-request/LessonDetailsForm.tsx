@@ -28,7 +28,7 @@ interface LessonDetailsFormProps {
   selectedDate: string;
   selectedTime: string;
   onTypeChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  onDurationChange: (e: React.ChangeEvent<HTMLSelectElement> | React.ChangeEvent<HTMLInputElement>) => void;
+  onDurationChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   onDateChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onTimeChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   disableType?: boolean;
@@ -78,17 +78,19 @@ const LessonDetailsForm: React.FC<LessonDetailsFormProps> = ({
 
         <div className="form-group">
           <label htmlFor="durationMinutes">Duration (minutes)</label>
-          <input
+          <select
             id="durationMinutes"
             name="durationMinutes"
-            type="number"
             value={durationMinutes}
             onChange={onDurationChange}
             required
-            min="15"
-            step="15"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
-          />
+          // Add appropriate select styling if needed, for now using default
+          >
+            <option value={30}>30</option>
+            <option value={45}>45</option>
+            <option value={60}>60</option>
+            <option value={90}>90</option>
+          </select>
         </div>
       </div>
 

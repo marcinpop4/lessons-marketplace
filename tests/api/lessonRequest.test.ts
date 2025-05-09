@@ -118,22 +118,21 @@ describe('API Integration: /api/v1/lesson-requests', () => {
             } catch (error: any) {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(403);
-                expect(error.response?.data?.error).toContain('Forbidden: You can only create lesson requests for yourself.');
+                expect(error.response?.data?.error).toContain('Forbidden: You can only create lesson requests for yourself or if you are a teacher creating a planned lesson.');
             }
         });
 
-        it('should return 403 Forbidden if a Teacher tries to create a request', async () => {
-            // Modify payload to potentially use teacher ID if needed by endpoint,
-            // but the core check is using the teacher token
-            const payloadForTeacher = { ...testRequestPayload, studentId: 'some-student-id' }; // Use a placeholder or teacher ID if logic requires
-            try {
-                await createLessonRequestRaw(teacher1Token, payloadForTeacher);
-                throw new Error('Request should have failed with 403');
-            } catch (error: any) {
-                expect(axios.isAxiosError(error)).toBe(true);
-                expect(error.response?.status).toBe(403);
-                expect(error.response?.data?.error).toContain('Forbidden'); // Expect generic Forbidden from checkRole
-            }
+        it('should allow a Teacher to create a lesson request for a student (201)', async () => {
+            // Teacher1 creates a request for Student1
+            const payloadForTeacher = { ...testRequestPayload, studentId: student1.id };
+            const response = await createLessonRequestRaw(teacher1Token, payloadForTeacher);
+
+            expect(response.status).toBe(201);
+            const createdRequest: LessonRequest = response.data;
+            expect(createdRequest).toBeDefined();
+            expect(createdRequest.id).toBeDefined();
+            expect(createdRequest.student?.id).toEqual(student1.id); // Ensure it's for the correct student
+            expect(createdRequest.type).toEqual(payloadForTeacher.type);
         });
 
         it('should return 400 Bad Request if required fields are missing', async () => {
