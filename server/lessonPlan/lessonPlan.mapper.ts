@@ -8,11 +8,10 @@ import {
     LessonQuote as PrismaLessonQuote,
     LessonRequest as PrismaLessonRequest
 } from '@prisma/client';
-import { LessonPlan as SharedLessonPlan } from '@shared/models/LessonPlan.js'; // Alias to avoid name clash
-import { LessonPlanStatus as SharedLessonPlanStatus, LessonPlanStatusValue } from '@shared/models/LessonPlanStatus.js'; // Alias
-import { Milestone as SharedMilestone } from '@shared/models/Milestone.js'; // Alias
-import { JsonValue } from '@shared/types/JsonTypes.js'; // Assuming JsonValue is imported if not globally available
-// import { toSharedMilestone } from '../milestone/milestone.mapper.js'; // Future import
+import { LessonPlan as SharedLessonPlan } from '../../shared/models/LessonPlan.js'; // Alias to avoid name clash
+import { LessonPlanStatus as SharedLessonPlanStatus, LessonPlanStatusValue } from '../../shared/models/LessonPlanStatus.js'; // Alias
+import { Milestone as SharedMilestone } from '../../shared/models/Milestone.js'; // Alias
+import { JsonValue } from '../../shared/types/JsonTypes.js'; // Assuming JsonValue is imported if not globally available
 
 // Define a more specific type for Prisma LessonPlan when relations are included
 export type PrismaLessonPlanWithRelations = LessonPlan & {

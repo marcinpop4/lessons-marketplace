@@ -3,12 +3,10 @@ import {
     MilestoneStatus,
     Lesson,
 } from '@prisma/client';
-import { Milestone as SharedMilestone } from '@shared/models/Milestone.js';
-import { MilestoneStatus as SharedMilestoneStatus, MilestoneStatusValue } from '@shared/models/MilestoneStatus.js';
-import { Lesson as SharedLesson } from '@shared/models/Lesson.js';
-import { JsonValue } from '@shared/types/JsonTypes.js'; // Assuming JsonValue is imported
-// Placeholder for LessonMapper, similar to how MilestoneMapper was handled in LessonPlanMapper
-// import { toSharedLesson } from '../lesson/lesson.mapper.js';
+import { Milestone as SharedMilestone } from '../../shared/models/Milestone.js';
+import { MilestoneStatus as SharedMilestoneStatus, MilestoneStatusValue } from '../../shared/models/MilestoneStatus.js';
+import { Lesson as SharedLesson } from '../../shared/models/Lesson.js';
+import { JsonValue } from '@../../shared/types/JsonTypes.js'; // Assuming JsonValue is imported
 
 export type PrismaMilestoneWithRelations = Milestone & {
     currentStatus?: MilestoneStatus | null;

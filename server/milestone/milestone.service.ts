@@ -1,7 +1,7 @@
 import { PrismaClient, UserType, LessonPlan, Milestone as PrismaMilestone } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
-import { Milestone } from '@shared/models/Milestone.js';
-import { MilestoneStatus, MilestoneStatusValue, MilestoneStatusTransition } from '@shared/models/MilestoneStatus.js';
+import { Milestone } from '../../shared/models/Milestone.js';
+import { MilestoneStatus, MilestoneStatusValue, MilestoneStatusTransition } from '../../shared/models/MilestoneStatus.js';
 import { CreateMilestoneDto, UpdateMilestoneStatusDto } from './milestone.dto.js';
 import { toSharedMilestone, PrismaMilestoneWithRelations } from './milestone.mapper.js';
 import {

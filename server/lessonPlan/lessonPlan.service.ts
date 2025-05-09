@@ -6,8 +6,8 @@ import {
     Prisma
 } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
-import { LessonPlan } from '@shared/models/LessonPlan.js';
-import { LessonPlanStatus, LessonPlanStatusValue, LessonPlanStatusTransition } from '@shared/models/LessonPlanStatus.js';
+import { LessonPlan } from '../../shared/models/LessonPlan.js';
+import { LessonPlanStatus, LessonPlanStatusValue, LessonPlanStatusTransition } from '../../shared/models/LessonPlanStatus.js';
 import { CreateLessonPlanDto, UpdateLessonPlanStatusDto } from './lessonPlan.dto.js';
 import { toSharedLessonPlan, PrismaLessonPlanWithRelations } from './lessonPlan.mapper.js';
 import {

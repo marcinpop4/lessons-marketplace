@@ -1,5 +1,5 @@
-import { MilestoneStatusTransition } from '@shared/models/MilestoneStatus.js';
-import { JsonValue } from '@shared/types/JsonTypes.js';
+import { MilestoneStatusTransition } from '@../../shared/models/MilestoneStatus.js';
+import { JsonValue } from '../../shared/types/JsonTypes.js';
 
 /**
  * @openapi
