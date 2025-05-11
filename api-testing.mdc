@@ -1,12 +1,17 @@
 ---
-description:
-globs:
+description: 
+globs: 
 alwaysApply: false
 ---
 # API Integration Testing Standards
 
 ## Goal
 Ensure API endpoints function correctly, independently, and securely through robust integration testing using `supertest` and `jest`. Tests should be reliable, easy to understand, maintainable, and verify adherence to RESTful principles and documentation.
+
+## Guiding Principles
+- **API as the SUT (System Under Test):** Integration tests focus on verifying the behavior of the API endpoints as black boxes. Internal implementation details are not the primary concern of these tests.
+- **No Direct Database Interaction in Tests:** Tests MUST NOT directly access or manipulate the database (e.g., using Prisma Client). All data setup, interaction, and verification related to persistence MUST occur through API endpoint calls.
+- **Shared Models for Types:** When type information is needed in tests (e.g., for request/response payloads or mock helper function signatures), tests SHOULD import types from `shared/models` rather than directly from `@prisma/client`.
 
 ## File Organization
 - All API integration tests MUST reside within the `tests/api` directory.
@@ -24,7 +29,8 @@ Ensure API endpoints function correctly, independently, and securely through rob
     - Use `beforeEach` within a `describe` block to set up state specific to *a single test case* (e.g., creating a unique resource instance to be acted upon in that `it` block).
     - Use `beforeAll` *only* for setup that is genuinely common and non-interfering across *all* tests within its `describe` block (e.g., creating shared user roles like a student and teacher whose tokens are needed for various permission checks).
     - AVOID creating test-specific data (like "the address to be fetched in the GET test") in a top-level `beforeAll`; create it closer to the test(s) that need it, preferably in a `beforeEach` or a `beforeAll` specific to the relevant inner `describe` block.
-- **Setup via API:** Create necessary prerequisite data (users, resources) for tests by calling the API endpoints themselves (using `supertest` and helper functions), not by directly manipulating the database or using service layers within tests.
+- **Setup and Interaction Exclusively via API:** Create necessary prerequisite data (users, resources) and interact with the application *solely* by calling the API endpoints themselves (using `supertest` and helper functions). Tests MUST NOT directly call service layer functions or use the Prisma client for setup, action, or assertion phases.
+- **No Prisma Client or Prisma-Generated Types in Tests:** Tests MUST NOT import or use the Prisma client directly. Similarly, tests SHOULD prefer types from `shared/models` and MUST NOT import types (e.g., enums, model types) directly from `@prisma/client` unless there is no shared model equivalent and it's absolutely necessary for mocking external signatures (this should be rare).
 - **Server Requirement:** API integration tests require the backend server to be running in a separate process.
 
 ## Authentication & Authorization

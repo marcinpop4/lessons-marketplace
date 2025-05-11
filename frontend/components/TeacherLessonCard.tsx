@@ -9,6 +9,74 @@ import Button from '@frontend/components/shared/Button/Button'; // Import shared
 import { formatDisplayLabel } from '@shared/models/LessonType'; // <-- Import added
 // Removed unused import: import { updateLessonStatus } from '@frontend/api/lessonApi';
 
+// --- New: Lesson Summary Modal ---
+interface LessonSummaryModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: (summary: string, homework: string) => void;
+    lessonTitle: string;
+}
+
+const LessonSummaryModal: React.FC<LessonSummaryModalProps> = ({ isOpen, onClose, onConfirm, lessonTitle }) => {
+    const [summary, setSummary] = useState('');
+    const [homework, setHomework] = useState('');
+
+    if (!isOpen) return null;
+
+    const handleConfirm = () => {
+        onConfirm(summary, homework);
+        setSummary('');
+        setHomework('');
+    };
+
+    const handleClose = () => {
+        onClose();
+        setSummary('');
+        setHomework('');
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full">
+                <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Create Summary for: {lessonTitle}</h2>
+                <div className="space-y-4">
+                    <div>
+                        <label htmlFor="lesson-summary" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Lesson Summary
+                        </label>
+                        <textarea
+                            id="lesson-summary"
+                            value={summary}
+                            onChange={(e) => setSummary(e.target.value)}
+                            rows={4}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 dark:focus:ring-offset-gray-900"
+                            placeholder="e.g., Key topics covered, student's progress, areas of difficulty..."
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="lesson-homework" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Homework / Next Steps
+                        </label>
+                        <textarea
+                            id="lesson-homework"
+                            value={homework}
+                            onChange={(e) => setHomework(e.target.value)}
+                            rows={3}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 dark:focus:ring-offset-gray-900"
+                            placeholder="e.g., Practice exercises, topics for next lesson..."
+                        />
+                    </div>
+                </div>
+                <div className="mt-5 flex justify-end space-x-3">
+                    <Button variant="secondary" onClick={handleClose}>Cancel</Button>
+                    <Button variant="primary" onClick={handleConfirm}>Save Summary</Button>
+                </div>
+            </div>
+        </div>
+    );
+};
+// --- End New: Lesson Summary Modal ---
+
 // Define props for the Notes Modal (can be moved to a separate Modal component later)
 interface NotesModalProps {
     isOpen: boolean;
@@ -59,13 +127,15 @@ interface TeacherLessonCardProps {
     currentStatus: LessonStatusValue; // Pass current status explicitly
     onUpdateStatus: (lessonId: string, currentStatus: LessonStatusValue, transition: LessonStatusTransition) => void;
     isUpdating: boolean; // Use loading state from parent
+    onOpenSummaryModal: (lessonId: string, lessonTitle: string) => void; // <-- New prop
 }
 
 const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
     lesson,
     currentStatus,
     onUpdateStatus,
-    isUpdating
+    isUpdating,
+    onOpenSummaryModal // <-- Destructure new prop
 }) => {
     const navigate = useNavigate();
 
@@ -181,10 +251,25 @@ const TeacherLessonCard: React.FC<TeacherLessonCardProps> = ({
                             Plan
                         </Button>
                     )}
+                    {/* New "Create Summary" button for COMPLETED lessons */}
+                    {currentStatus === LessonStatusValue.COMPLETED && (
+                        <Button
+                            variant="accent"
+                            size="sm"
+                            onClick={() => onOpenSummaryModal(lesson.id, lessonTitle)}
+                            className="ml-2"
+                            disabled={isUpdating}
+                        >
+                            Create Summary
+                        </Button>
+                    )}
                 </div>
             </div>
         </Card>
     );
 };
 
-export default TeacherLessonCard; 
+export default TeacherLessonCard;
+// Export the new modal if it's intended to be used elsewhere, or keep it co-located if only used here.
+// For now, keeping it co-located.
+export { LessonSummaryModal }; 

@@ -12,6 +12,7 @@ import { Address } from '@shared/models/Address';
 import { LessonType } from '@shared/models/LessonType'; // Import LessonType enum
 import { useAuth } from '@frontend/contexts/AuthContext';
 import { LessonQuoteStatus, LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus';
+import { LessonSummaryModal } from '@frontend/components/TeacherLessonCard';
 
 // Interface to hold both lesson model and extra display data
 interface LessonDisplayData {
@@ -134,6 +135,12 @@ const TeacherLessonsPage: React.FC = () => {
     const { user } = useAuth();
     const [successMessage, setSuccessMessage] = useState<string | null>(null); // State for success message
 
+    // --- New State for Summary Modal ---
+    const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
+    const [summaryModalLessonId, setSummaryModalLessonId] = useState<string | null>(null);
+    const [summaryModalLessonTitle, setSummaryModalLessonTitle] = useState<string>('');
+    // --- End New State for Summary Modal ---
+
     const fetchLessonsData = async () => {
         if (!user || user.userType !== 'TEACHER') {
             setError('User not authenticated or not a teacher.');
@@ -188,6 +195,29 @@ const TeacherLessonsPage: React.FC = () => {
             return () => clearTimeout(timer); // Cleanup timer on component unmount or if message changes
         }
     }, [successMessage]);
+
+    // --- New Handlers for Summary Modal ---
+    const handleOpenSummaryModal = (lessonId: string, lessonTitle: string) => {
+        setSummaryModalLessonId(lessonId);
+        setSummaryModalLessonTitle(lessonTitle);
+        setIsSummaryModalOpen(true);
+    };
+
+    const handleCloseSummaryModal = () => {
+        setIsSummaryModalOpen(false);
+        setSummaryModalLessonId(null);
+        setSummaryModalLessonTitle('');
+    };
+
+    const handleConfirmSummary = (summary: string, homework: string) => {
+        console.log(`Summary for lesson ${summaryModalLessonId} (${summaryModalLessonTitle}):`);
+        console.log('Summary:', summary);
+        console.log('Homework:', homework);
+        // Later, this will call an API to save the summary
+        setSuccessMessage(`Summary for '${summaryModalLessonTitle}' captured (logged to console).`);
+        handleCloseSummaryModal();
+    };
+    // --- End New Handlers for Summary Modal ---
 
     // Handle lesson status updates
     const handleUpdateStatus = async (lessonId: string, currentStatus: LessonStatusValue, transition: LessonStatusTransition) => {
@@ -285,6 +315,7 @@ const TeacherLessonsPage: React.FC = () => {
                                     currentStatus={item.lesson.currentStatus?.status || LessonStatusValue.ACCEPTED}
                                     onUpdateStatus={handleUpdateStatus}
                                     isUpdating={updatingLessonId === item.lesson.id}
+                                    onOpenSummaryModal={handleOpenSummaryModal}
                                 />
                             ))}
                         </div>
@@ -306,6 +337,14 @@ const TeacherLessonsPage: React.FC = () => {
                     No lessons found for this teacher.
                 </div>
             )}
+
+            {/* Render the Lesson Summary Modal */}
+            <LessonSummaryModal
+                isOpen={isSummaryModalOpen}
+                onClose={handleCloseSummaryModal}
+                onConfirm={handleConfirmSummary}
+                lessonTitle={summaryModalLessonTitle}
+            />
         </div>
     );
 };

@@ -160,7 +160,7 @@ router.patch(
  * @swagger
  * /lesson-plans/ai-recommendations/stream:
  *   get:
- *     tags: [Lesson Plans AI]
+ *     tags: [Lesson Plans]
  *     summary: Stream AI-generated lesson plan recommendations
  *     description: Streams AI-powered lesson plan recommendations tailored to a student, based on a source lesson. Requires TEACHER role.
  *     security:

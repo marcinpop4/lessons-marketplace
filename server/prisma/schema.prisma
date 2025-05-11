@@ -227,10 +227,24 @@ model Lesson {
   lessonPlan      LessonPlan?    @relation("PlanForLesson")
   milestoneId     String?        // Foreign key to Milestone
   milestone       Milestone?     @relation(fields: [milestoneId], references: [id]) // Relation to Milestone
+  lessonSummary   LessonSummary? // Optional one-to-one relation to a lesson summary
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
   @@index([milestoneId]) // Add index for the new foreign key
+}
+
+// New model for Lesson Summaries
+model LessonSummary {
+  id        String   @id @default(cuid())
+  lessonId  String   @unique // Each lesson can have only one summary
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  summary   String   @db.Text // For potentially long text
+  homework  String   @db.Text // For potentially long text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([lessonId])
 }
 
 // Model for storing refresh tokens
