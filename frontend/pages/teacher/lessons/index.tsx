@@ -2,128 +2,86 @@ import React, { useState, useEffect } from 'react';
 import TeacherLessonCard from '../../../components/TeacherLessonCard';
 import { Lesson } from '@shared/models/Lesson';
 import { LessonStatusValue, LessonStatusTransition, LessonStatus } from '@shared/models/LessonStatus';
-import { getTeacherLessons, TeacherLessonApiResponseItem } from '@frontend/api/teacherApi'; // Import API function and response type
-import { updateLessonStatus } from '@frontend/api/lessonApi'; // Import the update status function
+import { fetchTeacherLessons, updateLessonStatus, FullLessonDetailsForTeacher } from '@frontend/api/lessonApi'; // Corrected API imports
 import { LessonQuote } from '@shared/models/LessonQuote';
 import { LessonRequest } from '@shared/models/LessonRequest';
 import { Student } from '@shared/models/Student';
 import { Teacher } from '@shared/models/Teacher';
 import { Address } from '@shared/models/Address';
-import { LessonType } from '@shared/models/LessonType'; // Import LessonType enum
-import { useAuth } from '@frontend/contexts/AuthContext';
+import { LessonType, formatDisplayLabel } from '@shared/models/LessonType'; // formatDisplayLabel was missing
+import { useAuth } from '@frontend/contexts/AuthContext'; // Corrected useAuth import
 import { LessonQuoteStatus, LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus';
 import { LessonSummaryModal } from '@frontend/components/TeacherLessonCard';
+import { createLessonSummary, CreateLessonSummaryDto } from '@frontend/api/lessonSummaryApi'; // <-- Import createLessonSummary
+import { UserType } from '@shared/models/UserType';
 
 // Interface to hold both lesson model and extra display data
-interface LessonDisplayData {
+export interface LessonDisplayData {
     lesson: Lesson;
+    // Add any other display-specific properties if needed in the future
 }
 
 // Helper function to instantiate models from the API data structure
-const instantiateLessonFromData = (data: TeacherLessonApiResponseItem): LessonDisplayData | null => {
+const instantiateLessonFromData = (data: FullLessonDetailsForTeacher): LessonDisplayData | null => {
     try {
-        // Access nested data structures according to TeacherLessonApiResponseItem
         const quoteData = data.quote;
         const lessonRequestData = quoteData?.lessonRequest;
         const studentData = lessonRequestData?.student;
         const teacherData = quoteData?.teacher;
         const addressData = lessonRequestData?.address;
-        const lessonStatusData = data.currentStatus;
 
-        // Add null checks for potentially missing nested data
-        if (!quoteData || !lessonRequestData || !studentData || !teacherData || !addressData || !lessonStatusData) {
-            console.error(`Incomplete data for lesson ID ${data.id}. Skipping instantiation.`, data);
+        if (!quoteData || !lessonRequestData || !studentData || !teacherData || !addressData) {
+            console.warn('Skipping lesson due to incomplete data:', data);
             return null;
         }
 
-        const student = new Student({
-            id: studentData.id,
-            firstName: studentData.firstName,
-            lastName: studentData.lastName,
-            email: studentData.email, // Expecting email on student data from API now
-            phoneNumber: '', // Provide defaults if not present
-            dateOfBirth: new Date(0) // Provide defaults if not present
-        });
-
-        const teacher = new Teacher({
-            id: teacherData.id,
-            firstName: teacherData.firstName,
-            lastName: teacherData.lastName,
-            email: teacherData.email,
-            phoneNumber: '', // Provide defaults if not present
-            dateOfBirth: new Date(0) // Provide defaults if not present
-        });
-
-        const address = new Address({
-            id: addressData.id, // Expecting address ID
-            street: addressData.street,
-            city: addressData.city,
-            state: addressData.state,
-            postalCode: addressData.postalCode,
-            country: addressData.country
-        });
+        const student = new Student(studentData);
+        const address = new Address(addressData);
+        const teacher = new Teacher(teacherData);
 
         const lessonRequest = new LessonRequest({
-            id: lessonRequestData.id,
-            type: lessonRequestData.type as LessonType,
-            startTime: new Date(lessonRequestData.startTime),
-            durationMinutes: lessonRequestData.durationMinutes,
-            address: address,
-            student: student,
+            ...lessonRequestData,
+            student,
+            address,
+            startTime: new Date(lessonRequestData.startTime), // Main startTime is string, convert here
             createdAt: lessonRequestData.createdAt ? new Date(lessonRequestData.createdAt) : undefined,
-            updatedAt: lessonRequestData.updatedAt ? new Date(lessonRequestData.updatedAt) : undefined
+            updatedAt: lessonRequestData.updatedAt ? new Date(lessonRequestData.updatedAt) : undefined,
         });
-
-        // Reconstruct LessonQuoteStatus if quote status exists - THIS LOGIC MIGHT BE IRRELEVANT NOW
-        // If the API for fetching lessons doesn't include quote's status details, this should be null.
-        // Let's assume it's not included based on the previous error.
-        const quoteCurrentStatusModel = null;
-        /* quoteStatusData // Keep commented out unless API confirms quote status is provided here
-        ? new LessonQuoteStatus({
-            id: quoteStatusData.id,
-            lessonQuoteId: quoteData.id,
-            status: quoteStatusData.status as LessonQuoteStatusValue,
-            context: quoteStatusData.context || null,
-            createdAt: quoteStatusData.createdAt ? new Date(quoteStatusData.createdAt) : new Date()
-        })
-        : null; */
 
         const lessonQuote = new LessonQuote({
-            id: quoteData.id,
-            costInCents: quoteData.costInCents,
-            hourlyRateInCents: quoteData.hourlyRateInCents,
-            lessonRequest: lessonRequest,
-            teacher: teacher,
-            currentStatus: quoteCurrentStatusModel, // Pass mapped status object if available (now likely null)
-            currentStatusId: null, // Explicitly pass null as required by LessonQuoteProps
+            ...quoteData,
+            lessonRequest,
+            teacher,
+            currentStatus: quoteData.currentStatus ? new LessonQuoteStatus(quoteData.currentStatus) : null,
             createdAt: quoteData.createdAt ? new Date(quoteData.createdAt) : undefined,
-            updatedAt: quoteData.updatedAt ? new Date(quoteData.updatedAt) : undefined
+            updatedAt: quoteData.updatedAt ? new Date(quoteData.updatedAt) : undefined,
         });
 
-        // Construct LessonStatus for the lesson itself
-        const lessonStatus = new LessonStatus({
-            id: lessonStatusData.id,
-            lessonId: data.id,
-            status: lessonStatusData.status as LessonStatusValue,
-            context: lessonStatusData.context || null, // Include context if available
-            createdAt: lessonStatusData.createdAt ? new Date(lessonStatusData.createdAt) : new Date()
-        });
+        const lessonStatus = data.currentStatus ? new LessonStatus({
+            ...data.currentStatus,
+            status: data.currentStatus.status as LessonStatusValue,
+            createdAt: data.currentStatus.createdAt ? new Date(data.currentStatus.createdAt) : undefined,
+        }) : null;
 
-        // Construct the final Lesson model
         const lesson = new Lesson({
             id: data.id,
             quote: lessonQuote,
             currentStatus: lessonStatus,
-            createdAt: data.createdAt ? new Date(data.createdAt) : undefined,
-            updatedAt: data.updatedAt ? new Date(data.updatedAt) : undefined
+            statuses: data.statuses?.map(s => new LessonStatus({
+                ...s,
+                status: s.status as LessonStatusValue,
+                createdAt: s.createdAt ? new Date(s.createdAt) : undefined
+            })) || [],
+            lessonSummary: data.lessonSummary || null,
+            createdAt: data.createdAt ? new Date(data.createdAt) : undefined, // data.createdAt is from FullLessonDetailsForTeacher
+            updatedAt: data.updatedAt ? new Date(data.updatedAt) : undefined, // data.updatedAt is from FullLessonDetailsForTeacher
         });
 
-        // Return the combined object for display
         return { lesson };
 
-    } catch (instantiationError) {
-        console.error(`Error instantiating lesson data for ID ${data?.id}:`, instantiationError, "Data:", data);
-        return null; // Return null if any part of the instantiation fails
+    } catch (e) {
+        console.error('Error instantiating lesson from API data:', e, data);
+        return null;
     }
 };
 
@@ -139,6 +97,7 @@ const TeacherLessonsPage: React.FC = () => {
     const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
     const [summaryModalLessonId, setSummaryModalLessonId] = useState<string | null>(null);
     const [summaryModalLessonTitle, setSummaryModalLessonTitle] = useState<string>('');
+    const [summaryModalError, setSummaryModalError] = useState<string | null>(null); // <-- New state for modal error
     // --- End New State for Summary Modal ---
 
     const fetchLessonsData = async () => {
@@ -152,9 +111,9 @@ const TeacherLessonsPage: React.FC = () => {
         try {
             setLoading(true);
             setError(null);
-            const rawLessonsData = await getTeacherLessons(teacherId);
+            const rawLessonsData: FullLessonDetailsForTeacher[] = await fetchTeacherLessons(teacherId);
 
-            let lessonsArray: TeacherLessonApiResponseItem[];
+            let lessonsArray: FullLessonDetailsForTeacher[];
 
             // Check if API returns data nested or directly
             if (!Array.isArray(rawLessonsData)) {
@@ -200,6 +159,7 @@ const TeacherLessonsPage: React.FC = () => {
     const handleOpenSummaryModal = (lessonId: string, lessonTitle: string) => {
         setSummaryModalLessonId(lessonId);
         setSummaryModalLessonTitle(lessonTitle);
+        setSummaryModalError(null); // Clear previous errors
         setIsSummaryModalOpen(true);
     };
 
@@ -207,15 +167,41 @@ const TeacherLessonsPage: React.FC = () => {
         setIsSummaryModalOpen(false);
         setSummaryModalLessonId(null);
         setSummaryModalLessonTitle('');
+        setSummaryModalError(null); // Clear errors on close
     };
 
-    const handleConfirmSummary = (summary: string, homework: string) => {
-        console.log(`Summary for lesson ${summaryModalLessonId} (${summaryModalLessonTitle}):`);
-        console.log('Summary:', summary);
-        console.log('Homework:', homework);
-        // Later, this will call an API to save the summary
-        setSuccessMessage(`Summary for '${summaryModalLessonTitle}' captured (logged to console).`);
-        handleCloseSummaryModal();
+    const handleConfirmSummary = async (summary: string, homework: string) => {
+        if (!summaryModalLessonId) {
+            console.error('No lesson ID found for summary creation.');
+            setSummaryModalError('Could not create summary: Lesson ID missing.'); // Set modal error
+            // setError('Could not create summary: Lesson ID missing.'); // Remove page-level error
+            return;
+        }
+        setSummaryModalError(null); // Clear previous error before new attempt
+
+        const summaryData: CreateLessonSummaryDto = {
+            lessonId: summaryModalLessonId,
+            summary,
+            homework,
+        };
+
+        try {
+            setUpdatingLessonId(summaryModalLessonId); // Indicate loading state for this lesson
+            await createLessonSummary(summaryData);
+            setSuccessMessage(`Summary for '${summaryModalLessonTitle}' saved successfully.`);
+            await fetchLessonsData();
+            handleCloseSummaryModal(); // Close modal on success
+        } catch (err) {
+            console.error('Failed to save lesson summary:', err);
+            const apiError = err instanceof Error ? err.message : 'Failed to save summary';
+            // setError(`Error saving summary for '${summaryModalLessonTitle}': ${apiError}`); // Remove page-level error
+            setSummaryModalError(apiError); // Set modal-specific error
+            setSuccessMessage(null); // Clear success message if error occurred
+        } finally {
+            setUpdatingLessonId(null);
+            // Don't close modal automatically on error, so user can see the message
+            // handleCloseSummaryModal(); 
+        }
     };
     // --- End New Handlers for Summary Modal ---
 
@@ -247,6 +233,16 @@ const TeacherLessonsPage: React.FC = () => {
         } finally {
             setUpdatingLessonId(null);
         }
+    };
+
+    // Placeholder for cancel functionality
+    const handleCancelLesson = async (lessonId: string) => {
+        console.log(`Request to cancel lesson: ${lessonId}`);
+        // Here you would typically call an API endpoint to void or cancel the lesson
+        // For example: await voidLesson(lessonId);
+        // Then refresh data: await fetchLessonsData();
+        // And show a message: setSuccessMessage('Lesson cancelled.');
+        alert('Cancel functionality not fully implemented yet.');
     };
 
     // Update grouping function to work with LessonDisplayData
@@ -312,16 +308,16 @@ const TeacherLessonsPage: React.FC = () => {
                                 <TeacherLessonCard
                                     key={item.lesson.id}
                                     lesson={item.lesson}
-                                    currentStatus={item.lesson.currentStatus?.status || LessonStatusValue.ACCEPTED}
+                                    onOpenSummaryModal={handleOpenSummaryModal}
+                                    onCancel={handleCancelLesson}
+                                    currentUser={user ? { ...user, userType: user.userType as UserType } : null}
                                     onUpdateStatus={handleUpdateStatus}
                                     isUpdating={updatingLessonId === item.lesson.id}
-                                    onOpenSummaryModal={handleOpenSummaryModal}
                                 />
                             ))}
                         </div>
                     ) : (
                         // Placeholder text when no lessons in this status
-                        // Use utility function for placeholder text
                         <p className="text-sm text-gray-500 italic px-1">
                             No lessons with status '{LessonStatus.getDisplayLabelForStatus(status)}'.
                         </p>
@@ -344,6 +340,7 @@ const TeacherLessonsPage: React.FC = () => {
                 onClose={handleCloseSummaryModal}
                 onConfirm={handleConfirmSummary}
                 lessonTitle={summaryModalLessonTitle}
+                error={summaryModalError} // <-- Pass modal error
             />
         </div>
     );

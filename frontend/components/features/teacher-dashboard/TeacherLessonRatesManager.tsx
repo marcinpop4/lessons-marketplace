@@ -3,7 +3,7 @@ import LessonRateList from './LessonRateList';
 import LessonRateForm from './LessonRateForm';
 import apiClient from '../../../api/apiClient';
 import axios from 'axios';
-import './TeacherLessonRatesManager.css';
+
 
 // Import the shared model instead of the local interface
 import { TeacherLessonHourlyRate } from '@shared/models/TeacherLessonHourlyRate.js';
@@ -142,41 +142,29 @@ const TeacherLessonRatesManager: React.FC<Props> = ({ lessonRates = [], onRatesU
   };
 
   return (
-    <div className="lesson-rates-manager">
-      <h2 className="text-2xl font-semibold mb-6">Lesson Rates Management</h2>
+    <div className="space-y-6">
+      <h2 className="text-2xl font-semibold">Lesson Rates Management</h2>
       {error && <div className="alert alert-error mb-4">{error}</div>}
 
-      <div className="rates-layout">
-        <div className="rates-form-container">
-          <div className="card card-accent">
-            <div className="card-header">
-              <h3 className="text-xl font-semibold">Add New Rate</h3>
-            </div>
-            <div className="card-body">
-              <LessonRateForm
-                // Pass TeacherLessonHourlyRate | null to form
-                rate={editingRate}
-                onSubmit={handleAddOrUpdate}
-                onCancel={handleCancel}
-              />
-            </div>
-          </div>
+      <div className="grid md:grid-cols-2 gap-x-6 gap-y-8"> {/* Adjusted gap for y-axis if titles need more space */}
+        {/* Form Section */}
+        <div className="space-y-3">
+          <LessonRateForm
+            rate={editingRate}
+            onSubmit={handleAddOrUpdate}
+            onCancel={handleCancel}
+          />
         </div>
 
-        <div className="rates-list-container">
-          <div className="card card-accent">
-            <div className="card-header">
-              <h3 className="text-xl font-semibold">Your Lesson Rates</h3>
-            </div>
-            <div className="card-body">
-              <LessonRateList
-                // Pass TeacherLessonHourlyRate[] to list
-                rates={lessonRates}
-                onToggleActive={handleToggleActive}
-                onEdit={handleEdit}
-              />
-            </div>
-          </div>
+        {/* List Section */}
+        <div className="space-y-3"> {/* Add space between title and list */}
+          <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100">Your Lesson Rates</h3>
+          {/* The LessonRateList itself contains Cards for each item, so no extra wrapper needed here unless for spacing/background */}
+          <LessonRateList
+            rates={lessonRates}
+            onToggleActive={handleToggleActive}
+            onEdit={handleEdit}
+          />
         </div>
       </div>
     </div>

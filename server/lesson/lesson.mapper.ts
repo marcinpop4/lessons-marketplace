@@ -1,6 +1,9 @@
 import { Lesson } from '../../shared/models/Lesson.js';
 import { LessonQuoteMapper } from '../lessonQuote/lessonQuote.mapper.js';
 import { LessonStatusMapper } from '../lesson-status/lessonStatus.mapper.js';
+import { toSharedLessonSummary } from '../lessonSummary/lessonSummary.mapper.js';
+import { LessonSummary as SharedLessonSummary } from '../../shared/models/LessonSummary.js';
+import { LessonSummary as PrismaLessonSummary } from '@prisma/client';
 
 // Define database types locally
 type DbLesson = {
@@ -33,6 +36,7 @@ type DbLessonWithNestedRelations = DbLesson & {
         teacher: any;
         lessonRequest: any;
     };
+    lessonSummary?: PrismaLessonSummary | null;
 };
 
 /**
@@ -45,7 +49,7 @@ export class LessonMapper {
      * @returns A new instance of the shared Lesson model or null if required relations are missing.
      */
     public static toModel(dbLesson: DbLessonWithNestedRelations): Lesson | null {
-        const { id, createdAt, updatedAt, quoteId, currentStatusId, quote, currentStatus } = dbLesson;
+        const { id, createdAt, updatedAt, quoteId, currentStatusId, quote, currentStatus, lessonSummary: dbLessonSummary } = dbLesson;
 
         if (!quote || !currentStatus) {
             console.error(`Lesson ${id} is missing required nested quote or currentStatus. Cannot transform.`);
@@ -62,12 +66,21 @@ export class LessonMapper {
                 return null;
             }
 
+            let transformedLessonSummary: SharedLessonSummary | null = null;
+            if (dbLessonSummary) {
+                transformedLessonSummary = toSharedLessonSummary(dbLessonSummary);
+                if (!transformedLessonSummary) {
+                    console.warn(`Failed to transform lesson summary for lesson ${id}. Proceeding without summary.`);
+                }
+            }
+
             // Construct the shared model instance
             return new Lesson({
                 id,
                 quote: transformedQuote,
                 currentStatus: transformedStatus,
                 statuses: [transformedStatus], // Include at least the current status in statuses
+                lessonSummary: transformedLessonSummary,
                 createdAt: createdAt ?? undefined,
                 updatedAt: updatedAt ?? undefined,
             });

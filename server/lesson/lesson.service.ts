@@ -30,7 +30,8 @@ const lessonIncludeForMapper = {
             },
             currentStatus: true
         }
-    }
+    },
+    lessonSummary: true
 };
 
 // Define the includes needed for the controller's transformToModel (if different and still used elsewhere)

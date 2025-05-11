@@ -17,13 +17,3 @@ export const toSharedLessonSummary = (prismaLessonSummary: PrismaLessonSummary):
     };
     return new SharedLessonSummary(props);
 };
-
-// If you need to map from shared to Prisma (e.g., for updates, though less common for creation via DTOs):
-// export const toPrismaLessonSummaryCreateInput = (sharedLessonSummary: SharedLessonSummary): Prisma.LessonSummaryCreateInput => {
-//   return {
-//     lesson: { connect: { id: sharedLessonSummary.lessonId } }, // Assuming lessonId is on shared model to connect
-//     summary: sharedLessonSummary.summary,
-//     homework: sharedLessonSummary.homework,
-//     // id, createdAt, updatedAt are usually handled by Prisma
-//   };
-// }; 

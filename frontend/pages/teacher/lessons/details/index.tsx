@@ -6,6 +6,7 @@ import { getLessonById, updateLessonStatus } from '@frontend/api/lessonApi';
 import TeacherLessonDetailCard from '@frontend/components/TeacherLessonDetailCard';
 import StudentObjectivesDisplay from '@frontend/components/teacher/StudentObjectivesDisplay';
 import Button from '@frontend/components/shared/Button/Button';
+import LessonSummaryDisplay from '@frontend/components/lessons/LessonSummary';
 
 const TeacherLessonDetailsPage: React.FC = () => {
     const { lessonId } = useParams<{ lessonId: string }>();
@@ -102,6 +103,11 @@ const TeacherLessonDetailsPage: React.FC = () => {
             <h1 className="text-2xl font-bold mb-4">Lesson Details</h1>
 
             <TeacherLessonDetailCard lesson={lesson} />
+
+            {/* Display Lesson Summary if available */}
+            {lesson.lessonSummary && (
+                <LessonSummaryDisplay summaryDetails={lesson.lessonSummary} />
+            )}
 
             {studentId && lessonType && (
                 <StudentObjectivesDisplay studentId={studentId} lessonType={lessonType} />

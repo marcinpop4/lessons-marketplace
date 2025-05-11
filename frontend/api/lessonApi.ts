@@ -7,6 +7,7 @@ import { Student } from '@shared/models/Student';
 import apiClient from './apiClient';
 import { LessonStatus, LessonStatusValue, LessonStatusTransition } from '@shared/models/LessonStatus';
 import { LessonQuoteStatus, LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus';
+import { LessonSummary } from '@shared/models/LessonSummary';
 import axios, { AxiosError } from 'axios';
 
 // Check for API base URL using Vite's import.meta.env
@@ -121,10 +122,33 @@ export const getLessonById = async (id: string): Promise<Lesson> => {
       createdAt: statusData.createdAt ? new Date(statusData.createdAt) : new Date()
     });
 
+    let lessonSummaryModel: LessonSummary | null = null;
+    if (data.lessonSummary) {
+      lessonSummaryModel = new LessonSummary({
+        id: data.lessonSummary.id,
+        lessonId: data.lessonSummary.lessonId,
+        summary: data.lessonSummary.summary,
+        homework: data.lessonSummary.homework,
+        createdAt: new Date(data.lessonSummary.createdAt),
+        updatedAt: new Date(data.lessonSummary.updatedAt),
+      });
+    }
+
     return new Lesson({
       id: data.id,
       quote: lessonQuote,
       currentStatus: lessonStatus, // Pass the full LessonStatus object
+      lessonSummary: lessonSummaryModel,
+      statuses: data.statuses ? data.statuses.map((s: any) => new LessonStatus({
+        id: s.id,
+        lessonId: s.lessonId,
+        status: s.status as LessonStatusValue,
+        context: s.context || null,
+        createdAt: s.createdAt ? new Date(s.createdAt) : new Date()
+      })) : [],
+      createdAt: data.createdAt ? new Date(data.createdAt) : undefined,
+      updatedAt: data.updatedAt ? new Date(data.updatedAt) : undefined,
+      milestoneId: data.milestoneId || null,
     });
   } catch (error) {
     console.error('Error in getLessonById:', error);
@@ -157,7 +181,7 @@ export const fetchTeacherLessons = async (teacherId: string): Promise<FullLesson
     throw new Error("Teacher ID is required to fetch lessons.");
   }
   try {
-    const response = await apiClient.get(`/api/v1/teacher/${teacherId}/lessons`);
+    const response = await apiClient.get(`/api/v1/lessons`, { params: { teacherId } });
     // Ensure the response data is an array
     if (!Array.isArray(response.data)) {
       console.error("API did not return an array for teacher lessons:", response.data);
