@@ -86,22 +86,9 @@ Refer to `package.json` and `docker/docker-compose.yml` for details on the speci
 
 ## Production Build
 
-To build the application for production:
+To deploy the application in production:
 
-1.  **Build Frontend**:
-    ```bash
-    NODE_ENV=production pnpm build:frontend
-    ```
-2.  **Build Server**:
-    ```bash
-    NODE_ENV=production pnpm build:server
-    ```
-3.  **Build Shared (usually included in server build)**:
-    ```bash
-    NODE_ENV=production pnpm build:shared
-    ```
-
-These commands compile the code and output artifacts to the `dist/` directory, optimized for production deployment. The `NODE_ENV=production` flag ensures production-specific configurations and optimizations are applied.
+NODE_ENV=production FLY_API_TOKEN="your-fly-api-token" pnpm docker:deploy:fly
 
 ## CI/CD Pipelines
 
