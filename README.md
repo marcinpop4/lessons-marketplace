@@ -8,116 +8,83 @@ Follow these steps to set up your local development environment.
 
 ### Prerequisites
 
-1.  **Node.js**: Version 20 or later.
-2.  **pnpm**: Version 10.3.0 or later. Install using `npm install -g pnpm`.
-3.  **PostgreSQL**: Version 15. Install using Homebrew:
-    ```bash
-    brew install postgresql@15
-    brew services start postgresql@15
-    ```
-4.  **Create Database**: Connect to PostgreSQL and create the development database.
-    ```bash
-    # Connect with your system username (no need for -U flag on macOS with brew)
-    psql postgres
-    CREATE DATABASE arts_marketplace;
-    \q
-    ```
-5.  **Environment File**: Copy `env/.env.development.example` to `env/.env.development` and update `DATABASE_URL` if your local PostgreSQL user is not your system username (often `postgres` on Linux/Windows). For default brew installs on macOS, your system username is the correct value for `POSTGRES_USER` and should be reflected in the `DATABASE_URL`.
+1. **Node.js**: Install Node.js version 20 or later:
+   ```bash
+   # Using Homebrew on macOS
+   brew install node@20
+   
+   # Or download directly from https://nodejs.org/
+   ```
 
-    *Example `DATABASE_URL` for macOS brew install:*
-    `postgresql://YOUR_MACOS_USERNAME@localhost:5432/arts_marketplace?schema=public`
+2. **pnpm**: Install pnpm version 10.3.0 or later:
+   ```bash
+   # Using npm
+   npm install -g pnpm@10.3.0
+   
+   # Or using Homebrew on macOS
+   brew install pnpm
+   ```
 
-    *Example `DATABASE_URL` for standard PostgreSQL install:*
-    `postgresql://postgres:YOUR_PASSWORD@localhost:5432/arts_marketplace?schema=public` (Update password if you set one).
+3. **PostgreSQL**: Version 15. Install using Homebrew:
+   ```bash
+   brew install postgresql@15
+   brew services start postgresql@15
+   ```
+
+4. **Environment Setup**: Create your development environment file:
+   ```bash
+   # Copy the example environment file
+   cp env/.env.example env/.env.development
+   ```
 
 ### Installation and Setup
 
-Run the following commands from the project root:
-
-1.  **Install Dependencies**:
-    ```bash
-    pnpm install
-    ```
-
-2.  **Generate Prisma Client**:
-    ```bash
-    # Uses NODE_ENV=development by default from env/.env.development
-    pnpm prisma:generate
-    ```
-
-3.  **Run Database Migrations**:
-    ```bash
-    # Uses NODE_ENV=development by default from env/.env.development
-    pnpm prisma:migrate
-    ```
-
-4.  **Seed Database**:
-    ```bash
-    # Uses NODE_ENV=development by default from env/.env.development
-    pnpm prisma:seed
-    ```
-
-5.  **Start Development Servers**:
-    ```bash
-    # Uses NODE_ENV=development implicitly via the script's use of dotenv-cli
-    pnpm dev:full
-    ```
-    This will start the frontend and backend servers concurrently.
-    - Frontend: `http://localhost:5173`
-    - Backend API: `http://localhost:3000`
-
-### Running Commands with `NODE_ENV`
-
-Many scripts rely on the `NODE_ENV` environment variable to load the correct `.env` file (e.g., `env/.env.development`, `env/.env.test`, `env/.env.production`). While some scripts like `pnpm dev:full` set this implicitly via `dotenv-cli`, for ad-hoc commands or scripts that don't explicitly load environment files, you might need to prepend `NODE_ENV`:
+Run the following command to set up everything automatically:
 
 ```bash
-# Example: Running prisma studio with development environment
-NODE_ENV=development pnpm prisma:studio
-
-# Example: Running a specific test suite with test environment
-NODE_ENV=test jest --config tests/unit/jest.config.js
-```
-
-Generally, prefer using the provided `pnpm` scripts which handle environment loading.
-
-### Full Validation Script
-
-The `validate:full` script provides a comprehensive check of the project setup and integrity:
-
-```bash
-# Uses NODE_ENV=development for seeding/prisma commands
 pnpm validate:full
 ```
 
-This script performs the following actions:
-1.  `pnpm clean`: Removes `dist` and `node_modules`.
-2.  `pnpm install`: Installs dependencies.
-3.  `pnpm prisma:reset --force`: Resets the development database.
-4.  `pnpm prisma:seed`: Seeds the database.
-5.  `pnpm prisma:generate`: Generates the Prisma client.
-6.  `pnpm diagnose:ts`: Runs TypeScript diagnostics.
-7.  `pnpm test:local`: Runs all local tests (unit, API, E2E).
+This script will:
+1. Clean and install dependencies
+2. Create and set up the database
+3. Run migrations
+4. Generate Prisma client
+5. Seed the database
+6. Run diagnostics and tests
 
-Use this script to ensure your environment is correctly configured and all core components are functional.
+If `validate:full` succeeds, your development environment is ready!
+
+### Starting the Development Servers
+
+To start the development servers:
+
+```bash
+NODE_ENV=development pnpm dev:full
+```
+
+This will start:
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:3000`
 
 ## Running with Docker
 
 You can run the application and tests within a Docker environment.
 
-1.  **Deploy Locally**: Builds images and starts containers for frontend, server, and database.
-    ```bash
-    # Set NODE_ENV if you want to target a specific environment for the build/run
-    # Defaults often assume development or production based on script definition
-    pnpm docker:deploy
-    ```
-    This uses `docker compose -f docker/docker-compose.yml up -d`.
+1. **Deploy Locally**: Builds images and starts containers for frontend, server, and database.
+   ```bash
+   # Set NODE_ENV if you want to target a specific environment for the build/run
+   # Defaults often assume development or production based on script definition
+   pnpm docker:deploy
+   ```
+   This uses `docker compose -f docker/docker-compose.yml up -d`.
 
-2.  **Run Tests in Docker**: Builds a test image and runs tests against the Dockerized application.
-    ```bash
-    # The script explicitly sets NODE_ENV=test
-    pnpm docker:test
-    ```
-    This runs the test suite defined in `docker/docker-compose.yml`.
+2. **Run Tests in Docker**: Builds a test image and runs tests against the Dockerized application.
+   ```bash
+   # The script explicitly sets NODE_ENV=test
+   pnpm docker:test
+   ```
+   This runs the test suite defined in `docker/docker-compose.yml`.
 
 Refer to `package.json` and `docker/docker-compose.yml` for details on the specific environment variables used in these Docker commands.
 

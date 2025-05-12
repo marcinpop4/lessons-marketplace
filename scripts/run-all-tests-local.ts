@@ -170,10 +170,6 @@ async function main() {
             throw new Error('Services failed to start'); // Throw to trigger finally block and exit
         }
 
-        // 4. Setup Database (Reset)
-        // These scripts already use dotenv-cli, so NODE_ENV=development will be picked up
-        await runCommand('pnpm', ['prisma:reset', '--force'], { title: 'Prisma Reset' });
-
         // 5. Run API Tests
         await runCommand('pnpm', ['test:api'], { title: 'API Tests' });
 
