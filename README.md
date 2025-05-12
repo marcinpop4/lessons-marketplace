@@ -42,7 +42,7 @@ Follow these steps to set up your local development environment.
 Run the following command to set up everything automatically:
 
 ```bash
-pnpm validate:full
+NODE_ENV=development pnpm validate:full
 ```
 
 This script will:
@@ -73,16 +73,12 @@ You can run the application and tests within a Docker environment.
 
 1. **Deploy Locally**: Builds images and starts containers for frontend, server, and database.
    ```bash
-   # Set NODE_ENV if you want to target a specific environment for the build/run
-   # Defaults often assume development or production based on script definition
-   pnpm docker:deploy
+   NODE_ENV=test pnpm docker:deploy
    ```
-   This uses `docker compose -f docker/docker-compose.yml up -d`.
 
 2. **Run Tests in Docker**: Builds a test image and runs tests against the Dockerized application.
    ```bash
-   # The script explicitly sets NODE_ENV=test
-   pnpm docker:test
+   NODE_ENV=test pnpm docker:test
    ```
    This runs the test suite defined in `docker/docker-compose.yml`.
 
