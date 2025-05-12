@@ -46,7 +46,7 @@
     "lint-staged": "lint-staged",
     "prisma:create-migration": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate dev --schema=server/prisma/schema.prisma",
     "prisma:deploy": "prisma migrate deploy --schema=server/prisma/schema.prisma",
-    "prisma:drop-create-db": "dotenv -e env/.env.${NODE_ENV} -- sh -c 'DB_NAME=$(echo $DATABASE_URL | sed -E \"s/.*\\/([^?]+).*/\\1/\"); psql postgres -c \"DROP DATABASE IF EXISTS $DB_NAME;\" > /dev/null 2>&1 && echo \"Dropped database: $DB_NAME\" && psql postgres -c \"CREATE DATABASE $DB_NAME;\" > /dev/null 2>&1 && echo \"Created database: $DB_NAME\"'",
+    "prisma:drop-create-db": "dotenv -e env/.env.${NODE_ENV} -- tsx scripts/db-setup.ts",
     "prisma:generate": "prisma generate --schema=server/prisma/schema.prisma",
     "prisma:migrate": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate deploy --schema=server/prisma/schema.prisma",
     "prisma:reset": "dotenv -e env/.env.${NODE_ENV} -- prisma migrate reset --force --schema=server/prisma/schema.prisma",
