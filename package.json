@@ -72,7 +72,7 @@
     "typecheck:frontend": "NODE_ENV=production tsc --project tsconfig.json --noEmit",
     "typecheck:server": "NODE_ENV=production tsc --project tsconfig.json --noEmit",
     "typecheck:shared": "NODE_ENV=production tsc --project tsconfig.json --noEmit",
-    "validate:full": "pnpm clean && pnpm install && pnpm prisma:drop-create-db && pnpm prisma:migrate && pnpm prisma:generate && pnpm prisma:seed && pnpm diagnose:ts && pnpm test:local"
+    "validate:full": "tsx scripts/validate-with-timing.ts"
   },
   "dependencies": {
     "@tailwindcss/forms": "0.5.10",
