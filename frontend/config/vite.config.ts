@@ -2,8 +2,24 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import fs from 'fs'
-import chalk from 'chalk';
 import url from 'url'; // Import the url module
+import pino from 'pino';
+
+// Create a Pino logger specifically for Vite proxy logging
+const proxyLogger = pino({
+  name: 'vite-proxy',
+  level: process.env.NODE_ENV === 'development' ? 'info' : 'warn', // Less verbose in development
+  transport: process.env.NODE_ENV === 'development' ? {
+    target: 'pino-pretty',
+    options: {
+      colorize: true,
+      translateTime: 'HH:MM:ss',
+      ignore: 'pid,hostname,name',
+      messageFormat: '{method} {url} → {statusCode} | req: {requestBodySize} | res: {responseBodySize}',
+      singleLine: true
+    }
+  } : undefined
+});
 
 // --- Unified list of keys to scrub (all lowercase) ---
 const GLOBAL_KEYS_TO_SCRUB = ['password', 'email', 'token', 'accesstoken', 'authorization', 'apikey', 'secret'];
@@ -63,7 +79,10 @@ const scrubUrlParams = (urlString: string | undefined, keysToScrub: string[] = G
       return urlString;
     }
   } catch (e) {
-    console.warn('[VITE PROXY] Failed to parse/scrub URL parameters for logging:', urlString, e);
+    proxyLogger.warn('Failed to parse/scrub URL parameters for logging', {
+      url: urlString,
+      error: e instanceof Error ? e.message : String(e)
+    });
     return urlString; // Return original URL on error
   }
 };
@@ -99,8 +118,12 @@ export default defineConfig(({ mode }) => {
 
   // Only log in higher verbosity modes
   if (logLevel >= 2) {
-    console.log(`Building for ${mode} with API URL: ${process.env.VITE_API_BASE_URL}`);
-    console.log(`Environment type: ${process.env.NODE_ENV}`);
+    proxyLogger.debug('Building Vite configuration', {
+      mode,
+      apiUrl: process.env.VITE_API_BASE_URL,
+      nodeEnv: process.env.NODE_ENV,
+      logLevel
+    });
   }
 
   return {
@@ -174,6 +197,7 @@ export default defineConfig(({ mode }) => {
           secure: false,
           configure: (proxy, options) => {
             const disableLogs = process.env.DISABLE_VITE_PROXY_LOGS === 'true';
+            const verboseProxyLogs = process.env.VERBOSE_VITE_PROXY_LOGS === 'true';
 
             proxy.on('proxyReq', (proxyReq, req, res) => {
               let body = '';
@@ -194,7 +218,11 @@ export default defineConfig(({ mode }) => {
                     scrubbedRequestBodyString = JSON.stringify(scrubbedBody);
                   } catch (e) {
                     scrubbedRequestBodyString = rawRequestBody;
-                    console.warn('[VITE PROXY /api/v1] Failed to parse/scrub request body for logging.');
+                    proxyLogger.warn('Failed to parse/scrub request body for logging', {
+                      error: e,
+                      url: req.url,
+                      method: req.method
+                    });
                   }
                 }
 
@@ -217,7 +245,12 @@ export default defineConfig(({ mode }) => {
                     } catch (e) {
                       // Keep raw body if JSON parsing fails (might be compressed or not JSON)
                       scrubbedResponseBodyString = rawResponseBody;
-                      console.warn('[VITE PROXY /api/v1] Failed to parse/scrub response body for logging.');
+                      proxyLogger.warn('Failed to parse/scrub response body for logging', {
+                        error: e,
+                        url: req.url,
+                        method: req.method,
+                        statusCode: proxyRes.statusCode
+                      });
                     }
                   }
 
@@ -228,14 +261,38 @@ export default defineConfig(({ mode }) => {
                   // Scrub sensitive parameters from the URL before logging
                   const scrubbedUrl = scrubUrlParams(req.url);
 
-                  // Log with request and response body separated by ==>
-                  console.log(chalk.yellow(`${proxyRes.statusCode}\t${req.method}\t${scrubbedUrl}\t${finalRequestBodyString} ==>`), chalk.blue(`${finalResponseBodyString}`));
+                  // Log with structured data using Pino - only log non-health-check requests
+                  if (!disableLogs && !scrubbedUrl.includes('/health')) {
+                    const statusCode = proxyRes.statusCode || 0;
+
+                    // Only log errors, or if verbose mode is enabled
+                    if (statusCode >= 400 || verboseProxyLogs) {
+                      proxyLogger.info({
+                        method: req.method,
+                        url: scrubbedUrl,
+                        statusCode,
+                        requestBodySize: finalRequestBodyString.length > 2 ? `${finalRequestBodyString.length}b` : 'empty',
+                        responseBodySize: finalResponseBodyString.length > 2 ? `${finalResponseBodyString.length}b` : 'empty',
+                        userAgent: req.headers['user-agent']?.toString().slice(0, 50),
+                        // Only include bodies for errors or if response body is small
+                        ...(statusCode >= 400 || finalResponseBodyString.length < 200 ? {
+                          requestBody: finalRequestBodyString,
+                          responseBody: finalResponseBodyString
+                        } : {})
+                      }, `${req.method} ${scrubbedUrl}`);
+                    }
+                  }
                 });
               }
             });
 
             proxy.on('error', (err, req, res) => {
-              console.error('[VITE PROXY /api/v1] Proxy error:', err);
+              proxyLogger.error('Proxy error occurred', {
+                error: err.message,
+                stack: err.stack,
+                url: req.url,
+                method: req.method
+              });
               if (!res.headersSent) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
               }

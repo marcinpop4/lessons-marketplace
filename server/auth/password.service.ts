@@ -5,7 +5,11 @@ import { UserType } from '../../shared/models/UserType.js';
 import prisma from '../prisma.js';
 import bcryptjs from 'bcryptjs';
 import { PasswordCredentialMapper } from './password-credential.mapper.js'; // Import the mapper
+import { BadRequestError, NotFoundError } from '../errors/index.js';
+import { createChildLogger } from '../config/logger.js';
 
+// Create child logger for password service
+const logger = createChildLogger('password-service');
 
 // Define the type for the Prisma client or transaction client
 type PrismaTransactionClient = Omit<
@@ -69,9 +73,8 @@ class PasswordService {
             // Map the result from Prisma to the shared model
             return PasswordCredentialMapper.toModel(dbCredential);
         } catch (error) {
-            // Handle potential unique constraint errors if needed
-            console.error(`Error creating password credential for ${userType} ${userId}:`, error);
-            throw new Error('Failed to create password credential.');
+            logger.error(`Error creating password credential for ${userType} ${userId}:`, error);
+            throw error;
         }
     }
 

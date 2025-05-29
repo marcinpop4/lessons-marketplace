@@ -11,6 +11,10 @@ import { LessonRequestMapper } from './lessonRequest.mapper.js';
 import { BadRequestError, NotFoundError, AuthorizationError } from '../errors/index.js';
 import { isUuid } from '../utils/validation.utils.js';
 import { CreateLessonRequestDTO } from './lessonRequest.dto.js'; // Import the new DTO
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for lesson request service
+const logger = createChildLogger('lesson-request-service');
 
 export class LessonRequestService {
   private readonly prisma = prisma;
@@ -87,7 +91,7 @@ export class LessonRequestService {
       return lessonRequestModel;
 
     } catch (error) {
-      console.error('Error creating lesson request in service:', error);
+      logger.error('Error creating lesson request in service:', { error });
       throw error;
     }
   }

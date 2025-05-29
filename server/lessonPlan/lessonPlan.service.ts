@@ -22,21 +22,18 @@ import { Response } from 'express'; // For streaming
 import OpenAI from 'openai'; // Make sure OpenAI is imported
 import { ChatCompletionChunk } from 'openai/resources/chat/completions'; // Import necessary type
 import { logAndYieldAiStream } from '../utils/aiStream.utils.js'; // Import the AI stream utility
-
-// Import services needed for context gathering
+import { streamJsonResponse } from '../utils/sse.service.js';
 import { lessonService } from '../lesson/lesson.service.js';
-import { studentService } from '../student/student.service.js';
 import { objectiveService } from '../objective/objective.service.js';
 import { ObjectiveStatusValue } from '../../shared/models/ObjectiveStatus.js';
 import { LessonStatusValue } from '../../shared/models/LessonStatus.js';
 import { UserType as PrismaUserType } from '../../shared/models/UserType.js'; // Shared UserType
 import { LessonType } from '../../shared/models/LessonType.js'; // Import LessonType if needed for validation
-
-// Import shared models if not already imported via a central types/models file
 import { AiGeneratedLessonPlan, AiMilestone, AiPlannedLesson, AiObjectiveForPlan } from '../../shared/models/AiGeneratedLessonPlan.js';
+import { createChildLogger } from '../config/logger.js';
 
-// Import streamJsonResponse if it's not automatically included
-import { streamJsonResponse } from '../utils/sse.service.js';
+// Create child logger for lesson plan service
+const logger = createChildLogger('lesson-plan-service');
 
 // Define the includes needed for mapping
 const lessonPlanIncludes = {
@@ -282,7 +279,7 @@ export class LessonPlanService {
 
     async generateAndStreamLessonPlanRecommendations(teacherId: string, sourceLessonId: string, res: Response): Promise<void> {
         const logContext = `[AI LessonPlan Stream T:${teacherId} L:${sourceLessonId}]`;
-        console.log(`${logContext} Preparing stream generator.`);
+        logger.info(`${logContext} Preparing stream generator.`);
 
         try {
             // --- Prepare Prompts & Provider --- 
@@ -308,11 +305,11 @@ export class LessonPlanService {
                 const systemPrompt = `You are a helpful assistant that helps teachers come up with an objective, milestones and lessons for one-on-one lessons. Based on the student info, current lesson details, past lesson history, and the student's relevant learning objectives, suggest an overall objective, milestones and lessons to help the student achieve their objective. Come up with 3 options.\n\nGenerate ONLY the JSON array as your response. Each element of the array should be an object. This object should have two top-level keys: "objective" and "milestones".\n\nThe "objective" key should correspond to an object with "title", "description", and "dueDate" (YYYY-MM-DD format).\n\nThe "milestones" key should correspond to an array of milestone objects. Each milestone object should have "title", "description", "dueDate" (YYYY-MM-DD format), and a "lessons" array.\n\nEach lesson in the "lessons" array (within a milestone) should have "startTime" (as "YYYY-MM-DD HH:MM") and "durationMinutes" (as an integer representing minutes).`;
                 const userPrompt = `Student: ${studentName}.\nLesson Type: ${lessonType}.\nSource Lesson Start Time: ${lessonStartTime}.\nSource Lesson Duration: ${lessonDuration} minutes.\n\nStudent's Relevant Objectives for ${lessonType} (${studentObjectives.length}):\n${objectivesSummary}\n\nPast ${lessonType} Lessons Summary (${pastLessons.length}):\n${pastLessonsSummary}\n\nGenerate 3 lesson plan options. Remember to suggest future dates for objectives and milestones.`;
 
-                console.log(`${logContext} --- SYSTEM PROMPT ---`);
-                console.log(systemPrompt);
-                console.log(`${logContext} --- USER PROMPT ---`);
-                console.log(userPrompt);
-                console.log(`${logContext} --------------------`);
+                logger.info(`${logContext} --- SYSTEM PROMPT ---`);
+                logger.info(systemPrompt);
+                logger.info(`${logContext} --- USER PROMPT ---`);
+                logger.info(userPrompt);
+                logger.info(`${logContext} --------------------`);
 
                 // 3. Define AI Stream Provider
                 const aiStreamProvider = () => {
@@ -395,11 +392,11 @@ export class LessonPlanService {
                         });
                         return { parsedObject: potentialPlan as AiGeneratedLessonPlan, remainingBuffer: actualRemainingBuffer };
                     } else {
-                        console.warn(`${logContext} Discarding object due to failed structural validation: ${jsonChunk}`);
+                        logger.warn(`${logContext} Discarding object due to failed structural validation: ${jsonChunk}`);
                         return { parsedObject: null, remainingBuffer: actualRemainingBuffer };
                     }
                 } catch (parseError) {
-                    console.warn(`${logContext} JSON parse error for chunk. Error: ${parseError instanceof Error ? parseError.message : String(parseError)}. Chunk: ${jsonChunk}`);
+                    logger.warn(`${logContext} JSON parse error for chunk. Error: ${parseError instanceof Error ? parseError.message : String(parseError)}. Chunk: ${jsonChunk}`);
                     return { parsedObject: null, remainingBuffer: actualRemainingBuffer };
                 }
             };
@@ -414,7 +411,7 @@ export class LessonPlanService {
                     obj.milestones.every((m: AiMilestone) => m.lessons.every((l: AiPlannedLesson) => l.startTime && typeof l.durationMinutes === 'number')) // REVERTED & TYPED
                 );
                 if (!isValid) {
-                    console.warn(`${logContext} Validation failed for assembled object:`, JSON.stringify(obj, null, 2));
+                    logger.warn(`${logContext} Validation failed for assembled object:`, JSON.stringify(obj, null, 2));
                 }
                 return isValid;
             };
@@ -442,11 +439,11 @@ export class LessonPlanService {
                 objectValidator,
                 maxItems: 3
             }), (error) => {
-                console.error(`${logContext} Error during AI recommendation streaming:`, error);
+                logger.error(`${logContext} Error during AI recommendation streaming:`, error);
             });
 
         } catch (error) {
-            console.error(`${logContext} Failed to generate or stream recommendations:`, error);
+            logger.error(`${logContext} Failed to generate or stream recommendations:`, error);
             if (!res.headersSent) {
                 if (error instanceof NotFoundError) res.status(404).json({ error: error.message });
                 else if (error instanceof BadRequestError) res.status(400).json({ error: error.message });

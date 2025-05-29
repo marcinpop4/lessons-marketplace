@@ -6,6 +6,10 @@ import { ObjectiveStatusValue } from '../../shared/models/ObjectiveStatus.js'; /
 import { BadRequestError, AuthorizationError, NotFoundError } from '../errors/index.js';
 import { UserType as PrismaUserType } from '@prisma/client'; // Keep if needed elsewhere
 import { Objective } from '../../shared/models/Objective.js';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for objective controller
+const logger = createChildLogger('objective-controller');
 
 // Type helper for parsed query parameters
 interface GetObjectivesQuery {
@@ -145,9 +149,8 @@ class ObjectiveController {
         try {
             const studentId = (req as any).user?.id;
             if (!studentId) {
-                console.error("[SSE Controller] Authenticated user ID not found.");
-                // Use end() for SSE streams on error before headers sent
-                if (!res.headersSent) res.status(401).end();
+                logger.error("[SSE Controller] Authenticated user ID not found.");
+                res.status(401).json({ error: 'Authentication required.' });
                 return;
             }
 
@@ -167,10 +170,9 @@ class ObjectiveController {
             await objectiveService.streamObjectiveRecommendations(studentId, lessonType, res);
 
         } catch (error) {
-            // Catch errors that occur *before* streaming starts
-            console.error("Error setting up stream in objectiveController:", error);
+            logger.error("Error setting up stream in objectiveController:", { error });
             if (!res.headersSent) {
-                next(error);
+                res.status(500).json({ error: 'Failed to generate objective recommendations.' });
             }
         }
     }

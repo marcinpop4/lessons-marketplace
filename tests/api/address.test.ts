@@ -91,7 +91,7 @@ describe('API Integration: /api/v1/addresses', () => {
             } catch (error: any) {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(400);
-                expect(error.response?.data?.message || error.response?.data?.error).toContain('Missing required address fields.'); // Check data for error
+                expect(error.response?.data?.error).toContain('Missing required address fields.'); // Check data for error
             }
         });
 
@@ -179,7 +179,7 @@ describe('API Integration: /api/v1/addresses', () => {
             } catch (error: any) {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(404);
-                expect(error.response?.data?.message).toEqual(`Address with ID ${fakeId} not found.`); // Check data for error
+                expect(error.response?.data?.error).toEqual(`Address with ID ${fakeId} not found.`); // Check data for error
             }
         });
 
@@ -191,7 +191,7 @@ describe('API Integration: /api/v1/addresses', () => {
             } catch (error: any) {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(400);
-                expect(error.response?.data?.message).toEqual('Invalid address ID format.'); // Check data for error
+                expect(error.response?.data?.error).toEqual('Invalid address ID format.'); // Check data for error
             }
         });
     }); // End GET /:id describe

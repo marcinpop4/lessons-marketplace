@@ -3,6 +3,10 @@ import { LessonType } from '../../shared/models/LessonType.js';
 import { teacherService } from './teacher.service.js';
 import { Lesson } from '../../shared/models/Lesson.js';
 import { NotFoundError, BadRequestError } from '../errors/index.js';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for teacher controller
+const logger = createChildLogger('teacher-controller');
 
 // Basic UUID validation regex
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -20,48 +24,36 @@ export const teacherController = {
 
       // Validate lessonType is provided and valid
       if (!lessonType) {
-        res.status(400).json({ message: 'Lesson type is required' });
-        return;
+        throw new BadRequestError('Lesson type is required');
       }
 
       // Check if the provided lessonType is valid
       if (!Object.values(LessonType).includes(lessonType as LessonType)) {
-        res.status(400).json({
-          message: `Invalid lesson type. Must be one of: ${Object.values(LessonType).join(', ')}`
-        });
-        return;
+        throw new BadRequestError(`Invalid lesson type. Must be one of: ${Object.values(LessonType).join(', ')}`);
       }
 
       // Parse and validate limit parameter
       if (!limit) {
-        res.status(400).json({ message: 'Limit parameter is required' });
-        return;
+        throw new BadRequestError('Limit parameter is required');
       }
 
       if (!/^\d+$/.test(limit as string)) {
-        res.status(400).json({ message: 'Limit must be a positive number' });
-        return;
+        throw new BadRequestError('Limit must be a positive number');
       }
 
       const limitValue = Number(limit);
       if (limitValue < 1) {
-        res.status(400).json({ message: 'Limit must be a positive number' });
-        return;
+        throw new BadRequestError('Limit must be a positive number');
       }
 
-      try {
-        // Use the refactored service method (returns Teacher[])
-        const teachers = await teacherService.findTeachersByLessonType(lessonType as LessonType, limitValue);
+      // Use the refactored service method (returns Teacher[])
+      const teachers = await teacherService.findTeachersByLessonType(lessonType as LessonType, limitValue);
 
-        // Return shared models directly
-        res.status(200).json(teachers);
-      } catch (dbError) {
-        console.error('Database error fetching teachers:', dbError);
-        res.status(500).json({ message: 'Database error fetching teachers' });
-      }
+      // Return shared models directly
+      res.status(200).json(teachers);
     } catch (error) {
-      console.error('Error in getTeachers:', error);
-      res.status(500).json({ message: 'An error occurred while fetching teachers' });
+      logger.error('Error in getTeachers:', { error });
+      next(error);
     }
   },
 
@@ -79,7 +71,7 @@ export const teacherController = {
       const stats = await teacherService.getTeacherStatistics(teacherId);
       res.status(200).json(stats);
     } catch (error) {
-      console.error('Error fetching teacher stats:', error);
+      logger.error('Error fetching teacher stats:', error);
       res.status(500).json({ message: 'An error occurred while fetching teacher stats' });
     }
   },

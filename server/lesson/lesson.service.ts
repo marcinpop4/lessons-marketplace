@@ -9,6 +9,10 @@ import { BadRequestError, NotFoundError, AppError, AuthorizationError, ConflictE
 import { isUuid } from '../utils/validation.utils.js';
 import { UpdateLessonDto } from './lesson.dto.js';
 import { UserType as PrismaUserType } from '@prisma/client';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for lesson service
+const logger = createChildLogger('lesson-service');
 
 // Define the includes needed for transforming to a Lesson model via LessonMapper
 const lessonIncludeForMapper = {
@@ -117,7 +121,7 @@ export class LessonService {
             const lessonModel = LessonMapper.toModel(createdLessonData as unknown as DbLessonWithNestedRelations);
 
             if (!lessonModel) {
-                console.error(`Failed to instantiate Lesson model from DB data for supposedly created lesson ID: ${lessonId}`);
+                logger.error(`Failed to instantiate Lesson model from DB data for supposedly created lesson ID: ${lessonId}`);
                 throw new AppError(`Data integrity issue: Failed to create Lesson model for ID ${lessonId}`, 500);
             }
 
@@ -128,7 +132,7 @@ export class LessonService {
             if (error instanceof NotFoundError || error instanceof ConflictError || error instanceof AppError) {
                 throw error;
             }
-            console.error(`Unexpected error creating lesson from quote ${quoteId}:`, error);
+            logger.error(`Unexpected error creating lesson from quote ${quoteId}:`, error);
             // Wrap unexpected errors
             throw new AppError(`Failed to create lesson from quote ${quoteId}: ${error instanceof Error ? error.message : 'Unknown error'}`, 500);
         }
@@ -217,7 +221,7 @@ export class LessonService {
 
                 if (!currentLesson.currentStatusId) {
                     // This indicates a data integrity issue
-                    console.error(`Data Integrity Issue: Lesson ${lessonId} has null currentStatusId.`);
+                    logger.error(`Data Integrity Issue: Lesson ${lessonId} has null currentStatusId.`);
                     // Use AppError for internal server issues, which defaults to 500
                     throw new AppError(`Lesson ${lessonId} is missing status information.`, 500);
                 }
@@ -228,7 +232,7 @@ export class LessonService {
 
                 if (!currentStatusRecord) {
                     // This also indicates a data integrity issue
-                    console.error(`Data Integrity Issue: currentStatusId ${currentLesson.currentStatusId} for lesson ${lessonId} not found in LessonStatus table.`);
+                    logger.error(`Data Integrity Issue: currentStatusId ${currentLesson.currentStatusId} for lesson ${lessonId} not found in LessonStatus table.`);
                     throw new AppError(`Lesson ${lessonId} has invalid status information.`, 500);
                 }
 
@@ -256,7 +260,7 @@ export class LessonService {
                 throw error; // Re-throw specific errors
             }
             // Log and wrap unexpected errors as AppError (500)
-            console.error(`Unexpected error updating status for lesson ${lessonId} via transition ${transition}:`, error);
+            logger.error(`Unexpected error updating status for lesson ${lessonId} via transition ${transition}:`, error);
             throw new AppError(`Failed to update lesson status: ${error instanceof Error ? error.message : 'Unknown error'}`, 500);
         }
     }
@@ -378,14 +382,14 @@ export class LessonService {
             if (requestingUserId !== studentId && requestingUserId !== teacherId) {
                 // Don't throw error, just return null to indicate not found *for this user*
                 // Controller can return 404 in this case as well.
-                console.warn(`Auth check failed: User ${requestingUserId} tried to access lesson ${lessonId} owned by Student: ${studentId}, Teacher: ${teacherId}`);
+                logger.warn(`Auth check failed: User ${requestingUserId} tried to access lesson ${lessonId} owned by Student: ${studentId}, Teacher: ${teacherId}`);
                 return null;
             }
 
             // If authorized, use mapper to instantiate and return the model
             return LessonMapper.toModel(lessonData as unknown as DbLessonWithNestedRelations);
         } catch (error) {
-            console.error(`Error fetching lesson ${lessonId}:`, error);
+            logger.error(`Error fetching lesson ${lessonId}:`, error);
             throw new AppError(`Failed to fetch lesson: ${error instanceof Error ? error.message : 'Unknown error'}`, 500);
         }
     }
@@ -451,7 +455,7 @@ export class LessonService {
                 .map(lesson => LessonMapper.toModel(lesson as unknown as DbLessonWithNestedRelations))
                 .filter((lesson): lesson is Lesson => lesson !== null);
         } catch (error) {
-            console.error(`Error fetching lessons for student ${studentId}:`, error);
+            logger.error(`Error fetching lessons for student ${studentId}:`, error);
             throw new AppError(`Failed to fetch lessons by student: ${error instanceof Error ? error.message : 'Unknown error'}`, 500);
         }
     }

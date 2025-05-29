@@ -18,6 +18,10 @@ import { TeacherMapper } from './teacher.mapper.js';
 import { TeacherLessonHourlyRateMapper } from '../teacher-lesson-hourly-rate/teacher-lesson-hourly-rate.mapper.js';
 import { LessonMapper } from '../lesson/lesson.mapper.js';
 import { isUuid } from '../utils/validation.utils.js';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for teacher service
+const logger = createChildLogger('teacher-service');
 
 // Define the type for the Prisma client or transaction client
 // Use Prisma.TransactionClient for the interactive transaction type
@@ -72,7 +76,7 @@ class TeacherService {
                     throw new DuplicateEmailError(teacherCreateDTO.email);
                 }
             }
-            console.error('Error creating teacher profile:', error);
+            logger.error('Error creating teacher profile:', error);
             throw error;
         }
     }
@@ -230,7 +234,7 @@ class TeacherService {
                 where: { email }
             });
         } catch (error) {
-            console.error('Error finding teacher by email:', error);
+            logger.error('Error finding teacher by email:', error);
             throw error;
         }
     }
@@ -265,7 +269,7 @@ class TeacherService {
             // Map using the updated TeacherMapper logic
             return TeacherMapper.toModel(teacherDb, teacherDb.teacherLessonHourlyRates);
         } catch (error) {
-            console.error('Error finding teacher:', error);
+            logger.error('Error finding teacher:', error);
             throw error;
         }
     }

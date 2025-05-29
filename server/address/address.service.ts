@@ -9,7 +9,11 @@ import { AddressMapper } from './address.mapper.js';
 // Import the UUID validation utility
 import { isUuid } from '../utils/validation.utils.js';
 // Import shared error classes
-import { BadRequestError } from '../errors/index.js';
+import { BadRequestError, NotFoundError, AuthorizationError } from '../errors/index.js';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for address service
+const logger = createChildLogger('address-service');
 
 class AddressService {
     private readonly prisma = prisma;
@@ -52,10 +56,8 @@ class AddressService {
             });
             return AddressMapper.toModel(newDbAddress);
         } catch (error) {
-            // Log Prisma errors or other unexpected issues
-            console.error('Error creating address in service:', error);
-            // Re-throw a generic error for internal issues
-            throw new Error(`Failed to create address: ${error instanceof Error ? error.message : 'Unknown database error'}`);
+            logger.error('Error creating address in service:', { error });
+            throw error;
         }
     }
 
@@ -83,8 +85,8 @@ class AddressService {
             }
             return AddressMapper.toModel(dbAddress);
         } catch (error) {
-            console.error('Error finding address by ID in service:', error);
-            throw new Error(`Failed to find address: ${error instanceof Error ? error.message : 'Unknown database error'}`);
+            logger.error('Error finding address by ID in service:', { error });
+            throw error;
         }
     }
 }

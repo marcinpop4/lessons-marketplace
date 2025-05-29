@@ -1,8 +1,14 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, LessonSummary as PrismaLessonSummary } from '@prisma/client';
 import { CreateLessonSummaryDto } from './lessonSummary.dto.js';
 import { BadRequestError, NotFoundError } from '../errors/index.js'; // Corrected import path
+import { LessonSummary } from '../../shared/models/LessonSummary.js';
+import { toSharedLessonSummary } from './lessonSummary.mapper.js';
+import { isUuid } from '../utils/validation.utils.js';
+import prisma from '../prisma.js';
+import { createChildLogger } from '../config/logger.js';
 
-const prisma = new PrismaClient();
+// Create child logger for lesson summary service
+const logger = createChildLogger('lesson-summary-service');
 
 export class LessonSummaryService {
     /**
@@ -70,10 +76,8 @@ export class LessonSummaryService {
             });
             return newLessonSummary;
         } catch (error) {
-            // Log the detailed error for server-side inspection
-            console.error("Error creating lesson summary in Prisma:", error);
-            // Throw a generic error or a more specific one if identifiable
-            throw new BadRequestError('Could not create lesson summary. Please check your input or try again later.');
+            logger.error("Error creating lesson summary in Prisma:", error);
+            throw error;
         }
     }
 }

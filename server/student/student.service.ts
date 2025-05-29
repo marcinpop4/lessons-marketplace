@@ -4,6 +4,11 @@ import { DuplicateEmailError, BadRequestError } from '../errors/index.js';
 import { StudentMapper } from './student.mapper.js';
 import prisma from '../prisma.js'; // Import shared prisma instance
 import { isUuid } from '../utils/validation.utils.js'; // Import UUID validation util
+import { AppError, NotFoundError } from '../errors/index.js';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for student service
+const logger = createChildLogger('student-service');
 
 // Define the type for the Prisma client or transaction client
 // Use Prisma.TransactionClient for the interactive transaction type
@@ -51,9 +56,8 @@ class StudentService {
 
         // Date of Birth validation (ensure it's a valid Date object)
         if (!(dateOfBirth instanceof Date) || isNaN(dateOfBirth.getTime())) {
-            // This case might indicate an issue upstream if controller didn't parse correctly
-            console.error('[studentService] Invalid dateOfBirth received (not a Date object): ', dateOfBirth);
-            throw new BadRequestError('Invalid dateOfBirth. Must be a valid Date object.');
+            logger.error('[studentService] Invalid dateOfBirth received (not a Date object): ', { dateOfBirth });
+            throw new BadRequestError('dateOfBirth must be a valid Date object.');
         }
         // Optional: Add check if date is reasonably valid (e.g., not in the future)
         if (dateOfBirth > new Date()) {
@@ -87,8 +91,7 @@ class StudentService {
                     throw new DuplicateEmailError(studentCreateDTO.email);
                 }
             }
-            // Log and re-throw other errors
-            console.error('Error creating student profile:', error);
+            logger.error('Error creating student profile:', { error });
             throw error;
         }
     }
@@ -117,7 +120,7 @@ class StudentService {
             // Use StudentMapper to transform and return
             return StudentMapper.toModel(dbStudent);
         } catch (error) {
-            console.error('Error finding student:', error);
+            logger.error('Error finding student:', { error });
             throw error;
         }
     }
@@ -133,7 +136,7 @@ class StudentService {
                 where: { email }
             });
         } catch (error) {
-            console.error('Error finding student by email:', error);
+            logger.error('Error finding student by email:', { error });
             throw error;
         }
     }

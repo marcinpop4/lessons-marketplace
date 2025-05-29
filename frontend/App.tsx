@@ -1,7 +1,10 @@
 // CACHE-BUSTER: 20250320101632
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth, AuthProvider } from '@frontend/contexts/AuthContext';
+
+// Import the logger
+import logger from '@frontend/utils/logger';
 
 // Common Pages
 import LoginPage from '@frontend/pages/common/login';
@@ -57,9 +60,53 @@ const AppRoutes: React.FC = () => {
   const location = useLocation();
   const currentPath = location.pathname;
 
+  // Track page views when location changes
+  useEffect(() => {
+    logger.trackPageView(currentPath);
+  }, [currentPath]);
+
+  // Track user authentication
+  useEffect(() => {
+    if (user) {
+      logger.setUser(user.id, {
+        userType: user.userType,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName
+      });
+      logger.info('User authenticated', {
+        userType: user.userType,
+        userId: user.id
+      });
+    }
+  }, [user]);
+
+  // Track page performance on mount
+  useEffect(() => {
+    // Wait for page to fully load before tracking performance
+    window.addEventListener('load', () => {
+      logger.trackPerformance();
+    });
+  }, []);
+
   // Update navigation path if needed
   const handleBackFromQuotes = () => {
     navigate('/student/lesson-request');
+  };
+
+  const handleLogout = () => {
+    logger.info('User logging out', { userId: user?.id });
+    logout();
+  };
+
+  const handleNavigation = (path: string, buttonName: string) => {
+    logger.info('Navigation clicked', {
+      buttonName,
+      targetPath: path,
+      currentPath,
+      userId: user?.id
+    });
+    navigate(path);
   };
 
   return (
@@ -71,7 +118,13 @@ const AppRoutes: React.FC = () => {
             alt="Lessons Marketplace Logo"
             className="logo"
           />
-          <Link to="/" className="hover:text-primary-600 transition-colors">
+          <Link
+            to="/"
+            className="hover:text-primary-600 transition-colors"
+            onClick={(e) => {
+              logger.trackClick(e.target as HTMLElement, { linkType: 'logo' });
+            }}
+          >
             <h1>Take lessons and Git Gud!</h1>
           </Link>
         </div>
@@ -82,21 +135,21 @@ const AppRoutes: React.FC = () => {
               <Button
                 variant={currentPath === '/teacher/lessons' ? 'primary' : 'secondary'}
                 size="sm"
-                onClick={() => navigate('/teacher/lessons')}
+                onClick={() => handleNavigation('/teacher/lessons', 'My Lessons')}
               >
                 My Lessons
               </Button>
               <Button
                 variant={currentPath === '/teacher/profile' ? 'primary' : 'secondary'}
                 size="sm"
-                onClick={() => navigate('/teacher/profile')}
+                onClick={() => handleNavigation('/teacher/profile', 'My Profile')}
               >
                 My Profile
               </Button>
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={logout}
+                onClick={handleLogout}
               >
                 Logout
               </Button>
@@ -109,21 +162,21 @@ const AppRoutes: React.FC = () => {
               <Button
                 variant={currentPath === '/student/lesson-request' ? 'primary' : 'secondary'}
                 size="sm"
-                onClick={() => navigate('/student/lesson-request')}
+                onClick={() => handleNavigation('/student/lesson-request', 'Request Lesson')}
               >
                 Request Lesson
               </Button>
               <Button
                 variant={currentPath === '/student/objectives' ? 'primary' : 'secondary'}
                 size="sm"
-                onClick={() => navigate('/student/objectives')}
+                onClick={() => handleNavigation('/student/objectives', 'My Objectives')}
               >
                 My Objectives
               </Button>
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={logout}
+                onClick={handleLogout}
               >
                 Logout
               </Button>

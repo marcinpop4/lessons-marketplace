@@ -7,6 +7,10 @@ import { Milestone as SharedMilestone } from '../../shared/models/Milestone.js';
 import { MilestoneStatus as SharedMilestoneStatus, MilestoneStatusValue } from '../../shared/models/MilestoneStatus.js';
 import { Lesson as SharedLesson } from '../../shared/models/Lesson.js';
 import { JsonValue } from '@../../shared/types/JsonTypes.js'; // Assuming JsonValue is imported
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for milestone mapper
+const logger = createChildLogger('milestone-mapper');
 
 export type PrismaMilestoneWithRelations = Milestone & {
     currentStatus?: MilestoneStatus | null;
@@ -26,7 +30,7 @@ const toSharedMilestoneStatusMapper = (prismaStatus: MilestoneStatus): SharedMil
 
 // Placeholder for toSharedLesson - replace with actual import from lesson.mapper.ts when available
 const toSharedLessonPlaceholder = (prismaLesson: Lesson): SharedLesson => {
-    console.warn('Using placeholder for toSharedLesson. Implement actual lesson mapper.');
+    logger.warn('Using placeholder for toSharedLesson. Implement actual lesson mapper.');
     // This is a mock. In reality, this would call the actual lesson mapper.
     // It needs to map quote, currentStatus, statuses, lessonPlan, etc. for the Lesson model.
     return new SharedLesson({

@@ -1,5 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { UserType } from '../../shared/models/UserType.js';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for role middleware
+const logger = createChildLogger('role-middleware');
 
 /**
  * Higher-order function to create role-checking middleware.
@@ -15,8 +19,8 @@ export const checkRole = (allowedRoles: UserType[]) => {
         if (!user || !user.userType) {
             // If user is not attached or doesn't have a userType, forbid access
             // This might also indicate an issue with authMiddleware
-            console.warn('checkRole: User or userType not found on request object.');
-            res.status(403).json({ error: 'Forbidden: Access denied.' });
+            logger.warn('checkRole: User or userType not found on request object.');
+            res.status(401).json({ error: 'Authentication required' });
             return;
         }
 
@@ -27,8 +31,8 @@ export const checkRole = (allowedRoles: UserType[]) => {
             next();
         } else {
             // User role is not in the allowed list, forbid access
-            console.warn(`checkRole: User with role '${userRole}' attempted to access restricted route. Allowed: ${allowedRoles.join(', ')}`);
-            res.status(403).json({ error: 'Forbidden: Insufficient permissions.' });
+            logger.warn(`checkRole: User with role '${userRole}' attempted to access restricted route. Allowed: ${allowedRoles.join(', ')}`);
+            res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
             return;
         }
     };

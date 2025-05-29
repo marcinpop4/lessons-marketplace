@@ -6,7 +6,8 @@ import axios, {
     AxiosError,
     AxiosRequestConfig
 } from 'axios';
-import { buildApiUrl } from './buildApiUrl';
+import { buildApiUrl } from './buildApiUrl.js';
+import clientLogger from '../utils/logger.js';
 
 // Define a more specific type for error response data
 interface ErrorResponseData {
@@ -32,7 +33,7 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     }
     if (config.url) {
         const fullUrl = buildApiUrl('', config.url);
-        console.debug('Making API request to:', fullUrl);
+        clientLogger.debug('Making API request', { url: fullUrl });
     }
     return config;
 }, (error: AxiosError) => {
@@ -44,11 +45,19 @@ apiClient.interceptors.response.use(
     async (error: AxiosError<ErrorResponseData>) => {
         const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-        // Log API errors (keeping this for debugging)
+        // Log API errors
         if (error.response) {
-            console.error(`API Error: ${error.response.status} - ${error.message} for URL: ${error.config?.url}`, error.response.data);
+            clientLogger.error('API Error Response', {
+                status: error.response.status,
+                message: error.message,
+                url: error.config?.url,
+                data: error.response.data
+            });
         } else {
-            console.error(`API Error: ${error.message} for URL: ${error.config?.url}`);
+            clientLogger.error('API Error No Response', {
+                message: error.message,
+                url: error.config?.url
+            });
         }
 
         // Skip token refresh for login endpoint and if we've already retried
@@ -75,7 +84,7 @@ apiClient.interceptors.response.use(
                     return apiClient(originalRequest);
                 }
             } catch (refreshError: any) {
-                console.error('Token refresh failed:', refreshError);
+                clientLogger.error('Token refresh failed', { error: refreshError });
                 // If refresh token itself fails with 401, or any other error, clear token and redirect
                 localStorage.removeItem('auth_token');
                 if (typeof window !== 'undefined' && !window.location.pathname.includes('/auth')) {

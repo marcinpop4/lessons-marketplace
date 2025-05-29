@@ -3,6 +3,12 @@ import { refreshTokenService } from './refreshToken.service.js';
 import authService from './auth.service.js';
 import { cookieOptions, REFRESH_TOKEN_COOKIE_NAME } from './auth.constants.js';
 import { UserType } from '../../shared/models/UserType.js';
+import jwt from 'jsonwebtoken';
+import { PrismaClient } from '@prisma/client';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for refresh token controller
+const logger = createChildLogger('refresh-token-controller');
 
 export class RefreshTokenController {
     async refreshAccessToken(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -55,9 +61,8 @@ export class RefreshTokenController {
                 accessToken,
             });
         } catch (error) {
-            console.error('Token refresh error:', error);
-            // Send 500 for unexpected errors during refresh
-            res.status(500).json({ error: 'Failed to refresh token' }); // Avoid leaking error details
+            logger.error('Token refresh error:', error);
+            res.status(500).json({ message: 'Internal server error' });
         }
     }
 }

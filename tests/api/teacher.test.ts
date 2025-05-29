@@ -89,7 +89,7 @@ describe('API Integration: /api/v1/teachers', () => {
             } catch (error: any) {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(400);
-                expect(error.response?.data?.message).toContain('Lesson type is required');
+                expect(error.response?.data?.error).toContain('Lesson type is required');
             }
         });
 
@@ -103,7 +103,7 @@ describe('API Integration: /api/v1/teachers', () => {
             } catch (error: any) {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(400);
-                expect(error.response?.data?.message).toContain('Limit parameter is required');
+                expect(error.response?.data?.error).toContain('Limit parameter is required');
             }
 
             // Case 2: Invalid limit (not a number)
@@ -115,7 +115,7 @@ describe('API Integration: /api/v1/teachers', () => {
             } catch (error: any) {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(400);
-                expect(error.response?.data?.message).toContain('Limit must be a positive number');
+                expect(error.response?.data?.error).toContain('Limit must be a positive number');
             }
 
             // Case 3: Invalid limit (zero)
@@ -127,7 +127,7 @@ describe('API Integration: /api/v1/teachers', () => {
             } catch (error: any) {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(400);
-                expect(error.response?.data?.message).toContain('Limit must be a positive number');
+                expect(error.response?.data?.error).toContain('Limit must be a positive number');
             }
 
             // Case 4: Invalid limit (negative)
@@ -139,7 +139,7 @@ describe('API Integration: /api/v1/teachers', () => {
             } catch (error: any) {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(400);
-                expect(error.response?.data?.message).toContain('Limit must be a positive number');
+                expect(error.response?.data?.error).toContain('Limit must be a positive number');
             }
         });
     });

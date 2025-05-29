@@ -3,6 +3,10 @@ import { studentService } from './student.service.js';
 import authService, { AuthMethod } from '../auth/auth.service.js';
 import { UserType } from '../../shared/models/UserType.js';
 import { AuthorizationError } from '../errors/index.js';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for student controller
+const logger = createChildLogger('student-controller');
 
 /**
  * Controller for student-related operations.
@@ -60,7 +64,7 @@ export const studentController = {
             res.status(201).json(user);
 
         } catch (error) {
-            console.error('Error in studentController.createStudent:', error);
+            logger.error('Error in studentController.createStudent:', error);
             // Check for the specific unique constraint error message from the service
             if (error instanceof Error && error.message.includes('already exists')) {
                 res.status(409).json({ message: error.message }); // Conflict
@@ -114,7 +118,7 @@ export const studentController = {
 
             res.status(200).json(student);
         } catch (error) {
-            console.error('Error in studentController.getStudentById:', error);
+            logger.error('Error in studentController.getStudentById:', error);
             // Pass error to the central error handler
             next(error);
         }

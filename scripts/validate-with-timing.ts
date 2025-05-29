@@ -1,3 +1,5 @@
+#!/usr/bin/env tsx
+
 import { execa } from 'execa';
 import { ChildProcess } from 'child_process';
 // @ts-ignore - Suppressing persistent type error despite @types/wait-on installation
@@ -6,11 +8,16 @@ import chalk from 'chalk';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+import { createChildLogger } from '../server/config/logger.js';
+
+// Create child logger for validation script
+const logger = createChildLogger('validation-script');
 
 // Determine the root directory based on script location
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '..'); // Assumes script is in ./scripts
+const __dirname = dirname(__filename);
+const projectRoot = resolve(__dirname, '..'); // Assumes script is in ./scripts
 
 // Load environment variables from .env.development
 dotenv.config({ path: path.resolve(projectRoot, 'env', '.env.development') });
@@ -42,7 +49,9 @@ const SERVER_URL = `http://localhost:${SERVER_PORT}`;
 const baseEnv = {
     ...process.env,
     NODE_NO_WARNINGS: '1',
-    SILENCE_PRISMA_EXPECTED_ERRORS: 'true'
+    SILENCE_PRISMA_EXPECTED_ERRORS: 'true',
+    // Suppress console logs during tests unless explicitly requested
+    SHOW_TEST_LOGS: process.env.SHOW_TEST_LOGS || 'false'
 };
 
 interface Step {
@@ -69,7 +78,7 @@ function formatDuration(duration: number): string {
 }
 
 async function runSetupStep(step: Step): Promise<number> {
-    console.log(chalk.blue(`\nRunning: ${step.name}`));
+    logger.info(`\nRunning: ${step.name}`);
     const startTime = Date.now();
 
     try {
@@ -77,7 +86,7 @@ async function runSetupStep(step: Step): Promise<number> {
         const endTime = Date.now();
         return endTime - startTime;
     } catch (error) {
-        console.error(chalk.red(`Error in step ${step.name}:`), error);
+        logger.error(`Error in step ${step.name}:`, error);
         process.exit(1);
     }
 }
@@ -88,7 +97,7 @@ async function runTestCommand(
     title: string
 ): Promise<{ duration: number; failed: boolean }> {
     const startTime = Date.now();
-    console.log(chalk.blue(`\n---> Running: ${title} (${command} ${args.join(' ')})...`));
+    logger.info(`\n---> Running: ${title} (${command} ${args.join(' ')})...`);
 
     try {
         const subprocess = execa(command, args, {
@@ -98,11 +107,11 @@ async function runTestCommand(
         });
         const result = await subprocess;
         const endTime = Date.now();
-        console.log(chalk.green(`---> Finished: ${title} (Success)`));
+        logger.info(`---> Finished: ${title} (Success)`);
         return { duration: endTime - startTime, failed: false };
     } catch (error: any) {
         const endTime = Date.now();
-        console.error(chalk.red(`---> Failed: ${title}`));
+        logger.error(`---> Failed: ${title}`);
         return { duration: endTime - startTime, failed: true };
     }
 }
@@ -111,17 +120,17 @@ async function runTestCommand(
 const killProcesses = async () => {
     const killPromises: Promise<any>[] = [];
     if (serverProcess && !serverProcess.killed) {
-        console.log(chalk.yellow('Attempting to kill server process...'));
+        logger.warn('Attempting to kill server process...');
         serverProcess.kill('SIGTERM');
-        killPromises.push(serverProcess.catch((e: Error) => console.error(chalk.red('Error killing server process:', e.message))));
+        killPromises.push(serverProcess.catch((e: Error) => logger.error('Error killing server process:', e.message)));
     }
     if (frontendProcess && !frontendProcess.killed) {
-        console.log(chalk.yellow('Attempting to kill frontend process...'));
+        logger.warn('Attempting to kill frontend process...');
         frontendProcess.kill('SIGTERM');
-        killPromises.push(frontendProcess.catch((e: Error) => console.error(chalk.red('Error killing frontend process:', e.message))));
+        killPromises.push(frontendProcess.catch((e: Error) => logger.error('Error killing frontend process:', e.message)));
     }
     await Promise.allSettled(killPromises);
-    console.log(chalk.yellow('Background processes cleanup attempted.'));
+    logger.warn('Background processes cleanup attempted.');
 };
 
 async function runTests(): Promise<{ unitTime: number; apiTime: number; e2eTime: number; failed: boolean }> {
@@ -129,7 +138,7 @@ async function runTests(): Promise<{ unitTime: number; apiTime: number; e2eTime:
 
     // Trap exit signals to ensure cleanup
     const cleanupAndExit = async (signal: NodeJS.Signals) => {
-        console.log(chalk.yellow(`\nReceived ${signal}. Cleaning up...`));
+        logger.warn(`\nReceived ${signal}. Cleaning up...`);
         await killProcesses();
         process.exit(1);
     };
@@ -142,7 +151,7 @@ async function runTests(): Promise<{ unitTime: number; apiTime: number; e2eTime:
         if (unitResult.failed) finalExitCode = 1;
 
         // 2. Start Server and Frontend in background
-        console.log(chalk.blue('\n---> Starting background services...'));
+        logger.info(`\n---> Starting background services...`);
         const servicesStartTime = Date.now();
 
         serverProcess = execa('pnpm', ['run', 'dev:server:no-watch'], { stdio: ['inherit', 'inherit', 'ignore'], env: baseEnv });
@@ -151,14 +160,14 @@ async function runTests(): Promise<{ unitTime: number; apiTime: number; e2eTime:
 
         // Handle potential early exit of background processes
         serverProcess.catch((e: Error) => {
-            if (!serverProcess?.killed) console.error(chalk.red('Server process exited unexpectedly:'), e.message);
+            if (!serverProcess?.killed) logger.error('Server process exited unexpectedly:', e.message);
         });
         frontendProcess.catch((e: Error) => {
-            if (!frontendProcess?.killed) console.error(chalk.red('Frontend process exited unexpectedly:'), e.message);
+            if (!frontendProcess?.killed) logger.error('Frontend process exited unexpectedly:', e.message);
         });
 
         // 3. Wait for services
-        console.log(chalk.blue(`\n---> Waiting for services (Server: ${SERVER_URL}, Frontend: ${FRONTEND_URL})...`));
+        logger.info(`\n---> Waiting for services (Server: ${SERVER_URL}, Frontend: ${FRONTEND_URL})...`);
         try {
             await waitOn({
                 resources: [
@@ -173,9 +182,9 @@ async function runTests(): Promise<{ unitTime: number; apiTime: number; e2eTime:
             });
             const servicesEndTime = Date.now();
             const servicesDuration = servicesEndTime - servicesStartTime;
-            console.log(chalk.green(`Services are ready (took ${formatDuration(servicesDuration)}).`));
+            logger.info(`Services are ready (took ${formatDuration(servicesDuration)}).`);
         } catch (err) {
-            console.error(chalk.red('Services did not start in time.'), err);
+            logger.error('Services did not start in time.', err);
             throw new Error('Services failed to start');
         }
 
@@ -198,7 +207,7 @@ async function runTests(): Promise<{ unitTime: number; apiTime: number; e2eTime:
         };
 
     } catch (error: any) {
-        console.error(chalk.red(`\n--- An error occurred during test execution ---`));
+        logger.error(`\n--- An error occurred during test execution ---`);
         await killProcesses();
         return {
             unitTime: 0,
@@ -210,7 +219,7 @@ async function runTests(): Promise<{ unitTime: number; apiTime: number; e2eTime:
 }
 
 async function main() {
-    console.log(chalk.green('Starting validation process...\n'));
+    logger.info('Starting validation process...\n');
 
     const setupTimings: { name: string; duration: number }[] = [];
     let setupTime = 0;
@@ -228,35 +237,35 @@ async function main() {
     const totalTime = setupTime + testTime;
 
     // Print timing report
-    console.log(chalk.green('\n=== Validation Timing Report ==='));
+    logger.info('\n=== Validation Timing Report ===');
 
     // Setup steps
-    console.log(chalk.yellow('\nSetup steps:'));
+    logger.info('\nSetup steps:');
     setupTimings.forEach(({ name, duration }) => {
-        console.log(chalk.cyan(`${name}: ${formatDuration(duration)}`));
+        logger.info(`${name}: ${formatDuration(duration)}`);
     });
-    console.log(chalk.magenta(`Total setup time: ${formatDuration(setupTime)}`));
+    logger.info(`Total setup time: ${formatDuration(setupTime)}`);
 
     // Test execution
-    console.log(chalk.yellow('\nTest execution:'));
-    console.log(chalk.cyan(`Unit tests: ${formatDuration(testResults.unitTime)}`));
-    console.log(chalk.cyan(`API tests: ${formatDuration(testResults.apiTime)}`));
-    console.log(chalk.cyan(`E2E tests: ${formatDuration(testResults.e2eTime)}`));
-    console.log(chalk.magenta(`Total test time: ${formatDuration(testTime)}`));
+    logger.info('\nTest execution:');
+    logger.info(`Unit tests: ${formatDuration(testResults.unitTime)}`);
+    logger.info(`API tests: ${formatDuration(testResults.apiTime)}`);
+    logger.info(`E2E tests: ${formatDuration(testResults.e2eTime)}`);
+    logger.info(`Total test time: ${formatDuration(testTime)}`);
 
     // Overall summary
-    console.log(chalk.green('\nOverall summary:'));
-    console.log(chalk.cyan(`Total execution time: ${formatDuration(totalTime)}`));
+    logger.info('\nOverall summary:');
+    logger.info(`Total execution time: ${formatDuration(totalTime)}`);
 
     if (testResults.failed) {
-        console.log(chalk.red.bold('\n❌ Validation failed.'));
+        logger.error('\n❌ Validation failed.');
         process.exit(1);
     } else {
-        console.log(chalk.green.bold('\n✅ Validation completed successfully!'));
+        logger.info('\n✅ Validation completed successfully!');
     }
 }
 
 main().catch((error) => {
-    console.error(chalk.red('Fatal error:'), error);
+    logger.error('Fatal error:', error);
     process.exit(1);
 }); 

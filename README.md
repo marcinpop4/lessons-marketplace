@@ -2,6 +2,16 @@
 
 This project is a platform for connecting students and parents with 1:1 instructors.
 
+## Features
+
+- **Full-stack TypeScript** application with React frontend and Node.js backend
+- **Real-time learning objectives** with AI-powered recommendations
+- **Comprehensive user management** for students and teachers
+- **Lesson scheduling and quote system** for flexible booking
+- **Unified logging system** with Pino for production monitoring
+- **Docker containerization** for consistent deployment
+- **CI/CD pipeline** with GitHub Actions
+
 ## Development Setup
 
 Follow these steps to set up your local development environment.
@@ -66,6 +76,41 @@ NODE_ENV=development pnpm dev:full
 This will start:
 - Frontend: `http://localhost:5173`
 - Backend API: `http://localhost:3000`
+
+## Logging System
+
+This project includes a comprehensive logging system that captures both server-side and client-side events for monitoring and debugging.
+
+### Features
+- **High-performance structured logging** with Pino (replaces Morgan)
+- **Client-side error tracking** and user behavior analytics
+- **Request correlation** via unique request IDs
+- **Automatic log aggregation** from frontend to backend
+- **Security-first approach** with automatic data redaction
+
+### Quick Start
+The logging system is automatically enabled and requires no configuration for basic usage:
+
+```typescript
+// Server-side (automatic)
+import { logger } from './config/logger.js';
+logger.info('Application event', { userId: '123', action: 'login' });
+
+// Client-side (automatic)
+import logger from '@frontend/utils/logger';
+logger.info('User action', { page: '/dashboard', action: 'click' });
+```
+
+### Documentation
+For detailed information about the logging system, see:
+- **[Logging System Documentation](docs/logging-system.md)** - Complete guide and examples
+- **[API Documentation](http://localhost:3000/api-docs)** - Swagger docs including logging endpoints
+
+### Log Files
+In development, logs are written to:
+- `logs/app.log` - All application logs
+- `logs/errors.log` - Error logs only
+- Console output with pretty formatting
 
 ## Running with Docker
 

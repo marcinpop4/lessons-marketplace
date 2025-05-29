@@ -21,6 +21,10 @@ import { UserType as SharedUserType } from '../../shared/models/UserType.js';
 import { teacherService } from '../teacher/teacher.service.js';
 import { v4 as uuidv4 } from 'uuid';
 import { LessonQuoteStatus } from '../../shared/models/LessonQuoteStatus.js';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for lesson quote service
+const logger = createChildLogger('lesson-quote-service');
 
 // Define Prisma types for includes required by mapper methods
 // Type for Teacher with nested rates
@@ -146,7 +150,7 @@ class LessonQuoteService {
                 // Example: A quote might already exist for this teacher/request combination?
                 throw new ConflictError('A quote for this teacher and lesson request may already exist.');
             }
-            console.error("Error in LessonQuoteService.create:", error);
+            logger.error("Error in LessonQuoteService.create:", error);
             // Rethrow other errors (BadRequest, AppError, generic errors)
             throw error;
         }
@@ -171,7 +175,7 @@ class LessonQuoteService {
             targetTeachers = await teacherService.findTeachersByLessonType(lessonRequest.type, 5); // Use passed lessonType
 
             if (targetTeachers.length === 0) {
-                console.log(`No available teachers found for lesson type: ${lessonRequest.type}`); // Use passed lessonType
+                logger.info(`No available teachers found for lesson type: ${lessonRequest.type}`); // Use passed lessonType
                 return []; // Return empty array if no teachers are found/available
             }
         }
@@ -187,7 +191,7 @@ class LessonQuoteService {
                 this.create(lessonRequest, teacher) // Pass lessonType
                     .catch(error => {
                         // Log specific error (e.g., BadRequestError if rate is missing/inactive for *this* teacher)
-                        console.error(`Failed to create quote for teacher ${teacher.id} and request ${lessonRequest.id}:`, error.message || error);
+                        logger.error(`Failed to create quote for teacher ${teacher.id} and request ${lessonRequest.id}:`, error.message || error);
                         return null; // Return null on failure for filtering later
                     })
             );
@@ -278,7 +282,7 @@ class LessonQuoteService {
             });
             return quote;
         } catch (error) {
-            console.error(
+            logger.error(
                 `Error fetching quote ${quoteId} for update check:`,
                 error
             );
@@ -458,7 +462,7 @@ class LessonQuoteService {
                 throw error;
             }
             // Log and wrap unknown errors
-            console.error(`Unexpected error updating status for quote ${quoteId} to ${newStatus}:`, error);
+            logger.error(`Unexpected error updating status for quote ${quoteId} to ${newStatus}:`, error);
             throw new AppError(`Failed to update quote status: ${error instanceof Error ? error.message : 'Unknown error'}`, 500);
         }
     }

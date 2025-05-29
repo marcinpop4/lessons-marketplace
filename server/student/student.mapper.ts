@@ -1,5 +1,9 @@
-import type { Student as DbStudent } from '@prisma/client';
+import { Student as DbStudent } from '@prisma/client';
 import { Student } from '../../shared/models/Student.js';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for student mapper
+const logger = createChildLogger('student-mapper');
 
 /**
  * Maps between Prisma Student objects and shared Student models.
@@ -13,12 +17,13 @@ export class StudentMapper {
      */
     public static toModel(dbStudent: any): Student {
         try {
-            const { id, firstName, lastName, email, phoneNumber, dateOfBirth, isActive, createdAt, updatedAt } = dbStudent;
+            const { id, firstName, lastName, email, phoneNumber, dateOfBirth: originalDateOfBirth, isActive, createdAt, updatedAt } = dbStudent;
 
-            // Ensure date is a Date object
-            const safeDateOfBirth = dateOfBirth ? new Date(dateOfBirth) : new Date(); // Provide a default if null/undefined
-            if (isNaN(safeDateOfBirth.getTime())) {
-                console.warn(`Invalid dateOfBirth received for student ${id}. Using current date as fallback.`);
+            // Handle invalid dateOfBirth fallback (log warning)
+            let safeDateOfBirth = originalDateOfBirth;
+            if (!(originalDateOfBirth instanceof Date) || isNaN(originalDateOfBirth.getTime())) {
+                logger.warn(`Invalid dateOfBirth received for student ${id}. Using current date as fallback.`);
+                safeDateOfBirth = new Date(); // Fallback to current date
             }
 
             // Construct the shared model instance
@@ -28,13 +33,13 @@ export class StudentMapper {
                 lastName,
                 email,
                 phoneNumber,
-                dateOfBirth: safeDateOfBirth, // Use safe date
+                dateOfBirth: safeDateOfBirth,
                 isActive: isActive ?? true, // Default to active if not specified
                 createdAt: createdAt ?? undefined,
                 updatedAt: updatedAt ?? undefined
             });
         } catch (error: unknown) {
-            console.error('Error in StudentMapper.toModel:', error);
+            logger.error('Error in StudentMapper.toModel:', { error });
             throw new Error(`Failed to transform Student: ${error instanceof Error ? error.message : String(error)}`);
         }
     }

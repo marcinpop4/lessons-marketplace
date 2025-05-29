@@ -1,11 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for auth middleware
+const logger = createChildLogger('auth-middleware');
 
 // Test comment
 const JWT_SECRET = process.env.JWT_SECRET;
 
 if (!JWT_SECRET) {
-    console.error('FATAL ERROR: JWT_SECRET is not defined in environment variables.');
+    logger.error('FATAL ERROR: JWT_SECRET is not defined in environment variables.');
     process.exit(1); // Exit if the secret is missing
 }
 
@@ -22,7 +26,7 @@ const authMiddleware = (req: Request, res: Response, next: NextFunction): void =
     // Check if the request is for the SSE stream route
     if (!token && req.query.token && typeof req.query.token === 'string') {
         // Be cautious about where this token comes from and if it's logged.
-        console.log("[Auth] Using token from query parameter for SSE."); // Add log for visibility
+        logger.debug("[Auth] Using token from query parameter for SSE."); // Add log for visibility
         token = req.query.token;
     }
 
@@ -46,7 +50,7 @@ const authMiddleware = (req: Request, res: Response, next: NextFunction): void =
             res.status(401).json({ error: 'Unauthorized: Invalid token.' });
             return;
         }
-        console.error('Auth Middleware Error:', error);
+        logger.error('Auth Middleware Error:', error);
         res.status(401).json({ error: 'Unauthorized.' });
         return;
     }

@@ -2,6 +2,10 @@ import OpenAI from 'openai';
 import { Stream } from 'openai/streaming';
 import { ChatCompletionChunk } from 'openai/resources/chat/completions';
 import chalk from 'chalk';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for AI stream utilities
+const logger = createChildLogger('ai-stream');
 
 // Determine if detailed logging is enabled (consider moving to a shared config/env reader)
 const LOG_STREAMING_DETAILS = true;
@@ -46,17 +50,17 @@ export async function* logAndYieldAiStream<T>(
     const logPrefix = chalk.cyan(logContext);
 
     if (LOG_STREAMING_DETAILS) {
-        console.log(`${logPrefix} ${chalk.blue('System Prompt:')}\n${chalk.greenBright(systemPrompt)}`);
-        console.log(`${logPrefix} ${chalk.blue('User Prompt:')}\n${chalk.greenBright(userPrompt)}`);
+        logger.debug(`${logPrefix} ${chalk.blue('System Prompt:')}\n${chalk.greenBright(systemPrompt)}`);
+        logger.debug(`${logPrefix} ${chalk.blue('User Prompt:')}\n${chalk.greenBright(userPrompt)}`);
     }
 
-    console.log(`${logPrefix} Requesting stream from OpenAI.`);
+    logger.info(`${logPrefix} Requesting stream from OpenAI.`);
     let stream: Stream<ChatCompletionChunk>;
     try {
         stream = await aiStreamProvider();
-        console.log(`${logPrefix} ${chalk.green('OpenAI stream initiated.')}`);
+        logger.info(`${logPrefix} ${chalk.green('OpenAI stream initiated.')}`);
     } catch (error) {
-        console.error(`${logPrefix} ${chalk.red('Failed to initiate OpenAI stream:')}`, error);
+        logger.error(`${logPrefix} ${chalk.red('Failed to initiate OpenAI stream:')}`, { error });
         throw new Error(`Failed to initiate AI stream: ${error instanceof Error ? error.message : String(error)}`);
     }
 
@@ -79,7 +83,7 @@ export async function* logAndYieldAiStream<T>(
                     if (parsedObject) {
                         if (!objectValidator || objectValidator(parsedObject)) {
                             if (LOG_STREAMING_DETAILS) {
-                                console.log(`\n${logPrefix} ${chalk.magenta('Successfully parsed and yielding object:')} ${chalk.yellow(JSON.stringify(parsedObject))}`);
+                                logger.debug(`\n${logPrefix} ${chalk.magenta('Successfully parsed and yielding object:')} ${chalk.yellow(JSON.stringify(parsedObject))}`);
                             }
                             yield parsedObject;
                             itemsSent++;
@@ -87,14 +91,14 @@ export async function* logAndYieldAiStream<T>(
 
                             if (maxItems && itemsSent >= maxItems) {
                                 if (LOG_STREAMING_DETAILS) {
-                                    console.log(`\n${logPrefix} ${chalk.yellow('Reached target count')} (${maxItems}), aborting OpenAI stream.`);
+                                    logger.info(`\n${logPrefix} ${chalk.yellow('Reached target count')} (${maxItems}), aborting OpenAI stream.`);
                                 }
                                 stream.controller.abort();
                                 break;
                             }
                         } else {
                             if (LOG_STREAMING_DETAILS) {
-                                console.warn(`\n${logPrefix} ${chalk.yellow('Parsed object failed validation:')} ${chalk.gray(JSON.stringify(parsedObject))}`);
+                                logger.warn(`\n${logPrefix} ${chalk.yellow('Parsed object failed validation:')} ${chalk.gray(JSON.stringify(parsedObject))}`);
                             }
                             buffer = remainingBuffer;
                         }
@@ -104,7 +108,7 @@ export async function* logAndYieldAiStream<T>(
                     }
                 } catch (parseError) {
                     if (LOG_STREAMING_DETAILS) {
-                        console.warn(`\n${logPrefix} ${chalk.yellow('Warning during object assembly/parsing:')} ${chalk.red(parseError instanceof Error ? parseError.message : parseError)}. Buffer: ${chalk.gray(buffer.substring(0, 100))}...`);
+                        logger.warn(`\n${logPrefix} ${chalk.yellow('Warning during object assembly/parsing:')} ${chalk.red(parseError instanceof Error ? parseError.message : parseError)}. Buffer: ${chalk.gray(buffer.substring(0, 100))}...`);
                     }
                     break;
                 }
@@ -114,14 +118,14 @@ export async function* logAndYieldAiStream<T>(
             }
         }
     } catch (streamError) {
-        console.error(`${logPrefix} ${chalk.red('Error processing AI stream:')}`, streamError);
+        logger.error(`${logPrefix} ${chalk.red('Error processing AI stream:')}`, { error: streamError });
         throw streamError;
     } finally {
         if (LOG_STREAMING_DETAILS) {
             process.stdout.write('\n');
-            console.log(`${logPrefix} ${chalk.green('OpenAI stream processing finished.')} Sent ${chalk.blue(itemsSent)} items.`);
+            logger.info(`${logPrefix} ${chalk.green('OpenAI stream processing finished.')} Sent ${chalk.blue(itemsSent)} items.`);
             if (buffer.trim().length > 0) {
-                console.log(`${logPrefix} ${chalk.yellow('Remaining buffer content after loop:')} ${chalk.gray(buffer)}`);
+                logger.debug(`${logPrefix} ${chalk.yellow('Remaining buffer content after loop:')} ${chalk.gray(buffer)}`);
             }
         }
     }

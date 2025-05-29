@@ -3,7 +3,7 @@ import { Objective } from '../../shared/models/Objective.js';
 import { ObjectiveStatus, ObjectiveStatusValue, ObjectiveStatusTransition } from '../../shared/models/ObjectiveStatus.js';
 import { LessonType } from '../../shared/models/LessonType.js';
 import { mapPrismaObjectiveToObjective, mapPrismaObjectivesToObjectives } from './objective.mapper.js';
-import { NotFoundError, BadRequestError } from '../errors/index.js';
+import { NotFoundError, BadRequestError, AppError } from '../errors/index.js';
 import { studentService } from '../student/student.service.js';
 import OpenAI from 'openai';
 import { Response } from 'express';
@@ -16,6 +16,11 @@ import { ChatCompletionChunk } from 'openai/resources/chat/completions'; // Impo
 import { lessonService } from '../lesson/lesson.service.js'; // Import lessonService
 import { Lesson } from '../../shared/models/Lesson.js'; // Import Lesson model
 import { LessonStatusValue } from '../../shared/models/LessonStatus.js';
+import { v4 as uuidv4 } from 'uuid';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for objective service
+const logger = createChildLogger('objective-service');
 
 // Define the recommendation count constant
 const DEFAULT_RECOMMENDATION_COUNT = 6;
@@ -66,10 +71,16 @@ const _prepareObjectivePrompts = (
  * Parses and validates the raw string response from OpenAI into an array of ObjectiveRecommendations.
  */
 const _parseAndValidateObjectiveRecommendations = (responseText: string | null | undefined): ObjectiveRecommendation[] => {
-    if (!responseText) { console.warn('[ObjectiveService] OpenAI response was empty.'); return []; }
+    if (!responseText) {
+        logger.warn('[ObjectiveService] OpenAI response was empty.');
+        return [];
+    }
     try {
         const parsed = JSON.parse(responseText);
-        if (!Array.isArray(parsed)) { console.warn('[ObjectiveService] OpenAI response was not a JSON array:', parsed); return []; }
+        if (!Array.isArray(parsed)) {
+            logger.warn('[ObjectiveService] OpenAI response was not a JSON array:', parsed);
+            return [];
+        }
         const recommendations: ObjectiveRecommendation[] = [];
         for (const item of parsed) {
             if (item && typeof item.title === 'string' && typeof item.description === 'string') {
@@ -88,7 +99,11 @@ const _parseAndValidateObjectiveRecommendations = (responseText: string | null |
             }
         }
         return recommendations;
-    } catch (error) { console.error('[ObjectiveService] Error parsing OpenAI response:', error); console.error('[ObjectiveService] Raw OpenAI response:', responseText); return []; }
+    } catch (error) {
+        logger.error('[ObjectiveService] Error parsing OpenAI response:', error);
+        logger.error('[ObjectiveService] Raw OpenAI response:', responseText);
+        return [];
+    }
 };
 
 class ObjectiveService {
@@ -189,8 +204,8 @@ class ObjectiveService {
         });
 
         if (!newObjectiveResult.currentStatus) {
-            console.error(`[ObjectiveService] Failed to retrieve currentStatus for newly created objective ${newObjectiveResult.id}`);
-            throw new Error("Failed to create objective with status.");
+            logger.error(`[ObjectiveService] Failed to retrieve currentStatus for newly created objective ${newObjectiveResult.id}`);
+            throw new AppError('Created objective is missing status information.', 500);
         }
         // Use module-scoped mapper
         return mapPrismaObjectiveToObjective(newObjectiveResult);
@@ -259,8 +274,8 @@ class ObjectiveService {
         });
 
         if (!updatedObjective.currentStatus) {
-            console.error(`[ObjectiveService] Failed to retrieve currentStatus for updated objective ${objectiveId}`);
-            throw new Error("Failed to update objective status.");
+            logger.error(`[ObjectiveService] Failed to retrieve currentStatus for updated objective ${objectiveId}`);
+            throw new AppError('Updated objective is missing status information.', 500);
         }
         // Use module-scoped mapper
         return mapPrismaObjectiveToObjective(updatedObjective);
@@ -277,7 +292,7 @@ class ObjectiveService {
         lessonType: LessonType // Now required
     ): AsyncGenerator<ObjectiveRecommendation, void, unknown> {
         const logContext = `[Objective Stream S:${studentId} T:${lessonType}]`; // Include type in context
-        console.log(`${logContext} Preparing objective stream generator.`);
+        logger.info(`${logContext} Preparing objective stream generator.`);
 
         // --- Prepare Prompts & Provider --- 
         const preparePromptsAndProvider = async () => {
@@ -385,8 +400,8 @@ class ObjectiveService {
                     maxItems: DEFAULT_RECOMMENDATION_COUNT
                 });
             } catch (prepError) {
-                console.error(`${logContext} Error preparing prompts for AI stream:`, prepError);
-                throw prepError;
+                logger.error(`${logContext} Error preparing prompts for AI stream:`, prepError);
+                throw new AppError('Failed to prepare AI prompts for recommendation streaming.', 500);
             }
         }
         return invokeUtility();
@@ -411,7 +426,8 @@ class ObjectiveService {
 
         // Use the standard SSE utility
         await streamJsonResponse(res, generator, (error) => {
-            console.error(`[Objective Service] Error during objective recommendation streaming for student ${studentId}, type ${lessonType}:`, error);
+            logger.error(`[Objective Service] Error during objective recommendation streaming for student ${studentId}, type ${lessonType}:`, error);
+            throw new AppError('Failed to generate objective recommendations.', 500);
         });
     }
 }

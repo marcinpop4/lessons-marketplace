@@ -1,4 +1,9 @@
+import { LessonStatus as PrismaLessonStatus } from '@prisma/client';
 import { LessonStatus, LessonStatusValue } from '../../shared/models/LessonStatus.js';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for lesson status mapper
+const logger = createChildLogger('lesson-status-mapper');
 
 // Define the JsonValue type locally, mirroring the Prisma definition
 type JsonValue =
@@ -31,13 +36,13 @@ export class LessonStatusMapper {
         try {
             const { id, lessonId, status, context, createdAt } = dbStatus;
 
-            // Validate status value against the shared enum
-            const statusValue = Object.values(LessonStatusValue).includes(status as LessonStatusValue)
-                ? status as LessonStatusValue
-                : LessonStatusValue.REQUESTED; // Default value
-
-            if (statusValue !== status) {
-                console.warn(`Invalid status value '${status}' received from DB for status ID ${id}. Defaulting to ${statusValue}.`);
+            // Validate and cast the status value
+            let statusValue: LessonStatusValue;
+            if (!Object.values(LessonStatusValue).includes(status as LessonStatusValue)) {
+                logger.warn(`Invalid status value '${status}' received from DB for status ID ${id}. Defaulting to REQUESTED.`);
+                statusValue = LessonStatusValue.REQUESTED; // Default fallback
+            } else {
+                statusValue = status as LessonStatusValue;
             }
 
             // Construct the shared model instance
@@ -49,7 +54,7 @@ export class LessonStatusMapper {
                 createdAt: createdAt ?? undefined
             });
         } catch (error: unknown) {
-            console.error('Error in LessonStatusMapper.toModel:', error);
+            logger.error('Error in LessonStatusMapper.toModel:', { error });
             throw new Error(`Failed to transform LessonStatus: ${error instanceof Error ? error.message : String(error)}`);
         }
     }

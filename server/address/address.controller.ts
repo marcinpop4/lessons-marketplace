@@ -1,6 +1,11 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { addressService } from './address.service.js';
-import { BadRequestError } from '../errors/index.js';
+import { UserType } from '../../shared/models/UserType.js';
+import { BadRequestError, NotFoundError, AuthorizationError } from '../errors/index.js';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for address controller
+const logger = createChildLogger('address-controller');
 
 /**
  * Controller for address-related operations
@@ -11,29 +16,20 @@ export const addressController = {
    * @param req Request with id as a route parameter
    * @param res Response
    */
-  getAddressById: async (req: Request, res: Response): Promise<void> => {
+  getAddressById: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
 
       const address = await addressService.findById(id);
 
       if (!address) {
-        res.status(404).json({
-          message: `Address with ID ${id} not found.`
-        });
-        return;
+        throw new NotFoundError(`Address with ID ${id} not found.`);
       }
 
       res.status(200).json(address);
     } catch (error) {
-      if (error instanceof BadRequestError) {
-        res.status(400).json({ message: error.message });
-      } else {
-        console.error('Error fetching address:', error);
-        res.status(500).json({
-          message: 'An internal error occurred while fetching the address',
-        });
-      }
+      logger.error('Error fetching address:', { error });
+      next(error);
     }
   },
 
@@ -42,20 +38,14 @@ export const addressController = {
    * @param req Request with address data in the body
    * @param res Response
    */
-  createAddress: async (req: Request, res: Response): Promise<void> => {
+  createAddress: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const newAddress = await addressService.create(req.body);
 
       res.status(201).json(newAddress);
     } catch (error) {
-      if (error instanceof BadRequestError) {
-        res.status(400).json({ message: error.message });
-      } else {
-        console.error('Error creating address:', error);
-        res.status(500).json({
-          message: 'An internal error occurred while creating the address',
-        });
-      }
+      logger.error('Error creating address:', { error });
+      next(error);
     }
   }
 }; 

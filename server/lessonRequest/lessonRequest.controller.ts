@@ -5,6 +5,10 @@ import { LessonType } from '../../shared/models/LessonType.js'; // Import Lesson
 import { UserType } from '../../shared/models/UserType.js';
 // Import all required errors from the central index file
 import { AuthorizationError, BadRequestError, NotFoundError } from '../errors/index.js';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for lesson request controller
+const logger = createChildLogger('lesson-request-controller');
 
 export class LessonRequestController {
   constructor() {
@@ -125,7 +129,7 @@ export class LessonRequestController {
       // Return model directly
       res.json(lessonRequest);
     } catch (error) {
-      console.error('Error fetching lesson request:', error);
+      logger.error('Error fetching lesson request:', { error });
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       // Use next(error) to let the central error handler manage responses
       next(error);

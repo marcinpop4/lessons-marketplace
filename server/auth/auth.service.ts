@@ -6,13 +6,17 @@ import { studentService } from '../student/student.service.js';
 import { teacherService } from '../teacher/teacher.service.js';
 import { refreshTokenService } from './refreshToken.service.js';
 import { passwordService } from './password.service.js'; // Import the new PasswordService
-import { AppError, DuplicateEmailError, BadRequestError } from '../errors/index.js';
+import { AppError, DuplicateEmailError, BadRequestError, NotFoundError, AuthorizationError } from '../errors/index.js';
 import { UserType as SharedUserType } from '../../shared/models/UserType.js';
 import { AuthMethodType as SharedAuthMethodType } from '../../shared/models/AuthMethodType.js';
 import { authMethodService } from './auth-method.service.js'; // Import the new auth method service
 import { UserType as PrismaUserType, Teacher as DbTeacher, Student as DbStudent, Prisma } from '@prisma/client';
 import { UserType } from '../../shared/models/UserType.js';
 import { isUuid } from '../utils/validation.utils.js';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for auth service
+const logger = createChildLogger('auth-service');
 
 // Define AuthMethod as an enum
 export enum AuthMethod {
@@ -246,7 +250,7 @@ class AuthService {
       if (error instanceof AppError && error.isOperational) {
         throw error;
       }
-      console.error('Unexpected error during registration transaction:', error);
+      logger.error('Unexpected error during registration transaction:', error);
       if (error instanceof Error) {
         throw new Error(`Registration failed transactionally: ${error.message}`);
       }
@@ -274,25 +278,30 @@ class AuthService {
       }
       return decoded;
     } catch (error: any) {
-      console.error("JWT Verification Error:", error.message || error);
-      throw new Error('Invalid or expired token');
+      logger.error("JWT Verification Error:", error.message || error);
+      throw new AuthorizationError('Invalid or expired token.');
     }
   }
 
   // Fetches user and returns shared model instance
   async getUserByIdAndType(id: string, userType: SharedUserType): Promise<Student | Teacher | null> {
+    if (!Object.values(UserType).includes(userType as UserType)) {
+      logger.warn(`getUserByIdAndType called with invalid userType: ${userType}`);
+      return null;
+    }
+
     try {
       if (userType === SharedUserType.STUDENT) {
         return studentService.findById(id);
       } else if (userType === SharedUserType.TEACHER) {
         return teacherService.findById(id);
       } else {
-        console.warn(`getUserByIdAndType called with invalid userType: ${userType}`);
+        // This case is already handled above with logger.warn
         return null;
       }
     } catch (error) {
-      console.error(`Error fetching user ${id} (${userType}):`, error);
-      throw new Error('Failed to fetch user data');
+      logger.error(`Error fetching user ${id} (${userType}):`, error);
+      throw error;
     }
   }
 }

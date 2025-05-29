@@ -1,5 +1,9 @@
 import express, { Router, Request, Response, NextFunction } from 'express';
 import prisma from '../prisma.js'; // Already has .js
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for health routes
+const logger = createChildLogger('health-routes');
 
 const router: Router = express.Router();
 
@@ -44,7 +48,7 @@ router.get('/', async (_req, res) => {
       message: 'Server is running and database is connected'
     });
   } catch (error) {
-    console.error('Health check failed:', error);
+    logger.error('Health check failed:', error);
     res.status(500).json({
       status: 'error',
       timestamp: new Date().toISOString(),

@@ -3,6 +3,10 @@ import { Objective, ObjectiveProps } from '../../shared/models/Objective.js';
 import { ObjectiveStatus, ObjectiveStatusValue } from '../../shared/models/ObjectiveStatus.js';
 import { LessonType } from '../../shared/models/LessonType.js';
 import { JsonValue } from '../../shared/types/JsonTypes.js';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for objective mapper
+const logger = createChildLogger('objective-mapper');
 
 // Updated type alias: student relation is no longer required here
 type PrismaObjectiveWithStatus = PrismaObjective & {
@@ -14,8 +18,8 @@ type PrismaObjectiveWithStatus = PrismaObjective & {
  */
 export const mapPrismaObjectiveToObjective = (prismaObjective: PrismaObjectiveWithStatus): Objective => {
     if (!prismaObjective.currentStatus) {
-        console.error(`[ObjectiveMapper] Objective ${prismaObjective.id} is missing currentStatus relation.`);
-        throw new Error(`Objective ${prismaObjective.id} is missing its current status.`);
+        logger.error(`[ObjectiveMapper] Objective ${prismaObjective.id} is missing currentStatus relation.`);
+        throw new Error(`Objective ${prismaObjective.id} has no currentStatus. Data integrity issue.`);
     }
 
     const currentStatus = new ObjectiveStatus({

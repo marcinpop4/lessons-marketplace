@@ -1,5 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 import prisma from '../prisma.js'; // Adjust path if needed
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for util service
+const logger = createChildLogger('util-service');
 
 class UtilService {
     private readonly prisma: PrismaClient = prisma;
@@ -9,7 +13,7 @@ class UtilService {
      * Uses direct Prisma access specifically for this seed/testing cleanup task.
      */
     async clearDatabase(): Promise<void> {
-        console.log('Clearing database...');
+        logger.info('Clearing database...');
         try {
             await this.prisma.$transaction([
                 // Delete records that depend on others first
@@ -38,9 +42,9 @@ class UtilService {
                 this.prisma.teacher.deleteMany(),
                 this.prisma.student.deleteMany(),
             ]);
-            console.log('Database cleared successfully.');
+            logger.info('Database cleared successfully.');
         } catch (error) {
-            console.error("Error clearing database:", error);
+            logger.error("Error clearing database:", error);
             throw new Error(`Database clearing failed: ${error instanceof Error ? error.message : String(error)}`);
         }
     }

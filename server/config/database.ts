@@ -11,6 +11,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import { createChildLogger } from './logger.js';
 
 /**
  * Load environment variables from a specific path
@@ -26,6 +27,9 @@ export const loadEnvFromPath = (envPath?: string): void => {
 
 // By default, load from default location
 loadEnvFromPath();
+
+// Create child logger for database configuration
+const logger = createChildLogger('database-config');
 
 /**
  * Mask a database URL for secure logging by hiding the password
@@ -57,9 +61,9 @@ export const getDatabaseUrl = (options?: {
   // Check if DATABASE_URL is directly provided and should be used
   if (process.env.DATABASE_URL) {
     if (isDebugMode) {
-      console.debug('Using DATABASE_URL from environment variables');
+      logger.debug('Using DATABASE_URL from environment variables');
       const maskedUrl = maskDatabaseUrl(process.env.DATABASE_URL);
-      console.debug(`Database URL: ${maskedUrl}`);
+      logger.debug(`Database URL: ${maskedUrl}`);
     }
 
     return process.env.DATABASE_URL;
@@ -99,8 +103,8 @@ export const getDatabaseUrl = (options?: {
     // Log the database URL (with masked password for security) only in debug mode
     if (isDebugMode) {
       const maskedUrl = maskDatabaseUrl(url);
-      console.debug(`Built database URL from environment variables: ${maskedUrl}`);
-      console.debug(`SSL mode: ${DB_SSL ? 'enabled (require)' : 'disabled'}`);
+      logger.debug(`Built database URL from environment variables: ${maskedUrl}`);
+      logger.debug(`SSL mode: ${DB_SSL ? 'enabled (require)' : 'disabled'}`);
     }
 
     return url;

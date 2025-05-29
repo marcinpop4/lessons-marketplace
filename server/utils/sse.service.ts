@@ -1,4 +1,8 @@
 import { Response } from 'express';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for SSE service
+const logger = createChildLogger('sse-service');
 
 /**
  * Sends a specific SSE event with optional JSON data.
@@ -12,14 +16,14 @@ const sendSseEvent = (res: Response, eventType: string, data?: any): void => {
         try {
             dataString = `data: ${JSON.stringify(data)}\n`;
         } catch (e) {
-            console.error(`[SSE Service] Failed to stringify data for event type ${eventType}:`, data, e);
+            logger.error(`[SSE Service] Failed to stringify data for event type ${eventType}:`, { data, error: e });
             // Optionally send an error event back or just log
             dataString = `data: ${JSON.stringify({ error: "Failed to serialize event data on server." })}\n`;
             eventType = 'error'; // Force event type to error
         }
     }
     const message = `event: ${eventType}\n${dataString}\n`;
-    console.log(`[SSE Service] Sending event: ${message.replace(/\n/g, '\\n')}`); // Log sent event
+    logger.debug(`[SSE Service] Sending event: ${message.replace(/\n/g, '\\n')}`); // Log sent event
     res.write(message);
 };
 
@@ -59,7 +63,7 @@ const sendSseError = (res: Response, message: string | undefined | null, errorTy
     const errorPayload = { message: errorMessage };
 
     // Log the error being sent to the client (handled by sendSseEvent now)
-    // console.log(`[SSE Service] Sending error event - Type: ${errorType}, Payload: ${JSON.stringify(errorPayload)}`);
+    // logger.debug(`[SSE Service] Sending error event - Type: ${errorType}, Payload: ${JSON.stringify(errorPayload)}`);
 
     sendSseEvent(res, errorType, errorPayload);
 };
@@ -69,7 +73,7 @@ const sendSseError = (res: Response, message: string | undefined | null, errorTy
  * @param res - Express Response object.
  */
 const endSseStream = (res: Response): void => {
-    console.log("[SSE Service] Ending SSE stream.");
+    logger.info("[SSE Service] Ending SSE stream.");
     res.end();
 };
 
@@ -93,7 +97,7 @@ export const streamJsonResponse = async (
             if (!res.writableEnded) { // Check if client disconnected
                 sendSseData(res, chunk); // Uses 'message' event type
             } else {
-                console.log('[SSE Service] Client disconnected during stream.');
+                logger.info('[SSE Service] Client disconnected during stream.');
                 streamError = new Error('Client disconnected'); // Mark as error if client disconnects
                 break; // Stop streaming if client disconnected
             }
@@ -102,12 +106,12 @@ export const streamJsonResponse = async (
         // REMOVED: Explicit 'done' event sending is potentially causing timing issues.
         // The finally block will handle calling res.end() for clean closure.
         // if (!streamError && !res.writableEnded) {
-        //     console.log('[SSE Service] Stream generation complete, sending done event.');
+        //     logger.debug('[SSE Service] Stream generation complete, sending done event.');
         //     sendSseEvent(res, 'done', { message: 'Stream completed successfully.' });
         // }
     } catch (error: any) {
         streamError = error; // Capture the error
-        console.error('[SSE Service] Error during stream generation:', error); // Log the full error server-side
+        logger.error('[SSE Service] Error during stream generation:', { error }); // Log the full error server-side
         if (onError) {
             onError(error);
         }
@@ -119,13 +123,13 @@ export const streamJsonResponse = async (
         if (!res.writableEnded) {
             // Log whether we are ending cleanly or after an error
             if (!streamError) {
-                console.log('[SSE Service] Stream finished successfully, sending done event and closing connection.');
+                logger.info('[SSE Service] Stream finished successfully, sending done event and closing connection.');
                 // Send the [DONE] sentinel as a raw string for the data field
                 res.write('event: message\n');
                 res.write('data: [DONE]\n\n');
                 // res.flush(); // REVERTED: Causing TypeError: res.flush is not a function in some contexts
             } else {
-                console.log(`[SSE Service] Stream finished with error, closing connection.`);
+                logger.info(`[SSE Service] Stream finished with error, closing connection.`);
             }
             // Always end the stream if the client is still connected
             endSseStream(res);

@@ -4,6 +4,10 @@ import { LessonStatusMapper } from '../lesson-status/lessonStatus.mapper.js';
 import { toSharedLessonSummary } from '../lessonSummary/lessonSummary.mapper.js';
 import { LessonSummary as SharedLessonSummary } from '../../shared/models/LessonSummary.js';
 import { LessonSummary as PrismaLessonSummary } from '@prisma/client';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for lesson mapper
+const logger = createChildLogger('lesson-mapper');
 
 // Define database types locally
 type DbLesson = {
@@ -52,7 +56,7 @@ export class LessonMapper {
         const { id, createdAt, updatedAt, quoteId, currentStatusId, quote, currentStatus, lessonSummary: dbLessonSummary } = dbLesson;
 
         if (!quote || !currentStatus) {
-            console.error(`Lesson ${id} is missing required nested quote or currentStatus. Cannot transform.`);
+            logger.error(`Lesson ${id} is missing required nested quote or currentStatus. Cannot transform.`);
             return null;
         }
 
@@ -62,7 +66,7 @@ export class LessonMapper {
             const transformedStatus = LessonStatusMapper.toModel(currentStatus);
 
             if (!transformedQuote || !transformedStatus) {
-                console.error(`Failed to transform nested quote or status for lesson ${id}`);
+                logger.error(`Failed to transform nested quote or status for lesson ${id}`);
                 return null;
             }
 
@@ -70,7 +74,7 @@ export class LessonMapper {
             if (dbLessonSummary) {
                 transformedLessonSummary = toSharedLessonSummary(dbLessonSummary);
                 if (!transformedLessonSummary) {
-                    console.warn(`Failed to transform lesson summary for lesson ${id}. Proceeding without summary.`);
+                    logger.warn(`Failed to transform lesson summary for lesson ${id}. Proceeding without summary.`);
                 }
             }
 
@@ -85,7 +89,7 @@ export class LessonMapper {
                 updatedAt: updatedAt ?? undefined,
             });
         } catch (error: unknown) {
-            console.error(`Error transforming lesson ${id}:`, error);
+            logger.error(`Error transforming lesson ${id}:`, { error });
             return null;
         }
     }

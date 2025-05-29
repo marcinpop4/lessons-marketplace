@@ -4,9 +4,13 @@ import authService, { AuthMethod } from './auth.service.js';
 import { refreshTokenService } from './refreshToken.service.js';
 import { cookieOptions, REFRESH_TOKEN_COOKIE_NAME } from './auth.constants.js';
 import { UserType } from '../../shared/models/UserType.js';
-import { AppError, DuplicateEmailError, BadRequestError, AuthorizationError } from '../errors/index.js';
+import { AppError, DuplicateEmailError, BadRequestError, AuthorizationError, NotFoundError } from '../errors/index.js';
 import { RegisterUserDTO } from './registerUser.dto.js';
 import { LoginUserDTO } from './loginUser.dto.js';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for auth controller
+const logger = createChildLogger('auth-controller');
 
 export class AuthController {
 
@@ -112,9 +116,9 @@ export class AuthController {
             const user = await authService.getUserByIdAndType(id, userType);
 
             if (!user) {
-                console.warn(`User ID ${id} from token not found in database (/me).`);
-                // Throw specific error for central handler - remove status code argument
-                throw new AuthorizationError('User associated with token not found');
+                logger.warn(`User ID ${id} from token not found in database (/me).`);
+                res.status(404).json({ message: 'User not found' });
+                return;
             }
 
             res.status(200).json({ ...user, userType: userType });

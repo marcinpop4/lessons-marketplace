@@ -1,7 +1,10 @@
-import { LessonQuoteStatus, LessonQuoteStatusValue } from '../../shared/models/LessonQuoteStatus.js';
-// Import the specific Prisma type directly with an alias
 import { LessonQuoteStatus as PrismaLessonQuoteStatus } from '@prisma/client';
+import { LessonQuoteStatus, LessonQuoteStatusValue } from '../../shared/models/LessonQuoteStatus.js';
 import { JsonValue } from '../../shared/types/JsonTypes.js';
+import { createChildLogger } from '../config/logger.js';
+
+// Create child logger for lesson quote status mapper
+const logger = createChildLogger('lesson-quote-status-mapper');
 
 /**
  * Maps between database LessonQuoteStatus objects and shared LessonQuoteStatus models.
@@ -24,7 +27,7 @@ export class LessonQuoteStatusMapper {
                 : undefined; // Explicitly handle invalid status
 
             if (statusValue === undefined) {
-                console.error(`[LessonQuoteStatusMapper] Invalid status value '${status}' received from DB for LessonQuoteStatus ID ${id}.`);
+                logger.error(`[LessonQuoteStatusMapper] Invalid status value '${status}' received from DB for LessonQuoteStatus ID ${id}.`);
                 // Throw an error instead of defaulting or warning
                 throw new Error(`Invalid status value '${status}' received from DB for LessonQuoteStatus ID ${id}`);
             }
@@ -39,7 +42,7 @@ export class LessonQuoteStatusMapper {
                 createdAt: createdAt ?? undefined
             });
         } catch (error: unknown) {
-            console.error('Error in LessonQuoteStatusMapper.toModel:', error);
+            logger.error('Error in LessonQuoteStatusMapper.toModel:', error);
             throw new Error(`Failed to transform LessonQuoteStatus: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
