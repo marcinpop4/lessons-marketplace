@@ -48,25 +48,46 @@ const logger = pino({
     },
     timestamp: pino.stdTimeFunctions.isoTime,
 
-    // Pretty printing in development - or suppress entirely during tests
-    transport: getEnvVar('NODE_ENV') === 'development' ?
-        (getEnvVar('SHOW_TEST_LOGS') !== 'false' ? {
-            target: 'pino-pretty',
-            options: {
-                colorize: true,
-                translateTime: 'SYS:HH:MM:ss.l',
-                ignore: 'pid,hostname,req,res,responseTime,service,environment,component',
-                singleLine: false,
-                hideObject: false,
-                messageFormat: '{component} | {msg}',
+    // Use multiple transports - pretty for terminal, files for aggregation
+    transport: getEnvVar('NODE_ENV') === 'development' && getEnvVar('SHOW_TEST_LOGS') !== 'false' ? {
+        targets: [
+            // Pretty terminal output
+            {
+                target: 'pino-pretty',
+                level: 'debug',
+                options: {
+                    colorize: true,
+                    translateTime: 'SYS:HH:MM:ss.l',
+                    ignore: 'pid,hostname,service,environment',
+                    singleLine: false,
+                    hideObject: false,
+                    messageFormat: '{component} | {msg}',
+                }
+            },
+            // Structured JSON logs to file for aggregation
+            {
+                target: 'pino/file',
+                level: 'debug',
+                options: {
+                    destination: './logs/app.log',
+                    mkdir: true
+                }
             }
-        } : {
-            // During test runs with SHOW_TEST_LOGS=false, send logs to /dev/null
-            target: 'pino/file',
-            options: {
-                destination: (isNodeEnvironment && process.platform === 'win32') ? 'NUL' : '/dev/null'
-            }
-        }) : undefined,
+        ]
+    } : getEnvVar('NODE_ENV') === 'test' || getEnvVar('SHOW_TEST_LOGS') === 'false' ? {
+        // During test runs or when explicitly disabled, suppress output
+        target: 'pino/file',
+        options: {
+            destination: (isNodeEnvironment && process.platform === 'win32') ? 'NUL' : '/dev/null'
+        }
+    } : {
+        // Production: only file output
+        target: 'pino/file',
+        options: {
+            destination: './logs/app.log',
+            mkdir: true
+        }
+    },
 
     // Redact sensitive information
     redact: [

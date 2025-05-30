@@ -1,20 +1,37 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { createChildLogger } from '../../config/logger.js';
+import pino from 'pino';
 
 const router = express.Router();
 
 // Create client logger that logs at debug level in development to hide from console
 const clientLogger = createChildLogger('client');
 
-// Override log methods to use debug level in development for console hiding
+// Create a separate file-only logger for client logs (writes to files but not terminal)
+const clientFileLogger = pino({
+    level: 'debug',
+    base: {
+        service: 'lessons-marketplace',
+        component: 'client-logs'
+    },
+    transport: {
+        target: 'pino/file',
+        options: {
+            destination: './logs/client.log',
+            mkdir: true
+        }
+    },
+});
+
+// Override log methods to hide from terminal but write to files
 const createClientLogMethod = (originalLevel: string) => {
     return (obj: any, msg?: string) => {
-        // In development, log client messages at debug level to hide from console
-        // In production, use original level for proper structured logging
-        if (process.env.NODE_ENV === 'development') {
-            clientLogger.debug(obj, msg);
-        } else {
-            // Use the original level method
+        // Always write to file at the proper level
+        (clientFileLogger as any)[originalLevel](obj, msg);
+
+        // In development, don't log to terminal (hidden)
+        // In production, also log to main logger
+        if (process.env.NODE_ENV !== 'development') {
             (clientLogger as any)[originalLevel](obj, msg);
         }
     };
