@@ -2,8 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { teacherLessonHourlyRateService } from './teacherLessonHourlyRate.service.js';
 import { LessonType } from '../../shared/models/LessonType.js';
 import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourlyRate.js';
-// Import status transition enum
-import { TeacherLessonHourlyRateStatusTransition, TeacherLessonHourlyRateStatusValue } from '../../shared/models/TeacherLessonHourlyRateStatus.js';
+// Import status transition enum and status class
+import { TeacherLessonHourlyRateStatus, TeacherLessonHourlyRateStatusTransition, TeacherLessonHourlyRateStatusValue } from '../../shared/models/TeacherLessonHourlyRateStatus.js';
 import { BadRequestError, NotFoundError, ConflictError, AppError } from '../errors/index.js';
 
 // Match error messages defined in the service
@@ -53,14 +53,14 @@ export const teacherLessonHourlyRateController = {
 
     /**
      * Update the status of a lesson hourly rate (e.g., ACTIVE/INACTIVE).
-     * Expects the transition (ACTIVATE/DEACTIVATE) in the request body.
+     * Expects the target status (ACTIVE/INACTIVE) in the request body.
      */
     updateStatus: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const teacherId = req.user?.id;
             const { id: rateId } = req.params; // Get rate ID from URL parameter
-            // Expect the transition directly in the body now
-            const { transition, context } = req.body;
+            // Expect the target status directly in the body now
+            const { status: targetStatus, context } = req.body;
 
             if (!teacherId) {
                 res.status(401).json({ message: 'Unauthorized' });
@@ -72,16 +72,41 @@ export const teacherLessonHourlyRateController = {
                 throw new BadRequestError('Invalid or missing rate ID format in URL. Must be a valid UUID.');
             }
 
-            // Validate the received transition
-            if (!transition || !Object.values(TeacherLessonHourlyRateStatusTransition).includes(transition)) {
-                throw new BadRequestError(`Invalid or missing transition. Must be one of: ${Object.values(TeacherLessonHourlyRateStatusTransition).join(', ')}`);
+            // Validate the received target status
+            if (!targetStatus || !Object.values(TeacherLessonHourlyRateStatusValue).includes(targetStatus)) {
+                throw new BadRequestError(`Invalid or missing status. Must be one of: ${Object.values(TeacherLessonHourlyRateStatusValue).join(', ')}`);
             }
 
-            // Call the service method directly with the provided transition
+            // First, get the current rate to determine current status
+            const currentRate = await teacherLessonHourlyRateService.findRateById(teacherId, rateId);
+            if (!currentRate) {
+                throw new NotFoundError('Lesson rate not found or access denied.');
+            }
+
+            const currentStatus = currentRate.currentStatus?.status;
+            if (!currentStatus) {
+                throw new ConflictError('Cannot update status: Rate has no current status record.');
+            }
+
+            // Determine what transition is needed to get to the target status
+            const requiredTransition = TeacherLessonHourlyRateStatus.getRequiredTransition(
+                currentStatus as TeacherLessonHourlyRateStatusValue,
+                targetStatus as TeacherLessonHourlyRateStatusValue
+            );
+
+            if (requiredTransition === null) {
+                if (currentStatus === targetStatus) {
+                    throw new ConflictError(`Rate is already ${targetStatus}.`);
+                } else {
+                    throw new BadRequestError(`Cannot transition from ${currentStatus} to ${targetStatus}.`);
+                }
+            }
+
+            // Call the service method with the determined transition
             const updatedRate = await teacherLessonHourlyRateService.updateLessonRateStatus(
                 teacherId,
                 rateId,
-                transition, // Use the transition directly from the request body
+                requiredTransition,
                 context // Pass context along if provided
             );
 

@@ -143,4 +143,35 @@ export class TeacherLessonHourlyRateStatus {
         // Type assertion needed because TS doesn't fully infer the const assertion mapping here
         return (TeacherLessonHourlyRateStatus.StatusTransitions[currentStatus] as any)[transition];
     }
+
+    /**
+     * Determines what transition is needed to get from current status to target status.
+     * @param currentStatus The current status value.
+     * @param targetStatus The desired target status value.
+     * @returns The transition needed, or null if no transition is needed or possible.
+     */
+    static getRequiredTransition(
+        currentStatus: TeacherLessonHourlyRateStatusValue,
+        targetStatus: TeacherLessonHourlyRateStatusValue
+    ): TeacherLessonHourlyRateStatusTransition | null {
+        // If already at target status, no transition needed
+        if (currentStatus === targetStatus) {
+            return null;
+        }
+
+        // Check what transitions are available from current status
+        const availableTransitions = TeacherLessonHourlyRateStatus.StatusTransitions[currentStatus];
+        if (!availableTransitions) {
+            return null;
+        }
+
+        // Find the transition that leads to the target status
+        for (const [transition, resultingStatus] of Object.entries(availableTransitions)) {
+            if (resultingStatus === targetStatus) {
+                return transition as TeacherLessonHourlyRateStatusTransition;
+            }
+        }
+
+        return null; // No valid transition found
+    }
 } 

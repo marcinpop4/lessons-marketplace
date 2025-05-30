@@ -1,5 +1,12 @@
 import pino from 'pino';
 
+// Helper to check if we're in Node.js environment
+const isNodeEnvironment = typeof process !== 'undefined' && process.versions?.node;
+
+// File logging variables (initialized later)
+let appFileLogger: any = null;
+let errorFileLogger: any = null;
+
 // Convert numeric log levels to Pino string levels
 const getLogLevel = (logLevel: string | undefined): string => {
     if (!logLevel) return 'info';
@@ -26,20 +33,15 @@ const getLogLevel = (logLevel: string | undefined): string => {
     return 'info';
 };
 
-// Determine if we're in a Node.js environment
-const isNodeEnvironment = typeof process !== 'undefined' && process.versions && process.versions.node;
-
-// Get environment variables (works in both Node and browser with bundler)
-const getEnvVar = (name: string, defaultValue?: string): string | undefined => {
+// Helper function to get environment variables
+const getEnvVar = (name: string, defaultValue?: string): string => {
     if (isNodeEnvironment) {
-        return process.env[name] || defaultValue;
+        return process.env[name] ?? defaultValue ?? '';
     }
-    // In browser/frontend, environment variables are typically injected at build time
-    // This would be handled by Vite or other bundlers
-    return defaultValue;
+    return defaultValue ?? '';
 };
 
-// Create the base logger
+// Create the logger with console-only output for now
 const logger = pino({
     level: getLogLevel(getEnvVar('LOG_LEVEL')),
     base: {
@@ -48,46 +50,25 @@ const logger = pino({
     },
     timestamp: pino.stdTimeFunctions.isoTime,
 
-    // Use multiple transports - pretty for terminal, files for aggregation
+    // Console transport configuration
     transport: getEnvVar('NODE_ENV') === 'development' && getEnvVar('SHOW_TEST_LOGS') !== 'false' ? {
-        targets: [
-            // Pretty terminal output
-            {
-                target: 'pino-pretty',
-                level: 'debug',
-                options: {
-                    colorize: true,
-                    translateTime: 'SYS:HH:MM:ss.l',
-                    ignore: 'pid,hostname,service,environment',
-                    singleLine: false,
-                    hideObject: false,
-                    messageFormat: '{component} | {msg}',
-                }
-            },
-            // Structured JSON logs to file for aggregation
-            {
-                target: 'pino/file',
-                level: 'debug',
-                options: {
-                    destination: './logs/app.log',
-                    mkdir: true
-                }
-            }
-        ]
+        target: 'pino-pretty',
+        level: 'debug',
+        options: {
+            colorize: true,
+            translateTime: 'SYS:HH:MM:ss.l',
+            ignore: 'pid,hostname,service,environment',
+            singleLine: false,
+            hideObject: false,
+            messageFormat: '{component} | {msg}',
+        }
     } : getEnvVar('NODE_ENV') === 'test' || getEnvVar('SHOW_TEST_LOGS') === 'false' ? {
         // During test runs or when explicitly disabled, suppress output
         target: 'pino/file',
         options: {
             destination: (isNodeEnvironment && process.platform === 'win32') ? 'NUL' : '/dev/null'
         }
-    } : {
-        // Production: only file output
-        target: 'pino/file',
-        options: {
-            destination: './logs/app.log',
-            mkdir: true
-        }
-    },
+    } : undefined,
 
     // Redact sensitive information
     redact: [
@@ -105,6 +86,47 @@ const logger = pino({
 export const createChildLogger = (component: string, metadata: Record<string, any> = {}) => {
     return logger.child({ component, ...metadata });
 };
+
+// Initialize file logging asynchronously (Node.js only)
+if (isNodeEnvironment) {
+    // Dynamically import file logging without top-level await
+    Promise.resolve().then(async () => {
+        try {
+            const fileLoggerModule = await import('../server/config/fileLogger.js');
+            appFileLogger = fileLoggerModule.appFileLogger;
+            errorFileLogger = fileLoggerModule.errorFileLogger;
+
+            // Override logger methods to write to both console and files
+            const originalInfo = logger.info.bind(logger);
+            const originalWarn = logger.warn.bind(logger);
+            const originalError = logger.error.bind(logger);
+            const originalDebug = logger.debug.bind(logger);
+
+            logger.info = (obj: any, msg?: string, ...args: any[]) => {
+                originalInfo(obj, msg, ...args);
+                if (appFileLogger) appFileLogger.info(obj, msg, ...args);
+            };
+
+            logger.warn = (obj: any, msg?: string, ...args: any[]) => {
+                originalWarn(obj, msg, ...args);
+                if (appFileLogger) appFileLogger.warn(obj, msg, ...args);
+            };
+
+            logger.error = (obj: any, msg?: string, ...args: any[]) => {
+                originalError(obj, msg, ...args);
+                if (appFileLogger) appFileLogger.error(obj, msg, ...args);
+                if (errorFileLogger) errorFileLogger.error(obj, msg, ...args);
+            };
+
+            logger.debug = (obj: any, msg?: string, ...args: any[]) => {
+                originalDebug(obj, msg, ...args);
+                if (appFileLogger) appFileLogger.debug(obj, msg, ...args);
+            };
+        } catch (error) {
+            console.warn('File logging initialization failed:', error);
+        }
+    });
+}
 
 export { logger };
 export default logger; 

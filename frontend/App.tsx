@@ -60,12 +60,12 @@ const AppRoutes: React.FC = () => {
   const location = useLocation();
   const currentPath = location.pathname;
 
-  // Track page views when location changes
+  // Initialize logging when component mounts
   useEffect(() => {
     logger.trackPageView(currentPath);
   }, [currentPath]);
 
-  // Track user authentication
+  // Track user authentication changes
   useEffect(() => {
     if (user) {
       logger.setUser(user.id, {
@@ -81,19 +81,7 @@ const AppRoutes: React.FC = () => {
     }
   }, [user]);
 
-  // Track page performance on mount
-  useEffect(() => {
-    // Wait for page to fully load before tracking performance
-    window.addEventListener('load', () => {
-      logger.trackPerformance();
-    });
-  }, []);
-
-  // Update navigation path if needed
-  const handleBackFromQuotes = () => {
-    navigate('/student/lesson-request');
-  };
-
+  // Navigation handlers
   const handleLogout = () => {
     logger.info('User logging out', { userId: user?.id });
     logout();
@@ -121,9 +109,6 @@ const AppRoutes: React.FC = () => {
           <Link
             to="/"
             className="hover:text-primary-600 transition-colors"
-            onClick={(e) => {
-              logger.trackClick(e.target as HTMLElement, { linkType: 'logo' });
-            }}
           >
             <h1>Take lessons and Git Gud!</h1>
           </Link>

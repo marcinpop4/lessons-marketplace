@@ -42,34 +42,16 @@ const getLogLevel = (logLevel: string | undefined): string => {
     return 'info';
 };
 
-// Create a separate file logger for complete HTTP details (for Grafana aggregation)
-const httpFileLogger = pino({
-    level: 'debug',
-    base: {
-        service: 'lessons-marketplace',
-        component: 'http-requests'
-    },
-    transport: {
-        target: 'pino/file',
-        options: {
-            destination: './logs/http.log',
-            mkdir: true
-        }
-    },
-    // Redact sensitive information in file logs too
-    redact: [
-        'password',
-        'token',
-        'authorization',
-        'cookie',
-        'req.headers.authorization',
-        'req.headers.cookie',
-        'res.headers["set-cookie"]',
-        'req.body.password',
-        'res.body.token',
-        'res.body.accessToken'
-    ],
-});
+// Dynamically import file logging when available
+let httpFileLogger: any = null;
+if (typeof process !== 'undefined' && process.versions?.node) {
+    // Import file logger asynchronously
+    import('./fileLogger.js').then(fileLoggerModule => {
+        httpFileLogger = fileLoggerModule.httpFileLogger;
+    }).catch(error => {
+        console.warn('HTTP file logging not available:', error);
+    });
+}
 
 // Create a terminal-only logger for clean HTTP messages
 const httpTerminalLogger = pino({
@@ -228,8 +210,10 @@ export const httpLogger = (req: Request, res: Response, next: NextFunction) => {
             // Log to terminal (clean message with request body for readability)
             httpTerminalLogger[logLevel](terminalMessage);
 
-            // Log to file (structured JSON without request body in message)
-            httpFileLogger.info(fileLogData, `HTTP ${method} ${url} ${status} ${responseTime}ms`);
+            // Log to file (structured JSON with detailed request/response data)
+            if (httpFileLogger) {
+                httpFileLogger.info(fileLogData, `HTTP ${method} ${url} ${status} ${responseTime}ms`);
+            }
         }
 
         // Call the original end function

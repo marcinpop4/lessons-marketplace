@@ -83,6 +83,7 @@ This project includes a comprehensive logging system that captures both server-s
 
 ### Features
 - **High-performance structured logging** with Pino (replaces Morgan)
+- **Rotating log files** to prevent excessive disk usage
 - **Client-side error tracking** and user behavior analytics
 - **Request correlation** via unique request IDs
 - **Automatic log aggregation** from frontend to backend
@@ -101,15 +102,32 @@ import logger from '@frontend/utils/logger';
 logger.info('User action', { page: '/dashboard', action: 'click' });
 ```
 
+### Log Rotation
+Log files automatically rotate daily and when they reach 20MB:
+- **Daily rotation**: New log files created daily
+- **Size-based rotation**: Files rotate at 20MB to prevent excessive growth
+- **14-day retention**: Old logs are kept for 2 weeks, then automatically deleted
+- **Compression**: Archived logs are gzipped to save disk space
+
+```bash
+# Test log rotation
+pnpm run test:logs:rotation
+
+# Check log files
+ls -la logs/
+```
+
 ### Documentation
 For detailed information about the logging system, see:
-- **[Logging System Documentation](docs/logging-system.md)** - Complete guide and examples
+- **[Log Rotation System](docs/logging-rotation.md)** - Complete guide to log rotation
 - **[API Documentation](http://localhost:3000/api-docs)** - Swagger docs including logging endpoints
 
 ### Log Files
 In development, logs are written to:
-- `logs/app.log` - All application logs
-- `logs/errors.log` - Error logs only
+- `logs/app.log` - All application logs (rotates daily/20MB)
+- `logs/http.log` - HTTP request logs (rotates daily/20MB)  
+- `logs/client.log` - Client-side logs (rotates daily/20MB)
+- `logs/error.log` - Error logs only (rotates daily/20MB)
 - Console output with pretty formatting
 
 ## Running with Docker

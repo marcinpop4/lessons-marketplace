@@ -7,27 +7,24 @@ const router = express.Router();
 // Create client logger that logs at debug level in development to hide from console
 const clientLogger = createChildLogger('client');
 
-// Create a separate file-only logger for client logs (writes to files but not terminal)
-const clientFileLogger = pino({
-    level: 'debug',
-    base: {
-        service: 'lessons-marketplace',
-        component: 'client-logs'
-    },
-    transport: {
-        target: 'pino/file',
-        options: {
-            destination: './logs/client.log',
-            mkdir: true
-        }
-    },
-});
+// Dynamically import file logging when available
+let clientFileLogger: any = null;
+if (typeof process !== 'undefined' && process.versions?.node) {
+    // Import file logger asynchronously
+    import('./fileLogger.js').then(fileLoggerModule => {
+        clientFileLogger = fileLoggerModule.clientFileLogger;
+    }).catch(error => {
+        console.warn('Client file logging not available:', error);
+    });
+}
 
 // Override log methods to hide from terminal but write to files
 const createClientLogMethod = (originalLevel: string) => {
     return (obj: any, msg?: string) => {
-        // Always write to file at the proper level
-        (clientFileLogger as any)[originalLevel](obj, msg);
+        // Always write to file at the proper level (if available)
+        if (clientFileLogger) {
+            (clientFileLogger as any)[originalLevel](obj, msg);
+        }
 
         // In development, don't log to terminal (hidden)
         // In production, also log to main logger

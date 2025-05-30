@@ -8,6 +8,7 @@ class ClientLogger {
     private sessionId: string;
     private userId: string | null;
     private isEnabled: boolean;
+    private webVitalsCollected: Set<string> = new Set();
 
     constructor(config: {
         endpoint?: string;
@@ -24,14 +25,7 @@ class ClientLogger {
         this.isEnabled = config.enabled !== false; // Enabled by default
 
         if (this.isEnabled) {
-            // Start auto-flush
-            setInterval(() => this.flush(), this.flushInterval);
-
-            // Flush on page unload
-            window.addEventListener('beforeunload', () => this.flush());
-
-            // Capture unhandled errors
-            this.setupErrorHandlers();
+            this._initializeLogging();
         }
     }
 
@@ -39,7 +33,24 @@ class ClientLogger {
         return Date.now().toString(36) + Math.random().toString(36).substr(2);
     }
 
-    private setupErrorHandlers(): void {
+    private _initializeLogging(): void {
+        // Start auto-flush
+        setInterval(() => this.flush(), this.flushInterval);
+
+        // Flush on page unload
+        window.addEventListener('beforeunload', () => this.flush());
+
+        // Set up error handlers
+        this._setupErrorHandlers();
+
+        // Set up web-vitals tracking
+        this._setupWebVitals();
+
+        // Set up automatic click tracking
+        this._setupAutoClickTracking();
+    }
+
+    private _setupErrorHandlers(): void {
         // Capture JavaScript errors
         window.addEventListener('error', (event) => {
             this.error('JavaScript Error', {
@@ -60,10 +71,10 @@ class ClientLogger {
         });
 
         // Capture fetch failures by intercepting fetch
-        this.interceptFetch();
+        this._interceptFetch();
     }
 
-    private interceptFetch(): void {
+    private _interceptFetch(): void {
         const originalFetch = window.fetch;
         window.fetch = async (...args) => {
             const startTime = Date.now();
@@ -110,6 +121,85 @@ class ClientLogger {
                 throw error;
             }
         };
+    }
+
+    private _setupWebVitals(): void {
+        const vitalsData: Record<string, number> = {};
+        const expectedVitals = ['cls', 'fcp', 'inp', 'lcp', 'ttfb'];
+
+        const handleVital = (metric: Metric) => {
+            const metricName = metric.name.toLowerCase();
+
+            // Store the metric value (only first occurrence per page)
+            if (!this.webVitalsCollected.has(metricName)) {
+                vitalsData[metricName] = Math.round(metric.value * (metric.name === 'CLS' ? 1000 : 1)) / (metric.name === 'CLS' ? 1000 : 1);
+                this.webVitalsCollected.add(metricName);
+
+                // Log when all vitals are collected
+                if (this.webVitalsCollected.size === expectedVitals.length) {
+                    this._logWebVitals(vitalsData);
+                }
+            }
+        };
+
+        // Set up Core Web Vitals collection with callbacks
+        try {
+            onCLS(handleVital);
+            onFCP(handleVital);
+            onINP(handleVital);
+            onLCP(handleVital);
+            onTTFB(handleVital);
+        } catch (error) {
+            this.warn('Failed to initialize Core Web Vitals tracking', {
+                error: error instanceof Error ? error.message : String(error)
+            });
+        }
+
+        // Fallback: log partial results after timeout
+        setTimeout(() => {
+            if (this.webVitalsCollected.size > 0 && this.webVitalsCollected.size < expectedVitals.length) {
+                this._logWebVitals(vitalsData, true);
+            }
+        }, 10000);
+    }
+
+    private _logWebVitals(vitalsData: Record<string, number>, isPartial = false): void {
+        this.info(isPartial ? 'Core Web Vitals (Partial)' : 'Core Web Vitals', {
+            event: isPartial ? 'core_web_vitals_partial' : 'core_web_vitals',
+            path: window.location.pathname,
+            vitals: vitalsData,
+            vitalsCollected: Object.keys(vitalsData).length,
+            expectedVitals: 5,
+            isComplete: !isPartial,
+            ...(isPartial && { note: `Only ${Object.keys(vitalsData).length} of 5 vitals collected within timeout` })
+        });
+    }
+
+    private _setupAutoClickTracking(): void {
+        document.addEventListener('click', (event) => {
+            const target = event.target as HTMLElement;
+            if (!target) return;
+
+            // Only track clicks on interactive elements
+            const trackableSelectors = ['button', 'a', '[role="button"]', '[onclick]'];
+            const isTrackable = trackableSelectors.some(selector => {
+                return target.matches(selector) || target.closest(selector);
+            });
+
+            if (isTrackable) {
+                const element = target.closest('button, a, [role="button"], [onclick]') as HTMLElement || target;
+
+                this.info('Auto Click', {
+                    element: element.tagName.toLowerCase(),
+                    id: element.id || null,
+                    className: element.className || null,
+                    text: element.textContent?.trim().slice(0, 50) || null,
+                    href: element.getAttribute('href') || null,
+                    type: element.getAttribute('type') || null,
+                    path: window.location.pathname
+                });
+            }
+        }, { passive: true });
     }
 
     setUser(userId: string, userData: Record<string, any> = {}): void {
@@ -161,6 +251,20 @@ class ClientLogger {
         this.log('debug', message, data);
     }
 
+    // Simplified page view tracking
+    trackPageView = (path: string, userInfo?: { id: string; email?: string }) => {
+        this.info('Page View', {
+            event: 'page_view',
+            path,
+            url: window.location.href,
+            referrer: document.referrer,
+            userInfo
+        });
+
+        // Reset web vitals collection for new page
+        this.webVitalsCollected.clear();
+    };
+
     // Track user interactions
     trackClick(element: HTMLElement, data: Record<string, any> = {}): void {
         this.info('User Click', {
@@ -172,74 +276,8 @@ class ClientLogger {
         });
     }
 
-    // Track page views with Core Web Vitals using official library
-    trackPageView = (path: string, userInfo?: { id: string; email?: string }) => {
-        // Log initial page view
-        this.info('Page View', {
-            event: 'page_view',
-            path,
-            url: window.location.href,
-            referrer: document.referrer,
-            userInfo
-        });
-
-        // Collect Core Web Vitals using official library with callbacks
-        const vitalsData: Record<string, number> = {};
-        let vitalsCollected = 0;
-        const expectedVitals = 5; // CLS, FCP, INP, LCP, TTFB
-
-        const vitalsStartTime = Date.now();
-        const maxWaitTime = 10000; // 10 seconds
-
-        const handleVital = (metric: Metric) => {
-            // Store the metric value
-            vitalsData[metric.name.toLowerCase()] = Math.round(metric.value * (metric.name === 'CLS' ? 1000 : 1)) / (metric.name === 'CLS' ? 1000 : 1);
-            vitalsCollected++;
-
-            // Log when all vitals are collected or after a reasonable timeout
-            if (vitalsCollected === expectedVitals || Date.now() - vitalsStartTime > maxWaitTime) {
-                this.info('Core Web Vitals', {
-                    event: 'core_web_vitals',
-                    path,
-                    vitals: vitalsData,
-                    vitalsCollected,
-                    expectedVitals,
-                    isComplete: vitalsCollected === expectedVitals,
-                    collectionTimeMs: Date.now() - vitalsStartTime
-                });
-            }
-        };
-
-        // Set up Core Web Vitals collection with callbacks
-        try {
-            onCLS(handleVital);
-            onFCP(handleVital);
-            onINP(handleVital);
-            onLCP(handleVital);
-            onTTFB(handleVital);
-        } catch (error) {
-            this.warn('Failed to initialize Core Web Vitals tracking', {
-                error: error instanceof Error ? error.message : String(error)
-            });
-        }
-
-        // Fallback: log partial results after timeout
-        setTimeout(() => {
-            if (vitalsCollected < expectedVitals && Object.keys(vitalsData).length > 0) {
-                this.info('Core Web Vitals (Partial)', {
-                    event: 'core_web_vitals_partial',
-                    path,
-                    vitals: vitalsData,
-                    vitalsCollected: Object.keys(vitalsData).length,
-                    expectedVitals,
-                    timeoutMs: maxWaitTime,
-                    note: `Only ${Object.keys(vitalsData).length} of ${expectedVitals} vitals collected within timeout`
-                });
-            }
-        }, maxWaitTime);
-    };
-
-    // Track performance metrics
+    // Keep the legacy method for compatibility but mark as deprecated
+    /** @deprecated Use web-vitals integration instead */
     trackPerformance(): void {
         if ('performance' in window && 'timing' in performance) {
             const timing = performance.timing;
