@@ -1,5 +1,6 @@
 import apiClient from './apiClient';
 import { LessonSummary } from '@shared/models/LessonSummary';
+import logger from '../utils/logger';
 
 export interface CreateLessonSummaryDto {
     lessonId: string;
@@ -17,7 +18,7 @@ export const createLessonSummary = async (summaryData: CreateLessonSummaryDto): 
         const response = await apiClient.post<LessonSummary>('/api/v1/summary', summaryData);
         return response.data;
     } catch (error) {
-        console.error('Error creating lesson summary:', error);
+        logger.error('Error creating lesson summary', { error });
         // It's good practice to throw the error so the calling component can handle it (e.g., show a user-facing message)
         throw error;
     }

@@ -4,6 +4,7 @@ import { Address } from '@shared/models/Address';
 import { LessonQuote } from '@shared/models/LessonQuote';
 import apiClient from './apiClient';
 import { LessonQuoteStatus, LessonQuoteStatusValue } from '@shared/models/LessonQuoteStatus';
+import logger from '../utils/logger';
 
 export interface CreateLessonRequestPayload {
   type: LessonType;
@@ -97,7 +98,7 @@ export const createLessonRequest = async (data: CreateLessonRequestPayload): Pro
       quotes: []
     };
   } catch (error) {
-    console.error('Error creating lesson request:', error);
+    logger.error('Error creating lesson request', { error });
     throw error;
   }
 };
@@ -128,7 +129,7 @@ export const getLessonRequestById = async (id: string): Promise<LessonRequest> =
       student: responseData.student
     });
   } catch (error) {
-    console.error('Error fetching lesson request:', error);
+    logger.error('Error fetching lesson request', { error });
     throw error;
   }
 };
@@ -158,7 +159,7 @@ export const getLessonRequestsByStudent = async (studentId: string): Promise<Les
       student: data.student
     }));
   } catch (error) {
-    console.error('Error fetching student lesson requests:', error);
+    logger.error('Error fetching student lesson requests', { error });
     throw error;
   }
 }; 

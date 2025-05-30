@@ -2,6 +2,7 @@ import apiClient from './apiClient';
 import { Lesson } from '@shared/models/Lesson'; // Import the shared Lesson model
 import { LessonStatusValue } from '@shared/models/LessonStatus'; // Needed for the status enum
 import { LessonType } from '@shared/models/LessonType'; // Needed for the lesson type enum
+import logger from '../utils/logger';
 
 // Define the expected structure, reflecting the selected fields from the API
 export interface TeacherLessonApiResponseItem {
@@ -72,7 +73,7 @@ export const getTeacherLessons = async (teacherId: string): Promise<TeacherLesso
         // Return the raw data. Instantiation will happen in the component.
         return response.data;
     } catch (error) {
-        console.error('API Error fetching teacher lessons:', error);
+        logger.error('API Error fetching teacher lessons', { error });
         // Re-throw or handle as appropriate for the application
         throw error;
     }

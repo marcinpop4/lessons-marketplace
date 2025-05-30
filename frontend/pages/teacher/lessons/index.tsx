@@ -14,6 +14,7 @@ import { LessonQuoteStatus, LessonQuoteStatusValue } from '@shared/models/Lesson
 import { LessonSummaryModal } from '@frontend/components/TeacherLessonCard';
 import { createLessonSummary, CreateLessonSummaryDto } from '@frontend/api/lessonSummaryApi'; // <-- Import createLessonSummary
 import { UserType } from '@shared/models/UserType';
+import logger from '@frontend/utils/logger';
 
 // Interface to hold both lesson model and extra display data
 export interface LessonDisplayData {
@@ -31,7 +32,7 @@ const instantiateLessonFromData = (data: FullLessonDetailsForTeacher): LessonDis
         const addressData = lessonRequestData?.address;
 
         if (!quoteData || !lessonRequestData || !studentData || !teacherData || !addressData) {
-            console.warn('Skipping lesson due to incomplete data:', data);
+            logger.warn('Skipping lesson due to incomplete data', { data });
             return null;
         }
 
@@ -80,7 +81,7 @@ const instantiateLessonFromData = (data: FullLessonDetailsForTeacher): LessonDis
         return { lesson };
 
     } catch (e) {
-        console.error('Error instantiating lesson from API data:', e, data);
+        logger.error('Error instantiating lesson from API data', { error: e, data });
         return null;
     }
 };
@@ -119,7 +120,7 @@ const TeacherLessonsPage: React.FC = () => {
             if (!Array.isArray(rawLessonsData)) {
                 lessonsArray = (rawLessonsData as any)?.lessons || (rawLessonsData as any)?.data;
                 if (!Array.isArray(lessonsArray)) {
-                    console.error('API did not return an array of lessons.', rawLessonsData);
+                    logger.error('API did not return an array of lessons', { rawLessonsData });
                     throw new Error('Invalid data format received from API. Expected an array of lessons.');
                 }
             } else {
@@ -134,7 +135,7 @@ const TeacherLessonsPage: React.FC = () => {
             setLessonsData(instantiatedLessonsData); // Update state with the new structure
 
         } catch (err) {
-            console.error('Failed to fetch teacher lessons:', err);
+            logger.error('Failed to fetch teacher lessons', { error: err });
             setError(err instanceof Error ? err.message : 'An unknown error occurred');
         } finally {
             setLoading(false);
@@ -172,7 +173,7 @@ const TeacherLessonsPage: React.FC = () => {
 
     const handleConfirmSummary = async (summary: string, homework: string) => {
         if (!summaryModalLessonId) {
-            console.error('No lesson ID found for summary creation.');
+            logger.error('No lesson ID found for summary creation');
             setSummaryModalError('Could not create summary: Lesson ID missing.'); // Set modal error
             // setError('Could not create summary: Lesson ID missing.'); // Remove page-level error
             return;
@@ -192,7 +193,7 @@ const TeacherLessonsPage: React.FC = () => {
             await fetchLessonsData();
             handleCloseSummaryModal(); // Close modal on success
         } catch (err) {
-            console.error('Failed to save lesson summary:', err);
+            logger.error('Failed to save lesson summary', { error: err });
             const apiError = err instanceof Error ? err.message : 'Failed to save summary';
             // setError(`Error saving summary for '${summaryModalLessonTitle}': ${apiError}`); // Remove page-level error
             setSummaryModalError(apiError); // Set modal-specific error
@@ -237,7 +238,7 @@ const TeacherLessonsPage: React.FC = () => {
 
     // Placeholder for cancel functionality
     const handleCancelLesson = async (lessonId: string) => {
-        console.log(`Request to cancel lesson: ${lessonId}`);
+        logger.info('Request to cancel lesson', { lessonId });
         // Here you would typically call an API endpoint to void or cancel the lesson
         // For example: await voidLesson(lessonId);
         // Then refresh data: await fetchLessonsData();

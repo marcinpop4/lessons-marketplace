@@ -16,6 +16,7 @@ import { UIMilestone, UIPlannedLesson } from '@frontend/components/features/less
 import LessonPlanSummary from '@frontend/components/features/lesson-plan/LessonPlanSummary';
 import RecommendationSkeletonCard from '@frontend/components/features/lesson-plan/RecommendationSkeletonCard';
 import Button from '@frontend/components/shared/Button/Button';
+import logger from '@frontend/utils/logger';
 
 // Sleep utility
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -31,18 +32,18 @@ const scrollToElement = async (elementId: string, delay: number = 0) => {
         //     element.focus({ preventScroll: true }); 
         // }
     } else {
-        console.warn(`[UI Scroll] Element with ID '${elementId}' not found.`);
+        logger.warn('[UI Scroll] Element not found', { elementId });
     }
 };
 
 // Helper function to parse AI startTime into date and time parts
 const parseAiStartTime = (startTime: string): { selectedDate: string, selectedTime: string } => {
-    console.log(`[UI Parse Helper] Attempting to parse startTime: "${startTime}"`);
+    logger.info('[UI Parse Helper] Attempting to parse startTime', { startTime });
     try {
         // Attempt to parse as ISO or common format like "YYYY-MM-DD HH:MM"
         const dateObj = new Date(startTime.replace(' ', 'T')); // Handle space separator
         if (isNaN(dateObj.getTime())) {
-            console.error(`[UI Parse Helper] Invalid AI startTime format after parsing: "${startTime}"`);
+            logger.error('[UI Parse Helper] Invalid AI startTime format after parsing', { startTime });
             return { selectedDate: '', selectedTime: '' };
         }
 
@@ -56,10 +57,10 @@ const parseAiStartTime = (startTime: string): { selectedDate: string, selectedTi
             selectedDate: `${year}-${month}-${day}`,
             selectedTime: `${hours}:${minutes}`,
         };
-        console.log(`[UI Parse Helper] Successfully parsed "${startTime}" into:`, result);
+        logger.info('[UI Parse Helper] Successfully parsed startTime', { startTime, result });
         return result;
     } catch (e) {
-        console.error(`[UI Parse Helper] Error during parsing AI startTime: ${startTime}`, e);
+        logger.error('[UI Parse Helper] Error during parsing AI startTime', { startTime, error: e });
         return { selectedDate: '', selectedTime: '' };
     }
 };
@@ -115,7 +116,7 @@ const CreateLessonPlanPage: React.FC = () => {
                     setError(`Could not load details for lesson ID: ${lessonId}`);
                 }
             } catch (err) {
-                console.error("Error fetching source lesson:", err);
+                logger.error('Error fetching source lesson', { error: err });
                 setError(err instanceof Error ? err.message : 'Failed to load source lesson details.');
             } finally {
                 setIsLoading(false);
@@ -209,7 +210,7 @@ const CreateLessonPlanPage: React.FC = () => {
         }
         if (isStreamingRecommendations) return;
 
-        console.log('[UI] Starting AI plan generation...');
+        logger.info('[UI] Starting AI plan generation');
         setIsStreamingRecommendations(true);
         setAiRecommendations([]);
         setRecommendationError(null);
@@ -220,12 +221,12 @@ const CreateLessonPlanPage: React.FC = () => {
         const closeStream = fetchAiLessonPlanRecommendationsStream(
             sourceLesson.id,
             (plan) => {
-                console.log('[UI] Received AI plan recommendation:', plan);
+                logger.info('[UI] Received AI plan recommendation', { plan });
                 setAiLoadingMessage("↪️ Streaming recommendations...");
                 setAiRecommendations(prev => [...prev, plan]);
             },
             (error) => {
-                console.error('[UI] AI stream error:', error);
+                logger.error('[UI] AI stream error', { error });
                 const message = (typeof error === 'string')
                     ? error
                     : (error instanceof Event ? 'SSE connection error' : 'An unknown stream error occurred');
@@ -235,7 +236,7 @@ const CreateLessonPlanPage: React.FC = () => {
                 eventSourceRef.current = null;
             },
             () => {
-                console.log('[UI] AI stream completed.');
+                logger.info('[UI] AI stream completed');
                 setIsStreamingRecommendations(false);
                 setAiLoadingMessage(null);
                 eventSourceRef.current = null;
@@ -245,7 +246,7 @@ const CreateLessonPlanPage: React.FC = () => {
     }, [sourceLesson?.id, isStreamingRecommendations]);
 
     const handleApplyRecommendation = useCallback(async (plan: AiGeneratedLessonPlan) => {
-        console.log('[UI] Applying AI recommendation:', plan);
+        logger.info('[UI] Applying AI recommendation', { plan });
         const applyDelay = 300; // Milliseconds for noticeable delay - SLIGHTLY INCREASED
         const scrollDelay = 50; // Small delay before scrolling to ensure element might be rendered
 
@@ -324,7 +325,13 @@ const CreateLessonPlanPage: React.FC = () => {
                     ? aiLesson.durationMinutes
                     : parseInt(String(aiLesson.durationMinutes), 10) || 60;
 
-                console.log(`[UI Apply Lesson ${mIndex}-${lIndex}] Date: ${selectedDate}, Time: ${selectedTime}, Duration: ${durationMinutes}`);
+                logger.info('[UI Apply Lesson] Date, time, and duration details', {
+                    mIndex,
+                    lIndex,
+                    selectedDate,
+                    selectedTime,
+                    durationMinutes
+                });
 
                 const lessonShell: UIPlannedLesson = {
                     id: tempLessonId,
@@ -357,7 +364,7 @@ const CreateLessonPlanPage: React.FC = () => {
             await sleep(applyDelay);
         }
 
-        console.log('[UI] Finished applying AI recommendation.');
+        logger.info('[UI] Finished applying AI recommendation');
     }, [setLessonPlanTitle, setLessonPlanDescription, setLessonPlanDueDate, setMilestones]);
 
     const handleSaveLessonPlan = async () => {
@@ -409,16 +416,18 @@ const CreateLessonPlanPage: React.FC = () => {
                 })),
             };
 
-            console.log('[UI Save] Payload being sent to createFullLessonPlanSequentially:', JSON.stringify(apiPayload, null, 2));
+            logger.info('[UI Save] Payload being sent to createFullLessonPlanSequentially', {
+                payload: JSON.stringify(apiPayload, null, 2)
+            });
 
-            console.log('Page: Calling createFullLessonPlanSequentially with payload:', apiPayload);
+            logger.info('Page: Calling createFullLessonPlanSequentially with payload', { payload: apiPayload });
             await createFullLessonPlanSequentially(apiPayload);
-            console.log('Page: Lesson Plan and all components created successfully!');
+            logger.info('Page: Lesson Plan and all components created successfully');
 
             navigate('/teacher/lessons');
 
         } catch (err) {
-            console.error("Page: Error saving lesson plan:", err);
+            logger.error('Page: Error saving lesson plan', { error: err });
             const message = (err instanceof Error) ? err.message : 'Failed to save lesson plan. Please check details and try again.';
             if (axios.isAxiosError(err)) {
                 const serverError = (err.response?.data as { error?: string })?.error;

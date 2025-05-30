@@ -6,6 +6,7 @@ import AddObjectiveForm from '../../../components/student/objective/AddObjective
 import { ObjectiveRecommendation } from '@shared/models/ObjectiveRecommendation.js'; // Import recommendation type
 import { LessonType } from '@shared/models/LessonType.js'; // Import LessonType for filtering
 import { useAuth } from '../../../contexts/AuthContext'; // Import useAuth
+import logger from '@frontend/utils/logger';
 
 // Define the structure for grouped objectives
 type GroupedObjectives = { [key in ObjectiveStatusValue]?: Objective[] };
@@ -47,7 +48,7 @@ const ObjectivesPage: React.FC = () => {
             if (!studentId) {
                 // Handle case where user is not loaded yet or not logged in
                 // You might want to show a different loading state or error
-                console.error('Student ID not available from auth context.');
+                logger.error('Student ID not available from auth context');
                 setFetchError('User data not available. Please ensure you are logged in.');
                 setLoading(false); // Stop loading if we can't proceed
                 return; // Exit the function
@@ -90,7 +91,7 @@ const ObjectivesPage: React.FC = () => {
             setGroupedObjectives(groups);
 
         } catch (err: any) {
-            console.error("Error fetching/grouping objectives:", err);
+            logger.error('Error fetching/grouping objectives', { error: err });
             setFetchError(err.message || 'An unexpected error occurred.');
         } finally {
             setLoading(false);
@@ -102,7 +103,7 @@ const ObjectivesPage: React.FC = () => {
         // Cleanup function to close EventSource when component unmounts
         return () => {
             if (eventSourceRef.current) {
-                console.log('[SSE Cleanup] Closing EventSource.');
+                logger.info('[SSE Cleanup] Closing EventSource');
                 eventSourceRef.current.close();
                 eventSourceRef.current = null;
             }
@@ -111,7 +112,7 @@ const ObjectivesPage: React.FC = () => {
 
     // Function to handle generating recommendations
     const handleGenerateRecommendations = async (lessonTypeFilter: LessonType | null) => {
-        console.log('[SSE] Initiating recommendation stream...', { lessonTypeFilter });
+        logger.info('[SSE] Initiating recommendation stream', { lessonTypeFilter });
         setIsGenerating(true);
         setIsStreaming(true);
         setGenerationError(null);
@@ -121,7 +122,7 @@ const ObjectivesPage: React.FC = () => {
 
         // Close existing connection if any
         if (eventSourceRef.current) {
-            console.log('[SSE] Closing existing EventSource before creating new one.');
+            logger.info('[SSE] Closing existing EventSource before creating new one');
             eventSourceRef.current.close();
         }
 
@@ -142,7 +143,7 @@ const ObjectivesPage: React.FC = () => {
             eventSourceRef.current = eventSource; // Store ref
 
             eventSource.onopen = () => {
-                console.log('[SSE] Connection opened.');
+                logger.info('[SSE] Connection opened');
             };
 
             eventSource.onmessage = (event) => {
@@ -150,7 +151,7 @@ const ObjectivesPage: React.FC = () => {
 
                 // Check for the [DONE] sentinel string
                 if (event.data === '[DONE]') {
-                    console.log('[SSE] Received [DONE] sentinel. Stream complete.');
+                    logger.info('[SSE] Received [DONE] sentinel. Stream complete');
                     if (eventSourceRef.current) {
                         eventSourceRef.current.close();
                         eventSourceRef.current = null;
@@ -163,10 +164,10 @@ const ObjectivesPage: React.FC = () => {
                 receivedAnyMessageRef.current = true; // Mark that we received a data message
                 try {
                     const newRecommendation = JSON.parse(event.data) as ObjectiveRecommendation;
-                    console.log('[SSE] Received recommendation:', newRecommendation);
+                    logger.info('[SSE] Received recommendation', { recommendation: newRecommendation });
                     setRecommendations((prev) => [...prev, newRecommendation]);
                 } catch (e) {
-                    console.error('[SSE] Error parsing message data:', e, event.data);
+                    logger.error('[SSE] Error parsing message data', { error: e, eventData: event.data });
                     setGenerationError('Failed to parse recommendation data.');
                     if (eventSourceRef.current) {
                         eventSourceRef.current.close();
@@ -178,12 +179,12 @@ const ObjectivesPage: React.FC = () => {
             };
 
             eventSource.onerror = (error) => {
-                console.error('[SSE] EventSource error:', error);
+                logger.error('[SSE] EventSource error', { error });
                 // Only set the user-facing error if no recommendations were successfully received
                 if (!receivedAnyMessageRef.current) { // Check the ref instead of state
                     setGenerationError('Connection error occurred while streaming recommendations.');
                 } else {
-                    console.warn('[SSE] EventSource error occurred after receiving recommendations. User message suppressed.');
+                    logger.warn('[SSE] EventSource error occurred after receiving recommendations. User message suppressed');
                 }
                 if (eventSourceRef.current) eventSourceRef.current.close();
                 eventSourceRef.current = null; // Clear ref on error
@@ -193,7 +194,7 @@ const ObjectivesPage: React.FC = () => {
 
             // Optional: Add a specific 'end' event listener if the server sends one
             eventSource.addEventListener('end', () => {
-                console.log('[SSE] Received end event from server.');
+                logger.info('[SSE] Received end event from server');
                 if (eventSourceRef.current) eventSourceRef.current.close();
                 eventSourceRef.current = null;
                 setIsStreaming(false);
@@ -201,7 +202,7 @@ const ObjectivesPage: React.FC = () => {
             });
 
         } catch (err: any) {
-            console.error('Error setting up EventSource:', err);
+            logger.error('Error setting up EventSource', { error: err });
             setGenerationError(err.message || 'Failed to start recommendation stream.');
             setIsStreaming(false);
             setIsGenerating(false);

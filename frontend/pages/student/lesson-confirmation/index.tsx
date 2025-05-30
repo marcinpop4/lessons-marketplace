@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { getLessonById } from '@frontend/api/lessonApi';
 import { Lesson } from '@shared/models/Lesson';
 import LessonDetails from '@frontend/components/features/lesson-confirmation/LessonDetails';
+import logger from '@frontend/utils/logger';
 import './lesson-confirmation.css';
 
 export default function LessonConfirmation() {
@@ -20,14 +21,14 @@ export default function LessonConfirmation() {
           const fetchedLesson = await getLessonById(lessonId as string);
           setLesson(fetchedLesson);
         } catch (err: any) {
-          console.error('Error fetching lesson:', err);
+          logger.error('Error fetching lesson', { error: err });
           setError(err.message);
         }
         setLoading(false);
       };
       fetchLesson();
     } else {
-      console.log('No lessonId provided in URL params'); // Kept this one
+      logger.warn('No lessonId provided in URL params');
     }
   }, [lessonId]);
 
