@@ -7,13 +7,25 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 const execAsync = promisify(exec);
+
+// Migration script logging functions (console acceptable for infrastructure scripts)
+function logInfo(message, data = {}) {
+    console.log(`[MIGRATION] ${message}`, Object.keys(data).length > 0 ? data : '');
+}
+
+function logError(message, error) {
+    console.error(`[MIGRATION ERROR] ${message}`, error);
+}
+
 async function main() {
-    console.log('Starting database migration in production environment');
+    logInfo('Starting database migration in production environment');
     // Additional logging to help debug database connection issues
-    console.log(`Environment: ${process.env.NODE_ENV}`);
-    console.log(`Host: ${process.env.DB_HOST}`);
-    console.log(`Database Name: ${process.env.POSTGRES_DB}`);
-    console.log(`Fly.io Environment: ${process.env.FLY_APP_NAME ? 'Yes' : 'No'}`);
+    logInfo('Environment configuration', {
+        environment: process.env.NODE_ENV,
+        host: process.env.DB_HOST,
+        database: process.env.POSTGRES_DB,
+        flyIo: process.env.FLY_APP_NAME ? 'Yes' : 'No'
+    });
     try {
         // Check all required environment variables
         const requiredEnvVars = ['POSTGRES_USER', 'DB_HOST', 'DB_PORT', 'POSTGRES_DB', 'POSTGRES_PASSWORD'];
@@ -30,10 +42,12 @@ async function main() {
         const databaseUrl = `postgresql://${process.env.POSTGRES_USER}:${dbPassword}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.POSTGRES_DB}?sslmode=${process.env.DB_SSL === 'true' ? 'require' : 'disable'}`;
         // Log a masked version of the connection string for debugging
         const maskedUrl = databaseUrl.replace(/:([^:@]+)@/, ':****@');
-        console.log(`Using database connection: ${maskedUrl}`);
-        console.log(`SSL mode: ${process.env.DB_SSL === 'true' ? 'require' : 'disable'}`);
+        logInfo('Database connection configured', {
+            connectionString: maskedUrl,
+            sslMode: process.env.DB_SSL === 'true' ? 'require' : 'disable'
+        });
         // Run the migration with explicit schema path and environment variables
-        console.log('Executing migration command: npx prisma migrate deploy --schema=server/prisma/schema.prisma');
+        logInfo('Executing migration command: npx prisma migrate deploy --schema=server/prisma/schema.prisma');
         const { stdout, stderr } = await execAsync('npx prisma migrate deploy --schema=server/prisma/schema.prisma', {
             env: {
                 ...process.env,
@@ -41,19 +55,19 @@ async function main() {
             },
         });
         if (stdout)
-            console.log(stdout);
+            logInfo('Migration output', { stdout });
         if (stderr)
-            console.error(stderr);
-        console.log('Database migration completed successfully');
+            logError('Migration stderr', stderr);
+        logInfo('Database migration completed successfully');
     }
     catch (error) {
-        console.error('Migration failed:', error);
+        logError('Migration failed', error);
         process.exit(1);
     }
 }
 main()
     .then(() => process.exit(0))
     .catch((error) => {
-    console.error('Unexpected error during migration:', error);
-    process.exit(1);
-});
+        logError('Unexpected error during migration', error);
+        process.exit(1);
+    });

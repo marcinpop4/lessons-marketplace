@@ -7,23 +7,27 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { createChildLogger } from '../config/logger.js';
 
 const execAsync = promisify(exec);
+const logger = createChildLogger('migration-deploy');
 
 async function main() {
-  console.log('Starting database migration in production environment');
+  logger.info('Starting database migration in production environment');
 
   // Additional logging to help debug database connection issues
-  console.log(`Environment: ${process.env.NODE_ENV}`);
-  console.log(`Host: ${process.env.DB_HOST}`);
-  console.log(`Database Name: ${process.env.POSTGRES_DB}`);
-  console.log(`Fly.io Environment: ${process.env.FLY_APP_NAME ? 'Yes' : 'No'}`);
+  logger.info('Environment configuration', {
+    environment: process.env.NODE_ENV,
+    host: process.env.DB_HOST,
+    database: process.env.POSTGRES_DB,
+    flyEnvironment: process.env.FLY_APP_NAME ? 'Yes' : 'No'
+  });
 
   try {
     // Check all required environment variables
     const requiredEnvVars = ['POSTGRES_USER', 'DB_HOST', 'DB_PORT', 'POSTGRES_DB', 'POSTGRES_PASSWORD'];
     const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
-    
+
     if (missingVars.length > 0) {
       throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
     }
@@ -39,11 +43,16 @@ async function main() {
 
     // Log a masked version of the connection string for debugging
     const maskedUrl = databaseUrl.replace(/:([^:@]+)@/, ':****@');
-    console.log(`Using database connection: ${maskedUrl}`);
-    console.log(`SSL mode: ${process.env.DB_SSL === 'true' ? 'require' : 'disable'}`);
+    logger.info('Database connection configuration', {
+      connectionString: maskedUrl,
+      sslMode: process.env.DB_SSL === 'true' ? 'require' : 'disable'
+    });
 
     // Run the migration with explicit schema path and environment variables
-    console.log('Executing migration command: npx prisma migrate deploy --schema=server/prisma/schema.prisma');
+    logger.info('Executing migration command', {
+      command: 'npx prisma migrate deploy --schema=server/prisma/schema.prisma'
+    });
+
     const { stdout, stderr } = await execAsync('npx prisma migrate deploy --schema=server/prisma/schema.prisma', {
       env: {
         ...process.env,
@@ -51,12 +60,12 @@ async function main() {
       },
     });
 
-    if (stdout) console.log(stdout);
-    if (stderr) console.error(stderr);
+    if (stdout) logger.info('Migration stdout', { output: stdout });
+    if (stderr) logger.warn('Migration stderr', { output: stderr });
 
-    console.log('Database migration completed successfully');
+    logger.info('Database migration completed successfully');
   } catch (error) {
-    console.error('Migration failed:', error);
+    logger.error('Migration failed', { error });
     process.exit(1);
   }
 }
@@ -64,6 +73,6 @@ async function main() {
 main()
   .then(() => process.exit(0))
   .catch((error) => {
-    console.error('Unexpected error during migration:', error);
+    logger.error('Unexpected error during migration', { error });
     process.exit(1);
   }); 

@@ -1,3 +1,7 @@
+import { createChildLogger } from '../../server/config/logger.js';
+
+const logger = createChildLogger('lesson-status');
+
 // Define a JSON value type
 type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
 
@@ -157,7 +161,7 @@ export class LessonStatus {
             try {
                 return JSON.parse(this.context);
             } catch (e) {
-                console.warn('Failed to parse LessonStatus context as JSON:', e);
+                logger.warn('Failed to parse LessonStatus context as JSON', { error: e, context: this.context });
                 return this.context; // Return as is if parsing fails
             }
         }

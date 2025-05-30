@@ -9,7 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
-import chalk from 'chalk'; // Import chalk
+import { createChildLogger } from '../config/logger.js';
 
 // Import shared models and enums
 import { LessonType } from '../../shared/models/LessonType.js';
@@ -40,6 +40,9 @@ import { utilService } from '../util/util.service.js'; // Import new util servic
 // Initialize Prisma client (not used directly except by UtilService)
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient(); // Keep for finally block
+
+// Create logger for seed operations
+const logger = createChildLogger('database-seed');
 
 // --- Environment Setup ---
 const __filename = fileURLToPath(import.meta.url);
@@ -82,10 +85,18 @@ async function main() {
   const NUM_REQUESTS_PER_STUDENT = 4;
   const ALL_LESSON_TYPES = Object.values(LessonType);
 
+  logger.info('Starting database seeding process', {
+    numStudents: NUM_STUDENTS,
+    numTeachers: NUM_TEACHERS,
+    numAddresses: NUM_ADDRESSES,
+    requestsPerStudent: NUM_REQUESTS_PER_STUDENT
+  });
+
   try { // Ensure main try block is present
     // 1. Clear Database using UtilService
+    logger.info('Clearing existing database data');
     await utilService.clearDatabase();
-    console.log(chalk.yellow('Database cleared.')); // Summary log
+    logger.info('Database cleared successfully');
 
     // 2. Create Base Data (Teachers, Students, Addresses)
     // Teacher Data
@@ -96,6 +107,7 @@ async function main() {
       { firstName: 'James', lastName: 'Wilson', email: 'james.wilson@musicschool.com', phoneNumber: '123-456-7893', dateOfBirth: new Date('1978-06-18') },
     ];
 
+    logger.info('Creating teachers', { count: teacherData.length });
     const allTeachers: Teacher[] = (await Promise.all(
       teacherData.map(teacher => authService.register({
         ...teacher,
@@ -107,7 +119,7 @@ async function main() {
 
     const teachers = allTeachers.slice(0, NUM_TEACHERS);
     if (teachers.length < NUM_TEACHERS) throw new Error(`Failed to create enough teachers. Needed ${NUM_TEACHERS}, got ${teachers.length}`);
-    console.log(chalk.green(`✓ ${teachers.length} Teachers created.`)); // Summary log
+    logger.info('Teachers created successfully', { created: teachers.length, expected: NUM_TEACHERS });
 
     // Student Data
     const studentData = [
@@ -128,7 +140,7 @@ async function main() {
 
     const students = allStudents.slice(0, NUM_STUDENTS);
     if (students.length < NUM_STUDENTS) throw new Error(`Failed to create enough students. Needed ${NUM_STUDENTS}, got ${students.length}`);
-    console.log(chalk.green(`✓ ${students.length} Students created.`)); // Summary log
+    logger.info('Students created successfully', { created: students.length, expected: NUM_STUDENTS });
 
     // Address Data
     const sampleAddresses = [
@@ -142,7 +154,7 @@ async function main() {
       sampleAddresses.slice(0, NUM_ADDRESSES).map(addr => addressService.create(addr as AddressDTO))
     )).filter((addr): addr is Address => addr !== null);
     if (addresses.length < NUM_ADDRESSES) throw new Error(`Failed to create enough addresses. Needed ${NUM_ADDRESSES}, got ${addresses.length}`);
-    console.log(chalk.green(`✓ ${addresses.length} Addresses created.`)); // Summary log
+    logger.info('Addresses created successfully', { created: addresses.length, expected: NUM_ADDRESSES });
 
     // 3. Create Teacher Rates
     let ratesCreatedCount = 0;
@@ -153,21 +165,26 @@ async function main() {
           await teacherLessonHourlyRateService.createLessonRate(teacher.id, lessonType, rateInCents);
           ratesCreatedCount++;
         } catch (e: any) {
-          console.error(`Failed to create rate for teacher ${teacher.id}, type ${lessonType}: ${e.message}`);
+          logger.error('Failed to create teacher lesson rate', {
+            teacherId: teacher.id,
+            lessonType,
+            error: e.message
+          });
         }
       }
     }
     const expectedRateCount = teachers.length * ALL_LESSON_TYPES.length;
     if (ratesCreatedCount < expectedRateCount) {
-      console.warn(chalk.yellow(`Warning: Created ${ratesCreatedCount} rates, expected ${expectedRateCount}. Some teachers might be missing rates.`));
+      logger.warn('Teacher rate creation incomplete', {
+        created: ratesCreatedCount,
+        expected: expectedRateCount
+      });
     }
-    console.log(chalk.green(`✓ ${ratesCreatedCount} Teacher Rates created/updated.`)); // Summary log
+    logger.info('Teacher rates created successfully', { created: ratesCreatedCount, expected: expectedRateCount });
 
     const teachersWithRates: Teacher[] = await Promise.all(
       teachers.map(t => teacherService.getTeacherById(t.id))
     );
-    // console.log(`Refetched ${teachersWithRates.length} teachers with rates.`); // Removed internal log
-
 
     // 4. Create Lesson Requests
     const lessonRequests: LessonRequest[] = [];
@@ -175,7 +192,6 @@ async function main() {
     for (let s = 0; s < students.length; s++) {
       const student = students[s];
       const studentLessonType = ALL_LESSON_TYPES[s % ALL_LESSON_TYPES.length];
-      // console.log(`  Student ${s + 1} (${student.firstName}) requesting ${studentLessonType}...`); // Removed internal log
 
       for (let r = 0; r < NUM_REQUESTS_PER_STUDENT; r++) {
         const address = addresses[(s + r) % addresses.length];
@@ -199,11 +215,15 @@ async function main() {
             lessonRequests.push(request);
           }
         } catch (requestError) {
-          console.error(chalk.red(`Failed to create lesson request ${r + 1} for student ${student.id}:`), requestError);
+          logger.error('Failed to create lesson request', {
+            requestNumber: r + 1,
+            studentId: student.id,
+            error: requestError
+          });
         }
       }
     }
-    console.log(chalk.green(`✓ ${lessonRequests.length} Lesson Requests created.`)); // Summary log
+    logger.info('Lesson requests created successfully', { created: lessonRequests.length });
 
     // 5. Create Lesson Quotes for ALL Requests from ALL Teachers
     const createdQuotes: LessonQuote[] = [];
@@ -211,12 +231,14 @@ async function main() {
       try {
         const quotesForRequest = await lessonQuoteService.createQuotes(request, teachersWithRates);
         createdQuotes.push(...quotesForRequest);
-        // console.log(`  Created ${quotesForRequest.length} quotes for request ${request.id.substring(0, 8)}...`); // Removed internal log
       } catch (quoteError) {
-        console.error(chalk.red(`Failed to create quotes for request ${request.id}:`), quoteError);
+        logger.error('Failed to create lesson quotes', {
+          requestId: request.id,
+          error: quoteError
+        });
       }
     }
-    console.log(chalk.green(`✓ ${createdQuotes.length} Lesson Quotes created.`)); // Summary log
+    logger.info('Lesson quotes created successfully', { created: createdQuotes.length });
 
     // 6. Select One Quote Per Student and Create Lessons
     const quotesToAccept: LessonQuote[] = [];
@@ -227,26 +249,30 @@ async function main() {
       );
       if (quote) {
         quotesToAccept.push(quote);
-        // console.log(`  Selected quote ${quote.id.substring(0, 8)} for student ${student.id.substring(0, 8)}.`); // Removed internal log
       } else {
-        console.warn(chalk.yellow(`Warning: No suitable quote found for student ${student.id.substring(0, 8)}. This student will not have a lesson.`));
+        logger.warn('No suitable quote found for student', {
+          studentId: student.id.substring(0, 8)
+        });
       }
     }
 
     // Create lessons concurrently for the selected quotes
     const lessonCreationPromises = quotesToAccept.map(async (quote) => {
       try {
-        // console.log(`Creating lesson for quote ${quote.id.substring(0, 8)}...`); // Removed internal log
         const lesson = await lessonService.create(quote.id);
         if (lesson) {
-          // console.log(`Lesson ${lesson.id.substring(0, 8)} created.`); // Removed internal log
           return lesson;
         } else {
-          console.warn(chalk.yellow(`Warning: lessonService.create returned null for quote ${quote.id.substring(0, 8)}.`)); // Keep warning
+          logger.warn('Lesson service returned null', {
+            quoteId: quote.id.substring(0, 8)
+          });
           return null;
         }
       } catch (lessonError) {
-        console.error(chalk.red(`Failed to create lesson for quote ${quote.id}:`), lessonError);
+        logger.error('Failed to create lesson', {
+          quoteId: quote.id,
+          error: lessonError
+        });
         return null; // Return null on error
       }
     });
@@ -255,7 +281,7 @@ async function main() {
     // Filter out nulls (lessons that failed to create)
     const createdLessons: Lesson[] = createdLessonsResults.filter((l): l is Lesson => l !== null);
 
-    console.log(chalk.green(`✓ ${createdLessons.length} Lessons created.`)); // Summary log
+    logger.info('Lessons created successfully', { created: createdLessons.length });
 
     // 7.1 Move the last lesson to the Accepted state
     const lastLesson = createdLessons[createdLessons.length - 1];
@@ -287,20 +313,23 @@ async function main() {
           targetDate
         );
         objectivesCreatedCount++;
-        // console.log(`  Created ${lessonType} objective for student ${student.id.substring(0, 8)}.`); // Internal log
       } catch (objectiveError) {
-        console.error(chalk.red(`Failed to create objective for student ${student.id}, type ${lessonType}:`), objectiveError);
+        logger.error('Failed to create objective', {
+          studentId: student.id,
+          lessonType,
+          error: objectiveError
+        });
       }
     }
-    console.log(chalk.green(`✓ ${objectivesCreatedCount} Objectives created.`)); // Summary log
+    logger.info('Objectives created successfully', { created: objectivesCreatedCount });
 
 
-  } catch (e) { // Ensure catch block exists
-    console.error(chalk.red("Seeding script failed:"), e);
-    process.exit(1);
-  } finally { // Ensure finally block exists
+  } catch (e: any) {
+    logger.error('Seeding script failed', { error: e });
+    throw e; // Re-throw to ensure exit code
+  } finally {
     await prisma.$disconnect();
-    console.log(chalk.blue('Seeding script finished.'));
+    logger.info('Database seeding completed');
   }
 } // Ensure main function closing brace exists
 

@@ -4,32 +4,35 @@ import fs from 'fs';
 import { PrismaClient } from '@prisma/client';
 import path from 'path';
 import prisma from './prisma.js';
+import { createChildLogger } from './config/logger.js';
 
 // Load environment variables
 dotenv.config();
 
-console.log('=== PRISMA DEBUG INFO ===');
+const logger = createChildLogger('prisma-debug');
+
+logger.info('=== PRISMA DEBUG INFO ===');
 
 // Check OpenSSL version
 try {
-  console.log('Checking OpenSSL version:');
+  logger.info('Checking OpenSSL version');
   const opensslVersion = execSync('openssl version').toString().trim();
-  console.log(opensslVersion);
+  logger.info('OpenSSL version detected', { version: opensslVersion });
 } catch (error) {
-  console.error('Error checking OpenSSL version:', error);
+  logger.error('Error checking OpenSSL version', { error });
 }
 
 // Check for DATABASE_URL
-console.log('\nChecking DATABASE_URL:');
+logger.info('Checking DATABASE_URL configuration');
 if (process.env.DATABASE_URL) {
   // Mask password for security
   const maskedUrl = process.env.DATABASE_URL.replace(
     /\/\/([^:]+):([^@]+)@/,
     '//$1:******@'
   );
-  console.log(`DATABASE_URL is set: ${maskedUrl}`);
+  logger.info('DATABASE_URL is configured', { url: maskedUrl });
 } else {
-  console.log('DATABASE_URL is not set!');
+  logger.warn('DATABASE_URL is not set');
 
   // Check individual database config variables
   const dbVars = [
@@ -41,46 +44,50 @@ if (process.env.DATABASE_URL) {
     'DB_SSL'
   ];
 
+  const dbConfig: Record<string, string> = {};
   dbVars.forEach(varName => {
     const value = process.env[varName];
     if (varName === 'POSTGRES_PASSWORD' && value) {
-      console.log(`${varName} = ******`);
+      dbConfig[varName] = '******';
     } else {
-      console.log(`${varName} = ${value || 'not set'}`);
+      dbConfig[varName] = value || 'not set';
     }
   });
+
+  logger.info('Individual database configuration variables', { config: dbConfig });
 }
 
 // Check if prisma schema exists
 const schemaPath = 'server/prisma/schema.prisma';
-console.log(`\nChecking if schema exists at path: ${schemaPath}`);
+logger.info('Checking schema file existence', { path: schemaPath });
+
 if (fs.existsSync(schemaPath)) {
-  console.log('Schema file exists');
-  console.log('Schema file contents:');
+  logger.info('Schema file exists');
   const schema = fs.readFileSync(schemaPath, 'utf8');
-  console.log(schema.substring(0, 500) + '...');
+  logger.debug('Schema file contents preview', {
+    preview: schema.substring(0, 500) + '...',
+    size: schema.length
+  });
 } else {
-  console.log('Schema file does not exist!');
+  logger.error('Schema file does not exist', { expectedPath: schemaPath });
   // Try to find it elsewhere
   try {
     const possibleLocations = execSync('find . -name "schema.prisma"').toString().trim();
-    console.log('Possible schema locations:');
-    console.log(possibleLocations);
+    logger.info('Found possible schema locations', { locations: possibleLocations.split('\n') });
   } catch (error) {
-    console.error('Error finding schema:', error);
+    logger.error('Error finding schema file', { error });
   }
 }
 
 // Try to connect to the database
-console.log('\nAttempting to connect to database...');
+logger.info('Attempting database connection test');
 
 async function testConnection() {
   try {
     const result = await prisma.$queryRaw`SELECT 1 as test`;
-    console.log('Database connection successful!');
-    console.log('Query result:', result);
+    logger.info('Database connection successful', { testResult: result });
   } catch (error) {
-    console.error('Database connection failed:', error);
+    logger.error('Database connection failed', { error });
   } finally {
     await prisma.$disconnect();
   }

@@ -1,3 +1,7 @@
+import { createChildLogger } from '../../server/config/logger.js';
+
+const logger = createChildLogger('milestone-status');
+
 // Define a JSON value type
 type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
 
@@ -130,7 +134,7 @@ export class MilestoneStatus {
             try {
                 return JSON.parse(this.context);
             } catch (e) {
-                console.warn('Failed to parse MilestoneStatus context as JSON:', e);
+                logger.warn('Failed to parse MilestoneStatus context as JSON', { error: e, context: this.context });
                 return this.context;
             }
         }

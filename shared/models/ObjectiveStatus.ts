@@ -1,3 +1,7 @@
+import { createChildLogger } from '../../server/config/logger.js';
+
+const logger = createChildLogger('objective-status');
+
 type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
 
 /**
@@ -101,7 +105,7 @@ export class ObjectiveStatus {
 
         // Basic validation
         if (!Object.values(ObjectiveStatusValue).includes(status)) {
-            console.error(`[ObjectiveStatus Constructor] Invalid status value provided: ${status}`);
+            logger.error('Invalid status value provided in ObjectiveStatus constructor', { status });
             throw new Error(`Invalid status value: ${status}`);
         }
     }
@@ -117,7 +121,7 @@ export class ObjectiveStatus {
     ): ObjectiveStatus {
         // Add validation within the static create method as well
         if (!Object.values(ObjectiveStatusValue).includes(status)) {
-            console.error(`[ObjectiveStatus.create] Invalid status value provided: ${status}`);
+            logger.error('Invalid status value provided in ObjectiveStatus.create', { status });
             throw new Error(`Invalid status value: ${status}`);
         }
         return new ObjectiveStatus({ id, objectiveId, status, context });
@@ -178,7 +182,7 @@ export class ObjectiveStatus {
             default:
                 // Handle potential unknown status values gracefully
                 const exhaustiveCheck: never = status;
-                console.warn(`[ObjectiveStatus.getDisplayLabelForStatus] Unknown status value: ${status}`);
+                logger.warn('Unknown status value in ObjectiveStatus.getDisplayLabelForStatus', { status });
                 return String(status) || 'Unknown Status';
         }
     }

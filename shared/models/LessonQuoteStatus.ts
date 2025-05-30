@@ -1,4 +1,7 @@
 import { JsonValue } from '../types/JsonTypes.js'; // Import the shared type
+import { createChildLogger } from '../../server/config/logger.js';
+
+const logger = createChildLogger('lesson-quote-status');
 
 /**
  * @openapi
@@ -98,7 +101,7 @@ export class LessonQuoteStatus {
         this.createdAt = createdAt;
 
         if (!Object.values(LessonQuoteStatusValue).includes(status)) {
-            console.error(`[LessonQuoteStatus Constructor] Invalid status value: ${status}`);
+            logger.error('Invalid status value provided in LessonQuoteStatus constructor', { status });
             throw new Error(`Invalid status value: ${status}`);
         }
     }

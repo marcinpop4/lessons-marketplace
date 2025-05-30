@@ -1,0 +1,60 @@
+---
+description: logging
+globs: 
+alwaysApply: false
+---
+# Logging Standards
+
+## Core Rule
+**Never use `console.*` statements in business logic code.** Use structured logging instead.
+
+## Server-Side Setup
+```typescript
+import { createChildLogger } from '../config/logger.js';
+const logger = createChildLogger('component-name'); // kebab-case
+```
+
+## Usage Patterns
+```typescript
+// Basic logging
+logger.info('Operation completed successfully');
+logger.warn('Deprecated endpoint accessed');
+
+// With context (preferred)
+logger.error('Database operation failed', { error, userId, operation });
+logger.debug('Processing request', { requestId, path });
+```
+
+## Log Levels
+- **`error`**: System errors, exceptions, failed operations
+- **`warn`**: Unexpected conditions, deprecation warnings  
+- **`info`**: Important business events, user actions
+- **`debug`**: Development details (filtered out in production)
+
+## Frontend Setup
+```typescript
+import clientLogger from '../utils/logger.js';
+clientLogger.error('API request failed', { error, endpoint });
+```
+
+## Console Exceptions (Only Acceptable)
+- Infrastructure scripts (`scripts/`, build tools)
+- Database seeding (`seed.ts`)
+- Test debugging (test setup/teardown only)
+- Migration scripts
+
+## Migration Pattern
+```typescript
+// Before
+console.log('User created:', user.id);
+console.error('Failed:', err);
+
+// After  
+logger.info('User created successfully', { userId: user.id });
+logger.error('Operation failed', { error: err, operation: 'createUser' });
+```
+
+## Anti-Patterns
+- ❌ `console.log()` in services/controllers/mappers
+- ❌ Logging sensitive data (passwords, tokens)
+- ❌ String concatenation instead of structured objects

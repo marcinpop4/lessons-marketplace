@@ -1,6 +1,9 @@
 import { ObjectiveStatus, ObjectiveStatusValue } from './ObjectiveStatus.js';
 import { Student } from './Student.js';
 import { LessonType } from './LessonType.js';
+import { createChildLogger } from '../../server/config/logger.js';
+
+const logger = createChildLogger('objective');
 
 /**
  * Database representation of an Objective with its CurrentStatus
@@ -117,7 +120,7 @@ export class Objective implements ObjectiveProps {
 
         // Ensure currentStatus is a valid ObjectiveStatus instance
         if (!props.currentStatus || !(props.currentStatus instanceof ObjectiveStatus)) {
-            console.warn("[Objective Constructor] Invalid or missing currentStatus prop. Defaulting to CREATED.", props);
+            logger.warn('Invalid or missing currentStatus prop in Objective constructor, defaulting to CREATED', { props });
             // Create a default CREATED status if none is provided or invalid
             this.currentStatus = new ObjectiveStatus({
                 id: props.currentStatusId || 'temp-id-' + Date.now(), // Generate a temporary ID if needed
@@ -133,7 +136,10 @@ export class Objective implements ObjectiveProps {
             this.currentStatus = props.currentStatus;
             // Ensure currentStatusId matches the provided currentStatus object's ID
             if (this.currentStatusId !== this.currentStatus.id) {
-                console.warn(`[Objective Constructor] Mismatch between currentStatusId (${this.currentStatusId}) and currentStatus.id (${this.currentStatus.id}). Using currentStatus.id.`);
+                logger.warn('Mismatch between currentStatusId and currentStatus.id in Objective constructor', {
+                    currentStatusId: this.currentStatusId,
+                    currentStatusObjectId: this.currentStatus.id
+                });
                 this.currentStatusId = this.currentStatus.id;
             }
         }
@@ -143,7 +149,7 @@ export class Objective implements ObjectiveProps {
 
         // Validate LessonType
         if (!Object.values(LessonType).includes(props.lessonType)) {
-            console.error(`[Objective Constructor] Invalid lessonType provided: ${props.lessonType}`);
+            logger.error('Invalid lessonType provided in Objective constructor', { lessonType: props.lessonType });
             throw new Error(`Invalid lessonType: ${props.lessonType}`);
         }
     }
