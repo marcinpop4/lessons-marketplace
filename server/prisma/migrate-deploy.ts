@@ -7,7 +7,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 const execAsync = promisify(exec);
 const logger = createChildLogger('migration-deploy');

@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { addressService } from './address.service.js';
 import { UserType } from '../../shared/models/UserType.js';
 import { BadRequestError, NotFoundError, AuthorizationError } from '../errors/index.js';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for address controller
 const logger = createChildLogger('address-controller');

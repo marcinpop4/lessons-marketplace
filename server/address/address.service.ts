@@ -10,7 +10,7 @@ import { AddressMapper } from './address.mapper.js';
 import { isUuid } from '../utils/validation.utils.js';
 // Import shared error classes
 import { BadRequestError, NotFoundError, AuthorizationError } from '../errors/index.js';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for address service
 const logger = createChildLogger('address-service');

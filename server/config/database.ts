@@ -11,7 +11,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
-import { createChildLogger } from './logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 /**
  * Load environment variables from a specific path

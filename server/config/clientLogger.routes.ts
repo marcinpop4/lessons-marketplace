@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { createChildLogger } from './logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 const router = express.Router();
 

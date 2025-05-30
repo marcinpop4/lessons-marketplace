@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for SSE service
 const logger = createChildLogger('sse-service');

@@ -14,7 +14,8 @@ import { AppError } from './errors/index.js'; // Import base error
 import { ZodError } from 'zod';
 
 // Logging
-import { logger, httpLogger, createChildLogger } from './config/logger.js';
+import { logger, createChildLogger } from '../config/logger.js';
+import { httpLogger } from './config/httpLogger.js';
 
 // --- Debugging --- 
 // Moved debug logging setup earlier

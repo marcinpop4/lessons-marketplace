@@ -21,7 +21,7 @@ import { UserType as SharedUserType } from '../../shared/models/UserType.js';
 import { teacherService } from '../teacher/teacher.service.js';
 import { v4 as uuidv4 } from 'uuid';
 import { LessonQuoteStatus } from '../../shared/models/LessonQuoteStatus.js';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for lesson quote service
 const logger = createChildLogger('lesson-quote-service');

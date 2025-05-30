@@ -7,7 +7,7 @@ import { UserType } from '../../shared/models/UserType.js';
 import { AppError, DuplicateEmailError, BadRequestError, AuthorizationError, NotFoundError } from '../errors/index.js';
 import { RegisterUserDTO } from './registerUser.dto.js';
 import { LoginUserDTO } from './loginUser.dto.js';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for auth controller
 const logger = createChildLogger('auth-controller');

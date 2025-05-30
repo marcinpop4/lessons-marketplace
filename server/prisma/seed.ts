@@ -9,7 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Import shared models and enums
 import { LessonType } from '../../shared/models/LessonType.js';

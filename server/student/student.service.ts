@@ -5,7 +5,7 @@ import { StudentMapper } from './student.mapper.js';
 import prisma from '../prisma.js'; // Import shared prisma instance
 import { isUuid } from '../utils/validation.utils.js'; // Import UUID validation util
 import { AppError, NotFoundError } from '../errors/index.js';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for student service
 const logger = createChildLogger('student-service');

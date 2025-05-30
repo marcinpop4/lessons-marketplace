@@ -3,7 +3,7 @@ import { studentService } from './student.service.js';
 import authService, { AuthMethod } from '../auth/auth.service.js';
 import { UserType } from '../../shared/models/UserType.js';
 import { AuthorizationError } from '../errors/index.js';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for student controller
 const logger = createChildLogger('student-controller');

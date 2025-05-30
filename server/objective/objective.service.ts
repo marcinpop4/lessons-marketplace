@@ -17,7 +17,7 @@ import { lessonService } from '../lesson/lesson.service.js'; // Import lessonSer
 import { Lesson } from '../../shared/models/Lesson.js'; // Import Lesson model
 import { LessonStatusValue } from '../../shared/models/LessonStatus.js';
 import { v4 as uuidv4 } from 'uuid';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for objective service
 const logger = createChildLogger('objective-service');

@@ -36,7 +36,10 @@ export default {
   moduleNameMapper: {
     '^@shared/(.*)$': '<rootDir>/../../shared/$1', // Adjusted path
     '^@server/(.*)$': '<rootDir>/../../server/$1',  // Adjusted path
-    '^@frontend/(.*)$': '<rootDir>/../../frontend/$1' // Added frontend alias
+    '^@frontend/(.*)$': '<rootDir>/../../frontend/$1', // Added frontend alias
+    '^@config/(.*)$': '<rootDir>/../../config/$1',   // Added config alias
+    // Map relative config logger imports to the actual .ts file
+    '../../config/logger.js': '<rootDir>/../../config/logger.ts'
   },
   testTimeout: 30000, // Slightly increased timeout
   verbose: true

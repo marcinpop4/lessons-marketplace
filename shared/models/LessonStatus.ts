@@ -1,4 +1,4 @@
-import { createChildLogger } from '../../server/config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 const logger = createChildLogger('lesson-status');
 

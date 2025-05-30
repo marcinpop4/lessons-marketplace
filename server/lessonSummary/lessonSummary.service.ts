@@ -5,7 +5,7 @@ import { LessonSummary } from '../../shared/models/LessonSummary.js';
 import { toSharedLessonSummary } from './lessonSummary.mapper.js';
 import { isUuid } from '../utils/validation.utils.js';
 import prisma from '../prisma.js';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for lesson summary service
 const logger = createChildLogger('lesson-summary-service');

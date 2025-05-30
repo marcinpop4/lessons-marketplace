@@ -42,7 +42,10 @@ export default {
   // Module mapper paths are relative to project root (<rootDir> is tests/unit here)
   moduleNameMapper: {
     '^@shared/(.*)$': '<rootDir>/../../shared/$1', // Adjusted path
-    '^@server/(.*)$': '<rootDir>/../../server/$1'  // Adjusted path
+    '^@server/(.*)$': '<rootDir>/../../server/$1',  // Adjusted path
+    '^@config/(.*)$': '<rootDir>/../../config/$1',   // Added config alias
+    // Map relative config logger imports to the actual .ts file
+    '../../config/logger.js': '<rootDir>/../../config/logger.ts'
   },
   // Add verbose logging
   verbose: true

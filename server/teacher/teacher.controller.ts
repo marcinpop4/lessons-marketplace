@@ -3,7 +3,7 @@ import { LessonType } from '../../shared/models/LessonType.js';
 import { teacherService } from './teacher.service.js';
 import { Lesson } from '../../shared/models/Lesson.js';
 import { NotFoundError, BadRequestError } from '../errors/index.js';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for teacher controller
 const logger = createChildLogger('teacher-controller');

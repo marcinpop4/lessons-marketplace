@@ -9,7 +9,7 @@ import { BadRequestError, NotFoundError, AppError, AuthorizationError, ConflictE
 import { isUuid } from '../utils/validation.utils.js';
 import { UpdateLessonDto } from './lesson.dto.js';
 import { UserType as PrismaUserType } from '@prisma/client';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for lesson service
 const logger = createChildLogger('lesson-service');

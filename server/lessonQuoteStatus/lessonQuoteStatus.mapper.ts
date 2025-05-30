@@ -1,7 +1,7 @@
 import { LessonQuoteStatus as PrismaLessonQuoteStatus } from '@prisma/client';
 import { LessonQuoteStatus, LessonQuoteStatusValue } from '../../shared/models/LessonQuoteStatus.js';
 import { JsonValue } from '../../shared/types/JsonTypes.js';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for lesson quote status mapper
 const logger = createChildLogger('lesson-quote-status-mapper');

@@ -4,7 +4,7 @@ import fs from 'fs';
 import { PrismaClient } from '@prisma/client';
 import path from 'path';
 import prisma from './prisma.js';
-import { createChildLogger } from './config/logger.js';
+import { createChildLogger } from '../config/logger.js';
 
 // Load environment variables
 dotenv.config();

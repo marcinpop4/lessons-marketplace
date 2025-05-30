@@ -18,7 +18,7 @@ import { TeacherMapper } from './teacher.mapper.js';
 import { TeacherLessonHourlyRateMapper } from '../teacher-lesson-hourly-rate/teacher-lesson-hourly-rate.mapper.js';
 import { LessonMapper } from '../lesson/lesson.mapper.js';
 import { isUuid } from '../utils/validation.utils.js';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for teacher service
 const logger = createChildLogger('teacher-service');

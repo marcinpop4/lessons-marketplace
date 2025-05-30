@@ -5,7 +5,7 @@ import { LessonType } from '../../shared/models/LessonType.js'; // Import Lesson
 import { UserType } from '../../shared/models/UserType.js';
 // Import all required errors from the central index file
 import { AuthorizationError, BadRequestError, NotFoundError } from '../errors/index.js';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for lesson request controller
 const logger = createChildLogger('lesson-request-controller');

@@ -9,7 +9,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
-import { createChildLogger } from '../server/config/logger.js';
+import { createChildLogger } from '../config/logger.js';
 
 // Create child logger for validation script
 const logger = createChildLogger('validation-script');
@@ -148,7 +148,16 @@ async function runTests(): Promise<{ unitTime: number; apiTime: number; e2eTime:
     try {
         // 1. Run Unit Tests
         const unitResult = await runTestCommand('pnpm', ['test:unit'], 'Unit Tests');
-        if (unitResult.failed) finalExitCode = 1;
+        if (unitResult.failed) {
+            finalExitCode = 1;
+            logger.error('Unit tests failed. Stopping validation.');
+            return {
+                unitTime: unitResult.duration,
+                apiTime: 0,
+                e2eTime: 0,
+                failed: true
+            };
+        }
 
         // 2. Start Server and Frontend in background
         logger.info(`\n---> Starting background services...`);
@@ -190,11 +199,24 @@ async function runTests(): Promise<{ unitTime: number; apiTime: number; e2eTime:
 
         // 4. Run API Tests
         const apiResult = await runTestCommand('pnpm', ['test:api'], 'API Tests');
-        if (apiResult.failed) finalExitCode = 1;
+        if (apiResult.failed) {
+            finalExitCode = 1;
+            logger.error('API tests failed. Stopping validation.');
+            await killProcesses();
+            return {
+                unitTime: unitResult.duration,
+                apiTime: apiResult.duration,
+                e2eTime: 0,
+                failed: true
+            };
+        }
 
         // 5. Run E2E Tests
         const e2eResult = await runTestCommand('pnpm', ['test:e2e'], 'E2E Tests');
-        if (e2eResult.failed) finalExitCode = 1;
+        if (e2eResult.failed) {
+            finalExitCode = 1;
+            logger.error('E2E tests failed.');
+        }
 
         // Cleanup background processes
         await killProcesses();

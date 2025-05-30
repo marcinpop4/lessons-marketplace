@@ -1,6 +1,6 @@
 import { LessonStatus as PrismaLessonStatus } from '@prisma/client';
 import { LessonStatus, LessonStatusValue } from '../../shared/models/LessonStatus.js';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for lesson status mapper
 const logger = createChildLogger('lesson-status-mapper');

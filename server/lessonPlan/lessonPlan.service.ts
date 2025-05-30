@@ -30,7 +30,7 @@ import { LessonStatusValue } from '../../shared/models/LessonStatus.js';
 import { UserType as PrismaUserType } from '../../shared/models/UserType.js'; // Shared UserType
 import { LessonType } from '../../shared/models/LessonType.js'; // Import LessonType if needed for validation
 import { AiGeneratedLessonPlan, AiMilestone, AiPlannedLesson, AiObjectiveForPlan } from '../../shared/models/AiGeneratedLessonPlan.js';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for lesson plan service
 const logger = createChildLogger('lesson-plan-service');

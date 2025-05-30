@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import prisma from '../prisma.js'; // Adjust path if needed
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for util service
 const logger = createChildLogger('util-service');

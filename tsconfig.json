@@ -10,7 +10,8 @@
     "paths": {
       "@shared/*": ["shared/*"],
       "@frontend/*": ["frontend/*"],
-      "@server/*": ["server/*"]
+      "@server/*": ["server/*"],
+      "@config/*": ["config/*"]
     },
     "types": ["vite/client", "jest"],
     "esModuleInterop": true,
@@ -28,6 +29,7 @@
     "server/**/*",
     "scripts/**/*",
     "tests/**/*",
+    "config/**/*",
     "vite.config.ts"
   ],
   "exclude": [

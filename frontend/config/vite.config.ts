@@ -165,8 +165,19 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: resolve(projectRoot, 'dist/frontend'),
       rollupOptions: {
-        // Explicitly set the tsconfig path for the build
-        external: [],
+        external: [
+          // Exclude Node.js-only packages from frontend bundle
+          'pino-http',
+          'fs',
+          'path',
+          'os',
+          'crypto',
+          'stream',
+          'util',
+          'events',
+          'buffer',
+          'querystring'
+        ],
         output: {
           manualChunks: {}
         }
@@ -305,9 +316,9 @@ export default defineConfig(({ mode }) => {
     resolve: {
       extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json'],
       alias: {
+        '@frontend': resolve(__dirname, '..'),
         '@shared': resolve(projectRoot, 'shared'),
-        '@frontend': resolve(projectRoot, 'frontend'),
-        '@config': resolve(__dirname, '.'),
+        '@config': resolve(projectRoot, 'config'),
         '@frontend/api': resolve(__dirname, '../api'),
         '@frontend/components': resolve(__dirname, '../components'),
         '@frontend/contexts': resolve(__dirname, '../contexts'),

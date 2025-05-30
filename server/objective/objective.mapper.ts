@@ -3,7 +3,7 @@ import { Objective, ObjectiveProps } from '../../shared/models/Objective.js';
 import { ObjectiveStatus, ObjectiveStatusValue } from '../../shared/models/ObjectiveStatus.js';
 import { LessonType } from '../../shared/models/LessonType.js';
 import { JsonValue } from '../../shared/types/JsonTypes.js';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for objective mapper
 const logger = createChildLogger('objective-mapper');

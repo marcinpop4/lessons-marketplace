@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { UserType } from '../../shared/models/UserType.js';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for role middleware
 const logger = createChildLogger('role-middleware');

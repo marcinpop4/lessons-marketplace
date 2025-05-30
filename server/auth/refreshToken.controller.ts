@@ -5,7 +5,7 @@ import { cookieOptions, REFRESH_TOKEN_COOKIE_NAME } from './auth.constants.js';
 import { UserType } from '../../shared/models/UserType.js';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for refresh token controller
 const logger = createChildLogger('refresh-token-controller');

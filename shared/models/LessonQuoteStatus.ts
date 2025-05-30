@@ -1,5 +1,5 @@
 import { JsonValue } from '../types/JsonTypes.js'; // Import the shared type
-import { createChildLogger } from '../../server/config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 const logger = createChildLogger('lesson-quote-status');
 

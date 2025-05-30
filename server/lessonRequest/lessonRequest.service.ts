@@ -11,7 +11,7 @@ import { LessonRequestMapper } from './lessonRequest.mapper.js';
 import { BadRequestError, NotFoundError, AuthorizationError } from '../errors/index.js';
 import { isUuid } from '../utils/validation.utils.js';
 import { CreateLessonRequestDTO } from './lessonRequest.dto.js'; // Import the new DTO
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for lesson request service
 const logger = createChildLogger('lesson-request-service');

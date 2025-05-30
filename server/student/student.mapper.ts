@@ -1,6 +1,6 @@
 import { Student as DbStudent } from '@prisma/client';
 import { Student } from '../../shared/models/Student.js';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for student mapper
 const logger = createChildLogger('student-mapper');

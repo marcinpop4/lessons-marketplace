@@ -3,7 +3,7 @@ import { TeacherMapper } from '../teacher/teacher.mapper.js';
 import { LessonRequestMapper } from '../lessonRequest/lessonRequest.mapper.js';
 import { LessonQuoteStatusMapper } from '../lessonQuoteStatus/lessonQuoteStatus.mapper.js';
 import { Prisma, LessonQuoteStatus as PrismaLessonQuoteStatus } from '@prisma/client';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for lesson quote mapper
 const logger = createChildLogger('lesson-quote-mapper');

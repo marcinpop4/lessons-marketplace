@@ -13,7 +13,7 @@ import { authMethodService } from './auth-method.service.js'; // Import the new 
 import { UserType as PrismaUserType, Teacher as DbTeacher, Student as DbStudent, Prisma } from '@prisma/client';
 import { UserType } from '../../shared/models/UserType.js';
 import { isUuid } from '../utils/validation.utils.js';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for auth service
 const logger = createChildLogger('auth-service');

@@ -7,7 +7,7 @@ import { Milestone as SharedMilestone } from '../../shared/models/Milestone.js';
 import { MilestoneStatus as SharedMilestoneStatus, MilestoneStatusValue } from '../../shared/models/MilestoneStatus.js';
 import { Lesson as SharedLesson } from '../../shared/models/Lesson.js';
 import { JsonValue } from '@../../shared/types/JsonTypes.js'; // Assuming JsonValue is imported
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for milestone mapper
 const logger = createChildLogger('milestone-mapper');

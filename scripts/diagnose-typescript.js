@@ -69,7 +69,8 @@ const requiredOptions = {
   paths: {
     '@shared/*': ['shared/*'],
     '@frontend/*': ['frontend/*'],
-    '@server/*': ['server/*']
+    '@server/*': ['server/*'],
+    '@config/*': ['config/*']
   },
   types: ['vite/client', 'jest']
 };

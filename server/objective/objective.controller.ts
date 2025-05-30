@@ -6,7 +6,7 @@ import { ObjectiveStatusValue } from '../../shared/models/ObjectiveStatus.js'; /
 import { BadRequestError, AuthorizationError, NotFoundError } from '../errors/index.js';
 import { UserType as PrismaUserType } from '@prisma/client'; // Keep if needed elsewhere
 import { Objective } from '../../shared/models/Objective.js';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for objective controller
 const logger = createChildLogger('objective-controller');

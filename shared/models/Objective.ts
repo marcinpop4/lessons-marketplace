@@ -1,7 +1,8 @@
-import { ObjectiveStatus, ObjectiveStatusValue } from './ObjectiveStatus.js';
+import { ObjectiveStatus, ObjectiveStatusValue, ObjectiveStatusTransition } from './ObjectiveStatus.js';
 import { Student } from './Student.js';
+import { Teacher } from './Teacher.js';
 import { LessonType } from './LessonType.js';
-import { createChildLogger } from '../../server/config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 const logger = createChildLogger('objective');
 

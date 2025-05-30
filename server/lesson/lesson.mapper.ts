@@ -4,7 +4,7 @@ import { LessonStatusMapper } from '../lesson-status/lessonStatus.mapper.js';
 import { toSharedLessonSummary } from '../lessonSummary/lessonSummary.mapper.js';
 import { LessonSummary as SharedLessonSummary } from '../../shared/models/LessonSummary.js';
 import { LessonSummary as PrismaLessonSummary } from '@prisma/client';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for lesson mapper
 const logger = createChildLogger('lesson-mapper');

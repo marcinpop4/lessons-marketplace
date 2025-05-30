@@ -12,7 +12,7 @@ import { LessonPlan as SharedLessonPlan } from '../../shared/models/LessonPlan.j
 import { LessonPlanStatus as SharedLessonPlanStatus, LessonPlanStatusValue } from '../../shared/models/LessonPlanStatus.js'; // Alias
 import { Milestone as SharedMilestone } from '../../shared/models/Milestone.js'; // Alias
 import { JsonValue } from '../../shared/types/JsonTypes.js'; // Assuming JsonValue is imported if not globally available
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for lesson plan mapper
 const logger = createChildLogger('lesson-plan-mapper');

@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import { Stream } from 'openai/streaming';
 import { ChatCompletionChunk } from 'openai/resources/chat/completions';
 import chalk from 'chalk';
-import { createChildLogger } from '../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 
 // Create child logger for AI stream utilities
 const logger = createChildLogger('ai-stream');
