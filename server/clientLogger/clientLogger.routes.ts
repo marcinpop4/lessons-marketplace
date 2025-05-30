@@ -1,46 +1,7 @@
-import express, { Request, Response, NextFunction } from 'express';
-import { createChildLogger } from '../../config/logger.js';
-import pino from 'pino';
+import express from 'express';
+import { clientLoggerController } from './clientLogger.controller.js';
 
 const router = express.Router();
-
-// Create client logger that logs at debug level in development to hide from console
-const clientLogger = createChildLogger('client');
-
-// Dynamically import file logging when available
-let clientFileLogger: any = null;
-if (typeof process !== 'undefined' && process.versions?.node) {
-    // Import file logger asynchronously
-    import('../config/fileLogger.js').then(fileLoggerModule => {
-        clientFileLogger = fileLoggerModule.clientFileLogger;
-    }).catch(error => {
-        console.warn('Client file logging not available:', error);
-    });
-}
-
-// Override log methods to hide from terminal but write to files
-const createClientLogMethod = (originalLevel: string) => {
-    return (obj: any, msg?: string) => {
-        // Always write to file at the proper level (if available)
-        if (clientFileLogger) {
-            (clientFileLogger as any)[originalLevel](obj, msg);
-        }
-
-        // In development, don't log to terminal (hidden)
-        // In production, also log to main logger
-        if (process.env.NODE_ENV !== 'development') {
-            (clientLogger as any)[originalLevel](obj, msg);
-        }
-    };
-};
-
-// Create methods that hide client logs from development console
-const clientLogMethods = {
-    error: createClientLogMethod('error'),
-    warn: createClientLogMethod('warn'),
-    info: createClientLogMethod('info'),
-    debug: clientLogger.debug.bind(clientLogger)
-};
 
 /**
  * @openapi
@@ -164,21 +125,6 @@ const clientLogMethods = {
  *         - processed
  */
 
-interface ClientLogEntry {
-    timestamp: string;
-    level: string;
-    message: string;
-    data?: Record<string, any>;
-    sessionId?: string;
-    userId?: string;
-    url?: string;
-    userAgent?: string;
-    viewport?: {
-        width: number;
-        height: number;
-    };
-}
-
 /**
  * @openapi
  * /logs:
@@ -299,65 +245,6 @@ interface ClientLogEntry {
  *               }]
  *             }'
  */
-router.post('/', (req: Request, res: Response, next: NextFunction): void => {
-    try {
-        const { logs } = req.body;
-
-        if (!logs || !Array.isArray(logs)) {
-            res.status(400).json({ error: 'Invalid logs format' });
-            return;
-        }
-
-        // Validate array is not empty
-        if (logs.length === 0) {
-            res.status(400).json({ error: 'Invalid logs format' });
-            return;
-        }
-
-        // Validate array size to prevent abuse
-        if (logs.length > 100) {
-            res.status(400).json({ error: 'Too many log entries. Maximum 100 per request.' });
-            return;
-        }
-
-        // Process each log entry
-        logs.forEach((log: ClientLogEntry) => {
-            // Add server-side metadata
-            const enrichedLog = {
-                ...log.data,
-                clientTimestamp: log.timestamp,
-                sessionId: log.sessionId,
-                userId: log.userId,
-                url: log.url,
-                viewport: log.viewport,
-                serverTimestamp: new Date().toISOString(),
-                source: 'client',
-                ip: req.ip,
-                forwardedFor: req.get('X-Forwarded-For'),
-                userAgent: log.userAgent?.slice(0, 200), // Truncate long user agents
-            };
-
-            // Log based on level using structured logging
-            switch (log.level) {
-                case 'error':
-                    clientLogMethods.error(enrichedLog, log.message);
-                    break;
-                case 'warn':
-                    clientLogMethods.warn(enrichedLog, log.message);
-                    break;
-                case 'debug':
-                    clientLogMethods.debug(enrichedLog, log.message);
-                    break;
-                default:
-                    clientLogMethods.info(enrichedLog, log.message);
-            }
-        });
-
-        res.status(200).json({ success: true, processed: logs.length });
-    } catch (error) {
-        clientLogger.error({ err: error }, 'Error processing client logs');
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
+router.post('/', clientLoggerController.processLogs);
 
 export default router; 
