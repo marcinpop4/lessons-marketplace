@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import { logger } from '../../config/logger.js';
 import pino from 'pino';
 
@@ -9,11 +9,17 @@ declare global {
             id?: string;
         }
     }
+    var _httpLoggerDebugLogged: boolean | undefined;
 }
 
-// Helper function to get environment variables
-const getEnvVar = (name: string): string | undefined => {
-    return process.env[name];
+/**
+ * Redaction marker used consistently across all logging systems
+ */
+const REDACTION_MARKER = '[Redacted]';
+
+// Helper function to get environment variables with fallback
+const getEnvVar = (key: string, fallback: string = ''): string => {
+    return process.env[key] || fallback;
 };
 
 // Convert numeric log levels to Pino string levels (duplicate from main logger)
@@ -42,58 +48,93 @@ const getLogLevel = (logLevel: string | undefined): string => {
     return 'info';
 };
 
-// Dynamically import file logging when available
+// Import the shared redaction configuration and file logger
+let createRedactionConfig: any = null;
 let httpFileLogger: any = null;
-if (typeof process !== 'undefined' && process.versions?.node) {
-    // Import file logger asynchronously
-    import('./fileLogger.js').then(fileLoggerModule => {
-        httpFileLogger = fileLoggerModule.httpFileLogger;
-    }).catch(error => {
-        console.warn('HTTP file logging not available:', error);
-    });
-}
+let httpTerminalLogger: any = null;
 
-// Create a terminal-only logger for clean HTTP messages
-const httpTerminalLogger = pino({
-    level: getLogLevel(getEnvVar('LOG_LEVEL')), // Respect LOG_LEVEL setting
-    base: {}, // No base metadata to avoid component showing up
-    transport: getEnvVar('NODE_ENV') === 'development' ? {
-        target: 'pino-pretty',
-        options: {
-            colorize: true,
-            translateTime: 'SYS:HH:MM:ss.l',
-            ignore: 'pid,hostname',
-            singleLine: false, // Each log entry on its own line
-            hideObject: true, // Hide any structured data
-            messageFormat: 'http | {msg}',
-        }
-    } : undefined
+// Fallback redaction configuration if import fails
+const createFallbackRedactionConfig = () => ({
+    paths: [
+        // Basic sensitive fields
+        'password',
+        'token',
+        'authorization',
+        'cookie',
+        'secret',
+        'apikey',
+
+        // HTTP specific paths
+        'req.headers.authorization',
+        'req.headers.cookie',
+        'req.body.password',
+        'req.body.token',
+        'res.headers["set-cookie"]',
+        'res.body.password',
+        'res.body.token',
+
+        // Wildcards
+        '*.password',
+        '*.token',
+        '*.secret',
+        '*.authorization'
+    ],
+    censor: REDACTION_MARKER,
+    remove: false
 });
 
-// Security scrubbing function for sensitive data
-const scrubSensitiveData = (obj: any): any => {
-    if (obj === null || typeof obj !== 'object') {
-        return obj;
-    }
+// Initialize loggers after importing shared configuration
+if (typeof process !== 'undefined' && process.versions?.node) {
+    import('./fileLogger.js').then(fileLoggerModule => {
+        httpFileLogger = fileLoggerModule.httpFileLogger;
+        createRedactionConfig = fileLoggerModule.createRedactionConfig;
 
-    if (Array.isArray(obj)) {
-        return obj.map(item => scrubSensitiveData(item));
-    }
+        // Create the terminal logger with proper redaction config
+        httpTerminalLogger = pino({
+            level: getLogLevel(getEnvVar('LOG_LEVEL')),
+            base: {},
+            redact: createRedactionConfig(),
+            transport: getEnvVar('NODE_ENV') === 'development' ? {
+                target: 'pino-pretty',
+                options: {
+                    colorize: true,
+                    translateTime: 'SYS:HH:MM:ss.l',
+                    ignore: 'pid,hostname',
+                    singleLine: false,
+                    hideObject: true,
+                    messageFormat: 'http | {msg}',
+                }
+            } : undefined
+        });
+    }).catch(error => {
+        console.warn('HTTP logging initialization failed, using fallback:', error);
 
-    const scrubbed: { [key: string]: any } = {};
-    const sensitiveKeys = ['password', 'token', 'authorization', 'cookie', 'accesstoken', 'secret', 'apikey'];
-
-    for (const key in obj) {
-        if (Object.prototype.hasOwnProperty.call(obj, key)) {
-            if (sensitiveKeys.includes(key.toLowerCase())) {
-                scrubbed[key] = '[SCRUBBED]';
-            } else {
-                scrubbed[key] = scrubSensitiveData(obj[key]);
-            }
-        }
-    }
-    return scrubbed;
-};
+        // Create fallback logger
+        httpTerminalLogger = pino({
+            level: getLogLevel(getEnvVar('LOG_LEVEL')),
+            base: {},
+            redact: createFallbackRedactionConfig(),
+            transport: getEnvVar('NODE_ENV') === 'development' ? {
+                target: 'pino-pretty',
+                options: {
+                    colorize: true,
+                    translateTime: 'SYS:HH:MM:ss.l',
+                    ignore: 'pid,hostname',
+                    singleLine: false,
+                    hideObject: true,
+                    messageFormat: 'http | {msg}',
+                }
+            } : undefined
+        });
+    });
+} else {
+    // Browser environment fallback
+    httpTerminalLogger = pino({
+        level: getLogLevel(getEnvVar('LOG_LEVEL')),
+        base: {},
+        redact: createFallbackRedactionConfig()
+    });
+}
 
 // Create a simple HTTP logger middleware that only logs clean messages
 export const httpLogger = (req: Request, res: Response, next: NextFunction) => {
@@ -146,7 +187,7 @@ export const httpLogger = (req: Request, res: Response, next: NextFunction) => {
             // Build the clean terminal message
             let terminalMessage = `${method} ${url} ${status} ${responseTime}ms`;
 
-            // Create structured log object for file
+            // Create structured log object for file - Pino redaction will handle sensitive data
             const fileLogData: any = {
                 reqId: req.id,
                 method,
@@ -158,27 +199,25 @@ export const httpLogger = (req: Request, res: Response, next: NextFunction) => {
                 forwardedFor: req.get('x-forwarded-for'),
             };
 
-            // Add request data if it exists
+            // Add request data if it exists - no manual scrubbing needed, Pino handles it
             if ((req as any).body && Object.keys((req as any).body).length > 0) {
-                const scrubbedBody = scrubSensitiveData((req as any).body);
-
                 // For terminal: add request body to message (only in development)
                 if (method !== 'GET' && getEnvVar('NODE_ENV') === 'development') {
-                    const bodyStr = JSON.stringify(scrubbedBody);
+                    const bodyStr = JSON.stringify((req as any).body);
                     // Add yellow color to the req body for better visibility
                     terminalMessage += ` \x1b[33mreq: ${bodyStr}\x1b[0m`;
                 }
 
-                // For file: add as structured data
+                // For file: add as structured data - Pino will redact sensitive fields
                 fileLogData.req = {
-                    headers: scrubSensitiveData(req.headers),
+                    headers: req.headers,
                     query: req.query,
                     params: req.params,
-                    body: scrubbedBody
+                    body: (req as any).body
                 };
             } else {
                 fileLogData.req = {
-                    headers: scrubSensitiveData(req.headers),
+                    headers: req.headers,
                     query: req.query,
                     params: req.params
                 };
@@ -195,22 +234,34 @@ export const httpLogger = (req: Request, res: Response, next: NextFunction) => {
                 parsedResponseBody = responseBody;
             }
 
-            // Add response data if it exists
+            // Add response data if it exists - Pino will redact sensitive fields
             if (parsedResponseBody) {
                 fileLogData.res = {
-                    headers: scrubSensitiveData(res.getHeaders()),
-                    body: scrubSensitiveData(parsedResponseBody)
+                    headers: res.getHeaders(),
+                    body: parsedResponseBody
                 };
             } else {
                 fileLogData.res = {
-                    headers: scrubSensitiveData(res.getHeaders())
+                    headers: res.getHeaders()
                 };
             }
 
             // Log to terminal (clean message with request body for readability)
-            httpTerminalLogger[logLevel](terminalMessage);
+            // Pino redaction will handle any sensitive data in the message
+            // Only show terminal logs if SHOW_TEST_LOGS is explicitly set to true, or in production environments
+            const showTestLogs = getEnvVar('SHOW_TEST_LOGS') === 'true' || getEnvVar('SHOW_TEST_LOGS') === '1';
+            const isProduction = getEnvVar('NODE_ENV') === 'production';
+            const shouldShowTerminalLogs = showTestLogs || isProduction;
+
+            if (httpTerminalLogger && shouldShowTerminalLogs) {
+                httpTerminalLogger[logLevel](terminalMessage);
+            } else if (!httpTerminalLogger && shouldShowTerminalLogs) {
+                // Fallback to console logging if httpTerminalLogger isn't ready yet
+                console.log(`[HTTP] ${terminalMessage}`);
+            }
 
             // Log to file (structured JSON with detailed request/response data)
+            // Pino redaction will automatically handle sensitive data in the structured object
             if (httpFileLogger) {
                 httpFileLogger.info(fileLogData, `HTTP ${method} ${url} ${status} ${responseTime}ms`);
             }

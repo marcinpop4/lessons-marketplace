@@ -1,5 +1,10 @@
 import pino from 'pino';
 
+/**
+ * Redaction marker used consistently across all logging systems
+ */
+const REDACTION_MARKER = '[Redacted]';
+
 // Helper to check if we're in Node.js environment
 const isNodeEnvironment = typeof process !== 'undefined' && process.versions?.node;
 
@@ -41,6 +46,60 @@ const getEnvVar = (name: string, defaultValue?: string): string => {
     return defaultValue ?? '';
 };
 
+// Create comprehensive redaction configuration
+const createMainLoggerRedactionConfig = () => ({
+    paths: [
+        // Direct sensitive field names
+        'password',
+        'token',
+        'authorization',
+        'cookie',
+        'accesstoken',
+        'refreshtoken',
+        'secret',
+        'apikey',
+        'confirmpassword',
+        'oldpassword',
+        'newpassword',
+
+        // HTTP request/response paths
+        'req.headers.authorization',
+        'req.headers.cookie',
+        'req.headers["set-cookie"]',
+        'req.body.password',
+        'req.body.token',
+        'req.body.secret',
+        'res.headers["set-cookie"]',
+        'res.headers.authorization',
+        'res.body.password',
+        'res.body.token',
+
+        // Client data paths
+        'data.password',
+        'data.token',
+        'data.secret',
+        'data.authorization',
+
+        // Wildcard patterns for nested sensitive fields
+        '*.password',
+        '*.token',
+        '*.authorization',
+        '*.cookie',
+        '*.secret',
+        '*.apikey',
+        '*.accesstoken',
+        '*.refreshtoken',
+
+        // Array patterns
+        'logs[*].password',
+        'logs[*].token',
+        'data[*].password',
+        'data[*].secret'
+    ],
+    censor: REDACTION_MARKER,
+    remove: false
+});
+
 // Create the logger with console-only output for now
 const logger = pino({
     level: getLogLevel(getEnvVar('LOG_LEVEL')),
@@ -70,16 +129,8 @@ const logger = pino({
         }
     } : undefined,
 
-    // Redact sensitive information
-    redact: [
-        'password',
-        'token',
-        'authorization',
-        'cookie',
-        'req.headers.authorization',
-        'req.headers.cookie',
-        'res.headers["set-cookie"]'
-    ],
+    // Apply comprehensive redaction using Pino's built-in capabilities
+    redact: createMainLoggerRedactionConfig(),
 });
 
 // Create child loggers for different parts of the application

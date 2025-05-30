@@ -93,7 +93,7 @@ async function testDatabaseConnection() {
 // --- Route Imports --- 
 import addressRoutes from './address/address.routes.js';
 import authRoutes from './auth/auth.routes.js';
-import loggerRoutes from './config/clientLogger.routes.js';
+import loggerRoutes from './clientLogger/clientLogger.routes.js';
 import healthRoutes from './health/health.routes.js';
 import lessonPlanRoutes from './lessonPlan/lessonPlan.routes.js';
 import lessonQuoteRoutes from './lessonQuote/lessonQuote.routes.js';

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { AxiosResponse } from 'axios';
-import { TeacherLessonHourlyRateStatusTransition } from '../../shared/models/TeacherLessonHourlyRateStatus.js';
-import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourlyRate.js';
+import { TeacherLessonHourlyRateStatusTransition, TeacherLessonHourlyRateStatusValue } from '../../shared/models/TeacherLessonHourlyRateStatus';
+import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourlyRate';
 import { LessonType } from '../../shared/models/LessonType';
 
 const API_BASE_URL = process.env.VITE_API_BASE_URL;
@@ -79,8 +79,14 @@ export async function updateTestRateStatus(
     context?: any
 ): Promise<TeacherLessonHourlyRate> {
     try {
+        // Convert transition to target status
+        // ACTIVATE -> ACTIVE, DEACTIVATE -> INACTIVE
+        const targetStatus = transition === TeacherLessonHourlyRateStatusTransition.ACTIVATE
+            ? TeacherLessonHourlyRateStatusValue.ACTIVE
+            : TeacherLessonHourlyRateStatusValue.INACTIVE;
+
         const response = await axios.patch(`${API_BASE_URL}/api/v1/teacher-lesson-rates/${rateId}`,
-            { transition, context },
+            { status: targetStatus, context },
             { headers: { 'Authorization': `Bearer ${authToken}` } }
         );
 

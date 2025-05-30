@@ -140,10 +140,11 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
 
         it('should DEACTIVATE an active lesson rate', async () => {
             if (!testTeacherAuthToken) throw new Error('Auth token missing');
+            const rateType = SharedLessonType.GUITAR; // Changed from VOICE to GUITAR to avoid conflicts
 
-            // 1. Create the rate
-            const rateResult = await createTestTeacherRate(testTeacherAuthToken, SharedLessonType.DRUMS, 8000);
-            if ('error' in rateResult) {
+            // 1. Create the rate (starts ACTIVE by default)
+            const rateResult = await createTestTeacherRate(testTeacherAuthToken, rateType, 5000);
+            if ('error' in rateResult) { // Check for setup failure
                 throw new Error(`Test setup failed: createTestTeacherRate returned unexpected ${rateResult.status} error: ${JSON.stringify(rateResult.error)}`);
             }
             const rate = rateResult as TeacherLessonHourlyRate;
@@ -181,7 +182,7 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
             // 3. Try again (expecting error from raw call)
             try {
                 await axios.patch(`${API_BASE_URL}/api/v1/teacher-lesson-rates/${rateId}`, {
-                    transition: TeacherLessonHourlyRateStatusTransition.DEACTIVATE
+                    status: TeacherLessonHourlyRateStatusValue.INACTIVE
                 }, {
                     headers: { 'Authorization': `Bearer ${testTeacherAuthToken}` }
                 });
@@ -189,11 +190,11 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
             } catch (error: any) {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(409);
-                expect(error.response?.data?.error).toContain('Invalid transition');
+                expect(error.response?.data?.error).toContain('already INACTIVE');
             }
         });
 
-        it('should return 400 Bad Request if transition is missing or invalid', async () => {
+        it('should return 400 Bad Request if status is missing or invalid', async () => {
             // Uses the token created in beforeEach
             if (!testTeacherAuthToken) throw new Error('Auth token missing');
             const rateType = SharedLessonType.GUITAR; // Use GUITAR instead of VOICE to avoid default conflict
@@ -208,30 +209,30 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
             const rateId = rate.id;
 
             // 2. Test raw endpoint calls
-            // Missing transition
+            // Missing status
             try {
                 await axios.patch(`${API_BASE_URL}/api/v1/teacher-lesson-rates/${rateId}`, {}, {
                     headers: { 'Authorization': `Bearer ${testTeacherAuthToken}` }
                 });
-                throw new Error('Request (missing transition) should have failed with 400');
+                throw new Error('Request (missing status) should have failed with 400');
             } catch (error: any) {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(400);
-                expect(error.response?.data?.error).toContain('Invalid or missing transition');
+                expect(error.response?.data?.error).toContain('Invalid or missing status');
             }
 
-            // Invalid transition value
+            // Invalid status value
             try {
                 await axios.patch(`${API_BASE_URL}/api/v1/teacher-lesson-rates/${rateId}`, {
-                    transition: 'SOME_INVALID_ACTION'
+                    status: 'SOME_INVALID_STATUS'
                 }, {
                     headers: { 'Authorization': `Bearer ${testTeacherAuthToken}` }
                 });
-                throw new Error('Request (invalid transition) should have failed with 400');
+                throw new Error('Request (invalid status) should have failed with 400');
             } catch (error: any) {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(400);
-                expect(error.response?.data?.error).toContain('Invalid or missing transition');
+                expect(error.response?.data?.error).toContain('Invalid or missing status');
             }
         });
 
@@ -240,7 +241,7 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
             const nonExistentRateId = uuidv4();
             try {
                 await axios.patch(`${API_BASE_URL}/api/v1/teacher-lesson-rates/${nonExistentRateId}`, {
-                    transition: TeacherLessonHourlyRateStatusTransition.DEACTIVATE
+                    status: TeacherLessonHourlyRateStatusValue.INACTIVE
                 }, {
                     headers: { 'Authorization': `Bearer ${testTeacherAuthToken}` }
                 });
@@ -256,7 +257,7 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
             const invalidRateId = 'not-a-valid-uuid';
             try {
                 await axios.patch(`${API_BASE_URL}/api/v1/teacher-lesson-rates/${invalidRateId}`, {
-                    transition: TeacherLessonHourlyRateStatusTransition.DEACTIVATE
+                    status: TeacherLessonHourlyRateStatusValue.INACTIVE
                 }, {
                     headers: { 'Authorization': `Bearer ${testTeacherAuthToken}` }
                 });
@@ -270,7 +271,7 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
         // --- Reactivate ---
         it('should ACTIVATE an inactive lesson rate', async () => {
             if (!testTeacherAuthToken) throw new Error('Auth token missing');
-            const rateType = SharedLessonType.GUITAR;
+            const rateType = SharedLessonType.DRUMS; // Changed from VOICE to DRUMS to avoid the default VOICE rate created by createTestTeacher
 
             // 1. Create the rate
             const rateResult = await createTestTeacherRate(testTeacherAuthToken, rateType, 5500);
@@ -308,7 +309,7 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
             // 2. Try again (expecting error from raw call)
             try {
                 await axios.patch(`${API_BASE_URL}/api/v1/teacher-lesson-rates/${rateId}`, {
-                    transition: TeacherLessonHourlyRateStatusTransition.ACTIVATE
+                    status: TeacherLessonHourlyRateStatusValue.ACTIVE
                 }, {
                     headers: { 'Authorization': `Bearer ${testTeacherAuthToken}` }
                 });
@@ -316,7 +317,7 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
             } catch (error: any) {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(409);
-                expect(error.response?.data?.error).toContain('Invalid transition');
+                expect(error.response?.data?.error).toContain('already ACTIVE');
             }
         });
 
@@ -368,7 +369,7 @@ describe('API Integration: /api/v1/teacher-lesson-rates', () => {
 
         it('should handle conflict when creating a rate for an already active type', async () => {
             if (!testTeacherAuthToken) throw new Error('Auth token missing');
-            const conflictRateType = SharedLessonType.GUITAR;
+            const conflictRateType = SharedLessonType.GUITAR; // Changed back to GUITAR since the Advanced test section has its own fresh teacher
             const rateAmount = 8500;
 
             // 1. Ensure rate exists and is active

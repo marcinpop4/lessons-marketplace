@@ -11,7 +11,7 @@ const clientLogger = createChildLogger('client');
 let clientFileLogger: any = null;
 if (typeof process !== 'undefined' && process.versions?.node) {
     // Import file logger asynchronously
-    import('./fileLogger.js').then(fileLoggerModule => {
+    import('../config/fileLogger.js').then(fileLoggerModule => {
         clientFileLogger = fileLoggerModule.clientFileLogger;
     }).catch(error => {
         console.warn('Client file logging not available:', error);
@@ -304,6 +304,12 @@ router.post('/', (req: Request, res: Response, next: NextFunction): void => {
         const { logs } = req.body;
 
         if (!logs || !Array.isArray(logs)) {
+            res.status(400).json({ error: 'Invalid logs format' });
+            return;
+        }
+
+        // Validate array is not empty
+        if (logs.length === 0) {
             res.status(400).json({ error: 'Invalid logs format' });
             return;
         }

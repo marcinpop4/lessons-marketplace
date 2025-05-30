@@ -3,6 +3,11 @@ import { mkdirSync, existsSync } from 'fs';
 import * as rfs from 'rotating-file-stream';
 import pino from 'pino';
 
+/**
+ * Redaction marker used consistently across all logging systems
+ */
+const REDACTION_MARKER = '[Redacted]';
+
 // Convert numeric log levels to Pino string levels
 const getLogLevel = (logLevel: string | undefined): string => {
     if (!logLevel) return 'info';
@@ -43,6 +48,101 @@ const createRotatingStream = (filename: string) => {
     });
 };
 
+// Create comprehensive redaction configuration using Pino's built-in capabilities
+export const createRedactionConfig = (additionalPaths: string[] = []) => ({
+    paths: [
+        // Direct sensitive field names (top-level) - both snake_case and camelCase
+        'password',
+        'token',
+        'authorization',
+        'cookie',
+        'accesstoken',
+        'accessToken',
+        'refreshtoken',
+        'refreshToken',
+        'secret',
+        'apikey',
+        'apiKey',
+        'confirmpassword',
+        'confirmPassword',
+        'oldpassword',
+        'oldPassword',
+        'newpassword',
+        'newPassword',
+
+        // Single-level wildcard patterns for nested sensitive fields
+        '*.password',
+        '*.token',
+        '*.authorization',
+        '*.cookie',
+        '*.accesstoken',
+        '*.accessToken',
+        '*.refreshtoken',
+        '*.refreshToken',
+        '*.secret',
+        '*.apikey',
+        '*.apiKey',
+        '*.confirmpassword',
+        '*.confirmPassword',
+        '*.oldpassword',
+        '*.oldPassword',
+        '*.newpassword',
+        '*.newPassword',
+
+        // HTTP request/response specific paths (most commonly needed)
+        'req.headers.authorization',
+        'req.headers.cookie',
+        'req.headers["set-cookie"]',
+        'req.body.password',
+        'req.body.token',
+        'req.body.authorization',
+        'req.body.secret',
+        'req.body.apikey',
+        'req.body.apiKey',
+        'req.body.accessToken',
+        'req.body.refreshToken',
+
+        'res.headers["set-cookie"]',
+        'res.headers.authorization',
+        'res.body.password',
+        'res.body.token',
+        'res.body.authorization',
+        'res.body.secret',
+        'res.body.apikey',
+        'res.body.apiKey',
+        'res.body.accessToken',
+        'res.body.refreshToken',
+
+        // Client/data specific paths
+        'data.password',
+        'data.token',
+        'data.authorization',
+        'data.cookie',
+        'data.secret',
+        'data.apikey',
+        'data.apiKey',
+        'data.accesstoken',
+        'data.accessToken',
+        'data.refreshtoken',
+        'data.refreshToken',
+
+        // Array elements with sensitive data
+        'users[*].password',
+        'data[*].password',
+        'data[*].token',
+        'data[*].secret',
+        'data[*].apikey',
+        'data[*].apiKey',
+        'logs[*].password',
+        'logs[*].token',
+
+        // Additional paths for specific loggers
+        ...additionalPaths
+    ],
+    censor: REDACTION_MARKER,
+    remove: false // Keep fields but redact values for debugging context
+});
+
 // Create specific streams for different log types
 export const appLogStream = createRotatingStream('app.log');
 export const httpLogStream = createRotatingStream('http.log');
@@ -57,15 +157,7 @@ export const appFileLogger = pino({
         environment: process.env.NODE_ENV || 'development',
     },
     timestamp: pino.stdTimeFunctions.isoTime,
-    redact: [
-        'password',
-        'token',
-        'authorization',
-        'cookie',
-        'req.headers.authorization',
-        'req.headers.cookie',
-        'res.headers["set-cookie"]'
-    ],
+    redact: createRedactionConfig(),
 }, appLogStream);
 
 export const errorFileLogger = pino({
@@ -75,15 +167,7 @@ export const errorFileLogger = pino({
         environment: process.env.NODE_ENV || 'development',
     },
     timestamp: pino.stdTimeFunctions.isoTime,
-    redact: [
-        'password',
-        'token',
-        'authorization',
-        'cookie',
-        'req.headers.authorization',
-        'req.headers.cookie',
-        'res.headers["set-cookie"]'
-    ],
+    redact: createRedactionConfig(),
 }, errorLogStream);
 
 export const httpFileLogger = pino({
@@ -93,18 +177,13 @@ export const httpFileLogger = pino({
         component: 'http-requests'
     },
     timestamp: pino.stdTimeFunctions.isoTime,
-    redact: [
-        'password',
-        'token',
-        'authorization',
-        'cookie',
-        'req.headers.authorization',
-        'req.headers.cookie',
-        'res.headers["set-cookie"]',
-        'req.body.password',
-        'res.body.token',
-        'res.body.accessToken'
-    ],
+    redact: createRedactionConfig([
+        // Additional HTTP-specific paths
+        'req.query.password',
+        'req.query.token',
+        'req.params.password',
+        'req.params.token'
+    ]),
 }, httpLogStream);
 
 export const clientFileLogger = pino({
@@ -114,13 +193,13 @@ export const clientFileLogger = pino({
         component: 'client-logs'
     },
     timestamp: pino.stdTimeFunctions.isoTime,
-    redact: [
-        'password',
-        'token',
-        'authorization',
-        'cookie',
-        'req.headers.authorization',
-        'req.headers.cookie',
-        'res.headers["set-cookie"]'
-    ],
+    redact: createRedactionConfig([
+        // Additional client-specific paths
+        'data.password',
+        'data.token',
+        'data.authorization',
+        'data.cookie',
+        'data.secret',
+        'data.apikey'
+    ]),
 }, clientLogStream); 
