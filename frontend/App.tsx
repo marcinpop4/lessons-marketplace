@@ -62,7 +62,34 @@ const AppRoutes: React.FC = () => {
 
   // Initialize logging when component mounts
   useEffect(() => {
-    logger.trackPageView(currentPath);
+    // Create declarative page groups based on route patterns
+    const getPageGroup = (path: string): string => {
+      // Static routes
+      if (path === '/login') return '/login';
+      if (path === '/register') return '/register';
+      if (path === '/theme-demo') return '/theme-demo';
+      if (path === '/student/lesson-request') return '/student/lesson-request';
+      if (path === '/student/objectives') return '/student/objectives';
+      if (path === '/teacher/profile') return '/teacher/profile';
+      if (path === '/teacher/lessons') return '/teacher/lessons';
+      if (path === '/') return '/';
+
+      // Dynamic routes with patterns
+      if (path.match(/^\/student\/teacher-quotes\/[^\/]+$/)) return '/student/teacher-quotes/{id}';
+      if (path.match(/^\/student\/lesson-confirmation\/[^\/]+$/)) return '/student/lesson-confirmation/{id}';
+      if (path.match(/^\/teacher\/lessons\/[^\/]+$/)) return '/teacher/lessons/{id}';
+      if (path.match(/^\/teacher\/lessons\/[^\/]+\/create-plan$/)) return '/teacher/lessons/{id}/create-plan';
+
+      // Fallback to the actual path
+      logger.warn('Page group fallback', {
+        path: path,
+        reason: 'No page group pattern defined for this route'
+      });
+      return path;
+    };
+
+    const pageGroup = getPageGroup(currentPath);
+    logger.trackPageView(currentPath, undefined, pageGroup);
   }, [currentPath]);
 
   // Track user authentication changes

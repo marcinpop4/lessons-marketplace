@@ -50,8 +50,8 @@ const baseEnv = {
     ...process.env,
     NODE_NO_WARNINGS: '1',
     SILENCE_PRISMA_EXPECTED_ERRORS: 'true',
-    // Suppress console logs during tests unless explicitly requested
-    SHOW_TEST_LOGS: process.env.SHOW_TEST_LOGS || 'false'
+    // Show console logs by default, suppress only when explicitly requested
+    SHOW_TEST_LOGS: process.env.SHOW_TEST_LOGS || 'true'
 };
 
 interface Step {

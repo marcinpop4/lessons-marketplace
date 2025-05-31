@@ -9,6 +9,8 @@ class ClientLogger {
     private userId: string | null;
     private isEnabled: boolean;
     private webVitalsCollected: Set<string> = new Set();
+    private currentPageVitals: Record<string, number> = {};
+    private currentPageGroup: string | null = null;
 
     constructor(config: {
         endpoint?: string;
@@ -132,12 +134,24 @@ class ClientLogger {
 
             // Store the metric value (only first occurrence per page)
             if (!this.webVitalsCollected.has(metricName)) {
-                vitalsData[metricName] = Math.round(metric.value * (metric.name === 'CLS' ? 1000 : 1)) / (metric.name === 'CLS' ? 1000 : 1);
+                const value = Math.round(metric.value * (metric.name === 'CLS' ? 1000 : 1)) / (metric.name === 'CLS' ? 1000 : 1);
+                vitalsData[metricName] = value;
                 this.webVitalsCollected.add(metricName);
 
-                // Log when all vitals are collected
-                if (this.webVitalsCollected.size === expectedVitals.length) {
-                    this._logWebVitals(vitalsData);
+                // Store vitals data for inclusion in page view events
+                this.currentPageVitals = vitalsData;
+
+                // If this is a late-arriving vital (CLS or INP after page view), log it separately
+                if ((metricName === 'cls' || metricName === 'inp') && Object.keys(this.currentPageVitals).length > 3) {
+                    this.info('Core Web Vital Update', {
+                        event: 'core_web_vital_update',
+                        metric: metricName.toUpperCase(),
+                        value: value,
+                        path: window.location.pathname,
+                        pageGroup: this.currentPageGroup || window.location.pathname,
+                        vitalsCollected: this.webVitalsCollected.size,
+                        allVitals: this.currentPageVitals
+                    });
                 }
             }
         };
@@ -154,25 +168,6 @@ class ClientLogger {
                 error: error instanceof Error ? error.message : String(error)
             });
         }
-
-        // Fallback: log partial results after timeout
-        setTimeout(() => {
-            if (this.webVitalsCollected.size > 0 && this.webVitalsCollected.size < expectedVitals.length) {
-                this._logWebVitals(vitalsData, true);
-            }
-        }, 10000);
-    }
-
-    private _logWebVitals(vitalsData: Record<string, number>, isPartial = false): void {
-        this.info(isPartial ? 'Core Web Vitals (Partial)' : 'Core Web Vitals', {
-            event: isPartial ? 'core_web_vitals_partial' : 'core_web_vitals',
-            path: window.location.pathname,
-            vitals: vitalsData,
-            vitalsCollected: Object.keys(vitalsData).length,
-            expectedVitals: 5,
-            isComplete: !isPartial,
-            ...(isPartial && { note: `Only ${Object.keys(vitalsData).length} of 5 vitals collected within timeout` })
-        });
     }
 
     private _setupAutoClickTracking(): void {
@@ -252,17 +247,32 @@ class ClientLogger {
     }
 
     // Simplified page view tracking
-    trackPageView = (path: string, userInfo?: { id: string; email?: string }) => {
-        this.info('Page View', {
+    trackPageView = (path: string, userInfo?: { id: string; email?: string }, pageGroup?: string) => {
+        // Store the current page group for use in late-arriving vitals
+        this.currentPageGroup = pageGroup || path;
+
+        const pageViewData: Record<string, any> = {
             event: 'page_view',
-            path,
+            path: path,
+            pageGroup: pageGroup || path, // Use pageGroup if provided, otherwise fall back to path
             url: window.location.href,
             referrer: document.referrer,
             userInfo
-        });
+        };
+
+        // Include Core Web Vitals if available
+        const vitals = this.currentPageVitals;
+        if (vitals && Object.keys(vitals).length > 0) {
+            pageViewData.vitals = vitals;
+            pageViewData.vitalsCollected = Object.keys(vitals).length;
+            pageViewData.expectedVitals = 5;
+        }
+
+        this.info('Page View', pageViewData);
 
         // Reset web vitals collection for new page
         this.webVitalsCollected.clear();
+        this.currentPageVitals = {};
     };
 
     // Track user interactions
@@ -325,7 +335,7 @@ const logger = new ClientLogger({
     endpoint: import.meta.env.PROD
         ? `${import.meta.env.VITE_API_BASE_URL}/api/v1/logs`
         : '/api/v1/logs',
-    enabled: import.meta.env.PROD || import.meta.env.DEV // Enable in both prod and dev
+    enabled: true // Always enable logging - let server-side filtering handle log levels
 });
 
 export default logger; 

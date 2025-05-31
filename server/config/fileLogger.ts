@@ -1,12 +1,16 @@
 import { createWriteStream } from 'fs';
 import { mkdirSync, existsSync } from 'fs';
-import * as rfs from 'rotating-file-stream';
 import pino from 'pino';
 
 /**
  * Redaction marker used consistently across all logging systems
  */
 const REDACTION_MARKER = '[Redacted]';
+
+// Helper function to get environment variables with fallbacks
+const getEnvVar = (key: string, defaultValue: string = ''): string => {
+    return (typeof process !== 'undefined' ? process.env[key] : undefined) || defaultValue;
+};
 
 // Convert numeric log levels to Pino string levels
 const getLogLevel = (logLevel: string | undefined): string => {
@@ -37,15 +41,28 @@ if (!existsSync(logsDir)) {
     mkdirSync(logsDir, { recursive: true });
 }
 
-// Create rotating file streams
-const createRotatingStream = (filename: string) => {
-    return rfs.createStream(filename, {
-        path: logsDir,
-        size: '20M',        // Rotate when file reaches 20MB
-        interval: '1d',     // Rotate daily
-        maxFiles: 14,       // Keep 14 days of logs
-        compress: 'gzip',   // Compress old files
-    });
+/**
+ * Create a file stream compatible with Promtail and other log shippers.
+ * 
+ * For production environments, external log rotation (like logrotate) should be used
+ * instead of built-in rotation to avoid issues with log shipping tools.
+ * 
+ * For development, we use simple appending file streams that work reliably with Promtail.
+ */
+const createLogStream = (filename: string) => {
+    const isDevelopment = getEnvVar('NODE_ENV') === 'development';
+
+    if (isDevelopment) {
+        // In development, use simple file streams for Promtail compatibility
+        // External rotation should be handled by logrotate or similar tools
+        const filePath = `${logsDir}/${filename}`;
+        return createWriteStream(filePath, { flags: 'a' });
+    } else {
+        // In production, you may want to use external log rotation (logrotate)
+        // or a more sophisticated solution. For now, use the same simple approach.
+        const filePath = `${logsDir}/${filename}`;
+        return createWriteStream(filePath, { flags: 'a' });
+    }
 };
 
 // Create comprehensive redaction configuration using Pino's built-in capabilities
@@ -144,10 +161,10 @@ export const createRedactionConfig = (additionalPaths: string[] = []) => ({
 });
 
 // Create specific streams for different log types
-export const appLogStream = createRotatingStream('app.log');
-export const httpLogStream = createRotatingStream('http.log');
-export const clientLogStream = createRotatingStream('client.log');
-export const errorLogStream = createRotatingStream('error.log');
+export const appLogStream = createLogStream('app.log');
+export const httpLogStream = createLogStream('http.log');
+export const clientLogStream = createLogStream('client.log');
+export const errorLogStream = createLogStream('error.log');
 
 // Create file loggers
 export const appFileLogger = pino({

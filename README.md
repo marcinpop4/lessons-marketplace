@@ -110,8 +110,14 @@ Log files automatically rotate daily and when they reach 20MB:
 - **Compression**: Archived logs are gzipped to save disk space
 
 ```bash
-# Test log rotation
-pnpm run test:logs:rotation
+# Test log rotation (dry run)
+pnpm run logs:rotate:test
+
+# Force log rotation immediately
+pnpm run logs:rotate
+
+# Check rotation status
+pnpm run logs:rotate:status
 
 # Check log files
 ls -la logs/

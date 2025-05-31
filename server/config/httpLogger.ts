@@ -248,8 +248,8 @@ export const httpLogger = (req: Request, res: Response, next: NextFunction) => {
 
             // Log to terminal (clean message with request body for readability)
             // Pino redaction will handle any sensitive data in the message
-            // Only show terminal logs if SHOW_TEST_LOGS is explicitly set to true, or in production environments
-            const showTestLogs = getEnvVar('SHOW_TEST_LOGS') === 'true' || getEnvVar('SHOW_TEST_LOGS') === '1';
+            // Show terminal logs by default, hide only when SHOW_TEST_LOGS is explicitly set to 'false'
+            const showTestLogs = getEnvVar('SHOW_TEST_LOGS') !== 'false';
             const isProduction = getEnvVar('NODE_ENV') === 'production';
             const shouldShowTerminalLogs = showTestLogs || isProduction;
 
