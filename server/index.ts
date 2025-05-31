@@ -14,7 +14,7 @@ import { AppError } from './errors/index.js'; // Import base error
 import { ZodError } from 'zod';
 
 // Logging
-import { logger, createChildLogger } from '../config/logger.js';
+import { logger, createChildLogger, initializeFileLogging } from '../config/logger.js';
 import { httpLogger } from './config/httpLogger.js';
 
 // --- Debugging --- 
@@ -213,6 +213,7 @@ app.use((err: Error | any, req: Request, res: Response, next: NextFunction) => {
       statusCode = err.status;
       requestLogger.error({ err, status: statusCode }, 'AppError instance');
     } else {
+      console.log('Calling requestLogger.error for generic error');
       requestLogger.error({ err }, 'Generic error, defaulting to 500');
     }
   } else {
@@ -238,6 +239,9 @@ app.use((err: Error | any, req: Request, res: Response, next: NextFunction) => {
 // --- Start Server Logic --- 
 async function startServer() {
   try {
+    // Initialize file logging FIRST
+    await initializeFileLogging();
+
     // Ensure database is connected BEFORE starting the listener
     await testDatabaseConnection();
 
