@@ -1,0 +1,313 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 4,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "vis": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "editorMode": "code",
+          "expr": "sum(quantile_over_time(${percentile}, ({job=\"http-logs\"} | json | service=\"lessons-marketplace\" | component=\"http-requests\" | routeGroup=\"${apiMethod} ${apiRoute}\" | unwrap responseTime)[5m]))",
+          "legendFormat": "${percentile:text} Response Time",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "API Response Times - ${apiMethod} ${apiRoute} (${percentile:text})",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["api", "performance", "response-time"],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "P95",
+          "value": "0.95"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "percentile",
+        "options": [
+          {
+            "selected": false,
+            "text": "P50 (median)",
+            "value": "0.5"
+          },
+          {
+            "selected": false,
+            "text": "P75",
+            "value": "0.75"
+          },
+          {
+            "selected": false,
+            "text": "P90",
+            "value": "0.9"
+          },
+          {
+            "selected": true,
+            "text": "P95",
+            "value": "0.95"
+          },
+          {
+            "selected": false,
+            "text": "P99",
+            "value": "0.99"
+          }
+        ],
+        "query": "0.5,0.75,0.9,0.95,0.99",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "GET",
+          "value": "GET"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "apiMethod",
+        "options": [
+          {
+            "selected": true,
+            "text": "GET",
+            "value": "GET"
+          },
+          {
+            "selected": false,
+            "text": "POST",
+            "value": "POST"
+          },
+          {
+            "selected": false,
+            "text": "PUT",
+            "value": "PUT"
+          },
+          {
+            "selected": false,
+            "text": "PATCH",
+            "value": "PATCH"
+          },
+          {
+            "selected": false,
+            "text": "DELETE",
+            "value": "DELETE"
+          }
+        ],
+        "query": "GET,POST,PUT,PATCH,DELETE",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "/api/v1/addresses",
+          "value": "/api/v1/addresses"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "apiRoute",
+        "options": [
+          {
+            "selected": true,
+            "text": "/api/v1/addresses",
+            "value": "/api/v1/addresses"
+          },
+          {
+            "selected": false,
+            "text": "/api/v1/auth",
+            "value": "/api/v1/auth"
+          },
+          {
+            "selected": false,
+            "text": "/api/v1/health",
+            "value": "/api/v1/health"
+          },
+          {
+            "selected": false,
+            "text": "/api/v1/lesson-plans",
+            "value": "/api/v1/lesson-plans"
+          },
+          {
+            "selected": false,
+            "text": "/api/v1/lesson-quotes",
+            "value": "/api/v1/lesson-quotes"
+          },
+          {
+            "selected": false,
+            "text": "/api/v1/lesson-requests",
+            "value": "/api/v1/lesson-requests"
+          },
+          {
+            "selected": false,
+            "text": "/api/v1/lessons",
+            "value": "/api/v1/lessons"
+          },
+          {
+            "selected": false,
+            "text": "/api/v1/logs",
+            "value": "/api/v1/logs"
+          },
+          {
+            "selected": false,
+            "text": "/api/v1/milestones",
+            "value": "/api/v1/milestones"
+          },
+          {
+            "selected": false,
+            "text": "/api/v1/objectives",
+            "value": "/api/v1/objectives"
+          },
+          {
+            "selected": false,
+            "text": "/api/v1/refresh-token",
+            "value": "/api/v1/refresh-token"
+          },
+          {
+            "selected": false,
+            "text": "/api/v1/students",
+            "value": "/api/v1/students"
+          },
+          {
+            "selected": false,
+            "text": "/api/v1/summary",
+            "value": "/api/v1/summary"
+          },
+          {
+            "selected": false,
+            "text": "/api/v1/teacher-lesson-rates",
+            "value": "/api/v1/teacher-lesson-rates"
+          },
+          {
+            "selected": false,
+            "text": "/api/v1/teachers",
+            "value": "/api/v1/teachers"
+          }
+        ],
+        "query": "/api/v1/addresses,/api/v1/auth,/api/v1/health,/api/v1/lesson-plans,/api/v1/lesson-quotes,/api/v1/lesson-requests,/api/v1/lessons,/api/v1/logs,/api/v1/milestones,/api/v1/objectives,/api/v1/refresh-token,/api/v1/students,/api/v1/summary,/api/v1/teacher-lesson-rates,/api/v1/teachers",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "API Response Times",
+  "uid": "api-response-times",
+  "version": 1,
+  "weekStart": ""
+} 

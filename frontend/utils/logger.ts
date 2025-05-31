@@ -150,7 +150,7 @@ class ClientLogger {
                         path: window.location.pathname,
                         pageGroup: this.currentPageGroup || window.location.pathname,
                         vitalsCollected: this.webVitalsCollected.size,
-                        allVitals: this.currentPageVitals
+                        vitals: this.currentPageVitals
                     });
                 }
             }

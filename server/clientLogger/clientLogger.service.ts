@@ -106,9 +106,14 @@ class ClientLoggerService {
      * @param forwardedFor - X-Forwarded-For header value
      */
     private processLogEntry(log: ClientLogEntry, ip?: string, forwardedFor?: string): void {
-        // Add server-side metadata
+        // Extract key fields for Loki labels
+        const pageGroup = log.data?.pageGroup || 'unknown';
+        const eventType = log.data?.event || log.message.toLowerCase().replace(/\s+/g, '_');
+
+        // Add server-side metadata (excluding fields that will become labels)
+        const { pageGroup: _pg, event: _ev, ...dataWithoutLabels } = log.data || {};
         const enrichedLog = {
-            ...log.data,
+            ...dataWithoutLabels,
             clientTimestamp: log.timestamp,
             sessionId: log.sessionId,
             userId: log.userId,
@@ -121,19 +126,41 @@ class ClientLoggerService {
             userAgent: log.userAgent?.slice(0, 200), // Truncate long user agents
         };
 
+        // Create child logger with labels for efficient querying
+        const labeledLogger = clientFileLogger?.child({
+            pageGroup,
+            event_type: eventType
+        });
+
         // Log based on level using structured logging
         switch (log.level) {
             case 'error':
-                clientLogMethods.error(enrichedLog, log.message);
+                if (labeledLogger) {
+                    labeledLogger.error(enrichedLog, log.message);
+                } else {
+                    clientLogMethods.error(enrichedLog, log.message);
+                }
                 break;
             case 'warn':
-                clientLogMethods.warn(enrichedLog, log.message);
+                if (labeledLogger) {
+                    labeledLogger.warn(enrichedLog, log.message);
+                } else {
+                    clientLogMethods.warn(enrichedLog, log.message);
+                }
                 break;
             case 'debug':
-                clientLogMethods.debug(enrichedLog, log.message);
+                if (labeledLogger) {
+                    labeledLogger.debug(enrichedLog, log.message);
+                } else {
+                    clientLogMethods.debug(enrichedLog, log.message);
+                }
                 break;
             default:
-                clientLogMethods.info(enrichedLog, log.message);
+                if (labeledLogger) {
+                    labeledLogger.info(enrichedLog, log.message);
+                } else {
+                    clientLogMethods.info(enrichedLog, log.message);
+                }
         }
     }
 }

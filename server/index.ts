@@ -107,6 +107,101 @@ import studentRoutes from './student/student.routes.js';
 import teacherLessonHourlyRateRoutes from './teacher-lesson-hourly-rate/teacherLessonHourlyRate.routes.js';
 import teacherRoutes from './teacher/teacher.routes.js';
 
+// --- API Route Grouping for Monitoring ---
+/**
+ * Get logical route group for API endpoints
+ * Keep this function close to the route definitions below for easy maintenance
+ */
+export function getRouteGroup(method: string, url: string): string {
+  // Remove query parameters and normalize
+  const cleanUrl = url.split('?')[0];
+  const route = `${method} ${cleanUrl}`;
+
+  // Declarative route grouping - map specific routes to logical groups
+  const routePatterns: Record<string, string> = {
+    // Authentication
+    'POST /api/v1/auth/login': 'POST /api/v1/auth',
+    'POST /api/v1/auth/register': 'POST /api/v1/auth',
+    'POST /api/v1/auth/logout': 'POST /api/v1/auth',
+    'GET /api/v1/refresh-token': 'GET /api/v1/refresh-token',
+    'POST /api/v1/refresh-token': 'POST /api/v1/refresh-token',
+
+    // Lessons - main endpoint
+    'GET /api/v1/lessons': 'GET /api/v1/lessons',
+    'POST /api/v1/lessons': 'POST /api/v1/lessons',
+    'GET /api/v1/lessons/{id}': 'GET /api/v1/lessons',
+    'PATCH /api/v1/lessons/{id}': 'PATCH /api/v1/lessons',
+
+    // Lesson Requests
+    'GET /api/v1/lesson-requests': 'GET /api/v1/lesson-requests',
+    'POST /api/v1/lesson-requests': 'POST /api/v1/lesson-requests',
+    'GET /api/v1/lesson-requests/{id}': 'GET /api/v1/lesson-requests',
+
+    // Lesson Quotes  
+    'GET /api/v1/lesson-quotes': 'GET /api/v1/lesson-quotes',
+    'POST /api/v1/lesson-quotes': 'POST /api/v1/lesson-quotes',
+    'PATCH /api/v1/lesson-quotes': 'PATCH /api/v1/lesson-quotes',
+    'GET /api/v1/lesson-quotes/{id}': 'GET /api/v1/lesson-quotes',
+
+    // Lesson Plans
+    'GET /api/v1/lesson-plans': 'GET /api/v1/lesson-plans',
+    'POST /api/v1/lesson-plans': 'POST /api/v1/lesson-plans',
+    'GET /api/v1/lesson-plans/{id}': 'GET /api/v1/lesson-plans',
+
+    // Summary
+    'GET /api/v1/summary': 'GET /api/v1/summary',
+    'POST /api/v1/summary': 'POST /api/v1/summary',
+    'GET /api/v1/summary/{id}': 'GET /api/v1/summary',
+
+    // Users
+    'GET /api/v1/students': 'GET /api/v1/students',
+    'POST /api/v1/students': 'POST /api/v1/students',
+    'GET /api/v1/students/{id}': 'GET /api/v1/students',
+    'GET /api/v1/teachers': 'GET /api/v1/teachers',
+    'POST /api/v1/teachers': 'POST /api/v1/teachers',
+    'GET /api/v1/teachers/{id}': 'GET /api/v1/teachers',
+
+    // Other endpoints
+    'GET /api/v1/addresses': 'GET /api/v1/addresses',
+    'POST /api/v1/addresses': 'POST /api/v1/addresses',
+    'GET /api/v1/health': 'GET /api/v1/health',
+    'POST /api/v1/logs': 'POST /api/v1/logs',
+    'GET /api/v1/milestones': 'GET /api/v1/milestones',
+    'POST /api/v1/milestones': 'POST /api/v1/milestones',
+    'GET /api/v1/objectives': 'GET /api/v1/objectives',
+    'POST /api/v1/objectives': 'POST /api/v1/objectives',
+    'GET /api/v1/teacher-lesson-rates': 'GET /api/v1/teacher-lesson-rates',
+    'POST /api/v1/teacher-lesson-rates': 'POST /api/v1/teacher-lesson-rates'
+  };
+
+  // Check for exact matches first
+  if (routePatterns[route]) {
+    return routePatterns[route];
+  }
+
+  // Check for pattern matches with IDs and query parameters
+  for (const [pattern, group] of Object.entries(routePatterns)) {
+    const [patternMethod, patternPath] = pattern.split(' ');
+    if (method === patternMethod && cleanUrl.startsWith(patternPath.replace('/{id}', ''))) {
+      // Handle routes with IDs (e.g., /api/v1/lessons/123 -> GET /api/v1/lessons)
+      const basePath = patternPath.replace('/{id}', '');
+      if (cleanUrl === basePath ||
+        cleanUrl.match(new RegExp(`^${basePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(/[^/]+)*$`))) {
+        return group;
+      }
+    }
+  }
+
+  // Log unmatched routes for monitoring
+  if (cleanUrl.startsWith('/api/v1/') && !global._httpLoggerDebugLogged) {
+    console.warn(`🚨 Unmatched API route: ${route}`);
+    (global as any)._httpLoggerDebugLogged = true;
+  }
+
+  // Default: use the actual route
+  return route;
+}
+
 // --- Express App Setup --- 
 const app: Express = express();
 

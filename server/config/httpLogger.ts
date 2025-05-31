@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { logger } from '../../config/logger.js';
+import { getRouteGroup } from '../index.js';
 import pino from 'pino';
 
 // Extend Request interface to include id property
@@ -263,7 +264,14 @@ export const httpLogger = (req: Request, res: Response, next: NextFunction) => {
             // Log to file (structured JSON with detailed request/response data)
             // Pino redaction will automatically handle sensitive data in the structured object
             if (httpFileLogger) {
-                httpFileLogger.info(fileLogData, `HTTP ${method} ${url} ${status} ${responseTime}ms`);
+                // Create a child logger with routeGroup as a proper label for Loki
+                const routeGroup = getRouteGroup(method, originalUrl || url);
+                const routeGroupLogger = httpFileLogger.child({ routeGroup });
+
+                // Remove routeGroup from fileLogData since it's now a label
+                const { routeGroup: _, ...fileLogDataWithoutRouteGroup } = fileLogData;
+
+                routeGroupLogger.info(fileLogDataWithoutRouteGroup, `HTTP ${method} ${url} ${status} ${responseTime}ms`);
             }
         }
 
