@@ -1,0 +1,46 @@
+FROM node:20-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    openssl \
+    ca-certificates \
+    curl \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/* \
+    && openssl version \
+    && mkdir -p /etc/ssl
+
+# Install pnpm globally
+RUN npm install -g pnpm
+
+# Copy package files and install dependencies
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+# Copy prisma schema for client generation
+COPY server/prisma ./server/prisma
+RUN pnpm prisma:generate
+
+# Copy tsconfig for TypeScript compilation
+COPY tsconfig.json ./
+
+# Copy config directory for logger and other configs
+COPY config ./config
+
+# Copy scripts directory for diagnostic tools
+COPY scripts ./scripts
+
+# Copy source directories for development
+COPY server ./server
+COPY shared ./shared
+
+# Create logs directory
+RUN mkdir -p logs
+
+# Expose port
+EXPOSE 3000
+
+# Development command with hot reload
+CMD ["pnpm", "dev:server"] 

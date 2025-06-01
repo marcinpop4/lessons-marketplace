@@ -9,7 +9,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
-import { createChildLogger } from '../../config/logger.js';
 
 // Import shared models and enums
 import { LessonType } from '../../shared/models/LessonType.js';
@@ -24,6 +23,7 @@ import { Lesson } from '../../shared/models/Lesson.js';
 import { TeacherLessonHourlyRate } from '../../shared/models/TeacherLessonHourlyRate.js';
 import { UserType } from '../../shared/models/UserType.js';
 import { AuthMethod } from '../auth/auth.service.js'; // Ensure AuthMethod enum itself is imported if used directly
+import { createChildLogger } from '../../config/logger.js';
 
 // Import ALL services
 import { teacherService } from '../teacher/teacher.service.js';
@@ -45,15 +45,19 @@ const prisma = new PrismaClient(); // Keep for finally block
 const logger = createChildLogger('database-seed');
 
 // --- Environment Setup ---
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 if (!process.env.NODE_ENV) {
   throw new Error('NODE_ENV environment variable is required');
 }
-const envFile = path.resolve(__dirname, `../../env/.env.${process.env.NODE_ENV}`);
-const result = dotenv.config({ path: envFile });
-if (result.error) {
-  throw new Error(`Failed to load environment file at ${envFile}: ${result.error.message}`);
+// Skip manual dotenv loading in Docker environment as it's handled by the container
+if (!process.env.DATABASE_URL) {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  // Use process.cwd() to ensure we get the project root, works in both dev and compiled
+  const envFile = path.resolve(process.cwd(), `env/.env.${process.env.NODE_ENV}`);
+  const result = dotenv.config({ path: envFile });
+  if (result.error) {
+    throw new Error(`Failed to load environment file at ${envFile}: ${result.error.message}`);
+  }
 }
 
 // --- Helper Functions ---

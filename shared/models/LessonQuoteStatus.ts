@@ -1,7 +1,12 @@
 import { JsonValue } from '../types/JsonTypes.js'; // Import the shared type
-import { createChildLogger } from '../../config/logger.js';
+// Simple local logger to avoid import complexity
+const createLocalLogger = (component: string) => ({
+    warn: (message: string, context?: any) => {
+        console.warn(`[${component}] ${message}`, context || '');
+    }
+});
 
-const logger = createChildLogger('lesson-quote-status');
+const logger = createLocalLogger('lesson-quote-status');
 
 /**
  * @openapi
@@ -101,7 +106,7 @@ export class LessonQuoteStatus {
         this.createdAt = createdAt;
 
         if (!Object.values(LessonQuoteStatusValue).includes(status)) {
-            logger.error('Invalid status value provided in LessonQuoteStatus constructor', { status });
+            logger.warn('Invalid status value provided in LessonQuoteStatus constructor', { status });
             throw new Error(`Invalid status value: ${status}`);
         }
     }

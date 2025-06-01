@@ -23,7 +23,7 @@ services:
   server:
     build:
       context: ..
-      dockerfile: docker/server/Dockerfile
+      dockerfile: docker/server/Dockerfile.dev
       args:
         NODE_ENV: ${NODE_ENV}
     container_name: lessons-marketplace-server
@@ -33,52 +33,78 @@ services:
     env_file:
       - ../env/.env.${NODE_ENV}
     environment:
-      - RUN_SEED=${RUN_SEED:-false}
-      - SERVER_HEALTH_URL=http://localhost:3000/api/v1/health
       - NODE_ENV=${NODE_ENV}
+      - CHOKIDAR_USEPOLLING=true  # For file watching in Docker
+      - DOCKER_ENV=true  # Indicate running in Docker
+      - USE_DOCKER_LOGGING=true  # Output JSON logs for Docker native logging
     depends_on:
       database:
         condition: service_healthy
         restart: true
+    volumes:
+      # Mount source code for hot reload
+      - ../server:/app/server:cached
+      - ../shared:/app/shared:cached
+      - ../config:/app/config:cached
+      - ../env:/app/env:cached
+      # Exclude node_modules to avoid conflicts
+      - /app/node_modules
+      - /app/server/node_modules
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+        labels: "service,environment"
+    labels:
+      - "service=lessons-marketplace-server"
+      - "environment=development"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f $$SERVER_HEALTH_URL | grep -q 'database.*connected' || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/v1/health | grep -q 'database.*connected' || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 15
       start_period: 20s
-    volumes:
-      - ../logs:/app/logs:rw
 
   frontend:
     build:
       context: ..
-      dockerfile: docker/frontend/Dockerfile
+      dockerfile: docker/frontend/Dockerfile.dev
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3000}
         NODE_ENV: ${NODE_ENV}
     container_name: lessons-marketplace-frontend
     restart: "no"
     ports:
-      - "${FRONTEND_PORT:-5173}:80"
+      - "${FRONTEND_PORT:-5173}:5173"
     env_file:
       - ../env/.env.${NODE_ENV}
     environment:
-      - FRONTEND_HEALTH_URL=http://localhost:80/index.html
       - NODE_ENV=${NODE_ENV}
+      - CHOKIDAR_USEPOLLING=true  # For file watching in Docker
+      - DOCKER_ENV=true  # Indicate running in Docker
+      - USE_DOCKER_LOGGING=true  # Enable JSON logging for Docker native logs
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL}
     depends_on:
       server:
         condition: service_healthy
         restart: true
+    volumes:
+      # Mount source code for hot reload
+      - ../frontend:/app/frontend:cached
+      - ../shared:/app/shared:cached
+      - ../config:/app/config:cached
+      - ../env:/app/env:cached
+      # Exclude node_modules to avoid conflicts
+      - /app/node_modules
+      - /app/frontend/node_modules
     healthcheck:
-      test: ["CMD-SHELL", "curl -f $$FRONTEND_HEALTH_URL || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:5173 || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 5
       start_period: 10s
-    volumes:
-      - ../logs:/usr/share/nginx/logs:rw
 
-  # Test service using our dedicated test Dockerfile
+  # Test service
   test:
     profiles:
       - test
@@ -92,11 +118,14 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV}
       - TEST_ENV=docker
+      - FRONTEND_URL=http://localhost:5173
     volumes:
       - ../tests/results/test-results:/app/tests/results/test-results:rw
       - ../tests/results/playwright-report:/app/tests/results/playwright-report:rw
       - ../tests/results/screenshots:/app/tests/results/screenshots:rw
       - ../tests/results/test-logs:/app/tests/results/test-logs:rw
+      # Mount test source for hot reload
+      - ../tests:/app/tests:cached
     depends_on:
       database:
         condition: service_healthy
@@ -108,19 +137,72 @@ services:
         condition: service_healthy
         restart: false
 
-  deploy:
-    profiles:
-      - deploy
-    build:
-      context: ..
-      dockerfile: docker/deploy/Dockerfile
-    container_name: lessons-marketplace-deploy
-    environment:
-      - FLY_API_TOKEN=${FLY_API_TOKEN:-''}
-      - NODE_ENV=${NODE_ENV:-production}
-    restart: "no"
+  # === LOGGING INFRASTRUCTURE ===
+  # Loki - Log aggregation system
+  loki:
+    image: grafana/loki:3.3.1
+    container_name: lessons-marketplace-loki
+    ports:
+      - "3100:3100"
     volumes:
-      - ../logs:/app/logs:rw
+      - ./observability/loki-config.yaml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Promtail - Log shipper
+  promtail:
+    image: grafana/promtail:3.3.1
+    container_name: lessons-marketplace-promtail
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./observability/promtail-config.yaml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      loki:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q promtail /proc/1/comm || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # Grafana - Visualization and dashboards
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: lessons-marketplace-grafana
+    ports:
+      - "3001:3000"  # Changed to 3001 to avoid conflict with server
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_SERVER_HTTP_PORT=3000
+      - GF_SERVER_DOMAIN=localhost
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./observability/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
+      - ./observability/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      loki:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
   postgres_data:
+  loki_data:
+  grafana_data:

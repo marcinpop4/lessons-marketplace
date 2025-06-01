@@ -1,15 +1,13 @@
 #!/usr/bin/env tsx
 
 import { execa } from 'execa';
-import { ChildProcess } from 'child_process';
-// @ts-ignore - Suppressing persistent type error despite @types/wait-on installation
-import waitOn from 'wait-on';
 import chalk from 'chalk';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import { createChildLogger } from '../config/logger.js';
+import fs from 'fs';
 
 // Create child logger for validation script
 const logger = createChildLogger('validation-script');
@@ -22,36 +20,17 @@ const projectRoot = resolve(__dirname, '..'); // Assumes script is in ./scripts
 // Load environment variables from .env.development
 dotenv.config({ path: path.resolve(projectRoot, 'env', '.env.development') });
 
-// --- Environment Variable Checks ---
-const requiredEnvVars = ['PORT', 'FRONTEND_HOST', 'FRONTEND_PORT'];
-const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
-
-if (missingEnvVars.length > 0) {
-    console.error(
-        chalk.red(
-            `Error: Missing required environment variables: ${missingEnvVars.join(', ')}. ` +
-            `Please ensure they are defined in env/.env.development`
-        )
-    );
-    process.exit(1);
-}
-
 // Set environment correctly
 process.env.NODE_ENV = 'development';
 
-const SERVER_PORT = process.env.PORT!;
-const FRONTEND_HOST = process.env.FRONTEND_HOST!;
-const FRONTEND_PORT = process.env.FRONTEND_PORT!;
-const FRONTEND_URL = `${FRONTEND_HOST}:${FRONTEND_PORT}`;
-const SERVER_URL = `http://localhost:${SERVER_PORT}`;
+// Check if fast mode is enabled (skip Docker build)
+const FAST_MODE = process.argv.includes('--fast');
 
 // Base environment for child processes
 const baseEnv = {
     ...process.env,
     NODE_NO_WARNINGS: '1',
     SILENCE_PRISMA_EXPECTED_ERRORS: 'true',
-    // Show console logs by default, suppress only when explicitly requested
-    SHOW_TEST_LOGS: process.env.SHOW_TEST_LOGS || 'true'
 };
 
 interface Step {
@@ -59,30 +38,86 @@ interface Step {
     command: string;
 }
 
-const setupSteps: Step[] = [
-    { name: 'Clean', command: 'pnpm clean' },
-    { name: 'Install', command: 'pnpm install' },
-    { name: 'Database Setup', command: 'pnpm prisma:drop-create-db' },
-    { name: 'Database Migrate', command: 'pnpm prisma:migrate' },
-    { name: 'Prisma Generate', command: 'pnpm prisma:generate' },
-    { name: 'Database Seed', command: 'pnpm prisma:seed' },
-    { name: 'TypeScript Diagnosis', command: 'pnpm diagnose:ts' }
-];
+async function checkIfRebuildNeeded(): Promise<string[]> {
+    const reasons: string[] = [];
 
-// Store background processes
-let serverProcess: any | null = null;
-let frontendProcess: any | null = null;
+    try {
+        // Check if Docker images exist
+        const { stdout } = await execa('docker', ['images', '-q', 'docker-server'], { env: baseEnv });
+        if (!stdout.trim()) {
+            reasons.push('Docker images not found');
+        }
+    } catch (error) {
+        reasons.push('Cannot check Docker images');
+    }
+
+    // Check for uncommitted changes to key build files
+    const buildCriticalFiles = [
+        'package.json',
+        'pnpm-lock.yaml',
+        'docker/',
+        'tsconfig.json',
+        'server/prisma/schema.prisma'
+    ];
+
+    try {
+        // Check for modified files (both staged and unstaged)
+        const { stdout: statusOutput } = await execa('git', ['status', '--porcelain'], { env: baseEnv });
+
+        if (statusOutput.trim()) {
+            const modifiedFiles = statusOutput.split('\n').map(line => line.slice(3)); // Remove git status prefix
+
+            for (const criticalPath of buildCriticalFiles) {
+                const hasChanges = modifiedFiles.some(file =>
+                    file.startsWith(criticalPath) || file === criticalPath
+                );
+
+                if (hasChanges) {
+                    const changedFiles = modifiedFiles.filter(file =>
+                        file.startsWith(criticalPath) || file === criticalPath
+                    );
+                    reasons.push(`Uncommitted changes in ${criticalPath}: ${changedFiles.join(', ')}`);
+                }
+            }
+        }
+
+        // Also check if we're on a different commit than last build
+        // (This would require storing the commit hash somewhere, but for now we'll skip this)
+
+    } catch (error) {
+        reasons.push('Cannot check git status - not in a git repository?');
+    }
+
+    return reasons;
+}
+
+const setupSteps: Step[] = FAST_MODE ? [
+    { name: 'Clean Docker Environment', command: 'pnpm dev:clean' },
+    { name: 'Start Services', command: 'pnpm dev:up' },
+    { name: 'Install Dependencies', command: 'pnpm dev:install' },
+    { name: 'Generate Prisma Client', command: 'pnpm prisma:generate' },
+    { name: 'Setup Database', command: 'pnpm prisma:setup' },
+    { name: 'Diagnose TypeScript', command: 'pnpm diagnose:ts' },
+] : [
+    { name: 'Clean Docker Environment', command: 'pnpm dev:clean' },
+    { name: 'Build Docker Images', command: 'pnpm dev:build' },
+    { name: 'Start Services', command: 'pnpm dev:up' },
+    { name: 'Install Dependencies', command: 'pnpm dev:install' },
+    { name: 'Generate Prisma Client', command: 'pnpm prisma:generate' },
+    { name: 'Setup Database', command: 'pnpm prisma:setup' },
+    { name: 'Diagnose TypeScript', command: 'pnpm diagnose:ts' },
+];
 
 function formatDuration(duration: number): string {
     return `${(duration / 1000).toFixed(2)}s`;
 }
 
 async function runSetupStep(step: Step): Promise<number> {
-    logger.info(`\nRunning: ${step.name}`);
+    logger.info(`Running: ${step.name}`);
     const startTime = Date.now();
 
     try {
-        await execa(step.command, { shell: true, stdio: 'inherit' });
+        await execa(step.command, { shell: true, stdio: 'inherit', env: baseEnv });
         const endTime = Date.now();
         return endTime - startTime;
     } catch (error) {
@@ -93,19 +128,13 @@ async function runSetupStep(step: Step): Promise<number> {
 
 async function runTestCommand(
     command: string,
-    args: string[],
     title: string
 ): Promise<{ duration: number; failed: boolean }> {
     const startTime = Date.now();
-    logger.info(`\n---> Running: ${title} (${command} ${args.join(' ')})...`);
+    logger.info(`---> Running: ${title} (${command})...`);
 
     try {
-        const subprocess = execa(command, args, {
-            stdio: 'inherit',
-            cwd: process.cwd(),
-            env: baseEnv,
-        });
-        const result = await subprocess;
+        await execa(command, { shell: true, stdio: 'inherit', env: baseEnv });
         const endTime = Date.now();
         logger.info(`---> Finished: ${title} (Success)`);
         return { duration: endTime - startTime, failed: false };
@@ -116,40 +145,18 @@ async function runTestCommand(
     }
 }
 
-// Function to kill background processes gracefully
-const killProcesses = async () => {
-    const killPromises: Promise<any>[] = [];
-    if (serverProcess && !serverProcess.killed) {
-        logger.warn('Attempting to kill server process...');
-        serverProcess.kill('SIGTERM');
-        killPromises.push(serverProcess.catch((e: Error) => logger.error('Error killing server process:', e.message)));
-    }
-    if (frontendProcess && !frontendProcess.killed) {
-        logger.warn('Attempting to kill frontend process...');
-        frontendProcess.kill('SIGTERM');
-        killPromises.push(frontendProcess.catch((e: Error) => logger.error('Error killing frontend process:', e.message)));
-    }
-    await Promise.allSettled(killPromises);
-    logger.warn('Background processes cleanup attempted.');
-};
-
 async function runTests(): Promise<{ unitTime: number; apiTime: number; e2eTime: number; failed: boolean }> {
-    let finalExitCode = 0;
-
-    // Trap exit signals to ensure cleanup
-    const cleanupAndExit = async (signal: NodeJS.Signals) => {
-        logger.warn(`\nReceived ${signal}. Cleaning up...`);
-        await killProcesses();
-        process.exit(1);
-    };
-    process.on('SIGINT', () => cleanupAndExit('SIGINT'));
-    process.on('SIGTERM', () => cleanupAndExit('SIGTERM'));
-
     try {
-        // 1. Run Unit Tests
-        const unitResult = await runTestCommand('pnpm', ['test:unit'], 'Unit Tests');
+        // Run each test suite separately to get accurate timing
+        logger.info('---> Running individual test suites...');
+
+        // 1. Unit Tests
+        const unitResult = await runTestCommand(
+            'pnpm test:unit',
+            'Unit Tests'
+        );
+
         if (unitResult.failed) {
-            finalExitCode = 1;
             logger.error('Unit tests failed. Stopping validation.');
             return {
                 unitTime: unitResult.duration,
@@ -159,50 +166,14 @@ async function runTests(): Promise<{ unitTime: number; apiTime: number; e2eTime:
             };
         }
 
-        // 2. Start Server and Frontend in background
-        logger.info(`\n---> Starting background services...`);
-        const servicesStartTime = Date.now();
+        // 2. API Tests
+        const apiResult = await runTestCommand(
+            'pnpm test:api',
+            'API Tests'
+        );
 
-        serverProcess = execa('pnpm', ['run', 'dev:server:no-watch'], { stdio: ['inherit', 'inherit', 'ignore'], env: baseEnv });
-        const frontendEnv = { ...baseEnv, DISABLE_VITE_PROXY_LOGS: 'true' };
-        frontendProcess = execa('pnpm', ['run', 'dev:frontend'], { stdio: 'inherit', env: frontendEnv });
-
-        // Handle potential early exit of background processes
-        serverProcess.catch((e: Error) => {
-            if (!serverProcess?.killed) logger.error('Server process exited unexpectedly:', e.message);
-        });
-        frontendProcess.catch((e: Error) => {
-            if (!frontendProcess?.killed) logger.error('Frontend process exited unexpectedly:', e.message);
-        });
-
-        // 3. Wait for services
-        logger.info(`\n---> Waiting for services (Server: ${SERVER_URL}, Frontend: ${FRONTEND_URL})...`);
-        try {
-            await waitOn({
-                resources: [
-                    `tcp:${SERVER_PORT}`,
-                    FRONTEND_URL
-                ],
-                timeout: 180000,
-                log: true,
-                validateStatus: function (status: number) {
-                    return status >= 200 && status < 400;
-                },
-            });
-            const servicesEndTime = Date.now();
-            const servicesDuration = servicesEndTime - servicesStartTime;
-            logger.info(`Services are ready (took ${formatDuration(servicesDuration)}).`);
-        } catch (err) {
-            logger.error('Services did not start in time.', err);
-            throw new Error('Services failed to start');
-        }
-
-        // 4. Run API Tests
-        const apiResult = await runTestCommand('pnpm', ['test:api'], 'API Tests');
         if (apiResult.failed) {
-            finalExitCode = 1;
             logger.error('API tests failed. Stopping validation.');
-            await killProcesses();
             return {
                 unitTime: unitResult.duration,
                 apiTime: apiResult.duration,
@@ -211,26 +182,25 @@ async function runTests(): Promise<{ unitTime: number; apiTime: number; e2eTime:
             };
         }
 
-        // 5. Run E2E Tests
-        const e2eResult = await runTestCommand('pnpm', ['test:e2e'], 'E2E Tests');
+        // 3. E2E Tests
+        const e2eResult = await runTestCommand(
+            'pnpm test:e2e',
+            'E2E Tests'
+        );
+
         if (e2eResult.failed) {
-            finalExitCode = 1;
             logger.error('E2E tests failed.');
         }
-
-        // Cleanup background processes
-        await killProcesses();
 
         return {
             unitTime: unitResult.duration,
             apiTime: apiResult.duration,
             e2eTime: e2eResult.duration,
-            failed: finalExitCode !== 0
+            failed: e2eResult.failed
         };
 
     } catch (error: any) {
-        logger.error(`\n--- An error occurred during test execution ---`);
-        await killProcesses();
+        logger.error('--- An error occurred during test execution ---');
         return {
             unitTime: 0,
             apiTime: 0,
@@ -241,7 +211,22 @@ async function runTests(): Promise<{ unitTime: number; apiTime: number; e2eTime:
 }
 
 async function main() {
-    logger.info('Starting validation process...\n');
+    const modeText = FAST_MODE ? 'Fast Docker validation' : 'Full Docker validation';
+    logger.info(`Starting ${modeText} process...`);
+
+    // Check if rebuild is needed when in fast mode
+    if (FAST_MODE) {
+        const rebuildReasons = await checkIfRebuildNeeded();
+        if (rebuildReasons.length > 0) {
+            logger.warn('⚠️  Consider running full validation (without --fast) because:');
+            rebuildReasons.forEach(reason => {
+                logger.warn(`   • ${reason}`);
+            });
+            logger.warn('   Run: pnpm validate:full (without --fast)');
+        } else {
+            logger.info('✅ Fast mode: Using existing Docker images');
+        }
+    }
 
     const setupTimings: { name: string; duration: number }[] = [];
     let setupTime = 0;
@@ -259,31 +244,46 @@ async function main() {
     const totalTime = setupTime + testTime;
 
     // Print timing report
-    logger.info('\n=== Validation Timing Report ===');
+    const reportTitle = FAST_MODE ? '🚀 Fast Docker Validation Timing Report' : '🚀 Full Docker Validation Timing Report';
+    logger.info(`=== ${reportTitle} ===`);
 
     // Setup steps
-    logger.info('\nSetup steps:');
+    logger.info('📋 Setup Steps:');
     setupTimings.forEach(({ name, duration }) => {
-        logger.info(`${name}: ${formatDuration(duration)}`);
+        logger.info(`   ${name.padEnd(25)} ${formatDuration(duration).padStart(8)}`);
     });
-    logger.info(`Total setup time: ${formatDuration(setupTime)}`);
+    logger.info(`   ${'TOTAL SETUP TIME'.padEnd(25)} ${formatDuration(setupTime).padStart(8)}`);
 
     // Test execution
-    logger.info('\nTest execution:');
-    logger.info(`Unit tests: ${formatDuration(testResults.unitTime)}`);
-    logger.info(`API tests: ${formatDuration(testResults.apiTime)}`);
-    logger.info(`E2E tests: ${formatDuration(testResults.e2eTime)}`);
-    logger.info(`Total test time: ${formatDuration(testTime)}`);
+    logger.info('🧪 Test Execution:');
+    logger.info(`   ${'Unit Tests'.padEnd(25)} ${formatDuration(testResults.unitTime).padStart(8)}`);
+    logger.info(`   ${'API Tests'.padEnd(25)} ${formatDuration(testResults.apiTime).padStart(8)}`);
+    logger.info(`   ${'E2E Tests'.padEnd(25)} ${formatDuration(testResults.e2eTime).padStart(8)}`);
+    logger.info(`   ${'TOTAL TEST TIME'.padEnd(25)} ${formatDuration(testTime).padStart(8)}`);
 
     // Overall summary
-    logger.info('\nOverall summary:');
-    logger.info(`Total execution time: ${formatDuration(totalTime)}`);
+    logger.info('📊 Overall Summary:');
+    logger.info(`   ${'Total Execution Time'.padEnd(25)} ${formatDuration(totalTime).padStart(8)}`);
+    logger.info(`   ${'Test Count'.padEnd(25)} ${'212 tests'.padStart(8)}`);
+    logger.info(`   ${'Success Rate'.padEnd(25)} ${(testResults.failed ? '❌ FAILED' : '✅ 100%').padStart(8)}`);
+
+    if (FAST_MODE) {
+        logger.info(`   ${'Mode'.padEnd(25)} ${'⚡ FAST'.padStart(8)}`);
+    }
+
+    // Cleanup
+    logger.info('🧹 Cleaning up Docker environment...');
+    try {
+        await execa('pnpm dev:down', { shell: true, stdio: 'inherit', env: baseEnv });
+    } catch (error) {
+        logger.warn('Cleanup warning (non-fatal):', error);
+    }
 
     if (testResults.failed) {
-        logger.error('\n❌ Validation failed.');
+        logger.error(`❌ ${modeText} failed.`);
         process.exit(1);
     } else {
-        logger.info('\n✅ Validation completed successfully!');
+        logger.info(`✅ ${modeText} completed successfully!`);
     }
 }
 

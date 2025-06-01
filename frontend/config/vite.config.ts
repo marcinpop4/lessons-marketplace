@@ -189,12 +189,21 @@ export default defineConfig(({ mode }) => {
     server: {
       // Configure based on log level
       logLevel: logLevel >= 3 ? 'info' : logLevel >= 2 ? 'warn' : 'error',
+      // Docker hot reload configuration
+      host: isDev ? '0.0.0.0' : 'localhost', // Allow external connections in development
+      port: isDev ? 5173 : undefined,
       // Force Vite to always use new versions of files
       hmr: {
         overlay: true,
+        // For Docker, use polling for file watching
+        ...(process.env.DOCKER_ENV && {
+          port: 5173,
+          host: 'localhost'
+        })
       },
       watch: {
-        usePolling: isDev,
+        usePolling: isDev || !!process.env.DOCKER_ENV, // Use polling in Docker
+        interval: 1000
       },
       headers: isDev ? {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -203,7 +212,7 @@ export default defineConfig(({ mode }) => {
       } : undefined,
       proxy: {
         '/api/v1': {
-          target: 'http://localhost:3000', // Your backend server address
+          target: process.env.DOCKER_ENV ? 'http://server:3000' : 'http://localhost:3000', // Use Docker service name in containers
           changeOrigin: true,
           secure: false,
           configure: (proxy, options) => {

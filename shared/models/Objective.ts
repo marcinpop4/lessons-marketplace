@@ -2,9 +2,18 @@ import { ObjectiveStatus, ObjectiveStatusValue, ObjectiveStatusTransition } from
 import { Student } from './Student.js';
 import { Teacher } from './Teacher.js';
 import { LessonType } from './LessonType.js';
-import { createChildLogger } from '../../config/logger.js';
 
-const logger = createChildLogger('objective');
+// Simple local logger to avoid import complexity
+const createLocalLogger = (component: string) => ({
+    warn: (message: string, context?: any) => {
+        console.warn(`[${component}] ${message}`, context || '');
+    },
+    error: (message: string, context?: any) => {
+        console.error(`[${component}] ${message}`, context || '');
+    }
+});
+
+const logger = createLocalLogger('objective');
 
 /**
  * Database representation of an Objective with its CurrentStatus

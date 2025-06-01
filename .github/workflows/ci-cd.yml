@@ -17,18 +17,17 @@ permissions:
 
 jobs:
   test:
-    name: Run Tests
+    name: Validate Application
     runs-on: ubuntu-latest
     env:
       PNPM_VERSION: 10.3.0  # Match local environment version
-      NODE_ENV: test
-      RUN_SEED: true
+      NODE_ENV: development  # Use development for Docker setup
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetching all history to ensure lock file is included
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -44,89 +43,30 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Create logs directory with proper permissions
-        run: |
-          mkdir -p logs
-          chmod -R 777 logs
-          echo "Created logs directory with permissions $(ls -ld logs)"
+      - name: Create logs directory
+        run: mkdir -p logs
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Thorough Docker cleanup
-        run: pnpm docker:clean
+      - name: Run full validation suite
+        run: pnpm validate:full
 
-      - name: Deploy components
-        id: deploy
-        run: pnpm docker:deploy:rebuild
-
-      - name: Debug Docker environment
-        if: always() # Run even if previous step fails
-        run: |
-          # Ensure logs directory exists with proper permissions
-          mkdir -p logs
-          chmod -R 777 logs
-          
-          # Run TypeScript debug script
-          pnpm tsx scripts/docker-debug.ts
-          
-          # Ensure logs are accessible
-          chmod -R 777 logs
-          
-          # List debug files if they exist
-          echo "=== DEBUG FILES GENERATED ==="
-          find logs -type f -name "*-debug-*.log" | sort
-
-      - name: Upload debug logs
+      - name: Upload test results
         uses: actions/upload-artifact@v4
-        if: always() # Upload logs even if previous steps fail
+        if: always()
         with:
-          name: docker-debug-logs
+          name: test-results
           path: |
-            logs/*-debug-*.log
-          retention-days: 7
-          if-no-files-found: warn # Don't fail the build if no logs are found
-
-      - name: Run tests
-        if: steps.deploy.outcome == 'success'
-        run: |
-          mkdir -p tests/results/test-logs
-          set -e
-          # Run tests and tee output to both console and file
-          # Use a temporary file to capture exit code
-          set -o pipefail  # This makes pipeline exit status the status of the last failing command
-          DEBUG=pw:api pnpm docker:test 2>&1 | tee tests/results/test-logs/test-output.log
-
-      - name: Upload test execution logs
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-execution-logs
-          path: tests/results/test-logs/
+            tests/results/
           retention-days: 30
 
-      - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-report
-          path: tests/results/playwright-report/
-          retention-days: 30
-          
-      - name: Upload Playwright test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-test-results
-          path: |
-            tests/results/test-results/
-            tests/results/screenshots/
-          retention-days: 30
-          
-      - name: Upload Playwright traces
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-traces
-          path: tests/results/test-results/traces/
-          retention-days: 30
+  # Future: Deploy to production
+  # deploy:
+  #   name: Deploy to Production
+  #   runs-on: ubuntu-latest
+  #   needs: test
+  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  #   steps:
+  #     - name: Deploy to production
+  #       run: echo "Production deployment steps will be added here"

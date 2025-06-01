@@ -332,8 +332,8 @@
       {
         "current": {
           "selected": false,
-          "text": "/student/lesson-request",
-          "value": "/student/lesson-request"
+          "text": "/",
+          "value": "/"
         },
         "hide": 0,
         "includeAll": false,
@@ -342,14 +342,39 @@
         "name": "pageGroup",
         "options": [
           {
+            "selected": false,
+            "text": "/",
+            "value": "/"
+          },
+          {
+            "selected": false,
+            "text": "/login",
+            "value": "/login"
+          },
+          {
+            "selected": false,
+            "text": "/register",
+            "value": "/register"
+          },
+          {
+            "selected": false,
+            "text": "/student/lesson-confirmation/{id}",
+            "value": "/student/lesson-confirmation/{id}"
+          },
+          {
             "selected": true,
             "text": "/student/lesson-request",
             "value": "/student/lesson-request"
           },
           {
             "selected": false,
-            "text": "/student/lessons",
-            "value": "/student/lessons"
+            "text": "/student/objectives",
+            "value": "/student/objectives"
+          },
+          {
+            "selected": false,
+            "text": "/student/teacher-quotes/{id}",
+            "value": "/student/teacher-quotes/{id}"
           },
           {
             "selected": false,
@@ -358,11 +383,26 @@
           },
           {
             "selected": false,
-            "text": "/teacher/lesson-quotes",
-            "value": "/teacher/lesson-quotes"
+            "text": "/teacher/lessons/{id}",
+            "value": "/teacher/lessons/{id}"
+          },
+          {
+            "selected": false,
+            "text": "/teacher/lessons/{id}/create-plan",
+            "value": "/teacher/lessons/{id}/create-plan"
+          },
+          {
+            "selected": false,
+            "text": "/teacher/profile",
+            "value": "/teacher/profile"
+          },
+          {
+            "selected": false,
+            "text": "/theme-demo",
+            "value": "/theme-demo"
           }
         ],
-        "query": "/student/lesson-request,/student/lessons,/teacher/lessons,/teacher/lesson-quotes",
+        "query": "/,/login,/register,/student/lesson-confirmation/{id},/student/lesson-request,/student/objectives,/student/teacher-quotes/{id},/teacher/lessons,/teacher/lessons/{id},/teacher/lessons/{id}/create-plan,/teacher/profile,/theme-demo",
         "queryValue": "",
         "skipUrlSync": false,
         "type": "custom"

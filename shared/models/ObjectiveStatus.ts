@@ -1,6 +1,11 @@
-import { createChildLogger } from '../../config/logger.js';
+// Simple local logger to avoid import complexity
+const createLocalLogger = (component: string) => ({
+    warn: (message: string, context?: any) => {
+        console.warn(`[${component}] ${message}`, context || '');
+    }
+});
 
-const logger = createChildLogger('objective-status');
+const logger = createLocalLogger('objective-status');
 
 type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
 
@@ -105,7 +110,7 @@ export class ObjectiveStatus {
 
         // Basic validation
         if (!Object.values(ObjectiveStatusValue).includes(status)) {
-            logger.error('Invalid status value provided in ObjectiveStatus constructor', { status });
+            logger.warn('Invalid status value provided in ObjectiveStatus constructor', { status });
             throw new Error(`Invalid status value: ${status}`);
         }
     }
@@ -121,7 +126,7 @@ export class ObjectiveStatus {
     ): ObjectiveStatus {
         // Add validation within the static create method as well
         if (!Object.values(ObjectiveStatusValue).includes(status)) {
-            logger.error('Invalid status value provided in ObjectiveStatus.create', { status });
+            logger.warn('Invalid status value provided in ObjectiveStatus.create', { status });
             throw new Error(`Invalid status value: ${status}`);
         }
         return new ObjectiveStatus({ id, objectiveId, status, context });

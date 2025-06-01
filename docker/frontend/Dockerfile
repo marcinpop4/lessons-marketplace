@@ -29,7 +29,8 @@ FROM dependencies AS builder
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 
-# Generate Prisma client first
+# Copy prisma schema for client generation
+COPY server/prisma ./server/prisma
 RUN pnpm prisma:generate
 
 # Build shared first since frontend may depend on it

@@ -2,7 +2,9 @@ import { defineConfig, devices } from '@playwright/test';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
-const projectRoot = process.cwd();
+const projectRoot = process.cwd().includes('/tests/e2e')
+    ? path.resolve(process.cwd(), '../..')
+    : process.cwd();
 
 // --- Environment Loading --- 
 // 1. Check for NODE_ENV
@@ -86,7 +88,7 @@ if (expectTimeoutStr) {
 
 
 export default defineConfig({
-    testDir: '../../dist/tests/e2e',
+    testDir: path.resolve(projectRoot, 'tests/e2e'),
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,

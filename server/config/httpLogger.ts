@@ -95,7 +95,7 @@ if (typeof process !== 'undefined' && process.versions?.node) {
             level: getLogLevel(getEnvVar('LOG_LEVEL')),
             base: {},
             redact: createRedactionConfig(),
-            transport: getEnvVar('NODE_ENV') === 'development' ? {
+            transport: (getEnvVar('NODE_ENV') === 'development' && getEnvVar('USE_DOCKER_LOGGING') !== 'true') ? {
                 target: 'pino-pretty',
                 options: {
                     colorize: true,
@@ -115,7 +115,7 @@ if (typeof process !== 'undefined' && process.versions?.node) {
             level: getLogLevel(getEnvVar('LOG_LEVEL')),
             base: {},
             redact: createFallbackRedactionConfig(),
-            transport: getEnvVar('NODE_ENV') === 'development' ? {
+            transport: (getEnvVar('NODE_ENV') === 'development' && getEnvVar('USE_DOCKER_LOGGING') !== 'true') ? {
                 target: 'pino-pretty',
                 options: {
                     colorize: true,

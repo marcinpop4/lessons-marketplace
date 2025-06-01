@@ -1,6 +1,11 @@
-import { createChildLogger } from '../../config/logger.js';
+// Simple local logger to avoid import complexity
+const createLocalLogger = (component: string) => ({
+    warn: (message: string, context?: any) => {
+        console.warn(`[${component}] ${message}`, context || '');
+    }
+});
 
-const logger = createChildLogger('milestone-status');
+const logger = createLocalLogger('milestone-status');
 
 // Define a JSON value type
 type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];

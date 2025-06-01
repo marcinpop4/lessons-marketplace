@@ -10,9 +10,9 @@ dist/
 !dist/swagger
 
 # Environment files
-.env
-.env.local
-env/*
+# .env
+# .env.local
+# env/*
 
 # Cache
 .cache/
