@@ -49,9 +49,7 @@ const getLogLevel = (logLevel: string | undefined): string => {
     return 'info';
 };
 
-// Import the shared redaction configuration and file logger
-let createRedactionConfig: any = null;
-let httpFileLogger: any = null;
+// Import the shared redaction configuration
 let httpTerminalLogger: any = null;
 let httpStructuredLogger: any = null;
 

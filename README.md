@@ -8,13 +8,13 @@ This project is a platform for connecting students and parents with 1:1 instruct
 - **Real-time learning objectives** with AI-powered recommendations
 - **Comprehensive user management** for students and teachers
 - **Lesson scheduling and quote system** for flexible booking
-- **Unified logging system** with Pino for production monitoring
-- **Docker containerization** for consistent deployment
-- **CI/CD pipeline** with GitHub Actions
+- **Unified logging system** with Pino for structured monitoring
+- **Docker containerization** for consistent development and deployment
+- **Comprehensive test suite** with unit, API, and E2E testing
 
 ## Development Setup
 
-Follow these steps to set up your local development environment.
+Follow these steps to set up your local development environment from a completely clean checkout.
 
 ### Prerequisites
 
@@ -35,162 +35,213 @@ Follow these steps to set up your local development environment.
    brew install pnpm
    ```
 
-3. **PostgreSQL**: Version 15. Install using Homebrew:
+3. **Docker**: Install Docker Desktop for your platform:
    ```bash
-   brew install postgresql@15
-   brew services start postgresql@15
+   # Using Homebrew on macOS
+   brew install --cask docker
+   
+   # Or download from https://www.docker.com/products/docker-desktop/
    ```
 
-4. **Environment Setup**: Create your development environment file:
+### Quick Start (from clean checkout)
+
+1. **Clone the repository**:
    ```bash
-   # Copy the example environment file
+   git clone <repository-url>
+   cd lessons-marketplace
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   pnpm install
+   ```
+
+3. **Set up environment files**:
+   ```bash
+   # Copy example environment files (create these from your project needs)
    cp env/.env.example env/.env.development
+   cp env/.env.example env/.env.test
+   
+   # Edit the files with your specific configuration if needed
+   # The defaults should work for local development
    ```
 
-### Installation and Setup
+4. **Validate the entire setup** (recommended):
+   ```bash
+   NODE_ENV=development pnpm validate:full
+   ```
+   
+   This comprehensive script will:
+   - Clean any existing Docker containers
+   - Build fresh Docker images
+   - Start all services (server, frontend, database, observability stack)
+   - Install dependencies in containers
+   - Run database migrations
+   - Generate Prisma client
+   - Seed the database with test data
+   - Run all test suites (unit, API, E2E)
+   - Provide detailed timing reports
+   
+   If this command succeeds, your development environment is fully working!
 
-Run the following command to set up everything automatically:
+5. **Alternative: Fast setup** (skip Docker rebuild):
+   ```bash
+   NODE_ENV=development pnpm validate:fast
+   ```
+   
+   Use this if you've already run the full validation before and just want to quickly verify everything still works.
+
+## Docker Development
+
+The application runs entirely in Docker for consistent development across different machines.
+
+### Development Workflow
 
 ```bash
-NODE_ENV=development pnpm validate:full
+# Start all services
+NODE_ENV=development pnpm dev:up
+
+# View logs from all services
+NODE_ENV=development pnpm dev:logs
+
+# Stop all services
+NODE_ENV=development pnpm dev:down
+
+# Clean everything (containers, volumes, networks)
+NODE_ENV=development pnpm dev:clean
+
+# Rebuild Docker images
+NODE_ENV=development pnpm dev:build
 ```
 
-This script will:
-1. Clean and install dependencies
-2. Create and set up the database
-3. Run migrations
-4. Generate Prisma client
-5. Seed the database
-6. Run diagnostics and tests
+### Services Available
 
-If `validate:full` succeeds, your development environment is ready!
+When running, these services will be available:
+- **Frontend**: `http://localhost:5173` (Vite dev server)
+- **Backend API**: `http://localhost:3000` (Express server)
+- **API Documentation**: `http://localhost:3000/api-docs` (Swagger UI)
+- **Database**: PostgreSQL (internal Docker network)
+- **Observability Stack**: 
+  - Grafana: `http://localhost:3001` (monitoring dashboards)
+  - Loki: `http://localhost:3100` (log aggregation)
 
-### Starting the Development Servers
-
-To start the development servers:
+### Database Operations
 
 ```bash
-NODE_ENV=development pnpm dev:full
+# Run migrations
+NODE_ENV=development pnpm prisma:migrate
+
+# Reset database (destructive)
+NODE_ENV=development pnpm prisma:reset
+
+# Seed the database with test data
+NODE_ENV=development pnpm prisma:seed
+
+# Open Prisma Studio (database GUI)
+NODE_ENV=development pnpm prisma:studio
 ```
 
-This will start:
-- Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:3000`
+### Testing
+
+```bash
+# Run all tests
+NODE_ENV=development pnpm test:all
+
+# Run specific test suites
+NODE_ENV=development pnpm test:unit
+NODE_ENV=development pnpm test:api
+NODE_ENV=development pnpm test:e2e
+```
+
+### Environment Support
+
+All commands support different environments:
+
+```bash
+# Development (default)
+NODE_ENV=development pnpm dev:up
+
+# Test environment
+NODE_ENV=test pnpm dev:up
+```
+
+### Manual Setup
+
+If you prefer step-by-step setup or the automated validation fails:
+
+1. **Start Docker services**:
+   ```bash
+   NODE_ENV=development pnpm dev:up
+   ```
+
+2. **Install dependencies in containers**:
+   ```bash
+   NODE_ENV=development pnpm dev:install
+   ```
+
+3. **Set up the database**:
+   ```bash
+   NODE_ENV=development pnpm prisma:setup
+   ```
+
+4. **Run tests to verify**:
+   ```bash
+   NODE_ENV=development pnpm test:all
+   ```
+
+### Troubleshooting
+
+If you encounter issues:
+
+1. **Clean and rebuild everything**:
+   ```bash
+   NODE_ENV=development pnpm dev:clean
+   NODE_ENV=development pnpm dev:build
+   NODE_ENV=development pnpm validate:full
+   ```
+
+2. **Check service logs**:
+   ```bash
+   NODE_ENV=development pnpm dev:logs
+   ```
+
+3. **Access container shells for debugging**:
+   ```bash
+   # Server container
+   NODE_ENV=development pnpm dev:shell:server
+   
+   # Frontend container  
+   NODE_ENV=development pnpm dev:shell:frontend
+   ```
 
 ## Logging System
 
-This project includes a comprehensive logging system that captures both server-side and client-side events for monitoring and debugging.
+The application includes a comprehensive logging system for monitoring and debugging:
 
 ### Features
-- **High-performance structured logging** with Pino (replaces Morgan)
-- **Rotating log files** to prevent excessive disk usage
-- **Client-side error tracking** and user behavior analytics
+- **High-performance structured logging** with Pino
 - **Request correlation** via unique request IDs
 - **Automatic log aggregation** from frontend to backend
 - **Security-first approach** with automatic data redaction
+- **Real-time log streaming** to observability stack
+- **Client-side error tracking** and user behavior analytics
 
-### Quick Start
-The logging system is automatically enabled and requires no configuration for basic usage:
+### Accessing Logs
 
-```typescript
-// Server-side (automatic)
-import { logger } from './config/logger.js';
-logger.info('Application event', { userId: '123', action: 'login' });
+- **Development console**: Logs are displayed with pretty formatting
+- **Grafana dashboards**: `http://localhost:3001` for visual log analysis
+- **Container logs**: `NODE_ENV=development pnpm dev:logs`
 
-// Client-side (automatic)
-import logger from '@frontend/utils/logger';
-logger.info('User action', { page: '/dashboard', action: 'click' });
-```
+## API Documentation
 
-### Log Rotation
-Log files automatically rotate daily and when they reach 20MB:
-- **Daily rotation**: New log files created daily
-- **Size-based rotation**: Files rotate at 20MB to prevent excessive growth
-- **14-day retention**: Old logs are kept for 2 weeks, then automatically deleted
-- **Compression**: Archived logs are gzipped to save disk space
+Interactive API documentation is available at `http://localhost:3000/api-docs` when the server is running.
 
-```bash
-# Test log rotation (dry run)
-pnpm run logs:rotate:test
+## Testing Strategy
 
-# Force log rotation immediately
-pnpm run logs:rotate
+The project includes comprehensive testing at multiple levels:
 
-# Check rotation status
-pnpm run logs:rotate:status
+- **Unit Tests**: Fast, isolated tests for individual functions and components
+- **API Tests**: Integration tests for REST endpoints using Supertest
+- **E2E Tests**: End-to-end browser tests using Playwright
 
-# Check log files
-ls -la logs/
-```
-
-### Documentation
-For detailed information about the logging system, see:
-- **[Log Rotation System](docs/logging-rotation.md)** - Complete guide to log rotation
-- **[API Documentation](http://localhost:3000/api-docs)** - Swagger docs including logging endpoints
-
-### Log Files
-In development, logs are written to:
-- `logs/app.log` - All application logs (rotates daily/20MB)
-- `logs/http.log` - HTTP request logs (rotates daily/20MB)  
-- `logs/client.log` - Client-side logs (rotates daily/20MB)
-- `logs/error.log` - Error logs only (rotates daily/20MB)
-- Console output with pretty formatting
-
-## Running with Docker
-
-You can run the application and tests within a Docker environment.
-
-1. **Deploy Locally**: Builds images and starts containers for frontend, server, and database.
-   ```bash
-   NODE_ENV=test pnpm docker:deploy
-   ```
-
-2. **Run Tests in Docker**: Builds a test image and runs tests against the Dockerized application.
-   ```bash
-   NODE_ENV=test pnpm docker:test
-   ```
-   This runs the test suite defined in `docker/docker-compose.yml`.
-
-Refer to `package.json` and `docker/docker-compose.yml` for details on the specific environment variables used in these Docker commands.
-
-## Production Build
-
-To deploy the application in production:
-
-NODE_ENV=production FLY_API_TOKEN="your-fly-api-token" pnpm docker:deploy:fly
-
-## CI/CD Pipelines
-
-The project uses GitHub Actions for Continuous Integration and Continuous Deployment.
-
-### 1. CI Pipeline (`.github/workflows/ci-cd.yml`)
-
--   **Name**: `GitHub CI/CD Pipeline`
--   **Triggers**: Runs on pushes and pull requests to the `main` branch.
--   **Jobs**:
-    -   `test`:
-        -   Runs on `ubuntu-latest`.
-        -   Sets `NODE_ENV=test`.
-        -   Checks out code, sets up Node.js and pnpm.
-        -   Installs dependencies (`pnpm install --frozen-lockfile`).
-        -   Sets up Docker Buildx.
-        -   Cleans Docker environment (`pnpm docker:clean`).
-        -   Builds and deploys Docker containers (`pnpm docker:deploy:rebuild`).
-        -   Runs debug scripts (`scripts/docker-debug.ts`) and uploads logs.
-        -   Runs tests within Docker (`pnpm docker:test`).
-        -   Uploads test execution logs, Playwright reports, results, screenshots, and traces as artifacts.
-
-### 2. Production Deployment Pipeline (`.github/workflows/production-deploy.yml`)
-
--   **Name**: `Production Deployment`
--   **Triggers**:
-    -   Manual dispatch (`workflow_dispatch`).
-    -   Completion of the `GitHub CI/CD Pipeline` workflow on the `main` branch (`workflow_run`), only if the CI pipeline succeeded.
--   **Jobs**:
-    -   `deploy`:
-        -   Runs on `ubuntu-latest`.
-        -   Requires the `production` environment (allows for environment secrets like `FLY_API_TOKEN`).
-        -   Sets `NODE_ENV=production`.
-        -   Checks out code, sets up Node.js and pnpm.
-        -   Installs dependencies (`pnpm install --frozen-lockfile`).
-        -   Deploys the application to Fly.io using `pnpm docker:deploy:fly`.
+All tests run in Docker to ensure consistency across environments.

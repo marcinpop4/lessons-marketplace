@@ -12,12 +12,13 @@ RUN apt-get update && apt-get install -y \
     && openssl version \
     && mkdir -p /etc/ssl
 
-# Install pnpm globally
-RUN npm install -g pnpm
+# Enable pnpm via corepack (built into Node.js 20)
+RUN corepack enable
+RUN corepack use pnpm@10.3.0
 
 # Copy package files and install dependencies
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store pnpm install --frozen-lockfile
 
 # Copy prisma schema for client generation
 COPY server/prisma ./server/prisma

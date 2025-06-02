@@ -76,7 +76,7 @@ const createRedactionConfig = (additionalPaths: string[] = []) => ({
     remove: false
 });
 
-// Create client logger using Pino, same as fileLogger but output to stdout
+// Create client logger using Pino with structured output to stdout
 const clientFileLogger = pino({
     level: 'debug',
     base: {
@@ -169,7 +169,7 @@ class ClientLoggerService {
         const pageGroup = log.data?.pageGroup || 'unknown';
         const eventType = log.data?.event || log.message.toLowerCase().replace(/\s+/g, '_');
 
-        // Create enriched log data matching fileLogger structure
+        // Create enriched log data for structured logging
         const enrichedLogData = {
             ...log.data,
             pageGroup,
@@ -186,7 +186,7 @@ class ClientLoggerService {
             userAgent: log.userAgent?.slice(0, 200),
         };
 
-        // Use Pino logger same as fileLogger (outputs to stdout for Promtail)
+        // Use Pino logger for structured output (outputs to stdout for Promtail)
         switch (log.level) {
             case 'error':
                 clientFileLogger.error(enrichedLogData, log.message);

@@ -44,6 +44,8 @@ export default {
     '^@shared/(.*)$': '<rootDir>/../../shared/$1',
     '^@server/(.*)$': '<rootDir>/../../server/$1'
   },
+  // Add module file extensions
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   // Add verbose logging
   verbose: true
 }; 

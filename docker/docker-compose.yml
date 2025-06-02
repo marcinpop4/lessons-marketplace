@@ -123,12 +123,16 @@ services:
       - TEST_ENV=docker
       - FRONTEND_URL=http://localhost:5173
     volumes:
-      - ../tests/results/test-results:/app/tests/results/test-results:rw
-      - ../tests/results/playwright-report:/app/tests/results/playwright-report:rw
-      - ../tests/results/screenshots:/app/tests/results/screenshots:rw
-      - ../tests/results/test-logs:/app/tests/results/test-logs:rw
+      - ../tests/results/unit:/app/tests/results/unit:rw
+      - ../tests/results/api:/app/tests/results/api:rw
+      - ../tests/results/e2e:/app/tests/results/e2e:rw
       # Mount test source for hot reload
       - ../tests:/app/tests:cached
+      # Mount source code that tests depend on
+      - ../shared:/app/shared:cached
+      - ../server:/app/server:cached
+      - ../config:/app/config:cached
+      - ../env:/app/env:cached
     depends_on:
       database:
         condition: service_healthy

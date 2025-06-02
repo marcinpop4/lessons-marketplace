@@ -20,7 +20,6 @@ jobs:
     name: Validate Application
     runs-on: ubuntu-latest
     env:
-      PNPM_VERSION: 10.3.0  # Match local environment version
       NODE_ENV: test
 
     steps:
@@ -37,17 +36,11 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: ${{ env.PNPM_VERSION }}
+          version: 10.3.0
           run_install: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Create logs directory
-        run: mkdir -p logs
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
 
       - name: Run full validation suite
         run: pnpm validate:full

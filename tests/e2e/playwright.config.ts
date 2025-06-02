@@ -94,7 +94,8 @@ export default defineConfig({
     retries: process.env.CI ? 2 : 0,
     workers: process.env.CI ? 1 : undefined,
     reporter: [
-        ['html', { outputFolder: path.join(projectRoot, 'tests/results/playwright-report'), open: 'never' }],
+        ['html', { outputFolder: path.join(projectRoot, 'tests/results/e2e/html-report'), open: 'never' }],
+        ['json', { outputFile: path.join(projectRoot, 'tests/results/e2e/results.json') }],
         ['list']
     ],
     // Apply timeout override if present, otherwise use default
@@ -117,7 +118,7 @@ export default defineConfig({
         ...useOverrides,
         trace: 'retain-on-failure'
     },
-    outputDir: path.join(projectRoot, 'tests/results/screenshots'),
+    outputDir: path.join(projectRoot, 'tests/results/e2e/screenshots'),
     projects: [
         {
             name: 'chromium',
