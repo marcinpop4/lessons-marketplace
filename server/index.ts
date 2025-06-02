@@ -14,7 +14,7 @@ import { AppError } from './errors/index.js'; // Import base error
 import { ZodError } from 'zod';
 
 // Logging
-import { logger, createChildLogger, initializeFileLogging } from '../config/logger.js';
+import { logger, createChildLogger } from '../config/logger.js';
 import { httpLogger } from './config/httpLogger.js';
 
 // --- Debugging --- 
@@ -120,58 +120,59 @@ export function getRouteGroup(method: string, url: string): string {
   // Declarative route grouping - map specific routes to logical groups
   const routePatterns: Record<string, string> = {
     // Authentication
-    'POST /api/v1/auth/login': 'POST /api/v1/auth',
-    'POST /api/v1/auth/register': 'POST /api/v1/auth',
-    'POST /api/v1/auth/logout': 'POST /api/v1/auth',
-    'GET /api/v1/refresh-token': 'GET /api/v1/refresh-token',
-    'POST /api/v1/refresh-token': 'POST /api/v1/refresh-token',
+    'POST /api/v1/auth/login': '/api/v1/auth',
+    'POST /api/v1/auth/register': '/api/v1/auth',
+    'POST /api/v1/auth/logout': '/api/v1/auth',
+    'GET /api/v1/refresh-token': '/api/v1/refresh-token',
+    'POST /api/v1/refresh-token': '/api/v1/refresh-token',
 
     // Lessons - main endpoint
-    'GET /api/v1/lessons': 'GET /api/v1/lessons',
-    'POST /api/v1/lessons': 'POST /api/v1/lessons',
-    'GET /api/v1/lessons/{id}': 'GET /api/v1/lessons',
-    'PATCH /api/v1/lessons/{id}': 'PATCH /api/v1/lessons',
+    'GET /api/v1/lessons': '/api/v1/lessons',
+    'POST /api/v1/lessons': '/api/v1/lessons',
+    'GET /api/v1/lessons/{id}': '/api/v1/lessons',
+    'PATCH /api/v1/lessons/{id}': '/api/v1/lessons',
 
     // Lesson Requests
-    'GET /api/v1/lesson-requests': 'GET /api/v1/lesson-requests',
-    'POST /api/v1/lesson-requests': 'POST /api/v1/lesson-requests',
-    'GET /api/v1/lesson-requests/{id}': 'GET /api/v1/lesson-requests',
+    'GET /api/v1/lesson-requests': '/api/v1/lesson-requests',
+    'POST /api/v1/lesson-requests': '/api/v1/lesson-requests',
+    'GET /api/v1/lesson-requests/{id}': '/api/v1/lesson-requests',
 
     // Lesson Quotes  
-    'GET /api/v1/lesson-quotes': 'GET /api/v1/lesson-quotes',
-    'POST /api/v1/lesson-quotes': 'POST /api/v1/lesson-quotes',
-    'PATCH /api/v1/lesson-quotes': 'PATCH /api/v1/lesson-quotes',
-    'GET /api/v1/lesson-quotes/{id}': 'GET /api/v1/lesson-quotes',
+    'GET /api/v1/lesson-quotes': '/api/v1/lesson-quotes',
+    'POST /api/v1/lesson-quotes': '/api/v1/lesson-quotes',
+    'PATCH /api/v1/lesson-quotes': '/api/v1/lesson-quotes',
+    'GET /api/v1/lesson-quotes/{id}': '/api/v1/lesson-quotes',
 
     // Lesson Plans
-    'GET /api/v1/lesson-plans': 'GET /api/v1/lesson-plans',
-    'POST /api/v1/lesson-plans': 'POST /api/v1/lesson-plans',
-    'GET /api/v1/lesson-plans/{id}': 'GET /api/v1/lesson-plans',
+    'GET /api/v1/lesson-plans': '/api/v1/lesson-plans',
+    'POST /api/v1/lesson-plans': '/api/v1/lesson-plans',
+    'GET /api/v1/lesson-plans/{id}': '/api/v1/lesson-plans',
 
     // Summary
-    'GET /api/v1/summary': 'GET /api/v1/summary',
-    'POST /api/v1/summary': 'POST /api/v1/summary',
-    'GET /api/v1/summary/{id}': 'GET /api/v1/summary',
+    'GET /api/v1/summary': '/api/v1/summary',
+    'POST /api/v1/summary': '/api/v1/summary',
+    'GET /api/v1/summary/{id}': '/api/v1/summary',
 
     // Users
-    'GET /api/v1/students': 'GET /api/v1/students',
-    'POST /api/v1/students': 'POST /api/v1/students',
-    'GET /api/v1/students/{id}': 'GET /api/v1/students',
-    'GET /api/v1/teachers': 'GET /api/v1/teachers',
-    'POST /api/v1/teachers': 'POST /api/v1/teachers',
-    'GET /api/v1/teachers/{id}': 'GET /api/v1/teachers',
+    'GET /api/v1/students': '/api/v1/students',
+    'POST /api/v1/students': '/api/v1/students',
+    'GET /api/v1/students/{id}': '/api/v1/students',
+    'GET /api/v1/teachers': '/api/v1/teachers',
+    'POST /api/v1/teachers': '/api/v1/teachers',
+    'GET /api/v1/teachers/{id}': '/api/v1/teachers',
 
     // Other endpoints
-    'GET /api/v1/addresses': 'GET /api/v1/addresses',
-    'POST /api/v1/addresses': 'POST /api/v1/addresses',
-    'GET /api/v1/health': 'GET /api/v1/health',
-    'POST /api/v1/logs': 'POST /api/v1/logs',
-    'GET /api/v1/milestones': 'GET /api/v1/milestones',
-    'POST /api/v1/milestones': 'POST /api/v1/milestones',
-    'GET /api/v1/objectives': 'GET /api/v1/objectives',
-    'POST /api/v1/objectives': 'POST /api/v1/objectives',
-    'GET /api/v1/teacher-lesson-rates': 'GET /api/v1/teacher-lesson-rates',
-    'POST /api/v1/teacher-lesson-rates': 'POST /api/v1/teacher-lesson-rates'
+    'GET /api/v1/addresses': '/api/v1/addresses',
+    'POST /api/v1/addresses': '/api/v1/addresses',
+    'GET /api/v1/health': '/api/v1/health',
+    'POST /api/v1/logs': '/api/v1/logs',
+    'GET /api/v1/milestones': '/api/v1/milestones',
+    'POST /api/v1/milestones': '/api/v1/milestones',
+    'GET /api/v1/objectives': '/api/v1/objectives',
+    'POST /api/v1/objectives': '/api/v1/objectives',
+    'GET /api/v1/teacher-lesson-rates': '/api/v1/teacher-lesson-rates',
+    'POST /api/v1/teacher-lesson-rates': '/api/v1/teacher-lesson-rates',
+    'PATCH /api/v1/teacher-lesson-rates': '/api/v1/teacher-lesson-rates'
   };
 
   // Check for exact matches first
@@ -183,7 +184,7 @@ export function getRouteGroup(method: string, url: string): string {
   for (const [pattern, group] of Object.entries(routePatterns)) {
     const [patternMethod, patternPath] = pattern.split(' ');
     if (method === patternMethod && cleanUrl.startsWith(patternPath.replace('/{id}', ''))) {
-      // Handle routes with IDs (e.g., /api/v1/lessons/123 -> GET /api/v1/lessons)
+      // Handle routes with IDs (e.g., /api/v1/lessons/123 -> /api/v1/lessons)
       const basePath = patternPath.replace('/{id}', '');
       if (cleanUrl === basePath ||
         cleanUrl.match(new RegExp(`^${basePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(/[^/]+)*$`))) {
@@ -198,8 +199,8 @@ export function getRouteGroup(method: string, url: string): string {
     (global as any)._httpLoggerDebugLogged = true;
   }
 
-  // Default: use the actual route
-  return route;
+  // Default: use just the clean URL (no method prefix)
+  return cleanUrl;
 }
 
 // --- Express App Setup --- 
@@ -334,9 +335,6 @@ app.use((err: Error | any, req: Request, res: Response, next: NextFunction) => {
 // --- Start Server Logic --- 
 async function startServer() {
   try {
-    // Initialize file logging FIRST
-    await initializeFileLogging();
-
     // Ensure database is connected BEFORE starting the listener
     await testDatabaseConnection();
 

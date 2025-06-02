@@ -53,6 +53,7 @@ const getLogLevel = (logLevel: string | undefined): string => {
 let createRedactionConfig: any = null;
 let httpFileLogger: any = null;
 let httpTerminalLogger: any = null;
+let httpStructuredLogger: any = null;
 
 // Fallback redaction configuration if import fails
 const createFallbackRedactionConfig = () => ({
@@ -65,68 +66,71 @@ const createFallbackRedactionConfig = () => ({
         'secret',
         'apikey',
 
-        // HTTP specific paths
+        // HTTP specific paths - exact field names
         'req.headers.authorization',
+        'req.headers.Authorization',
         'req.headers.cookie',
+        'req.headers.Cookie',
         'req.body.password',
         'req.body.token',
         'res.headers["set-cookie"]',
         'res.body.password',
         'res.body.token',
 
-        // Wildcards
+        // Session-related exact paths
+        'req.headers["x-session-token"]',
+        'req.headers["x-auth-token"]',
+        'req.headers["x-access-token"]',
+
+        // Common JWT/Bearer token locations
+        'req.headers["x-api-key"]',
+        'req.headers["api-key"]',
+        'req.headers["access-token"]',
+        'req.headers["refresh-token"]',
+
+        // Response sensitive headers
+        'res.headers["authorization"]',
+        'res.headers["Authorization"]',
+        'res.headers["set-cookie"]',
+        'res.headers["Set-Cookie"]',
+
+        // Wildcards for nested objects (valid patterns only)
         '*.password',
         '*.token',
         '*.secret',
-        '*.authorization'
+        '*.authorization',
+        '*.cookie',
     ],
     censor: REDACTION_MARKER,
     remove: false
 });
 
-// Initialize loggers after importing shared configuration
+// Initialize loggers
 if (typeof process !== 'undefined' && process.versions?.node) {
-    import('./fileLogger.js').then(fileLoggerModule => {
-        httpFileLogger = fileLoggerModule.httpFileLogger;
-        createRedactionConfig = fileLoggerModule.createRedactionConfig;
+    // Create the terminal logger with proper redaction config
+    httpTerminalLogger = pino({
+        level: getLogLevel(getEnvVar('LOG_LEVEL')),
+        base: {},
+        redact: createFallbackRedactionConfig(),
+        transport: getEnvVar('STRUCTURED_LOGS') === 'false' ? {
+            target: 'pino-pretty',
+            options: {
+                colorize: true,
+                translateTime: 'SYS:HH:MM:ss.l',
+                ignore: 'pid,hostname',
+                singleLine: false,
+                hideObject: true,
+                messageFormat: 'http | {msg}',
+            }
+        } : undefined
+    });
 
-        // Create the terminal logger with proper redaction config
-        httpTerminalLogger = pino({
-            level: getLogLevel(getEnvVar('LOG_LEVEL')),
-            base: {},
-            redact: createRedactionConfig(),
-            transport: (getEnvVar('NODE_ENV') === 'development' && getEnvVar('USE_DOCKER_LOGGING') !== 'true') ? {
-                target: 'pino-pretty',
-                options: {
-                    colorize: true,
-                    translateTime: 'SYS:HH:MM:ss.l',
-                    ignore: 'pid,hostname',
-                    singleLine: false,
-                    hideObject: true,
-                    messageFormat: 'http | {msg}',
-                }
-            } : undefined
-        });
-    }).catch(error => {
-        console.warn('HTTP logging initialization failed, using fallback:', error);
-
-        // Create fallback logger
-        httpTerminalLogger = pino({
-            level: getLogLevel(getEnvVar('LOG_LEVEL')),
-            base: {},
-            redact: createFallbackRedactionConfig(),
-            transport: (getEnvVar('NODE_ENV') === 'development' && getEnvVar('USE_DOCKER_LOGGING') !== 'true') ? {
-                target: 'pino-pretty',
-                options: {
-                    colorize: true,
-                    translateTime: 'SYS:HH:MM:ss.l',
-                    ignore: 'pid,hostname',
-                    singleLine: false,
-                    hideObject: true,
-                    messageFormat: 'http | {msg}',
-                }
-            } : undefined
-        });
+    // Create a structured logger for JSON output with redaction
+    httpStructuredLogger = pino({
+        level: getLogLevel(getEnvVar('LOG_LEVEL')),
+        base: {},
+        redact: createFallbackRedactionConfig(),
+        // No transport = raw JSON output
     });
 } else {
     // Browser environment fallback
@@ -135,6 +139,8 @@ if (typeof process !== 'undefined' && process.versions?.node) {
         base: {},
         redact: createFallbackRedactionConfig()
     });
+
+    httpStructuredLogger = httpTerminalLogger;
 }
 
 // Create a simple HTTP logger middleware that only logs clean messages
@@ -173,105 +179,121 @@ export const httpLogger = (req: Request, res: Response, next: NextFunction) => {
         if (originalUrl?.includes('/api/v1/logs') && getEnvVar('LOG_LEVEL') !== '3' && !getEnvVar('DEBUG')) {
             // Silently skip logging for client logging API calls
         } else {
-            // Determine log level based on status code
-            let logLevel: 'error' | 'warn' | 'info' | 'debug' = 'info';
+            // Check if we should quiet development noise (healthchecks, etc.)
+            const quietDevLogs = getEnvVar('DEV_QUIET_LOGS') === 'true';
 
-            if (status >= 500) {
-                logLevel = 'error';
-            } else if (status >= 400) {
-                logLevel = 'warn';
-            } else if (status >= 300) {
-                // For redirects and 304s, use debug level in development to reduce noise
-                logLevel = getEnvVar('NODE_ENV') === 'development' ? 'debug' : 'info';
-            }
+            // Skip healthcheck logs if DEV_QUIET_LOGS is enabled
+            if (quietDevLogs && originalUrl?.includes('/health')) {
+                // Silently skip healthcheck logs in quiet dev mode
+            } else {
+                // Determine log level based on status code
+                let logLevel: 'error' | 'warn' | 'info' | 'debug' = 'info';
 
-            // Build the clean terminal message
-            let terminalMessage = `${method} ${url} ${status} ${responseTime}ms`;
-
-            // Create structured log object for file - Pino redaction will handle sensitive data
-            const fileLogData: any = {
-                reqId: req.id,
-                method,
-                url: originalUrl || url,
-                status,
-                responseTime,
-                userAgent: req.get('user-agent'),
-                ip: req.ip,
-                forwardedFor: req.get('x-forwarded-for'),
-            };
-
-            // Add request data if it exists - no manual scrubbing needed, Pino handles it
-            if ((req as any).body && Object.keys((req as any).body).length > 0) {
-                // For terminal: add request body to message (only in development)
-                if (method !== 'GET' && getEnvVar('NODE_ENV') === 'development') {
-                    const bodyStr = JSON.stringify((req as any).body);
-                    // Add yellow color to the req body for better visibility
-                    terminalMessage += ` \x1b[33mreq: ${bodyStr}\x1b[0m`;
+                if (status >= 500) {
+                    logLevel = 'error';
+                } else if (status >= 400) {
+                    logLevel = 'warn';
+                } else if (status >= 300) {
+                    // For redirects and 304s, use debug level in development to reduce noise
+                    logLevel = getEnvVar('NODE_ENV') === 'development' ? 'debug' : 'info';
                 }
 
-                // For file: add as structured data - Pino will redact sensitive fields
-                fileLogData.req = {
-                    headers: req.headers,
-                    query: req.query,
-                    params: req.params,
-                    body: (req as any).body
-                };
-            } else {
-                fileLogData.req = {
-                    headers: req.headers,
-                    query: req.query,
-                    params: req.params
-                };
-            }
+                // Build the clean terminal message using originalUrl to show complete URL with query params
+                let terminalMessage = `${method} ${originalUrl} ${status} ${responseTime}ms`;
 
-            // Log complete structured data to file for Grafana aggregation
-            let parsedResponseBody = null;
-            try {
-                if (responseBody) {
-                    parsedResponseBody = JSON.parse(responseBody);
+                // Create structured log object for file - Pino redaction will handle sensitive data
+                const fileLogData: any = {
+                    reqId: req.id,
+                    method,
+                    url: originalUrl || url,
+                    status,
+                    responseTime,
+                    userAgent: req.get('user-agent'),
+                    ip: req.ip,
+                    forwardedFor: req.get('x-forwarded-for'),
+                };
+
+                // Add request data if it exists - no manual scrubbing needed, Pino handles it
+                if ((req as any).body && Object.keys((req as any).body).length > 0) {
+                    // For terminal: add request body to message (only in development and human-readable mode)
+                    if (method !== 'GET' && getEnvVar('NODE_ENV') === 'development') {
+                        const bodyStr = JSON.stringify((req as any).body);
+                        // Only add color codes when using human-readable logs (STRUCTURED_LOGS=false)
+                        if (getEnvVar('STRUCTURED_LOGS') === 'false') {
+                            // Add yellow color to the req body for better visibility in terminal
+                            terminalMessage += ` \x1b[33mreq: ${bodyStr}\x1b[0m`;
+                        } else {
+                            // No color codes for structured JSON logs
+                            terminalMessage += ` req: ${bodyStr}`;
+                        }
+                    }
+
+                    // For file: add as structured data - Pino will redact sensitive fields
+                    fileLogData.req = {
+                        headers: req.headers,
+                        query: req.query,
+                        params: req.params,
+                        body: (req as any).body
+                    };
+                } else {
+                    fileLogData.req = {
+                        headers: req.headers,
+                        query: req.query,
+                        params: req.params
+                    };
                 }
-            } catch (e) {
-                // Keep as string if not JSON
-                parsedResponseBody = responseBody;
-            }
 
-            // Add response data if it exists - Pino will redact sensitive fields
-            if (parsedResponseBody) {
-                fileLogData.res = {
-                    headers: res.getHeaders(),
-                    body: parsedResponseBody
-                };
-            } else {
-                fileLogData.res = {
-                    headers: res.getHeaders()
-                };
-            }
+                // Log complete structured data to file for Grafana aggregation
+                let parsedResponseBody = null;
+                try {
+                    if (responseBody) {
+                        parsedResponseBody = JSON.parse(responseBody);
+                    }
+                } catch (e) {
+                    // Keep as string if not JSON
+                    parsedResponseBody = responseBody;
+                }
 
-            // Log to terminal (clean message with request body for readability)
-            // Pino redaction will handle any sensitive data in the message
-            // Show terminal logs by default, hide only when SHOW_TEST_LOGS is explicitly set to 'false'
-            const showTestLogs = getEnvVar('SHOW_TEST_LOGS') !== 'false';
-            const isProduction = getEnvVar('NODE_ENV') === 'production';
-            const shouldShowTerminalLogs = showTestLogs || isProduction;
+                // Add response data if it exists - Pino will redact sensitive fields
+                if (parsedResponseBody) {
+                    fileLogData.res = {
+                        headers: res.getHeaders(),
+                        body: parsedResponseBody
+                    };
+                } else {
+                    fileLogData.res = {
+                        headers: res.getHeaders()
+                    };
+                }
 
-            if (httpTerminalLogger && shouldShowTerminalLogs) {
-                httpTerminalLogger[logLevel](terminalMessage);
-            } else if (!httpTerminalLogger && shouldShowTerminalLogs) {
-                // Fallback to console logging if httpTerminalLogger isn't ready yet
-                console.log(`[HTTP] ${terminalMessage}`);
-            }
+                // Log to terminal - use different approaches based on STRUCTURED_LOGS
+                if (getEnvVar('STRUCTURED_LOGS') === 'true') {
+                    // Structured logs: use structured logger with redaction
+                    const routeGroup = getRouteGroup(method, originalUrl || url);
 
-            // Log to file (structured JSON with detailed request/response data)
-            // Pino redaction will automatically handle sensitive data in the structured object
-            if (httpFileLogger) {
-                // Create a child logger with routeGroup as a proper label for Loki
-                const routeGroup = getRouteGroup(method, originalUrl || url);
-                const routeGroupLogger = httpFileLogger.child({ routeGroup });
-
-                // Remove routeGroup from fileLogData since it's now a label
-                const { routeGroup: _, ...fileLogDataWithoutRouteGroup } = fileLogData;
-
-                routeGroupLogger.info(fileLogDataWithoutRouteGroup, `HTTP ${method} ${url} ${status} ${responseTime}ms`);
+                    // ONLY log essential fields - NO nested req/res objects to prevent field explosion
+                    httpStructuredLogger[logLevel]({
+                        service: 'lessons-marketplace',
+                        component: 'http-logs',
+                        reqId: req.id,
+                        method,
+                        url: originalUrl || url,
+                        status,
+                        responseTime,
+                        userAgent: req.get('user-agent'),
+                        ip: req.ip,
+                        routeGroup,
+                        // Do NOT include req/res objects - they cause field explosion in Loki
+                    });
+                } else {
+                    // Human-readable logs: use formatted message
+                    if (httpTerminalLogger) {
+                        httpTerminalLogger[logLevel](terminalMessage);
+                    } else if (!httpTerminalLogger) {
+                        // Fallback to console logging if httpTerminalLogger isn't ready yet
+                        console.log(`[HTTP] ${terminalMessage}`);
+                    }
+                }
             }
         }
 

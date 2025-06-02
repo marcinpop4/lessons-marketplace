@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PNPM_VERSION: 10.3.0  # Match local environment version
-      NODE_ENV: development  # Use development for Docker setup
+      NODE_ENV: ci
 
     steps:
       - name: Checkout code

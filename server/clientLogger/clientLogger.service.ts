@@ -1,43 +1,102 @@
 import { createChildLogger } from '../../config/logger.js';
 import { BadRequestError } from '../errors/index.js';
+import pino from 'pino';
 
-// Create client logger that logs at debug level in development to hide from console
-const clientLogger = createChildLogger('client');
+/**
+ * Redaction marker used consistently across all logging systems
+ */
+const REDACTION_MARKER = '[Redacted]';
 
-// Dynamically import file logging when available
-let clientFileLogger: any = null;
-if (typeof process !== 'undefined' && process.versions?.node) {
-    // Import file logger asynchronously
-    import('../config/fileLogger.js').then(fileLoggerModule => {
-        clientFileLogger = fileLoggerModule.clientFileLogger;
-    }).catch(error => {
-        console.warn('Client file logging not available:', error);
-    });
-}
+// Create comprehensive redaction configuration using Pino's built-in capabilities
+const createRedactionConfig = (additionalPaths: string[] = []) => ({
+    paths: [
+        // Direct sensitive field names (top-level) - both snake_case and camelCase
+        'password',
+        'token',
+        'authorization',
+        'cookie',
+        'accesstoken',
+        'accessToken',
+        'refreshtoken',
+        'refreshToken',
+        'secret',
+        'apikey',
+        'apiKey',
+        'confirmpassword',
+        'confirmPassword',
+        'oldpassword',
+        'oldPassword',
+        'newpassword',
+        'newPassword',
 
-// Override log methods to hide from terminal but write to files
-const createClientLogMethod = (originalLevel: string) => {
-    return (obj: any, msg?: string) => {
-        // Always write to file at the proper level (if available)
-        if (clientFileLogger) {
-            (clientFileLogger as any)[originalLevel](obj, msg);
-        }
+        // Single-level wildcard patterns for nested sensitive fields
+        '*.password',
+        '*.token',
+        '*.authorization',
+        '*.cookie',
+        '*.accesstoken',
+        '*.accessToken',
+        '*.refreshtoken',
+        '*.refreshToken',
+        '*.secret',
+        '*.apikey',
+        '*.apiKey',
+        '*.confirmpassword',
+        '*.confirmPassword',
+        '*.oldpassword',
+        '*.oldPassword',
+        '*.newpassword',
+        '*.newPassword',
 
-        // In development, don't log to terminal (hidden)
-        // In production, also log to main logger
-        if (process.env.NODE_ENV !== 'development') {
-            (clientLogger as any)[originalLevel](obj, msg);
-        }
-    };
-};
+        // Client/data specific paths
+        'data.password',
+        'data.token',
+        'data.authorization',
+        'data.cookie',
+        'data.secret',
+        'data.apikey',
+        'data.apiKey',
+        'data.accessToken',
+        'data.refreshToken',
 
-// Create methods that hide client logs from development console
-const clientLogMethods = {
-    error: createClientLogMethod('error'),
-    warn: createClientLogMethod('warn'),
-    info: createClientLogMethod('info'),
-    debug: clientLogger.debug.bind(clientLogger)
-};
+        // User object specific paths
+        'user.password',
+        'user.token',
+        'user.authorization',
+        'user.secret',
+        'user.apikey',
+        'user.apiKey',
+        'user.accessToken',
+        'user.refreshToken',
+
+        // Additional custom paths
+        ...additionalPaths
+    ],
+    censor: REDACTION_MARKER,
+    remove: false
+});
+
+// Create client logger using Pino, same as fileLogger but output to stdout
+const clientFileLogger = pino({
+    level: 'debug',
+    base: {
+        service: 'lessons-marketplace',
+        component: 'client-logs'
+    },
+    timestamp: pino.stdTimeFunctions.isoTime,
+    redact: createRedactionConfig([
+        // Additional client-specific paths
+        'data.password',
+        'data.token',
+        'data.authorization',
+        'data.cookie',
+        'data.secret',
+        'data.apikey'
+    ]),
+}); // No stream specified = outputs to stdout
+
+// Create backup logger for fallback
+const clientLogger = createChildLogger('client-logs');
 
 interface ClientLogEntry {
     timestamp: string;
@@ -110,10 +169,11 @@ class ClientLoggerService {
         const pageGroup = log.data?.pageGroup || 'unknown';
         const eventType = log.data?.event || log.message.toLowerCase().replace(/\s+/g, '_');
 
-        // Add server-side metadata (excluding fields that will become labels)
-        const { pageGroup: _pg, event: _ev, ...dataWithoutLabels } = log.data || {};
-        const enrichedLog = {
-            ...dataWithoutLabels,
+        // Create enriched log data matching fileLogger structure
+        const enrichedLogData = {
+            ...log.data,
+            pageGroup,
+            event_type: eventType,
             clientTimestamp: log.timestamp,
             sessionId: log.sessionId,
             userId: log.userId,
@@ -123,44 +183,37 @@ class ClientLoggerService {
             source: 'client',
             ip: ip,
             forwardedFor: forwardedFor,
-            userAgent: log.userAgent?.slice(0, 200), // Truncate long user agents
+            userAgent: log.userAgent?.slice(0, 200),
         };
 
-        // Create child logger with labels for efficient querying
-        const labeledLogger = clientFileLogger?.child({
-            pageGroup,
-            event_type: eventType
-        });
-
-        // Log based on level using structured logging
+        // Use Pino logger same as fileLogger (outputs to stdout for Promtail)
         switch (log.level) {
             case 'error':
-                if (labeledLogger) {
-                    labeledLogger.error(enrichedLog, log.message);
-                } else {
-                    clientLogMethods.error(enrichedLog, log.message);
-                }
+                clientFileLogger.error(enrichedLogData, log.message);
                 break;
             case 'warn':
-                if (labeledLogger) {
-                    labeledLogger.warn(enrichedLog, log.message);
-                } else {
-                    clientLogMethods.warn(enrichedLog, log.message);
-                }
+                clientFileLogger.warn(enrichedLogData, log.message);
                 break;
             case 'debug':
-                if (labeledLogger) {
-                    labeledLogger.debug(enrichedLog, log.message);
-                } else {
-                    clientLogMethods.debug(enrichedLog, log.message);
-                }
+                clientFileLogger.debug(enrichedLogData, log.message);
                 break;
             default:
-                if (labeledLogger) {
-                    labeledLogger.info(enrichedLog, log.message);
-                } else {
-                    clientLogMethods.info(enrichedLog, log.message);
-                }
+                clientFileLogger.info(enrichedLogData, log.message);
+        }
+
+        // Also log using standard logger for backup
+        switch (log.level) {
+            case 'error':
+                clientLogger.error(enrichedLogData, log.message);
+                break;
+            case 'warn':
+                clientLogger.warn(enrichedLogData, log.message);
+                break;
+            case 'debug':
+                clientLogger.debug(enrichedLogData, log.message);
+                break;
+            default:
+                clientLogger.info(enrichedLogData, log.message);
         }
     }
 }

@@ -13,17 +13,6 @@ const getEnvVar = (key: string, fallback: string = ''): string => {
     return (typeof process !== 'undefined' ? process.env[key] : undefined) || fallback;
 };
 
-// Check if we should use Docker native logging
-const useDockerLogging = getEnvVar('USE_DOCKER_LOGGING') === 'true';
-
-// File logging variables (initialized later)
-let appFileLogger: any = null;
-let errorFileLogger: any = null;
-let fileLoggingInitialized = false;
-
-// Track child loggers to update them when file logging is ready
-const childLoggers: any[] = [];
-
 // Convert numeric log levels to Pino string levels
 const getLogLevel = (logLevel: string | undefined): string => {
     if (!logLevel) return 'info';
@@ -190,12 +179,6 @@ const createLoggerTransport = () => {
         };
     }
 
-    // Check if we should use Docker native logging as fallback
-    if (useDockerLogging) {
-        // Docker environment: output raw JSON to stdout
-        return undefined;
-    }
-
     // Default fallback: human-readable output
     return {
         target: 'pino-pretty',
@@ -223,94 +206,9 @@ const logger = pino({
     redact: createMainLoggerRedactionConfig(),
 });
 
-// Initialize file logging synchronously in Node.js environment (only if not using Docker logging)
-const initializeFileLogging = async () => {
-    if (!isNodeEnvironment || fileLoggingInitialized || useDockerLogging) return;
-
-    try {
-        const fileLoggerModule = await import('../server/config/fileLogger.js');
-        appFileLogger = fileLoggerModule.appFileLogger;
-        errorFileLogger = fileLoggerModule.errorFileLogger;
-
-        // Override main logger methods to write to both console and files
-        const originalInfo = logger.info.bind(logger);
-        const originalWarn = logger.warn.bind(logger);
-        const originalError = logger.error.bind(logger);
-        const originalDebug = logger.debug.bind(logger);
-
-        logger.info = (obj: any, msg?: string, ...args: any[]) => {
-            originalInfo(obj, msg, ...args);
-            if (appFileLogger) appFileLogger.info(obj, msg, ...args);
-        };
-
-        logger.warn = (obj: any, msg?: string, ...args: any[]) => {
-            originalWarn(obj, msg, ...args);
-            if (appFileLogger) appFileLogger.warn(obj, msg, ...args);
-        };
-
-        logger.error = (obj: any, msg?: string, ...args: any[]) => {
-            originalError(obj, msg, ...args);
-            if (appFileLogger) appFileLogger.error(obj, msg, ...args);
-            if (errorFileLogger) errorFileLogger.error(obj, msg, ...args);
-        };
-
-        logger.debug = (obj: any, msg?: string, ...args: any[]) => {
-            originalDebug(obj, msg, ...args);
-            if (appFileLogger) appFileLogger.debug(obj, msg, ...args);
-        };
-
-        // Update all existing child loggers
-        childLoggers.forEach(addFileLoggingToChildLogger);
-
-        fileLoggingInitialized = true;
-        logger.info('File logging initialized successfully');
-    } catch (error) {
-        console.warn('File logging initialization failed:', error);
-    }
-};
-
-// Helper function to add file logging to a child logger (only if not using Docker logging)
-const addFileLoggingToChildLogger = (childLogger: any) => {
-    if (!appFileLogger || !errorFileLogger || useDockerLogging) return;
-
-    const originalChildInfo = childLogger.info.bind(childLogger);
-    const originalChildWarn = childLogger.warn.bind(childLogger);
-    const originalChildError = childLogger.error.bind(childLogger);
-    const originalChildDebug = childLogger.debug.bind(childLogger);
-
-    childLogger.info = (obj: any, msg?: string, ...args: any[]) => {
-        originalChildInfo(obj, msg, ...args);
-        if (appFileLogger) appFileLogger.info(obj, msg, ...args);
-    };
-
-    childLogger.warn = (obj: any, msg?: string, ...args: any[]) => {
-        originalChildWarn(obj, msg, ...args);
-        if (appFileLogger) appFileLogger.warn(obj, msg, ...args);
-    };
-
-    childLogger.error = (obj: any, msg?: string, ...args: any[]) => {
-        originalChildError(obj, msg, ...args);
-        if (appFileLogger) appFileLogger.error(obj, msg, ...args);
-        if (errorFileLogger) errorFileLogger.error(obj, msg, ...args);
-    };
-
-    childLogger.debug = (obj: any, msg?: string, ...args: any[]) => {
-        originalChildDebug(obj, msg, ...args);
-        if (appFileLogger) appFileLogger.debug(obj, msg, ...args);
-    };
-};
-
 // Create child loggers for different parts of the application
 export const createChildLogger = (component: string, metadata: Record<string, any> = {}) => {
     const childLogger = logger.child({ component, ...metadata });
-
-    // Track this child logger
-    childLoggers.push(childLogger);
-
-    // If file logging is already initialized and not using Docker logging, add file logging to this child
-    if (fileLoggingInitialized && !useDockerLogging) {
-        addFileLoggingToChildLogger(childLogger);
-    }
 
     return childLogger;
 };
@@ -321,14 +219,4 @@ export const createApplicationLogger = (env?: 'development' | 'test' | 'producti
 };
 
 // Export the main logger
-export { logger };
-
-// Export initializeFileLogging for server/index.ts compatibility
-export { initializeFileLogging };
-
-// Initialize file logging in Node.js environment (skip if using Docker logging)
-if (isNodeEnvironment && !useDockerLogging) {
-    initializeFileLogging();
-} else if (isNodeEnvironment && useDockerLogging) {
-    logger.info('Using Docker native logging (stdout/stderr)');
-} 
+export { logger }; 

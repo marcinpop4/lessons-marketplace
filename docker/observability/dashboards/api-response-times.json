@@ -106,13 +106,13 @@
             "uid": "P8E80F9AEF21F6940"
           },
           "editorMode": "code",
-          "expr": "sum(quantile_over_time(${percentile}, ({job=\"http-logs\"} | json | service=\"lessons-marketplace\" | component=\"http-requests\" | routeGroup=\"${apiMethod} ${apiRoute}\" | unwrap responseTime)[5m]))",
+          "expr": "sum(quantile_over_time(${percentile}, ({component=\"http-logs\", method=\"${method}\", routeGroup=\"${routeGroup}\"} | unwrap responseTime)[5m]))",
           "legendFormat": "${percentile:text} Response Time",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "API Response Times - ${apiMethod} ${apiRoute} (${percentile:text})",
+      "title": "API Response Times - ${method} ${routeGroup} (${percentile:text})",
       "type": "timeseries"
     }
   ],
@@ -173,7 +173,7 @@
         "hide": 0,
         "includeAll": false,
         "multi": false,
-        "name": "apiMethod",
+        "name": "method",
         "options": [
           {
             "selected": true,
@@ -215,7 +215,7 @@
         "hide": 0,
         "includeAll": false,
         "multi": false,
-        "name": "apiRoute",
+        "name": "routeGroup",
         "options": [
           {
             "selected": true,

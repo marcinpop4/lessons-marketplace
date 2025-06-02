@@ -108,12 +108,12 @@
             "uid": "P8E80F9AEF21F6940"
           },
           "editorMode": "code",
-          "expr": "count_over_time({job=\"http-logs\"}[5m])",
+          "expr": "sum(rate({component=\"http-logs\", routeGroup!=\"/api/v1/health\"}[5m]))",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "Request Volume Over Time",
+      "title": "Request Volume Over Time (Excluding Health)",
       "type": "timeseries"
     },
     {
@@ -176,7 +176,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": "/^{status=\"2.*/"
+              "options": "/2xx/"
             },
             "properties": [
               {
@@ -191,7 +191,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": "/^{status=\"4.*/"
+              "options": "/4xx/"
             },
             "properties": [
               {
@@ -206,7 +206,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": "/^{status=\"5.*/"
+              "options": "/5xx/"
             },
             "properties": [
               {
@@ -221,7 +221,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": "/^{status=\"3.*/"
+              "options": "/3xx/"
             },
             "properties": [
               {
@@ -254,7 +254,6 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "10.1.0",
       "targets": [
         {
           "datasource": {
@@ -262,12 +261,179 @@
             "uid": "P8E80F9AEF21F6940"
           },
           "editorMode": "code",
-          "expr": "count by (status) (count_over_time({job=\"http-logs\"} | json | status != \"\" [5m]))",
+          "expr": "sum by (status_class) (rate({component=\"http-logs\", status_class!=\"\", routeGroup!=\"/api/v1/health\"}[5m]))",
           "queryType": "range",
           "refId": "A"
         }
       ],
       "title": "Status Code Distribution",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "vis": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/p95/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/p50/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/avg/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "editorMode": "code",
+          "expr": "quantile_over_time(0.95, ({component=\"http-logs\", routeGroup!=\"/api/v1/health\"} | unwrap responseTime)[5m])",
+          "legendFormat": "p95",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "editorMode": "code",
+          "expr": "quantile_over_time(0.50, ({component=\"http-logs\", routeGroup!=\"/api/v1/health\"} | unwrap responseTime)[5m])",
+          "legendFormat": "p50",
+          "queryType": "range",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time(({component=\"http-logs\", routeGroup!=\"/api/v1/health\"} | unwrap responseTime)[5m])",
+          "legendFormat": "avg",
+          "queryType": "range",
+          "refId": "C"
+        }
+      ],
+      "title": "Response Time Percentiles",
       "type": "timeseries"
     },
     {
@@ -337,9 +503,102 @@
       },
       "gridPos": {
         "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "editorMode": "code",
+          "expr": "(sum(rate({component=\"http-logs\", status_class=~\"4xx|5xx\", routeGroup!=\"/api/v1/health\"}[5m])) / sum(rate({component=\"http-logs\", status_class!=\"\", routeGroup!=\"/api/v1/health\"}[5m]))) * 100",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Error Rate Over Time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 16
       },
       "id": 5,
       "options": {
@@ -361,12 +620,12 @@
             "uid": "P8E80F9AEF21F6940"
           },
           "editorMode": "code",
-          "expr": "(sum(count_over_time({job=\"http-logs\"} | json | status =~ \"^[45].*\" [5m])) / sum(count_over_time({job=\"http-logs\"} | json | status != \"\" [5m]))) * 100",
+          "expr": "sum by (routeGroup) (rate({component=\"http-logs\", routeGroup!=\"/api/v1/health\"}[5m]))",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "Error Rate Over Time",
+      "title": "Requests by Route",
       "type": "timeseries"
     }
   ],
@@ -382,13 +641,13 @@
     "list": []
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "HTTP Requests",
   "uid": "df623679-2c17-45dd-a66d-1ae0124cfb70",
-  "version": 4,
+  "version": 5,
   "weekStart": ""
 } 
