@@ -32,7 +32,7 @@ import { createChildLogger } from '../config/logger.js';
 import fs from 'fs';
 import { config } from 'dotenv';
 import pino from 'pino';
-import { safeValidateValidationTiming, type ValidationTiming } from '@shared/schemas/devops.js';
+import { safeValidateValidationTiming, type ValidationTiming } from '@shared/schemas/devops-schema-v1.js';
 import { z } from 'zod';
 
 // Determine the root directory based on script location

@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import {
-    validateHttpLog,
     safeValidateHttpLog,
+    validateHttpLog,
     validateWithFallback,
     validateSpecificVersion,
     getSchemaInfo,
@@ -9,7 +9,7 @@ import {
     type HttpLogV1_0_0,
     SchemaVersions,
     HttpLogsSchemaMetadata
-} from '@shared/schemas/http-logs';
+} from '@shared/schemas/http-logs-schema-v1';
 
 /**
  * Test suite for HTTP Logs schema validation functions

@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import {
-    validateClientLog,
     safeValidateClientLog,
+    validateClientLog,
     validateWithFallback,
     validateSpecificVersion,
     getSchemaInfo,
@@ -9,7 +9,7 @@ import {
     type ClientLogV1_0_0,
     SchemaVersions,
     ClientLogsSchemaMetadata
-} from '@shared/schemas/client-logs';
+} from '@shared/schemas/client-logs-schema-v1';
 
 /**
  * Test suite for Client Logs schema validation functions
