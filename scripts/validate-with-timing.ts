@@ -1,5 +1,27 @@
 #!/usr/bin/env tsx
 
+/**
+ * Docker Validation Script with Timing
+ * 
+ * This script validates the entire Docker environment by building/starting services,
+ * running all test suites, and reporting detailed timing information.
+ * 
+ * Usage:
+ *   pnpm tsx scripts/validate-with-timing.ts [--fast] [--env=<environment>]
+ *   
+ * Options:
+ *   --fast               Skip Docker image rebuilding (faster, but may miss build issues)
+ *   --env=<environment>  Specify environment (development|test|production)
+ *                       Defaults to NODE_ENV or 'development'
+ * 
+ * Examples:
+ *   pnpm tsx scripts/validate-with-timing.ts
+ *   pnpm tsx scripts/validate-with-timing.ts --fast
+ *   pnpm tsx scripts/validate-with-timing.ts --env=test
+ *   pnpm tsx scripts/validate-with-timing.ts --fast --env=test
+ *   NODE_ENV=test pnpm tsx scripts/validate-with-timing.ts --fast
+ */
+
 import { execa } from 'execa';
 import chalk from 'chalk';
 import dotenv from 'dotenv';
@@ -9,28 +31,63 @@ import { dirname, resolve } from 'path';
 import { createChildLogger } from '../config/logger.js';
 import fs from 'fs';
 
-// Create child logger for validation script
-const logger = createChildLogger('validation-script');
-
 // Determine the root directory based on script location
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = resolve(__dirname, '..'); // Assumes script is in ./scripts
 
-// Load environment variables from .env.development
-dotenv.config({ path: path.resolve(projectRoot, 'env', '.env.development') });
+// Parse command line arguments for environment
+function parseArguments() {
+    const args = process.argv.slice(2);
+    let nodeEnv = process.env.NODE_ENV || 'development';
+    let fastMode = false;
+
+    for (const arg of args) {
+        if (arg === '--fast') {
+            fastMode = true;
+        } else if (arg.startsWith('--env=')) {
+            nodeEnv = arg.split('=')[1];
+        } else if (arg.startsWith('--NODE_ENV=')) {
+            nodeEnv = arg.split('=')[1];
+        }
+    }
+
+    return { nodeEnv, fastMode };
+}
+
+const { nodeEnv, fastMode } = parseArguments();
+
+// Validate environment
+const validEnvironments = ['development', 'test', 'production'];
+if (!validEnvironments.includes(nodeEnv)) {
+    console.error(`❌ Invalid NODE_ENV: ${nodeEnv}. Must be one of: ${validEnvironments.join(', ')}`);
+    process.exit(1);
+}
+
+// Load environment variables from appropriate .env file
+const envFilePath = path.resolve(projectRoot, 'env', `.env.${nodeEnv}`);
+if (!fs.existsSync(envFilePath)) {
+    console.error(`❌ Environment file not found: ${envFilePath}`);
+    process.exit(1);
+}
+
+dotenv.config({ path: envFilePath });
 
 // Set environment correctly
-process.env.NODE_ENV = 'development';
+process.env.NODE_ENV = nodeEnv;
+
+// Create child logger for validation script
+const logger = createChildLogger('validation-script');
 
 // Check if fast mode is enabled (skip Docker build)
-const FAST_MODE = process.argv.includes('--fast');
+const FAST_MODE = fastMode;
 
 // Base environment for child processes
 const baseEnv = {
     ...process.env,
     NODE_NO_WARNINGS: '1',
     SILENCE_PRISMA_EXPECTED_ERRORS: 'true',
+    NODE_ENV: nodeEnv,
 };
 
 interface Step {
@@ -211,8 +268,9 @@ async function runTests(): Promise<{ unitTime: number; apiTime: number; e2eTime:
 }
 
 async function main() {
-    const modeText = FAST_MODE ? 'Fast Docker validation' : 'Full Docker validation';
-    logger.info(`Starting ${modeText} process...`);
+    const modeText = FAST_MODE ? '🚀 Fast Docker Validation' : '🚀 Full Docker Validation';
+    logger.info(`Starting ${modeText} process for ${nodeEnv.toUpperCase()} environment...`);
+    logger.info(`Environment file: ${envFilePath}`);
 
     // Check if rebuild is needed when in fast mode
     if (FAST_MODE) {
@@ -222,7 +280,7 @@ async function main() {
             rebuildReasons.forEach(reason => {
                 logger.warn(`   • ${reason}`);
             });
-            logger.warn('   Run: pnpm validate:full (without --fast)');
+            logger.warn(`   Run: pnpm validate:full --env=${nodeEnv} (without --fast)`);
         } else {
             logger.info('✅ Fast mode: Using existing Docker images');
         }
@@ -244,7 +302,9 @@ async function main() {
     const totalTime = setupTime + testTime;
 
     // Print timing report
-    const reportTitle = FAST_MODE ? '🚀 Fast Docker Validation Timing Report' : '🚀 Full Docker Validation Timing Report';
+    const reportTitle = FAST_MODE ?
+        `🚀 Fast Docker Validation Timing Report (${nodeEnv.toUpperCase()})` :
+        `🚀 Full Docker Validation Timing Report (${nodeEnv.toUpperCase()})`;
     logger.info(`=== ${reportTitle} ===`);
 
     // Setup steps
@@ -263,6 +323,7 @@ async function main() {
 
     // Overall summary
     logger.info('📊 Overall Summary:');
+    logger.info(`   ${'Environment'.padEnd(25)} ${nodeEnv.toUpperCase().padStart(8)}`);
     logger.info(`   ${'Total Execution Time'.padEnd(25)} ${formatDuration(totalTime).padStart(8)}`);
     logger.info(`   ${'Test Count'.padEnd(25)} ${'212 tests'.padStart(8)}`);
     logger.info(`   ${'Success Rate'.padEnd(25)} ${(testResults.failed ? '❌ FAILED' : '✅ 100%').padStart(8)}`);
@@ -280,10 +341,10 @@ async function main() {
     }
 
     if (testResults.failed) {
-        logger.error(`❌ ${modeText} failed.`);
+        logger.error(`❌ ${modeText} failed for ${nodeEnv.toUpperCase()} environment.`);
         process.exit(1);
     } else {
-        logger.info(`✅ ${modeText} completed successfully!`);
+        logger.info(`✅ ${modeText} completed successfully for ${nodeEnv.toUpperCase()} environment!`);
     }
 }
 
