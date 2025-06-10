@@ -36,14 +36,13 @@ export default {
   ],
   // Ignore non-unit test directories
   testPathIgnorePatterns: [
-    '/node_modules/', 
+    '/node_modules/',
     '/dist/'
   ],
-  // Essential path aliases for tests
-  moduleNameMapper: {
-    '^@shared/(.*)$': '<rootDir>/../../shared/$1',
-    '^@server/(.*)$': '<rootDir>/../../server/$1'
-  },
+  // Tell Jest to look for modules in the project root
+  modulePaths: [
+    '<rootDir>/../../'
+  ],
   // Add module file extensions
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   // Add verbose logging

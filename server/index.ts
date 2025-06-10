@@ -273,63 +273,34 @@ app.use('/api/v1/students', studentRoutes);
 app.use('/api/v1/teacher-lesson-rates', teacherLessonHourlyRateRoutes);
 app.use('/api/v1/teachers', teacherRoutes);
 
-// --- Error Handling --- 
-app.use((err: Error | any, req: Request, res: Response, next: NextFunction) => {
-  // Create a child logger with request context
-  const requestLogger = createChildLogger('error-handler', {
-    reqId: req.id,
-    method: req.method,
-    url: req.originalUrl,
+// --- Global Error Handling ---
+// This MUST be the last `app.use()`
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  // Use Pino's standard serializers to safely log the request and error
+  logger.error({ err, req }, 'An unhandled error occurred');
+
+  // Default to 500 Internal Server Error
+  let statusCode = 500;
+  let errorMessage = 'An internal server error occurred.';
+
+  if (err instanceof AppError) {
+    statusCode = err.status;
+    errorMessage = err.message;
+  } else if (err instanceof ZodError) {
+    statusCode = 400;
+    // Format Zod errors for a more helpful response
+    errorMessage = err.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+  }
+
+  // Avoid sending response if one has already been sent
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  res.status(statusCode).json({
+    error: errorMessage,
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
   });
-
-  let statusCode = 500; // Default to 500
-  let errorMessage = 'Something went wrong!';
-  let errorDetails = undefined; // For Zod errors
-  let errorStack = undefined;
-
-  // Log different properties depending on the error type
-  if (err instanceof ZodError) {
-    // Handle Zod validation errors
-    statusCode = 400; // Bad Request
-    // Use the first Zod issue to create a more specific main error message
-    const firstIssue = err.errors[0];
-    errorMessage = `Validation failed: ${firstIssue.message} at path [${firstIssue.path.join('.')}]`;
-    errorDetails = err.errors; // Extract detailed issues from ZodError
-    requestLogger.warn({ zodErrors: errorDetails }, 'Zod validation error');
-    // No stack needed for typical validation errors
-  } else if (err instanceof Error) {
-    errorMessage = err.message; // Use the error's message
-    errorStack = err.stack;
-
-    // Check if it's an instance of our custom AppError or its subclasses
-    if ('status' in err && typeof (err as any).status === 'number') {
-      statusCode = (err as any).status;
-      requestLogger.error({ err, status: statusCode }, 'Application error with status');
-    } else if (err instanceof AppError) {
-      statusCode = err.status;
-      requestLogger.error({ err, status: statusCode }, 'AppError instance');
-    } else {
-      console.log('Calling requestLogger.error for generic error');
-      requestLogger.error({ err }, 'Generic error, defaulting to 500');
-    }
-  } else {
-    // Log non-Error objects as best as possible
-    requestLogger.error({ err }, 'Caught non-Error object');
-  }
-
-  // Ensure response status is set
-  if (!res.headersSent) {
-    res.status(statusCode).json({
-      error: errorMessage,
-      // Include Zod details if present
-      details: errorDetails,
-      // Optionally include stack in development for non-Zod errors
-      stack: process.env.NODE_ENV === 'development' && !errorDetails ? errorStack : undefined
-    });
-  } else {
-    requestLogger.error('Headers already sent, cannot send JSON error response');
-    next(err);
-  }
 });
 
 // --- Start Server Logic --- 

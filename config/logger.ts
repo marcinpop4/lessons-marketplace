@@ -1,4 +1,5 @@
 import pino from 'pino';
+import stdSerializers from 'pino-std-serializers';
 
 /**
  * Redaction marker used consistently across all logging systems
@@ -81,9 +82,21 @@ const createMainLoggerRedactionConfig = (additionalPaths: string[] = []) => ({
         '*.newPassword',
 
         // HTTP request/response specific paths (most commonly needed)
+        // Case-sensitive headers are included for robustness
         'req.headers.authorization',
+        'req.headers.Authorization',
         'req.headers.cookie',
+        'req.headers.Cookie',
         'req.headers["set-cookie"]',
+        'req.headers["Set-Cookie"]',
+        'req.headers["x-session-token"]',
+        'req.headers["x-auth-token"]',
+        'req.headers["x-access-token"]',
+        'req.headers["x-api-key"]',
+        'req.headers["api-key"]',
+        'req.headers["access-token"]',
+        'req.headers["refresh-token"]',
+
         'req.body.password',
         'req.body.token',
         'req.body.authorization',
@@ -94,7 +107,9 @@ const createMainLoggerRedactionConfig = (additionalPaths: string[] = []) => ({
         'req.body.refreshToken',
 
         'res.headers["set-cookie"]',
+        'res.headers["Set-Cookie"]',
         'res.headers.authorization',
+        'res.headers.Authorization',
         'res.body.password',
         'res.body.token',
         'res.body.authorization',
@@ -197,6 +212,16 @@ const createLoggerTransport = () => {
 // Create the logger
 const logger = pino({
     level: getLogLevel(getEnvVar('LOG_LEVEL')),
+    serializers: {
+        err: stdSerializers.err,
+        req: stdSerializers.req,
+        res: stdSerializers.res,
+    },
+    formatters: {
+        level: (label) => {
+            return { level: label };
+        },
+    },
     base: {
         service: 'lessons-marketplace',
         environment: getEnvVar('NODE_ENV', 'development'),

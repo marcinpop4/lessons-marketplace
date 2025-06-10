@@ -1,4 +1,4 @@
-import { ConflictError } from './conflict.error.js';
+import { ConflictError } from './conflict.error';
 
 /**
  * @openapi

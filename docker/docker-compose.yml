@@ -36,7 +36,7 @@ services:
       - NODE_ENV=${NODE_ENV}
       - CHOKIDAR_USEPOLLING=true  # For file watching in Docker
       - DOCKER_ENV=true  # Indicate running in Docker
-      - STRUCTURED_LOGS=${STRUCTURED_LOGS:-false}  # Control log format (false = human-readable for dev)
+      - STRUCTURED_LOGS=${STRUCTURED_LOGS:-true}  # Control log format (false = human-readable for dev)
       - LOG_LEVEL=${LOG_LEVEL:-info}  # Control log verbosity (debug, info, warn, error)
     depends_on:
       database:
@@ -84,7 +84,7 @@ services:
       - CHOKIDAR_USEPOLLING=true  # For file watching in Docker
       - DOCKER_ENV=true  # Indicate running in Docker
       - VITE_API_BASE_URL=${VITE_API_BASE_URL}
-      - STRUCTURED_LOGS=${STRUCTURED_LOGS:-false}  # Control log format (false = human-readable for dev)
+      - STRUCTURED_LOGS=${STRUCTURED_LOGS:-true}  # Control log format (false = human-readable for dev)
       - DEV_QUIET_LOGS=${DEV_QUIET_LOGS:-true}  # Control development noise (true = hide healthchecks, false = show all logs)
       - LOG_LEVEL=${LOG_LEVEL:-info}  # Control log verbosity (debug, info, warn, error)
     depends_on:
@@ -118,10 +118,16 @@ services:
         NODE_ENV: ${NODE_ENV}
     container_name: lessons-marketplace-test
     network_mode: "container:lessons-marketplace-frontend"
+    env_file:
+      - ../env/.env.${NODE_ENV}
     environment:
       - NODE_ENV=${NODE_ENV}
       - TEST_ENV=docker
       - FRONTEND_URL=http://localhost:5173
+      # Override URLs for container-to-container communication
+      - LOKI_URL=http://${LOKI_CONTAINER_NAME}:${LOKI_PORT}
+      - ALLOY_URL=http://${ALLOY_CONTAINER_NAME}:${ALLOY_PORT}
+      - EXTERNAL_SERVER_URL=http://lessons-marketplace-server:3000
     volumes:
       - ../tests/results/unit:/app/tests/results/unit:rw
       - ../tests/results/api:/app/tests/results/api:rw
@@ -143,56 +149,66 @@ services:
       frontend:
         condition: service_healthy
         restart: false
+      loki:
+        condition: service_healthy
+        restart: false
+      alloy:
+        condition: service_healthy
+        restart: false
 
   # === LOGGING INFRASTRUCTURE ===
   # Loki - Log aggregation system
   loki:
-    image: grafana/loki:3.3.1
-    container_name: lessons-marketplace-loki
+    image: grafana/loki:${LOKI_VERSION:-3.3.1}
+    container_name: ${LOKI_CONTAINER_NAME:-lessons-marketplace-loki}
     ports:
-      - "3100:3100"
+      - "${LOKI_PORT:-3100}:3100"
     volumes:
       - ./observability/loki-config.yaml:/etc/loki/local-config.yaml
       - loki_data:/loki
     command: -config.file=/etc/loki/local-config.yaml
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      test: ["CMD-SHELL", "nc -z localhost 3100 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
 
-  # Promtail - Log shipper
-  promtail:
-    image: grafana/promtail:3.3.1
-    container_name: lessons-marketplace-promtail
+  # Grafana Alloy - Log shipper (replacement for Promtail)
+  alloy:
+    build:
+      context: ./observability
+      dockerfile: Dockerfile.alloy
+    container_name: ${ALLOY_CONTAINER_NAME:-lessons-marketplace-alloy}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./observability/promtail-config.yaml:/etc/promtail/config.yml
-    command: -config.file=/etc/promtail/config.yml
+      - ./observability/alloy-config.alloy:/etc/alloy/config.alloy
+      - ./observability/test_line.log:/etc/alloy/test_line.log:ro
+      - /tmp/alloy-test-logs:/tmp/alloy-test-logs:ro  # Mount test log directory for integration tests
+    command: run --server.http.listen-addr=0.0.0.0:9080 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     depends_on:
       loki:
         condition: service_healthy
     restart: unless-stopped
+    ports:
+      - "${ALLOY_PORT:-9080}:9080"  # Alloy UI port
     healthcheck:
-      test: ["CMD-SHELL", "grep -q promtail /proc/1/comm || exit 1"]
+      test: ["CMD-SHELL", "true"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 15s
 
   # Grafana - Visualization and dashboards
   grafana:
-    image: grafana/grafana:11.4.0
-    container_name: lessons-marketplace-grafana
+    image: grafana/grafana:${GRAFANA_VERSION:-11.4.0}
+    container_name: ${GRAFANA_CONTAINER_NAME:-lessons-marketplace-grafana}
     ports:
-      - "3001:3000"  # Changed to 3001 to avoid conflict with server
+      - "${GRAFANA_PORT:-3001}:3000"  # Default to 3001 to avoid conflict with server
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin123}
       - GF_SERVER_HTTP_PORT=3000
-      - GF_SERVER_DOMAIN=localhost
+      - GF_SERVER_DOMAIN=${GRAFANA_DOMAIN:-localhost}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml

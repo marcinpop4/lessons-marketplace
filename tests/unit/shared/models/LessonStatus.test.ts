@@ -1,4 +1,4 @@
-import { LessonStatus, LessonStatusValue, LessonStatusTransition } from '@shared/models/LessonStatus';
+import { LessonStatus, LessonStatusValue, LessonStatusTransition } from '../../../../shared/models/LessonStatus';
 
 describe('LessonStatus Model', () => {
     describe('isValidTransition (static method)', () => {

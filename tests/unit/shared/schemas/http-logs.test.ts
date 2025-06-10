@@ -9,7 +9,7 @@ import {
     type HttpLogV1_0_0,
     SchemaVersions,
     HttpLogsSchemaMetadata
-} from '@shared/schemas/http-logs-schema-v1';
+} from '../../../../shared/schemas/http-logs-schema-v1';
 
 /**
  * Test suite for HTTP Logs schema validation functions

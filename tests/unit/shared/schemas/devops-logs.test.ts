@@ -9,7 +9,7 @@ import {
     type ValidationTimingV1_0_0,
     SchemaVersions,
     DevOpsSchemaMetadata
-} from '@shared/schemas/devops-schema-v1';
+} from '../../../../shared/schemas/devops-schema-v1';
 
 /**
  * Test suite for DevOps schema validation functions
@@ -24,11 +24,12 @@ describe('DevOps Schema Validation', () => {
         environment: 'TEST',
         mode: 'fast',
         success: true,
-        totalExecutionTimeMs: 126159,
-        totalSetupTimeMs: 46431,
-        totalTestTimeMs: 79728,
+        totalExecutionTimeMs: 300000,
+        totalSetupTimeMs: 60000,
+        totalTestTimeMs: 240000,
+        totalTestCount: 150,
         failureReason: '',
-        failureStage: 'completed',
+        failureStage: '',
         setupSteps: {
             cleanDockerMs: null,
             buildImagesMs: null,
@@ -39,14 +40,21 @@ describe('DevOps Schema Validation', () => {
             diagnoseTypescriptMs: 5739,
         },
         testSuites: {
-            unitTestsMs: 26001,
-            apiTestsMs: 22586,
-            e2eTestsMs: 31141,
+            unitTestsMs: 100000,
+            apiTestsMs: 120000,
+            e2eTestsMs: 20000,
+            logsTestsMs: 15000,
+        },
+        testCounts: {
+            unitTestCount: 80,
+            apiTestCount: 50,
+            e2eTestCount: 15,
+            logsTestCount: 5,
         },
         performance: {
-            setupTimeSeconds: 46.43,
-            testTimeSeconds: 79.73,
-            totalTimeSeconds: 126.16,
+            setupTimeSeconds: 60,
+            testTimeSeconds: 240,
+            totalTimeSeconds: 300,
             setupPercentage: 36.8,
             testPercentage: 63.2,
         },
@@ -66,23 +74,24 @@ describe('DevOps Schema Validation', () => {
         });
 
         it('should validate data with failure scenario', () => {
-            const failureData = createValidData({
+            const failedData = createValidData({
                 success: false,
-                failureReason: 'Unit tests failed',
+                failureReason: 'Test suite failed',
                 failureStage: 'testing',
                 testSuites: {
-                    unitTestsMs: 5000,
+                    ...createValidData().testSuites,
                     apiTestsMs: null,
-                    e2eTestsMs: null,
+                    logsTestsMs: 0,
+                },
+                testCounts: {
+                    ...createValidData().testCounts,
+                    apiTestCount: 0,
                 }
             });
 
-            const result = validateValidationTiming(failureData);
-
+            const result = validateValidationTiming(failedData);
             expect(result.success).toBe(false);
-            expect(result.failureReason).toBe('Unit tests failed');
-            expect(result.failureStage).toBe('testing');
-            expect(result.testSuites.apiTestsMs).toBeNull();
+            expect(result.failureReason).toBe('Test suite failed');
         });
 
         it('should validate different environments', () => {
@@ -237,19 +246,28 @@ describe('DevOps Schema Validation', () => {
 
         it('should handle null values correctly', () => {
             const dataWithNulls = createValidData({
+                failureReason: '',
+                failureStage: '',
                 setupSteps: {
-                    cleanDockerMs: null, // Valid null
-                    buildImagesMs: null, // Valid null
-                    startServicesMs: 26601,
-                    installDepsMs: 4190,
-                    generatePrismaMs: 1198,
-                    setupDatabaseMs: 8703,
-                    diagnoseTypescriptMs: 5739,
+                    cleanDockerMs: null,
+                    buildImagesMs: 120000,
+                    startServicesMs: 30000,
+                    installDepsMs: null,
+                    generatePrismaMs: 5000,
+                    setupDatabaseMs: 10000,
+                    diagnoseTypescriptMs: null,
                 },
                 testSuites: {
-                    unitTestsMs: 26001,
-                    apiTestsMs: null, // Valid null
-                    e2eTestsMs: null, // Valid null
+                    unitTestsMs: 50000,
+                    apiTestsMs: null,
+                    e2eTestsMs: 25000,
+                    logsTestsMs: null,
+                },
+                testCounts: {
+                    unitTestCount: 50,
+                    apiTestCount: null,
+                    e2eTestCount: 10,
+                    logsTestCount: null,
                 }
             });
 
@@ -259,6 +277,7 @@ describe('DevOps Schema Validation', () => {
             if (result.success) {
                 expect(result.data.setupSteps.cleanDockerMs).toBeNull();
                 expect(result.data.testSuites.apiTestsMs).toBeNull();
+                expect(result.data.testSuites.logsTestsMs).toBeNull();
             }
         });
     });
@@ -347,6 +366,28 @@ describe('DevOps Schema Validation', () => {
                 totalExecutionTimeMs: 0,
                 totalSetupTimeMs: 0,
                 totalTestTimeMs: 0,
+                totalTestCount: 0,
+                setupSteps: {
+                    cleanDockerMs: 0,
+                    buildImagesMs: 0,
+                    startServicesMs: 0,
+                    installDepsMs: 0,
+                    generatePrismaMs: 0,
+                    setupDatabaseMs: 0,
+                    diagnoseTypescriptMs: 0,
+                },
+                testSuites: {
+                    unitTestsMs: 0,
+                    apiTestsMs: 0,
+                    e2eTestsMs: 0,
+                    logsTestsMs: 0,
+                },
+                testCounts: {
+                    unitTestCount: 0,
+                    apiTestCount: 0,
+                    e2eTestCount: 0,
+                    logsTestCount: 0,
+                },
                 performance: {
                     setupTimeSeconds: 0,
                     testTimeSeconds: 0,
@@ -414,26 +455,43 @@ describe('DevOps Schema Validation', () => {
 
     describe('Real-world Scenarios', () => {
         it('should validate full validation run data', () => {
-            const fullRunData = createValidData({
+            const fullRunData: ValidationTiming = {
+                ...createValidData(),
                 mode: 'full',
+                success: true,
+                totalExecutionTimeMs: 450000,
+                totalSetupTimeMs: 150000,
+                totalTestTimeMs: 300000,
+                totalTestCount: 200,
                 setupSteps: {
                     cleanDockerMs: 6120,
-                    buildImagesMs: 57210,
-                    startServicesMs: 23770,
-                    installDepsMs: 4240,
-                    generatePrismaMs: 1280,
-                    setupDatabaseMs: 8720,
-                    diagnoseTypescriptMs: 5760,
+                    buildImagesMs: 120500,
+                    startServicesMs: 15300,
+                    installDepsMs: 4500,
+                    generatePrismaMs: 1500,
+                    setupDatabaseMs: 2000,
+                    diagnoseTypescriptMs: 800,
                 },
-                totalSetupTimeMs: 107300,
+                testSuites: {
+                    unitTestsMs: 120000,
+                    apiTestsMs: 150000,
+                    e2eTestsMs: 25000,
+                    logsTestsMs: 5000,
+                },
+                testCounts: {
+                    unitTestCount: 120,
+                    apiTestCount: 60,
+                    e2eTestCount: 15,
+                    logsTestCount: 5,
+                },
                 performance: {
-                    setupTimeSeconds: 107.3,
-                    testTimeSeconds: 79.73,
-                    totalTimeSeconds: 187.03,
-                    setupPercentage: 57.4,
-                    testPercentage: 42.6,
+                    setupTimeSeconds: 150,
+                    testTimeSeconds: 300,
+                    totalTimeSeconds: 450,
+                    setupPercentage: 33.33,
+                    testPercentage: 66.67,
                 }
-            });
+            };
 
             const result = safeValidateValidationTiming(fullRunData);
 
@@ -441,22 +499,31 @@ describe('DevOps Schema Validation', () => {
             if (result.success) {
                 expect(result.data.mode).toBe('full');
                 expect(result.data.setupSteps.cleanDockerMs).toBe(6120);
-                expect(result.data.setupSteps.buildImagesMs).toBe(57210);
+                expect(result.data.setupSteps.buildImagesMs).toBe(120500);
             }
         });
 
         it('should validate failed validation run data', () => {
-            const failedRunData = createValidData({
+            const failedRunData: ValidationTiming = {
+                ...createValidData(),
                 success: false,
-                failureReason: 'API tests failed with timeout errors',
+                failureReason: 'E2E suite failed on login test',
                 failureStage: 'testing',
+                totalTestTimeMs: 180000,
+                totalTestCount: 95,
                 testSuites: {
-                    unitTestsMs: 26001,
-                    apiTestsMs: 45000, // Failed after 45 seconds
-                    e2eTestsMs: null,  // Never ran due to API failure
+                    unitTestsMs: 120000,
+                    apiTestsMs: 60000,
+                    e2eTestsMs: 0, // Failed partway through
+                    logsTestsMs: 0,
                 },
-                totalTestTimeMs: 71001
-            });
+                testCounts: {
+                    unitTestCount: 80,
+                    apiTestCount: 15, // Only some ran before failure
+                    e2eTestCount: 0,
+                    logsTestCount: 0,
+                }
+            };
 
             const result = safeValidateValidationTiming(failedRunData);
 
@@ -464,7 +531,7 @@ describe('DevOps Schema Validation', () => {
             if (result.success) {
                 expect(result.data.success).toBe(false);
                 expect(result.data.failureStage).toBe('testing');
-                expect(result.data.testSuites.e2eTestsMs).toBeNull();
+                expect(result.data.testSuites.e2eTestsMs).toBe(0);
             }
         });
 

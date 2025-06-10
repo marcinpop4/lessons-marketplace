@@ -106,13 +106,13 @@
             "uid": "P8E80F9AEF21F6940"
           },
           "editorMode": "code",
-          "expr": "sum(quantile_over_time(${percentile}, ({component=\"http-logs\", method=\"${method}\", routeGroup=\"${routeGroup}\"} | unwrap responseTime)[5m]))",
-          "legendFormat": "${percentile:text} Response Time",
+          "expr": "sum(quantile_over_time(${percentile}, ({component=\"http-logs\", method=\"${method}\", routeGroup=\"${routeGroup}\"} | json | unwrap responseTime)[5m])) by (routeGroup, method)",
+          "legendFormat": "${percentile:text} {{routeGroup}}",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "API Response Times - ${method} ${routeGroup} (${percentile:text})",
+      "title": "API Response Times - ${method} (${percentile:text})",
       "type": "timeseries"
     }
   ],
@@ -209,14 +209,19 @@
       {
         "current": {
           "selected": false,
-          "text": "/api/v1/addresses",
-          "value": "/api/v1/addresses"
+          "text": "All",
+          "value": "All"
         },
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "routeGroup",
         "options": [
+          {
+            "selected": false,
+            "text": "All",
+            "value": "All"
+          },
           {
             "selected": true,
             "text": "/api/v1/addresses",
@@ -293,10 +298,14 @@
             "value": "/api/v1/teachers"
           }
         ],
-        "query": "/api/v1/addresses,/api/v1/auth,/api/v1/health,/api/v1/lesson-plans,/api/v1/lesson-quotes,/api/v1/lesson-requests,/api/v1/lessons,/api/v1/logs,/api/v1/milestones,/api/v1/objectives,/api/v1/refresh-token,/api/v1/students,/api/v1/summary,/api/v1/teacher-lesson-rates,/api/v1/teachers",
+        "query": "label_values(routeGroup)",
         "queryValue": "",
         "skipUrlSync": false,
-        "type": "custom"
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "P8E80F9AEF21F6940"
+        }
       }
     ]
   },

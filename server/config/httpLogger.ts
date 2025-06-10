@@ -1,7 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { logger } from '../../config/logger.js';
+import { createChildLogger } from '../../config/logger.js';
 import { getRouteGroup } from '../index.js';
-import pino from 'pino';
 
 // Extend Request interface to include id property
 declare global {
@@ -13,133 +12,14 @@ declare global {
     var _httpLoggerDebugLogged: boolean | undefined;
 }
 
-/**
- * Redaction marker used consistently across all logging systems
- */
-const REDACTION_MARKER = '[Redacted]';
-
 // Helper function to get environment variables with fallback
 const getEnvVar = (key: string, fallback: string = ''): string => {
     return process.env[key] || fallback;
 };
 
-// Convert numeric log levels to Pino string levels (duplicate from main logger)
-const getLogLevel = (logLevel: string | undefined): string => {
-    if (!logLevel) return 'info';
-
-    // If it's already a valid Pino level string, use it
-    const validLevels = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'];
-    if (validLevels.includes(logLevel.toLowerCase())) {
-        return logLevel.toLowerCase();
-    }
-
-    // Convert numeric levels to string levels
-    const numericLevel = parseInt(logLevel, 10);
-    if (!isNaN(numericLevel)) {
-        switch (numericLevel) {
-            case 0: return 'error';   // Minimal logging
-            case 1: return 'warn';    // Warnings and errors
-            case 2: return 'info';    // Info, warnings, and errors  
-            case 3: return 'debug';   // Debug and above
-            default: return 'info';   // Default fallback
-        }
-    }
-
-    // Fallback for invalid values
-    return 'info';
-};
-
-// Import the shared redaction configuration
-let httpTerminalLogger: any = null;
-let httpStructuredLogger: any = null;
-
-// Fallback redaction configuration if import fails
-const createFallbackRedactionConfig = () => ({
-    paths: [
-        // Basic sensitive fields
-        'password',
-        'token',
-        'authorization',
-        'cookie',
-        'secret',
-        'apikey',
-
-        // HTTP specific paths - exact field names
-        'req.headers.authorization',
-        'req.headers.Authorization',
-        'req.headers.cookie',
-        'req.headers.Cookie',
-        'req.body.password',
-        'req.body.token',
-        'res.headers["set-cookie"]',
-        'res.body.password',
-        'res.body.token',
-
-        // Session-related exact paths
-        'req.headers["x-session-token"]',
-        'req.headers["x-auth-token"]',
-        'req.headers["x-access-token"]',
-
-        // Common JWT/Bearer token locations
-        'req.headers["x-api-key"]',
-        'req.headers["api-key"]',
-        'req.headers["access-token"]',
-        'req.headers["refresh-token"]',
-
-        // Response sensitive headers
-        'res.headers["authorization"]',
-        'res.headers["Authorization"]',
-        'res.headers["set-cookie"]',
-        'res.headers["Set-Cookie"]',
-
-        // Wildcards for nested objects (valid patterns only)
-        '*.password',
-        '*.token',
-        '*.secret',
-        '*.authorization',
-        '*.cookie',
-    ],
-    censor: REDACTION_MARKER,
-    remove: false
-});
-
-// Initialize loggers
-if (typeof process !== 'undefined' && process.versions?.node) {
-    // Create the terminal logger with proper redaction config
-    httpTerminalLogger = pino({
-        level: getLogLevel(getEnvVar('LOG_LEVEL')),
-        base: {},
-        redact: createFallbackRedactionConfig(),
-        transport: getEnvVar('STRUCTURED_LOGS') === 'false' ? {
-            target: 'pino-pretty',
-            options: {
-                colorize: true,
-                translateTime: 'SYS:HH:MM:ss.l',
-                ignore: 'pid,hostname',
-                singleLine: false,
-                hideObject: true,
-                messageFormat: 'http | {msg}',
-            }
-        } : undefined
-    });
-
-    // Create a structured logger for JSON output with redaction
-    httpStructuredLogger = pino({
-        level: getLogLevel(getEnvVar('LOG_LEVEL')),
-        base: {},
-        redact: createFallbackRedactionConfig(),
-        // No transport = raw JSON output
-    });
-} else {
-    // Browser environment fallback
-    httpTerminalLogger = pino({
-        level: getLogLevel(getEnvVar('LOG_LEVEL')),
-        base: {},
-        redact: createFallbackRedactionConfig()
-    });
-
-    httpStructuredLogger = httpTerminalLogger;
-}
+// Create a dedicated child logger for HTTP requests.
+// This will inherit the main logger's configuration (level, formatters, redaction).
+const httpLoggerInstance = createChildLogger('http-logs');
 
 // Create a simple HTTP logger middleware that only logs clean messages
 export const httpLogger = (req: Request, res: Response, next: NextFunction) => {
@@ -174,6 +54,11 @@ export const httpLogger = (req: Request, res: Response, next: NextFunction) => {
 
         // Hide internal logging framework calls unless in debug mode
         const originalUrl = req.originalUrl || req.url;
+
+        // TEMPORARY DEBUGGING
+        const structuredLogsEnv = getEnvVar('STRUCTURED_LOGS');
+        // console.log(`[HTTP_LOGGER_DEBUG] STRUCTURED_LOGS env value: "${structuredLogsEnv}" for ${method} ${originalUrl}`);
+
         if (originalUrl?.includes('/api/v1/logs') && getEnvVar('LOG_LEVEL') !== '3' && !getEnvVar('DEBUG')) {
             // Silently skip logging for client logging API calls
         } else {
@@ -241,6 +126,13 @@ export const httpLogger = (req: Request, res: Response, next: NextFunction) => {
                     };
                 }
 
+                // Add routeGroup to customData for Alloy
+                const routeGroup = getRouteGroup(method, originalUrl || url);
+                fileLogData.customData = {
+                    routeGroup: routeGroup,
+                    testIdentifier: req.headers['x-test-id']
+                };
+
                 // Log complete structured data to file for Grafana aggregation
                 let parsedResponseBody = null;
                 try {
@@ -264,38 +156,12 @@ export const httpLogger = (req: Request, res: Response, next: NextFunction) => {
                     };
                 }
 
-                // Log to terminal - use different approaches based on STRUCTURED_LOGS
-                if (getEnvVar('STRUCTURED_LOGS') === 'true') {
-                    // Structured logs: use structured logger with redaction
-                    const routeGroup = getRouteGroup(method, originalUrl || url);
-
-                    // ONLY log essential fields - NO nested req/res objects to prevent field explosion
-                    httpStructuredLogger[logLevel]({
-                        service: 'lessons-marketplace',
-                        component: 'http-logs',
-                        reqId: req.id,
-                        method,
-                        url: originalUrl || url,
-                        status,
-                        responseTime,
-                        userAgent: req.get('user-agent'),
-                        ip: req.ip,
-                        routeGroup,
-                        // Do NOT include req/res objects - they cause field explosion in Loki
-                    });
-                } else {
-                    // Human-readable logs: use formatted message
-                    if (httpTerminalLogger) {
-                        httpTerminalLogger[logLevel](terminalMessage);
-                    } else if (!httpTerminalLogger) {
-                        // Fallback to console logging if httpTerminalLogger isn't ready yet
-                        console.log(`[HTTP] ${terminalMessage}`);
-                    }
-                }
+                // The single httpLoggerInstance will handle both structured and pretty logging
+                // based on the main logger's transport configuration.
+                httpLoggerInstance[logLevel](fileLogData, terminalMessage);
             }
         }
 
-        // Call the original end function
         return originalEnd.call(this, chunk, encoding, cb);
     };
 

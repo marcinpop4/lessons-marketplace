@@ -1,0 +1,167 @@
+logging {
+  level = "debug"
+  format = "logfmt" // or "json" for JSON formatted logs
+}
+// Docker discovery for the main application server
+discovery.docker "app_server_discovery" {
+	host             = "unix:///var/run/docker.sock"
+	refresh_interval = "5s"
+}
+
+// Relabeling to keep only the lessons-marketplace-server container
+discovery.relabel "app_server_relabel" {
+	targets = discovery.docker.app_server_discovery.targets
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		action        = "keep"
+		regex         = "/lessons-marketplace-server" // Ensure this matches your container name
+	}
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		target_label  = "container" // Adds a 'container' label with the full container name
+	}
+}
+
+// Loki source for the relabeled application server logs
+loki.source.docker "app_server_source" {
+	host       = "unix:///var/run/docker.sock"
+	targets    = discovery.relabel.app_server_relabel.output
+	forward_to = [loki.process.client_logs.receiver, loki.process.http_logs.receiver]
+}
+
+// Loki source for a test file
+loki.source.file "minimal_file_source" {
+  targets    = [{"__path__" = "/etc/alloy/test_line.log", "job" = "test_file_job"}]
+  forward_to = [loki.write.default.receiver]
+}
+
+// Processing pipeline specifically for client_logs
+loki.process "client_logs" {
+	forward_to = [loki.write.default.receiver]
+
+	// 1. Extract the original 'component' field into a temporary key.
+	stage.json {
+		expressions = {
+			_component_value = "component",
+		}
+	}
+
+	// 2. Clean the extracted value by removing leading/trailing whitespace.
+	stage.replace {
+	  source      = "_component_value"
+	  expression  = "^\\s+|\\s+$"
+	  replace     = ""
+	}
+
+	// 3. Use the template to classify the log based on the cleaned value.
+	//    The template output will overwrite _component_value.
+	stage.template {
+	  source   = "_component_value"
+	  template = "{{ if eq .Value \"client-logs\" }}KEEP_THIS_LOG{{ else }}DROP_THIS_LOG{{ end }}"
+	}
+
+	// 4. Drop the log if its classification is "DROP_THIS_LOG".
+	stage.drop {
+		source              = "_component_value"
+		value               = "DROP_THIS_LOG"
+		drop_counter_reason = "drop_log_not_client_log_type"
+	}
+
+	// 5. Add static labels (only logs classified to KEEP should reach here).
+	stage.static_labels {
+	  	values = {
+	    	job = "client-logs",
+	  	}
+	}
+
+	// 6. Extract additional data for labels from the log content.
+	stage.json {
+		expressions = {
+			_component = "component",
+			_pageGroup = "pageGroup",
+			_level = "level",
+			_vitals_lcp = "vitals.largestContentfulPaint",
+			_vitals_fcp = "vitals.firstContentfulPaint",
+			_vitals_ttfb = "vitals.loadTime",
+			_vitals_cls = "vitals.cumulativeLayoutShift",
+			_vitals_inp = "vitals.firstInputDelay",
+		}
+	}
+
+	// 7. Create the final set of labels for Loki.
+	stage.labels {
+		values = {
+			component = "_component",
+			pageGroup = "_pageGroup",
+			level = "_level",
+			vitals_lcp = "_vitals_lcp",
+			vitals_fcp = "_vitals_fcp",
+			vitals_ttfb = "_vitals_ttfb",
+			vitals_cls = "_vitals_cls",
+			vitals_inp = "_vitals_inp",
+		}
+	}
+}
+
+// Processing pipeline specifically for http_logs
+loki.process "http_logs" {
+	forward_to = [loki.write.default.receiver]
+
+	// 1. Extract fields from the JSON log line into a temporary key.
+	stage.json {
+		expressions = {
+			_component_value = "component",
+		}
+	}
+
+	// 2. Use the template to classify the log. The template reads from _component_value,
+	//    and its output overwrites _component_value.
+	stage.template {
+	  source   = "_component_value"
+	  template = "{{ if eq .Value \"http-logs\" }}KEEP_THIS_LOG{{ else }}DROP_THIS_LOG{{ end }}"
+	}
+
+	// 3. Drop the log if its classification is "DROP_THIS_LOG".
+	stage.drop {
+		source              = "_component_value"
+		value               = "DROP_THIS_LOG"
+		drop_counter_reason = "drop_log_not_http_log_type"
+	}
+
+	// 4. Add static labels (only logs classified to KEEP should reach here).
+	stage.static_labels {
+	  	values = {
+	    	job = "http-logs",
+	  	}
+	}
+
+	// 5. Extract additional data for labels from the log content.
+	stage.json {
+		expressions = {
+			_component = "component",
+			_method = "method",
+			_routeGroup = "customData.routeGroup",
+			_level = "level",
+			_status = "status",
+		}
+	}
+
+	// 6. Create the final set of labels for Loki.
+	stage.labels {
+		values = {
+			component = "_component",
+			method = "_method",
+			routeGroup = "_routeGroup",
+			level = "_level",
+			status = "_status",
+		}
+	}
+}
+
+// Default Loki writer
+loki.write "default" {
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
+	}
+}
+

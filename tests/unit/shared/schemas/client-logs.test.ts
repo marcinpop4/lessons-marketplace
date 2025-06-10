@@ -9,7 +9,7 @@ import {
     type ClientLogV1_0_0,
     SchemaVersions,
     ClientLogsSchemaMetadata
-} from '@shared/schemas/client-logs-schema-v1';
+} from '../../../../shared/schemas/client-logs-schema-v1';
 
 /**
  * Test suite for Client Logs schema validation functions

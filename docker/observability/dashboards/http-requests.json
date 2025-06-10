@@ -176,7 +176,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": "/2xx/"
+              "options": "/^2\\d\\d$/"
             },
             "properties": [
               {
@@ -191,7 +191,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": "/4xx/"
+              "options": "/^4\\d\\d$/"
             },
             "properties": [
               {
@@ -206,7 +206,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": "/5xx/"
+              "options": "/^5\\d\\d$/"
             },
             "properties": [
               {
@@ -221,7 +221,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": "/3xx/"
+              "options": "/^3\\d\\d$/"
             },
             "properties": [
               {
@@ -261,7 +261,7 @@
             "uid": "P8E80F9AEF21F6940"
           },
           "editorMode": "code",
-          "expr": "sum by (status_class) (rate({component=\"http-logs\", status_class!=\"\", routeGroup!=\"/api/v1/health\"}[5m]))",
+          "expr": "sum by (status) (rate({component=\"http-logs\", status!=\"\", routeGroup!=\"/api/v1/health\"}[5m]))",
           "queryType": "range",
           "refId": "A"
         }
@@ -527,7 +527,7 @@
             "uid": "P8E80F9AEF21F6940"
           },
           "editorMode": "code",
-          "expr": "(sum(rate({component=\"http-logs\", status_class=~\"4xx|5xx\", routeGroup!=\"/api/v1/health\"}[5m])) / sum(rate({component=\"http-logs\", status_class!=\"\", routeGroup!=\"/api/v1/health\"}[5m]))) * 100",
+          "expr": "(sum(rate({component=\"http-logs\", status=~\"4\\\\d\\\\d|5\\\\d\\\\d\", routeGroup!=\"/api/v1/health\"}[5m])) / sum(rate({component=\"http-logs\", status!=\"\", routeGroup!=\"/api/v1/health\"}[5m]))) * 100",
           "queryType": "range",
           "refId": "A"
         }

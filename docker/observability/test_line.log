@@ -1,0 +1,1 @@
+{"level":30,"time":1719000000000,"service":"lessons-marketplace","component":"http-logs","environment":"TEST","msg":"This is a test http-log from a file"} {"level":30,"time":1719000000001,"service":"lessons-marketplace","component":"client-logs","environment":"TEST","msg":"This is an appended client-log from a file"}

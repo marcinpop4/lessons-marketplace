@@ -205,19 +205,69 @@ class ClientLogger {
     private log(level: string, message: string, data: Record<string, any> = {}): void {
         if (!this.isEnabled) return;
 
-        const logEntry = {
-            timestamp: new Date().toISOString(),
-            level,
-            message,
-            data,
-            sessionId: this.sessionId,
-            userId: this.userId,
-            url: window.location.href,
-            userAgent: navigator.userAgent,
-            viewport: {
-                width: window.innerWidth,
-                height: window.innerHeight
+        // Map the logger's level to the schema's required enum
+        const mapLevel = (lvl: string): 'INFO' | 'WARN' | 'ERROR' | 'DEBUG' | 'FATAL' => {
+            const upperLvl = lvl.toUpperCase();
+            if (['INFO', 'WARN', 'ERROR', 'DEBUG', 'FATAL'].includes(upperLvl)) {
+                return upperLvl as 'INFO' | 'WARN' | 'ERROR' | 'DEBUG' | 'FATAL';
             }
+            return 'INFO'; // Default to INFO if an unknown level is provided
+        };
+
+        // Get environment from Vite's env variables (or default)
+        const environment = (import.meta.env.VITE_NODE_ENV || 'development').toUpperCase() as 'DEVELOPMENT' | 'TEST' | 'PRODUCTION';
+
+
+        // Transform the incoming data into a schema-compliant structure
+        const logEntry = {
+            // == Required Schema Fields ==
+            schemaVersion: '1.0.0',
+            service: 'lessons-marketplace',
+            component: 'client-logs',
+            environment: environment,
+            logLevel: mapLevel(level),
+            message: message,
+            timestamp: new Date().toISOString(),
+
+            // == Context Object ==
+            context: {
+                sessionId: this.sessionId,
+                userId: this.userId,
+                userAgent: navigator.userAgent,
+                url: window.location.href,
+                referrer: document.referrer || null,
+                viewportWidth: window.innerWidth,
+                viewportHeight: window.innerHeight,
+                timestamp: new Date().toISOString(), // Redundant but good for context snapshot
+            },
+
+            // == Optional Data Payloads ==
+            // Assume incoming `data` could be one of these types.
+            // A more robust implementation might require specific log methods for these.
+            performanceMetrics: data.eventType === 'PERFORMANCE' ? data : null,
+            apiCall: data.url && data.status ? {
+                url: data.url,
+                method: data.method || 'GET',
+                status: data.status,
+                duration: data.duration,
+                correlationId: null // Not available on client-side
+            } : null,
+            userInteraction: data.element ? {
+                type: 'click', // Default to click for now
+                element: data.element,
+                elementId: data.id,
+                elementClass: data.className,
+                elementText: data.text
+            } : null,
+            error: level === 'error' ? {
+                name: 'Error',
+                message: data.message || message,
+                stack: data.stack,
+                details: data
+            } : null,
+
+            // All other arbitrary data goes into `customData`
+            customData: data
         };
 
         this.logQueue.push(logEntry);

@@ -1,11 +1,22 @@
-import { createChildLogger } from '../../config/logger.js';
-import { BadRequestError } from '../errors/index.js';
+import { createChildLogger } from '../../config/logger';
+import { BadRequestError } from '../errors/index';
 import pino from 'pino';
+import { validateClientLog, ClientLogV1_0_0 } from '../../shared/schemas/client-logs-schema-v1';
 
 /**
  * Redaction marker used consistently across all logging systems
  */
 const REDACTION_MARKER = '[Redacted]';
+
+// Map client log levels to lowercase pino levels
+const LOG_LEVEL_MAP: Record<string, string> = {
+    'ERROR': 'error',
+    'WARN': 'warn',
+    'INFO': 'info',
+    'DEBUG': 'debug',
+    'TRACE': 'trace',
+    'FATAL': 'fatal'
+};
 
 // Create comprehensive redaction configuration using Pino's built-in capabilities
 const createRedactionConfig = (additionalPaths: string[] = []) => ({
@@ -77,25 +88,6 @@ const createRedactionConfig = (additionalPaths: string[] = []) => ({
 });
 
 // Create client logger using Pino with structured output to stdout
-const clientFileLogger = pino({
-    level: 'debug',
-    base: {
-        service: 'lessons-marketplace',
-        component: 'client-logs'
-    },
-    timestamp: pino.stdTimeFunctions.isoTime,
-    redact: createRedactionConfig([
-        // Additional client-specific paths
-        'data.password',
-        'data.token',
-        'data.authorization',
-        'data.cookie',
-        'data.secret',
-        'data.apikey'
-    ]),
-}); // No stream specified = outputs to stdout
-
-// Create backup logger for fallback
 const clientLogger = createChildLogger('client-logs');
 
 interface ClientLogEntry {
@@ -114,7 +106,7 @@ interface ClientLogEntry {
 }
 
 interface ProcessLogsRequest {
-    logs: ClientLogEntry[];
+    logs: any[]; // Change to any[] to accept raw logs before validation
     ip?: string;
     forwardedFor?: string;
 }
@@ -125,6 +117,12 @@ interface ProcessLogsResult {
 }
 
 class ClientLoggerService {
+    private logger: pino.Logger;
+
+    constructor(logger: pino.Logger) {
+        this.logger = logger;
+    }
+
     /**
      * Process client log entries with validation and enrichment.
      * @param request - The logs and metadata to process
@@ -134,88 +132,126 @@ class ClientLoggerService {
     async processLogs(request: ProcessLogsRequest): Promise<ProcessLogsResult> {
         const { logs, ip, forwardedFor } = request;
 
-        // Validation
+        // Basic structural validation
         if (!logs || !Array.isArray(logs)) {
-            throw new BadRequestError('Invalid logs format');
+            throw new BadRequestError('Invalid logs format: logs field must be an array.');
         }
 
         if (logs.length === 0) {
-            throw new BadRequestError('Invalid logs format');
+            throw new BadRequestError('Invalid logs format: logs array cannot be empty.');
         }
 
         if (logs.length > 100) {
             throw new BadRequestError('Too many log entries. Maximum 100 per request.');
         }
 
-        // Process each log entry
-        logs.forEach((log: ClientLogEntry) => {
+        const validLogs: ClientLogV1_0_0[] = [];
+        const validationErrors: { log: any; error: string }[] = [];
+
+        // Atomically validate all logs before processing any
+        logs.forEach((rawLog: any) => {
+            try {
+                const validatedLog = validateClientLog(rawLog);
+                validLogs.push(validatedLog);
+            } catch (error: any) {
+                const validationErrorMessage = error.message || 'Unknown validation error';
+                validationErrors.push({ log: rawLog, error: validationErrorMessage });
+            }
+        });
+
+        // Process all valid logs
+        validLogs.forEach((log) => {
             this.processLogEntry(log, ip, forwardedFor);
         });
 
+        // If there were any validation errors, log them for debugging.
+        // This prevents a few bad logs from a client from stopping all log ingestion.
+        if (validationErrors.length > 0) {
+            this.logger.warn({
+                message: 'Some client logs failed validation and were discarded.',
+                component: 'client-logs-validation-error',
+                totalReceived: logs.length,
+                validCount: validLogs.length,
+                invalidCount: validationErrors.length,
+                // Log details of the first error to keep log size reasonable
+                firstError: {
+                    errorMessage: validationErrors[0].error,
+                    logPayloadSnippet: JSON.stringify(validationErrors[0].log).substring(0, 500) + '...'
+                }
+            }, `Discarded ${validationErrors.length} invalid client logs`);
+
+            // Only fail the entire request if ALL logs were invalid.
+            if (validLogs.length === 0) {
+                throw new BadRequestError(`All ${logs.length} client log entries failed validation. First error: ${validationErrors[0].error}`);
+            }
+        }
+
         return {
             success: true,
-            processed: logs.length
+            processed: validLogs.length
         };
     }
 
     /**
      * Process a single log entry by enriching it with server-side metadata and logging it.
-     * @param log - The client log entry to process
+     * @param log - The VALIDATED client log entry to process
      * @param ip - Client IP address
      * @param forwardedFor - X-Forwarded-For header value
      */
-    private processLogEntry(log: ClientLogEntry, ip?: string, forwardedFor?: string): void {
-        // Extract key fields for Loki labels
-        const pageGroup = log.data?.pageGroup || 'unknown';
-        const eventType = log.data?.event || log.message.toLowerCase().replace(/\s+/g, '_');
+    private processLogEntry(
+        log: ClientLogV1_0_0,
+        ip?: string,
+        forwardedFor?: string
+    ): void {
+        // Extract key fields for Loki labels (directly from validated log structure)
+        const pageGroup = log.customData?.pageGroup || 'unknown';
+        const eventType = log.customData?.event_type || log.message.toLowerCase().replace(/\\s+/g, '_');
 
         // Create enriched log data for structured logging
-        const enrichedLogData = {
-            ...log.data,
+        const enrichedLogData: Record<string, any> = {
+            message: log.message,
+            level: LOG_LEVEL_MAP[log.logLevel] || 'info', // Map to lowercase pino level
+
             pageGroup,
             event_type: eventType,
-            clientTimestamp: log.timestamp,
-            sessionId: log.sessionId,
-            userId: log.userId,
-            url: log.url,
-            viewport: log.viewport,
+
+            clientTimestamp: log.context?.timestamp || log.timestamp,
+            sessionId: log.context?.sessionId,
+            userId: log.context?.userId,
+            url: log.context?.url,
+            viewport: log.context?.viewportWidth !== undefined && log.context?.viewportHeight !== undefined
+                ? { width: log.context.viewportWidth, height: log.context.viewportHeight }
+                : undefined,
+
+            vitals: log.performanceMetrics,
+
+            errorDetails: log.error,
+            apiCallDetails: log.apiCall,
+            userInteractionDetails: log.userInteraction,
+
+            service: log.service,
+            component: log.component,
+            environment: log.environment,
+            schemaVersion: log.schemaVersion,
             serverTimestamp: new Date().toISOString(),
             source: 'client',
             ip: ip,
             forwardedFor: forwardedFor,
-            userAgent: log.userAgent?.slice(0, 200),
+            userAgent: log.context?.userAgent?.slice(0, 200),
+
+            ...(log.customData || {}),
         };
 
-        // Use Pino logger for structured output (outputs to stdout for Promtail)
-        switch (log.level) {
-            case 'error':
-                clientFileLogger.error(enrichedLogData, log.message);
-                break;
-            case 'warn':
-                clientFileLogger.warn(enrichedLogData, log.message);
-                break;
-            case 'debug':
-                clientFileLogger.debug(enrichedLogData, log.message);
-                break;
-            default:
-                clientFileLogger.info(enrichedLogData, log.message);
-        }
+        // Remove undefined fields to keep logs clean
+        Object.keys(enrichedLogData).forEach(key => {
+            if (enrichedLogData[key] === undefined) {
+                delete enrichedLogData[key];
+            }
+        });
 
-        // Also log using standard logger for backup
-        switch (log.level) {
-            case 'error':
-                clientLogger.error(enrichedLogData, log.message);
-                break;
-            case 'warn':
-                clientLogger.warn(enrichedLogData, log.message);
-                break;
-            case 'debug':
-                clientLogger.debug(enrichedLogData, log.message);
-                break;
-            default:
-                clientLogger.info(enrichedLogData, log.message);
-        }
+        // Log using standard logger
+        this.logger.info(enrichedLogData, log.message);
     }
 }
 
-export const clientLoggerService = new ClientLoggerService(); 
+export const clientLoggerService = new ClientLoggerService(clientLogger); 

@@ -7,11 +7,13 @@ alwaysApply: true
 
 This document clarifies how to write import statements across different parts of the application (`server/`, `frontend/`, `shared/`, `tests/`) to ensure consistency and compatibility with our tooling (TypeScript compiler, Vite, Jest).
 
-## Guiding Principle Update
+## Guiding Principle: No Aliases, Strict Paths
+
+**Path aliases (e.g., `@/`, `@shared/`) are forbidden in this project.** All imports must use relative paths.
 
 **Import paths in TypeScript (`.ts`, `.tsx`) files generally omit the file extension, EXCEPT for relative imports within directories compiled for Node.js ESM (`server/`, `shared/`), which MUST include the `.js` extension.**
 
-Rely on the respective build/run tools and their configurations (`tsconfig.json`, `vite.config.ts`, `jest.config.js`) for module resolution (especially for aliases and node modules), but respect Node.js ESM requirements for server-side and shared library relative imports.
+Rely on the respective build/run tools and their configurations (`tsconfig.json`, `vite.config.ts`, `jest.config.js`) for module resolution, but respect Node.js ESM requirements for server-side and shared library relative imports.
 
 ## Specific Areas
 
@@ -22,13 +24,13 @@ Rely on the respective build/run tools and their configurations (`tsconfig.json`
     // Correct:
     import { userService } from './user.service.js';
     import { authMiddleware } from '../auth/auth.middleware.js';
-    import { Lesson } from '../../models/Lesson,js';
     ```
--   **Shared Imports (from `@shared/`):** Use the configured path alias (`@shared/`) **without** the extension.
+-   **Shared Imports (from `shared/`):** Use relative paths **AND include** the `.js` extension.
     ```typescript
     // Correct:
-
--   **Reasoning:** Compiled server code runs in Node.js using ESM, which requires explicit `.js` extensions for relative imports. Aliases and node modules are resolved differently.
+    import { Lesson } from '../../shared/models/Lesson.js';
+    ```
+-   **Reasoning:** Compiled server code runs in Node.js using ESM, which requires explicit `.js` extensions for all relative imports.
 
 ### 2. Shared (`shared/**/*.ts`)
 
@@ -56,30 +58,29 @@ Rely on the respective build/run tools and their configurations (`tsconfig.json`
     import { useAuthStore } from './stores/authStore';
     import { LoginButton } from '../components/LoginButton';
     ```
--   **Shared Imports (from `@shared/`):** Use the configured path alias (`@shared/`) **without** the extension.
+-   **Shared Imports (from `shared/`):** Use relative paths **without** the extension.
     ```typescript
     // Correct:
-    import { Lesson } from '@shared/models/Lesson';
+    import { Lesson } from '../../shared/models/Lesson';
     ```
 -   **Node Modules:** Import from `node_modules` as usual (no extension).
     ```typescript
     import React from 'react';
     ```
--   **Reasoning:** Vite handles module resolution for the frontend and does not require extensions.
+-   **Reasoning:** Vite handles module resolution for the frontend and does not require extensions for relative paths.
 
 ### 4. Tests (`tests/**/*.ts`)
 
--   **Imports of Source Code (`server/`, `shared/`, `frontend/`):** 
-    - Imports *from* `server/` using relative paths need `.js`.
-    - Imports *from* `shared/` using relative paths need `.js`.
-    - Imports *from* `shared/` using the `@shared/` alias need *no* extension.
-    - Imports *from* `frontend/` using relative paths need *no* extension.
+-   **Imports of Source Code (`server/`, `shared/`, `frontend/`):** All imports must use relative paths.
+    - Imports *from* `server/` require the `.js` extension.
+    - Imports *from* `shared/` require the `.js` extension.
+    - Imports *from* `frontend/` must **not** include an extension.
     ```typescript
-    // Correct:
-
-    import { Lesson } from '@shared/models/Lesson';    
+    // Correct (e.g., from tests/api/some.test.ts):
+    import { Lesson } from '../../shared/models/Lesson.js';
+    import { someUtil } from './utils/some.util.js'; // if it's a .ts file compiled for tests
     ```
--   **Imports of Test Utilities (within `tests/`):** Use relative paths **without** the extension.
+-   **Imports of Test Utilities (within `tests/`):** Use relative paths. Whether to include the extension depends on your Jest/ts-jest configuration, but it's safest to be consistent with the source files you are importing.
     ```typescript
     // Correct (e.g., from within tests/api/lesson.test.ts):
     import { createTestStudent } from './utils/user.utils';
@@ -91,6 +92,6 @@ Rely on the respective build/run tools and their configurations (`tsconfig.json`
     import { v4 as uuidv4 } from 'uuid'; 
     import { describe, it, expect, beforeAll } from '@jest/globals'; // Example Jest import
     ```
--   **Reasoning:** Jest (with `ts-jest`) uses `tsconfig.test.json`. It resolves test utilities and aliases without extensions. However, when importing compiled `.js` files from `server` or `shared` via relative paths, the `.js` is needed due to the underlying Node ESM runtime environment.
+-   **Reasoning:** Jest (with `ts-jest`) uses `tsconfig.test.json` for module resolution. When importing compiled `.js` files from `server/` or `shared/` via relative paths, the `.js` extension is required by the underlying Node.js ESM runtime.
 
 # ... (summary table and final sentence) ...

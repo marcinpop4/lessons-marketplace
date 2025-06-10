@@ -80,6 +80,9 @@ importers:
       pino-http:
         specifier: ^10.4.0
         version: 10.4.0
+      pino-std-serializers:
+        specifier: ^7.0.0
+        version: 7.0.0
       react:
         specifier: 19.1.0
         version: 19.1.0

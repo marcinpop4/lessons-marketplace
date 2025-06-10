@@ -66,6 +66,9 @@ export const ValidationTimingSchemaV1_0_0 = z.object({
     /** Total test execution time in milliseconds */
     totalTestTimeMs: z.number().min(0),
 
+    /** Total number of tests executed */
+    totalTestCount: z.number().int().min(0),
+
     /** Human-readable failure reason (empty string if successful) */
     failureReason: z.string(),
 
@@ -88,6 +91,15 @@ export const ValidationTimingSchemaV1_0_0 = z.object({
         unitTestsMs: z.number().min(0).nullable(),
         apiTestsMs: z.number().min(0).nullable(),
         e2eTestsMs: z.number().min(0).nullable(),
+        logsTestsMs: z.number().min(0).nullable(),
+    }),
+
+    /** Individual test suite counts (null if suite was skipped) */
+    testCounts: z.object({
+        unitTestCount: z.number().int().min(0).nullable(),
+        apiTestCount: z.number().int().min(0).nullable(),
+        e2eTestCount: z.number().int().min(0).nullable(),
+        logsTestCount: z.number().int().min(0).nullable(),
     }),
 
     /** Calculated performance metrics */

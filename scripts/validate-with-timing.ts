@@ -215,6 +215,12 @@ async function runTestCommand(
                 'npm run test:api:container',
                 `dotenv -e env/.env.${process.env.NODE_ENV} -- docker compose -f docker/docker-compose.yml run --rm test npx jest --config tests/api/jest.config.js --json --outputFile=${reportFile}`
             );
+        } else if (title.toLowerCase().includes('logs')) {
+            reportFile = `tests/results/logs/jest-report-${timestamp}.json`;
+            modifiedCommand = command.replace(
+                'npm run test:logs:container',
+                `dotenv -e env/.env.${process.env.NODE_ENV} -- docker compose -f docker/docker-compose.yml run --rm test npx jest --config tests/logs/jest.config.js --json --outputFile=${reportFile}`
+            );
         } else if (title.toLowerCase().includes('e2e')) {
             // For E2E, use the standard command and read from the fixed path
             reportFile = `tests/results/e2e/results.json`;
@@ -291,17 +297,19 @@ async function runTests(): Promise<{
     unitTime: number;
     apiTime: number;
     e2eTime: number;
+    logsTime: number;
     unitCount: number;
     apiCount: number;
     e2eCount: number;
+    logsCount: number;
     failed: boolean
 }> {
     try {
         // Clean and create organized test results directories
         logger.info('🧹 Organizing test results directories...');
         try {
-            await execa('rm', ['-rf', 'tests/results/unit', 'tests/results/api', 'tests/results/e2e'], { shell: true });
-            await execa('mkdir', ['-p', 'tests/results/unit', 'tests/results/api', 'tests/results/e2e/screenshots'], { shell: true });
+            await execa('rm', ['-rf', 'tests/results/unit', 'tests/results/api', 'tests/results/e2e', 'tests/results/logs'], { shell: true });
+            await execa('mkdir', ['-p', 'tests/results/unit', 'tests/results/api', 'tests/results/e2e/screenshots', 'tests/results/logs'], { shell: true });
         } catch (error) {
             logger.warn('Could not clean test results directories (non-fatal):', error);
         }
@@ -320,16 +328,22 @@ async function runTests(): Promise<{
             'NODE_ENV=test npm run test:e2e:container',
             'E2E Tests'
         );
+        const logsResult = await runTestCommand(
+            'NODE_ENV=test npm run test:logs:container',
+            'Logs Tests'
+        );
 
-        const failed = unitResult.failed || apiResult.failed || e2eResult.failed;
+        const failed = unitResult.failed || apiResult.failed || e2eResult.failed || logsResult.failed;
 
         return {
             unitTime: unitResult.duration,
             apiTime: apiResult.duration,
             e2eTime: e2eResult.duration,
+            logsTime: logsResult.duration,
             unitCount: unitResult.testCount,
             apiCount: apiResult.testCount,
             e2eCount: e2eResult.testCount,
+            logsCount: logsResult.testCount,
             failed
         };
     } catch (error) {
@@ -338,9 +352,11 @@ async function runTests(): Promise<{
             unitTime: 0,
             apiTime: 0,
             e2eTime: 0,
+            logsTime: 0,
             unitCount: 0,
             apiCount: 0,
             e2eCount: 0,
+            logsCount: 0,
             failed: true
         };
     }
@@ -358,9 +374,11 @@ async function main() {
         unitTime: 0,
         apiTime: 0,
         e2eTime: 0,
+        logsTime: 0,
         unitCount: 0,
         apiCount: 0,
         e2eCount: 0,
+        logsCount: 0,
         failed: false
     };
     let totalTime = 0;
@@ -394,7 +412,7 @@ async function main() {
         // Run tests
         failureStage = 'testing';
         testResults = await runTests();
-        const testTime = testResults.unitTime + testResults.apiTime + testResults.e2eTime;
+        const testTime = testResults.unitTime + testResults.apiTime + testResults.e2eTime + testResults.logsTime;
         totalTime = setupTime + testTime;
 
         if (testResults.failed) {
@@ -423,11 +441,12 @@ async function main() {
         logger.info('🧪 Test Execution:');
         logger.info(`   ${'Unit Tests'.padEnd(25)} ${formatDuration(testResults.unitTime).padStart(8)} (${testResults.unitCount} tests)`);
         logger.info(`   ${'API Tests'.padEnd(25)} ${formatDuration(testResults.apiTime).padStart(8)} (${testResults.apiCount} tests)`);
+        logger.info(`   ${'Logs Tests'.padEnd(25)} ${formatDuration(testResults.logsTime).padStart(8)} (${testResults.logsCount} tests)`);
         logger.info(`   ${'E2E Tests'.padEnd(25)} ${formatDuration(testResults.e2eTime).padStart(8)} (${testResults.e2eCount} tests)`);
         logger.info(`   ${'TOTAL TEST TIME'.padEnd(25)} ${formatDuration(testTime).padStart(8)}`);
 
         // Calculate total test count dynamically
-        const totalTestCount = testResults.unitCount + testResults.apiCount + testResults.e2eCount;
+        const totalTestCount = testResults.unitCount + testResults.apiCount + testResults.e2eCount + testResults.logsCount;
 
         // Overall summary
         logger.info('📊 Overall Summary:');
@@ -443,13 +462,13 @@ async function main() {
     } catch (error: any) {
         validationSuccess = false;
         failureReason = error.message || 'Unknown error';
-        totalTime = setupTime + (testResults.unitTime + testResults.apiTime + testResults.e2eTime);
+        totalTime = setupTime + (testResults.unitTime + testResults.apiTime + testResults.e2eTime + testResults.logsTime);
 
         logger.error(`❌ ${modeText} failed during ${failureStage} stage: ${failureReason}`);
     } finally {
         // Always log structured timing data for Grafana visualization, even on failure
-        const testTime = testResults.unitTime + testResults.apiTime + testResults.e2eTime;
-        const totalTestCount = testResults.unitCount + testResults.apiCount + testResults.e2eCount;
+        const testTime = testResults.unitTime + testResults.apiTime + testResults.e2eTime + testResults.logsTime;
+        const totalTestCount = testResults.unitCount + testResults.apiCount + testResults.e2eCount + testResults.logsCount;
         const rawValidationTiming = {
             schemaVersion: '1.0.0' as const,
             service: 'lessons-marketplace',
@@ -476,9 +495,13 @@ async function main() {
                 unitTestsMs: testResults.unitTime || null,
                 apiTestsMs: testResults.apiTime || null,
                 e2eTestsMs: testResults.e2eTime || null,
+                logsTestsMs: testResults.logsTime || null,
+            },
+            testCounts: {
                 unitTestCount: testResults.unitCount || null,
                 apiTestCount: testResults.apiCount || null,
                 e2eTestCount: testResults.e2eCount || null,
+                logsTestCount: testResults.logsCount || null,
             },
             performance: {
                 setupTimeSeconds: Math.round((setupTime / 1000) * 100) / 100,
