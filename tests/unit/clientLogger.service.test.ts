@@ -3,6 +3,7 @@ import { clientLoggerService } from '../../server/clientLogger/clientLogger.serv
 import { BadRequestError } from '../../server/errors/index';
 import pino from 'pino';
 import { Writable } from 'stream';
+import { LogLevel } from '../../shared/types/LogLevel';
 
 // Get the class from the exported instance's constructor
 const ClientLoggerService = clientLoggerService.constructor as new (logger: pino.Logger) => typeof clientLoggerService;
@@ -24,6 +25,16 @@ describe('ClientLoggerService', () => {
         service = new ClientLoggerService(logger);
     });
 
+    const createValidLog = (overrides = {}) => ({
+        schemaVersion: '1.0.0',
+        service: 'lessons-marketplace',
+        component: 'client-logs',
+        environment: 'TEST',
+        logLevel: LogLevel.Warn,
+        eventType: 'ERROR',
+        message: 'Test error message',
+        // ... rest of the test data ...
+    });
 
     describe('Failing Test for Invalid apiCall Schema', () => {
         it('should throw a BadRequestError when a log contains an apiCall object with an invalid URL and missing required fields', async () => {
@@ -34,7 +45,7 @@ describe('ClientLoggerService', () => {
                 service: 'lessons-marketplace',
                 component: 'client-logs',
                 environment: 'DEVELOPMENT',
-                logLevel: 'WARN',
+                logLevel: LogLevel.Warn,
                 message: 'HTTP Error Response',
                 timestamp: '2025-06-10T17:46:00.664Z',
                 context: {
@@ -83,7 +94,7 @@ describe('ClientLoggerService', () => {
                 service: 'lessons-marketplace',
                 component: 'client-logs',
                 environment: 'TEST',
-                logLevel: 'INFO',
+                logLevel: LogLevel.Info,
                 eventType: 'PAGE_LOAD',
                 message: 'Page loaded successfully',
                 context: {

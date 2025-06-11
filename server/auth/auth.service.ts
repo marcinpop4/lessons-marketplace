@@ -99,11 +99,11 @@ class AuthService {
     } else if (userType === SharedUserType.TEACHER) {
       userProfile = await teacherService.findByEmail(email);
     } else {
-      throw new Error(`Invalid user type for authentication: ${userType}`);
+      throw new BadRequestError(`Invalid user type for authentication: ${userType}`);
     }
 
     if (!userProfile) {
-      throw new Error('Authentication failed: Invalid credentials.');
+      throw new AuthorizationError('Invalid credentials');
     }
 
     // 2. Check if user has PASSWORD auth method enabled
@@ -115,13 +115,13 @@ class AuthService {
       );
 
       if (!hasPasswordAuth) {
-        throw new Error('Authentication failed: Password authentication not enabled for this user.');
+        throw new AuthorizationError('Invalid credentials');
       }
 
       // 3. Verify password using PasswordService
       const isValidPassword = await passwordService.verifyPassword(userProfile.id, userType, password);
       if (!isValidPassword) {
-        throw new Error('Authentication failed: Invalid credentials.');
+        throw new AuthorizationError('Invalid credentials');
       }
 
       // 4. Generate Tokens
@@ -144,8 +144,13 @@ class AuthService {
         uniqueRefreshToken,
       };
     } catch (error) {
-      // Add more specific error handling as needed
-      throw error;
+      // Re-throw AuthorizationError and BadRequestError
+      if (error instanceof AuthorizationError || error instanceof BadRequestError) {
+        throw error;
+      }
+      // Log unexpected errors and throw a generic error
+      logger.error('Unexpected error during authentication:', error);
+      throw new Error('An unexpected error occurred during authentication.');
     }
   }
 

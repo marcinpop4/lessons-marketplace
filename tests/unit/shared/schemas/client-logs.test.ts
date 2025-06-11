@@ -10,6 +10,7 @@ import {
     SchemaVersions,
     ClientLogsSchemaMetadata
 } from '../../../../shared/schemas/client-logs-schema-v1';
+import { LogLevel } from '../../../../shared/types/LogLevel';
 
 /**
  * Test suite for Client Logs schema validation functions
@@ -22,7 +23,7 @@ describe('Client Logs Schema Validation', () => {
         service: 'lessons-marketplace',
         component: 'client-logs',
         environment: 'TEST',
-        logLevel: 'INFO',
+        logLevel: LogLevel.Info,
         eventType: 'PAGE_LOAD',
         message: 'Page loaded successfully',
         context: {
@@ -91,8 +92,7 @@ describe('Client Logs Schema Validation', () => {
         });
 
         it('should validate different log levels', () => {
-            const logLevels: Array<'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL'> =
-                ['DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL'];
+            const logLevels: Array<LogLevel> = [LogLevel.Debug, LogLevel.Info, LogLevel.Warn, LogLevel.Error, LogLevel.Fatal];
 
             logLevels.forEach(logLevel => {
                 const data = createValidData({ logLevel });
@@ -114,7 +114,7 @@ describe('Client Logs Schema Validation', () => {
         it('should validate error event with error details', () => {
             const errorData = createValidData({
                 eventType: 'ERROR',
-                logLevel: 'ERROR',
+                logLevel: LogLevel.Error,
                 message: 'JavaScript error occurred',
                 error: {
                     name: 'TypeError',
@@ -472,7 +472,7 @@ describe('Client Logs Schema Validation', () => {
         it('should validate production environment data', () => {
             const prodData = createValidData({
                 environment: 'PRODUCTION',
-                logLevel: 'ERROR',
+                logLevel: LogLevel.Error,
                 eventType: 'ERROR',
                 message: 'Critical error in production',
                 error: {

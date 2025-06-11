@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { ClientLogV1_0_0 } from '@shared/schemas/client-logs-schema-v1';
+import { LogLevel } from '@shared/types/LogLevel';
 
 // Base URL for the running server (Loaded via jest.setup.api.ts)
 const API_BASE_URL = process.env.VITE_API_BASE_URL;
@@ -22,7 +23,7 @@ const createValidLog = (overrides: Partial<ClientLogV1_0_0> = {}): ClientLogV1_0
         service: 'lessons-marketplace',
         component: 'client-logs',
         environment: 'TEST',
-        logLevel: 'INFO',
+        logLevel: LogLevel.Info,
         eventType: 'USER_INTERACTION',
         message: 'This is a test log message.',
         timestamp: new Date().toISOString(),
@@ -71,9 +72,9 @@ describe('API Integration: /api/v1/logs', () => {
 
         it('should successfully process multiple log entries', async () => {
             const multipleLogs = [
-                createValidLog({ logLevel: 'INFO', message: 'First log' }),
-                createValidLog({ logLevel: 'WARN', message: 'Second log' }),
-                createValidLog({ logLevel: 'ERROR', message: 'Third log' }),
+                createValidLog({ logLevel: LogLevel.Info, message: 'First log' }),
+                createValidLog({ logLevel: LogLevel.Warn, message: 'Second log' }),
+                createValidLog({ logLevel: LogLevel.Error, message: 'Third log' }),
             ];
 
             const response = await axios.post(`${API_BASE_URL}/api/v1/logs`, { logs: multipleLogs });
@@ -91,7 +92,7 @@ describe('API Integration: /api/v1/logs', () => {
                 service: 'lessons-marketplace',
                 component: 'client-logs',
                 environment: 'TEST',
-                logLevel: 'DEBUG',
+                logLevel: LogLevel.Debug,
                 eventType: 'USER_INTERACTION',
                 message: 'Minimal log entry',
                 timestamp: new Date().toISOString(),
@@ -125,11 +126,11 @@ describe('API Integration: /api/v1/logs', () => {
 
         it('should handle different valid log levels', async () => {
             const differentLevels = [
-                createValidLog({ logLevel: 'ERROR' }),
-                createValidLog({ logLevel: 'WARN' }),
-                createValidLog({ logLevel: 'INFO' }),
-                createValidLog({ logLevel: 'DEBUG' }),
-                createValidLog({ logLevel: 'FATAL' }),
+                createValidLog({ logLevel: LogLevel.Error }),
+                createValidLog({ logLevel: LogLevel.Warn }),
+                createValidLog({ logLevel: LogLevel.Info }),
+                createValidLog({ logLevel: LogLevel.Debug }),
+                createValidLog({ logLevel: LogLevel.Fatal }),
             ];
 
             const response = await axios.post(`${API_BASE_URL}/api/v1/logs`, { logs: differentLevels });
@@ -247,14 +248,13 @@ describe('API Integration: /api/v1/logs', () => {
             } catch (error: any) {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(400);
-                expect(error.response?.data?.error).toContain('Invalid client log entry');
-                expect(error.response?.data?.error).toContain('Invalid literal value, expected "1.0.0"');
+                expect(error.response?.data?.error).toBe('All 1 client log entries failed validation. First error: Client log data validation failed (v1.0.0): schemaVersion: Invalid literal value, expected "1.0.0"');
             }
         });
 
         it('should return 400 for a log with an incorrect data type for a field', async () => {
-            // @ts-ignore
-            const invalidLog = createValidLog({ timestamp: 12345 }); // Invalid type
+            const invalidLog = createValidLog();
+            (invalidLog as any).timestamp = Date.now(); // Make it a number instead of string
 
             try {
                 await axios.post(`${API_BASE_URL}/api/v1/logs`, { logs: [invalidLog] });
@@ -262,8 +262,7 @@ describe('API Integration: /api/v1/logs', () => {
             } catch (error: any) {
                 expect(axios.isAxiosError(error)).toBe(true);
                 expect(error.response?.status).toBe(400);
-                expect(error.response?.data?.error).toContain('Invalid client log entry');
-                expect(error.response?.data?.error).toContain('timestamp: Expected string, received number');
+                expect(error.response?.data?.error).toBe('All 1 client log entries failed validation. First error: Client log data validation failed (v1.0.0): timestamp: Expected string, received number');
             }
         });
 

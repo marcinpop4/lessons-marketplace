@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LogLevel } from '../types/LogLevel';
 
 /**
  * Client Logs Schema Versioning
@@ -23,7 +24,8 @@ export type SupportedVersion = typeof SchemaVersions.SUPPORTED[number];
 // VERSION 1.0.0 SCHEMAS
 // =============================================================================
 
-const LogLevelSchema = z.enum(['DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL']);
+// Convert LogLevel enum to Zod enum
+const LogLevelSchema = z.nativeEnum(LogLevel);
 const ClientEventTypeSchema = z.enum([
     'PAGE_LOAD',
     'USER_INTERACTION',

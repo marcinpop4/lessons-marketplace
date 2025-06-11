@@ -10,15 +10,15 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "${DB_PORT}:5432"
     env_file:
       - ../env/.env.${NODE_ENV}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" && psql -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -c 'SELECT 1' || exit 1"]
       interval: 2s
-      timeout: 5s
-      retries: 15
-      start_period: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
   server:
     build:
@@ -29,15 +29,15 @@ services:
     container_name: lessons-marketplace-server
     restart: on-failure
     ports:
-      - "${SERVER_PORT:-3000}:3000"
+      - "${PORT}:3000"
     env_file:
       - ../env/.env.${NODE_ENV}
     environment:
       - NODE_ENV=${NODE_ENV}
       - CHOKIDAR_USEPOLLING=true  # For file watching in Docker
       - DOCKER_ENV=true  # Indicate running in Docker
-      - STRUCTURED_LOGS=${STRUCTURED_LOGS:-true}  # Control log format (false = human-readable for dev)
-      - LOG_LEVEL=${LOG_LEVEL:-info}  # Control log verbosity (debug, info, warn, error)
+      - STRUCTURED_LOGS=${STRUCTURED_LOGS}  # Control log format (false = human-readable for dev)
+      - LOG_LEVEL=${LOG_LEVEL}  # Control log verbosity (debug, info, warn, error)
     depends_on:
       database:
         condition: service_healthy
@@ -62,10 +62,10 @@ services:
       - "environment=development"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3000/api/v1/health | grep -q 'database.*connected' || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 15
-      start_period: 20s
+      interval: 2s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
   frontend:
     build:
@@ -76,7 +76,7 @@ services:
     container_name: lessons-marketplace-frontend
     restart: "no"
     ports:
-      - "${FRONTEND_PORT:-5173}:5173"
+      - "${FRONTEND_PORT}:5173"
     env_file:
       - ../env/.env.${NODE_ENV}
     environment:
@@ -84,9 +84,9 @@ services:
       - CHOKIDAR_USEPOLLING=true  # For file watching in Docker
       - DOCKER_ENV=true  # Indicate running in Docker
       - VITE_API_BASE_URL=${VITE_API_BASE_URL}
-      - STRUCTURED_LOGS=${STRUCTURED_LOGS:-true}  # Control log format (false = human-readable for dev)
-      - DEV_QUIET_LOGS=${DEV_QUIET_LOGS:-true}  # Control development noise (true = hide healthchecks, false = show all logs)
-      - LOG_LEVEL=${LOG_LEVEL:-info}  # Control log verbosity (debug, info, warn, error)
+      - STRUCTURED_LOGS=${STRUCTURED_LOGS}  # Control log format (false = human-readable for dev)
+      - DEV_QUIET_LOGS=${DEV_QUIET_LOGS}  # Control development noise (true = hide healthchecks, false = show all logs)
+      - LOG_LEVEL=${LOG_LEVEL}  # Control log verbosity (debug, info, warn, error)
     depends_on:
       server:
         condition: service_healthy
@@ -102,10 +102,10 @@ services:
       - /app/frontend/node_modules
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5173 || exit 1"]
-      interval: 5s
+      interval: 2s
       timeout: 3s
-      retries: 5
-      start_period: 10s
+      retries: 10
+      start_period: 5s
 
   # Test service
   test:
@@ -123,11 +123,11 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV}
       - TEST_ENV=docker
-      - FRONTEND_URL=http://localhost:5173
+      - FRONTEND_URL=${FRONTEND_URL}
       # Override URLs for container-to-container communication
       - LOKI_URL=http://${LOKI_CONTAINER_NAME}:${LOKI_PORT}
       - ALLOY_URL=http://${ALLOY_CONTAINER_NAME}:${ALLOY_PORT}
-      - EXTERNAL_SERVER_URL=http://lessons-marketplace-server:3000
+      - EXTERNAL_SERVER_URL=${EXTERNAL_SERVER_URL}
     volumes:
       - ../tests/results/unit:/app/tests/results/unit:rw
       - ../tests/results/api:/app/tests/results/api:rw
@@ -159,28 +159,28 @@ services:
   # === LOGGING INFRASTRUCTURE ===
   # Loki - Log aggregation system
   loki:
-    image: grafana/loki:${LOKI_VERSION:-3.3.1}
-    container_name: ${LOKI_CONTAINER_NAME:-lessons-marketplace-loki}
+    image: grafana/loki:${LOKI_VERSION}
+    container_name: ${LOKI_CONTAINER_NAME}
     ports:
-      - "${LOKI_PORT:-3100}:3100"
+      - "${LOKI_PORT}:3100"
     volumes:
       - ./observability/loki-config.yaml:/etc/loki/local-config.yaml
       - loki_data:/loki
     command: -config.file=/etc/loki/local-config.yaml
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 3100 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      test: ["CMD-SHELL", "busybox wget -q --spider http://localhost:3100/metrics || exit 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
 
   # Grafana Alloy - Log shipper (replacement for Promtail)
   alloy:
     build:
       context: ./observability
       dockerfile: Dockerfile.alloy
-    container_name: ${ALLOY_CONTAINER_NAME:-lessons-marketplace-alloy}
+    container_name: ${ALLOY_CONTAINER_NAME}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./observability/alloy-config.alloy:/etc/alloy/config.alloy
@@ -192,23 +192,25 @@ services:
         condition: service_healthy
     restart: unless-stopped
     ports:
-      - "${ALLOY_PORT:-9080}:9080"  # Alloy UI port
+      - "${ALLOY_PORT}:9080"  # Alloy UI port
     healthcheck:
-      test: ["CMD-SHELL", "true"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/9080 && echo -e 'GET /-/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r' >&3 && head -1 <&3 | grep -q '200 OK'"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
 
   # Grafana - Visualization and dashboards
   grafana:
-    image: grafana/grafana:${GRAFANA_VERSION:-11.4.0}
-    container_name: ${GRAFANA_CONTAINER_NAME:-lessons-marketplace-grafana}
+    image: grafana/grafana:${GRAFANA_VERSION}
+    container_name: ${GRAFANA_CONTAINER_NAME}
     ports:
-      - "${GRAFANA_PORT:-3001}:3000"  # Default to 3001 to avoid conflict with server
+      - "${GRAFANA_PORT}:3000"  # Default to 3001 to avoid conflict with server
     environment:
-      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin123}
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
       - GF_SERVER_HTTP_PORT=3000
-      - GF_SERVER_DOMAIN=${GRAFANA_DOMAIN:-localhost}
+      - GF_SERVER_DOMAIN=${GRAFANA_DOMAIN}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
@@ -220,10 +222,10 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      interval: 2s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
 volumes:
   postgres_data:

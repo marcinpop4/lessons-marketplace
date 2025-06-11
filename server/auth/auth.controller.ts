@@ -61,11 +61,6 @@ export class AuthController {
             // Use the DTO type for the body
             const loginDto: LoginUserDTO = req.body;
 
-            // Remove basic validation - Service layer is responsible
-            // if (!loginDto.email || !loginDto.password || !loginDto.userType) {
-            //     throw new BadRequestError('Email, password, and userType are required');
-            // }
-
             // Keep basic type check
             if (loginDto.userType !== UserType.STUDENT && loginDto.userType !== UserType.TEACHER) {
                 throw new BadRequestError('Invalid userType provided. Must be STUDENT or TEACHER.');
@@ -79,7 +74,15 @@ export class AuthController {
             res.status(200).json({ user, accessToken });
 
         } catch (error: unknown) {
-            // Pass error to central handler
+            if (error instanceof AuthorizationError) {
+                res.status(401).json({ error: error.message });
+                return;
+            }
+            if (error instanceof BadRequestError) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
+            // Pass other errors to central handler
             next(error);
         }
     }

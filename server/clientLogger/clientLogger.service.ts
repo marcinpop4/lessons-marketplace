@@ -2,20 +2,20 @@ import { createChildLogger } from '../../config/logger';
 import { BadRequestError } from '../errors/index';
 import pino from 'pino';
 import { validateClientLog, ClientLogV1_0_0 } from '../../shared/schemas/client-logs-schema-v1';
+import { LogLevel } from '../../shared/types/LogLevel';
 
 /**
  * Redaction marker used consistently across all logging systems
  */
 const REDACTION_MARKER = '[Redacted]';
 
-// Map client log levels to lowercase pino levels
-const LOG_LEVEL_MAP: Record<string, string> = {
-    'ERROR': 'error',
-    'WARN': 'warn',
-    'INFO': 'info',
-    'DEBUG': 'debug',
-    'TRACE': 'trace',
-    'FATAL': 'fatal'
+// Map client log levels to pino levels (which are already lowercase)
+const LOG_LEVEL_MAP: Record<LogLevel, string> = {
+    [LogLevel.Error]: 'error',
+    [LogLevel.Warn]: 'warn',
+    [LogLevel.Info]: 'info',
+    [LogLevel.Debug]: 'debug',
+    [LogLevel.Fatal]: 'fatal'
 };
 
 // Create comprehensive redaction configuration using Pino's built-in capabilities

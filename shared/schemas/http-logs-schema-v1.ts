@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LogLevel } from '../types/LogLevel';
 
 /**
  * HTTP Logs Schema Versioning
@@ -24,7 +25,7 @@ export type SupportedVersion = typeof SchemaVersions.SUPPORTED[number];
 // =============================================================================
 
 const HttpMethodSchema = z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS']);
-const LogLevelSchema = z.enum(['DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL']);
+const LogLevelSchema = z.nativeEnum(LogLevel);
 
 const RequestHeadersSchema = z.record(z.string(), z.string()).nullable();
 const ResponseHeadersSchema = z.record(z.string(), z.string()).nullable();

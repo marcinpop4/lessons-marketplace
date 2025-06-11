@@ -10,6 +10,7 @@ import {
     SchemaVersions,
     HttpLogsSchemaMetadata
 } from '../../../../shared/schemas/http-logs-schema-v1';
+import { LogLevel } from '../../../../shared/types/LogLevel';
 
 /**
  * Test suite for HTTP Logs schema validation functions
@@ -22,8 +23,8 @@ describe('HTTP Logs Schema Validation', () => {
         service: 'lessons-marketplace',
         component: 'http-logs',
         environment: 'TEST',
-        logLevel: 'INFO',
-        message: 'HTTP request processed successfully',
+        logLevel: LogLevel.Info,
+        message: 'Test HTTP log',
         request: {
             method: 'GET',
             url: 'https://api.example.com/lessons/123',
@@ -116,8 +117,7 @@ describe('HTTP Logs Schema Validation', () => {
         });
 
         it('should validate different log levels', () => {
-            const logLevels: Array<'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL'> =
-                ['DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL'];
+            const logLevels = [LogLevel.Debug, LogLevel.Info, LogLevel.Warn, LogLevel.Error, LogLevel.Fatal];
 
             logLevels.forEach(logLevel => {
                 const data = createValidData({ logLevel });
@@ -143,7 +143,7 @@ describe('HTTP Logs Schema Validation', () => {
 
         it('should validate error scenario with error details', () => {
             const errorData = createValidData({
-                logLevel: 'ERROR',
+                logLevel: LogLevel.Error,
                 message: 'HTTP request failed with error',
                 response: {
                     statusCode: 500,
@@ -532,7 +532,7 @@ describe('HTTP Logs Schema Validation', () => {
 
         it('should validate rate-limited request', () => {
             const rateLimitData = createValidData({
-                logLevel: 'WARN',
+                logLevel: LogLevel.Warn,
                 message: 'Request rate limited',
                 response: {
                     statusCode: 429,
@@ -568,7 +568,7 @@ describe('HTTP Logs Schema Validation', () => {
         it('should validate production environment high-load scenario', () => {
             const prodData = createValidData({
                 environment: 'PRODUCTION',
-                logLevel: 'INFO',
+                logLevel: LogLevel.Info,
                 message: 'High load API request processed',
                 timing: {
                     startTime: '2024-06-02T14:30:00.000Z',
