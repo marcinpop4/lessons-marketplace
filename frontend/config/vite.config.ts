@@ -190,15 +190,17 @@ export default defineConfig(({ mode }) => {
       // Configure based on log level
       logLevel: logLevel >= 3 ? 'info' : logLevel >= 2 ? 'warn' : 'error',
       // Docker hot reload configuration
-      host: isDev ? '0.0.0.0' : 'localhost', // Allow external connections in development
+      host: process.env.DOCKER_ENV ? '0.0.0.0' : 'localhost', // Allow external connections when running in Docker
       port: isDev ? 5173 : undefined,
+      // Allow access from Docker service name
+      allowedHosts: process.env.DOCKER_ENV ? ['frontend', 'localhost'] : undefined,
       // Force Vite to always use new versions of files
       hmr: {
         overlay: true,
         // For Docker, use polling for file watching
         ...(process.env.DOCKER_ENV && {
           port: 5173,
-          host: 'localhost'
+          host: '0.0.0.0'
         })
       },
       watch: {

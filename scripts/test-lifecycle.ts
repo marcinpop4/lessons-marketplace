@@ -68,11 +68,8 @@ export function runPnpmScript(scriptName: string, env: NodeJS.ProcessEnv = proce
 
         pnpmProcess.on('close', (code, signal) => {
             console.log(`---> Script ${scriptName} finished with code: ${code}, signal: ${signal}`);
-            if (code === 0) {
-                resolve({ code, signal });
-            } else {
-                reject(new Error(`Script ${scriptName} failed with exit code ${code}`));
-            }
+            // Always resolve with the actual exit code, don't reject
+            resolve({ code, signal });
         });
     });
 }

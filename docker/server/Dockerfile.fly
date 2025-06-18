@@ -30,7 +30,7 @@ RUN pnpm install --frozen-lockfile
 COPY server/prisma ./server/prisma
 
 # Generate Prisma client
-RUN pnpm prisma:generate
+RUN pnpm prisma:generate:run
 
 # Build stage
 FROM dependencies AS builder

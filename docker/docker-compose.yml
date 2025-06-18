@@ -23,9 +23,11 @@ services:
   server:
     build:
       context: ..
-      dockerfile: docker/server/Dockerfile.dev
+      dockerfile: docker/server/Dockerfile
       args:
         NODE_ENV: ${NODE_ENV}
+        NODE_VERSION: ${NODE_VERSION}
+        PNPM_VERSION: ${PNPM_VERSION}
     container_name: lessons-marketplace-server
     restart: on-failure
     ports:
@@ -70,9 +72,11 @@ services:
   frontend:
     build:
       context: ..
-      dockerfile: docker/frontend/Dockerfile.dev
+      dockerfile: docker/frontend/Dockerfile
       args:
         NODE_ENV: ${NODE_ENV}
+        NODE_VERSION: ${NODE_VERSION}
+        PNPM_VERSION: ${PNPM_VERSION}
     container_name: lessons-marketplace-frontend
     restart: "no"
     ports:
@@ -116,8 +120,9 @@ services:
       dockerfile: docker/test/Dockerfile
       args:
         NODE_ENV: ${NODE_ENV}
+        NODE_VERSION: ${NODE_VERSION}
+        PNPM_VERSION: ${PNPM_VERSION}
     container_name: lessons-marketplace-test
-    network_mode: "container:lessons-marketplace-frontend"
     env_file:
       - ../env/.env.${NODE_ENV}
     environment:
@@ -127,7 +132,7 @@ services:
       # Override URLs for container-to-container communication
       - LOKI_URL=http://${LOKI_CONTAINER_NAME}:${LOKI_PORT}
       - ALLOY_URL=http://${ALLOY_CONTAINER_NAME}:${ALLOY_PORT}
-      - EXTERNAL_SERVER_URL=${EXTERNAL_SERVER_URL}
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL}
     volumes:
       - ../tests/results/unit:/app/tests/results/unit:rw
       - ../tests/results/api:/app/tests/results/api:rw
@@ -138,7 +143,11 @@ services:
       - ../shared:/app/shared:cached
       - ../server:/app/server:cached
       - ../config:/app/config:cached
+      - ../scripts:/app/scripts:cached
       - ../env:/app/env:cached
+      # Mount package.json for script access
+      - ../package.json:/app/package.json:cached
+      - ../pnpm-lock.yaml:/app/pnpm-lock.yaml:cached
     depends_on:
       database:
         condition: service_healthy
@@ -149,12 +158,7 @@ services:
       frontend:
         condition: service_healthy
         restart: false
-      loki:
-        condition: service_healthy
-        restart: false
-      alloy:
-        condition: service_healthy
-        restart: false
+    command: ["tail", "-f", "/dev/null"]
 
   # === LOGGING INFRASTRUCTURE ===
   # Loki - Log aggregation system
@@ -163,13 +167,15 @@ services:
     container_name: ${LOKI_CONTAINER_NAME}
     ports:
       - "${LOKI_PORT}:3100"
+    env_file:
+      - ../env/.env.${NODE_ENV}
     volumes:
       - ./observability/loki-config.yaml:/etc/loki/local-config.yaml
       - loki_data:/loki
     command: -config.file=/etc/loki/local-config.yaml
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "busybox wget -q --spider http://localhost:3100/metrics || exit 1"]
+      test: ["CMD-SHELL", "busybox wget -q --spider http://localhost:3100/ready || exit 1"]
       interval: 2s
       timeout: 3s
       retries: 10
@@ -181,6 +187,8 @@ services:
       context: ./observability
       dockerfile: Dockerfile.alloy
     container_name: ${ALLOY_CONTAINER_NAME}
+    env_file:
+      - ../env/.env.${NODE_ENV}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./observability/alloy-config.alloy:/etc/alloy/config.alloy
@@ -206,6 +214,8 @@ services:
     container_name: ${GRAFANA_CONTAINER_NAME}
     ports:
       - "${GRAFANA_PORT}:3000"  # Default to 3001 to avoid conflict with server
+    env_file:
+      - ../env/.env.${NODE_ENV}
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}

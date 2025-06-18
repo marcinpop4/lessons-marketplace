@@ -34,6 +34,7 @@ import { config } from 'dotenv';
 import pino from 'pino';
 import { safeValidateValidationTiming, type ValidationTiming } from '@shared/schemas/devops-schema-v1.js';
 import { z } from 'zod';
+import { v4 as uuidv4 } from 'uuid';
 
 // Determine the root directory based on script location
 const __filename = fileURLToPath(import.meta.url);
@@ -80,8 +81,9 @@ dotenv.config({ path: envFilePath });
 // Set environment correctly
 process.env.NODE_ENV = nodeEnv;
 
-// Create child logger for validation script
-const logger = createChildLogger('validation-script');
+// Create child logger for validation script with trace ID
+const traceId = uuidv4();
+const logger = createChildLogger('validation-script', { traceId });
 
 // Check if fast mode is enabled (skip Docker build)
 const FAST_MODE = fastMode;
@@ -92,11 +94,13 @@ const baseEnv = {
     NODE_NO_WARNINGS: '1',
     SILENCE_PRISMA_EXPECTED_ERRORS: 'true',
     NODE_ENV: nodeEnv,
+    VALIDATION_TRACE_ID: traceId,
 };
 
 interface Step {
     name: string;
     command: string;
+    runOnHost: boolean;
 }
 
 async function checkIfRebuildNeeded(): Promise<string[]> {
@@ -153,33 +157,40 @@ async function checkIfRebuildNeeded(): Promise<string[]> {
 }
 
 const setupSteps: Step[] = FAST_MODE ? [
-    { name: 'Start Services', command: 'pnpm dev:up:structured' },
-    { name: 'Install Dependencies', command: 'pnpm dev:install' },
-    { name: 'Generate Prisma Client', command: 'pnpm prisma:generate' },
-    { name: 'Setup Database', command: 'pnpm prisma:setup' },
-    { name: 'Diagnose TypeScript', command: 'pnpm diagnose:ts' },
+    { name: 'Start Services for Testing', command: 'dev:up:test', runOnHost: true },
+    { name: 'Run Database Migrations', command: 'prisma:migrate:run', runOnHost: false },
+    { name: 'Seed Database', command: 'prisma:seed:run', runOnHost: false },
 ] : [
-    { name: 'Clean Docker Environment', command: 'pnpm dev:clean' },
-    { name: 'Build Docker Images', command: 'pnpm dev:build' },
-    { name: 'Start Services', command: 'pnpm dev:up' },
-    { name: 'Install Dependencies', command: 'pnpm dev:install' },
-    { name: 'Generate Prisma Client', command: 'pnpm prisma:generate' },
-    { name: 'Setup Database', command: 'pnpm prisma:setup' },
-    { name: 'Diagnose TypeScript', command: 'pnpm diagnose:ts' },
+    { name: 'Clean Docker Environment', command: 'dev:clean', runOnHost: true },
+    { name: 'Build Docker Images', command: 'dev:build', runOnHost: true },
+    { name: 'Start Services for Testing', command: 'dev:up:test', runOnHost: true },
+    { name: 'Run Database Migrations', command: 'prisma:migrate:run', runOnHost: false },
+    { name: 'Seed Database', command: 'prisma:seed:run', runOnHost: false },
 ];
 
 function formatDuration(duration: number): string {
     return `${(duration / 1000).toFixed(2)}s`;
 }
 
-async function runSetupStep(step: Step): Promise<number> {
-    logger.info(`Running: ${step.name}`);
+async function runStep(step: Step): Promise<number> {
+    logger.info(`Running: ${step.name}${step.runOnHost ? ' (on host)' : ' (in container)'}`);
     const startTime = Date.now();
 
     try {
-        await execa(step.command, { shell: true, stdio: 'inherit', env: baseEnv });
+        if (step.runOnHost) {
+            // Run on host via pnpm
+            await execa('pnpm', [step.command], { shell: true, stdio: 'inherit', env: baseEnv });
+        } else {
+            // Run in container via docker compose exec
+            const execInTest = `docker compose -f docker/docker-compose.yml exec -e VALIDATION_TRACE_ID=${traceId} test pnpm ${step.command}`;
+            const [file, ...args] = execInTest.split(' ');
+            await execa(file, args, { stdio: 'inherit', env: baseEnv });
+        }
+
         const endTime = Date.now();
-        return endTime - startTime;
+        const duration = endTime - startTime;
+        logger.info(`Completed: ${step.name} (${formatDuration(duration)})`);
+        return duration;
     } catch (error) {
         const endTime = Date.now();
         const duration = endTime - startTime;
@@ -196,20 +207,100 @@ async function runTestCommand(
     logger.info(`---> Running: ${title} (${command})...`);
 
     try {
-        // Just run the command as-is from package.json
-        await execa(command, { shell: true, stdio: 'inherit', env: baseEnv });
+        // Run test command in container via docker compose exec
+        const execInTest = `docker compose -f docker/docker-compose.yml exec -e VALIDATION_TRACE_ID=${traceId} test pnpm ${command}`;
+        const [file, ...args] = execInTest.split(' ');
+
+        // Capture output while also displaying it with colors
+        const result = await execa(file, args, {
+            env: baseEnv,
+            stdio: ['pipe', 'pipe', 'pipe'],
+            all: true
+        });
+
         const endTime = Date.now();
 
-        // For now, return a dummy test count since we're not generating JSON reports
-        // This could be enhanced later if needed
-        const testCount = 1; // Placeholder
+        // Display the output to console with original colors preserved FIRST
+        if (result.all) {
+            console.log(result.all);
+        } else {
+            if (result.stdout) console.log(result.stdout);
+            if (result.stderr) console.error(result.stderr);
+        }
+
+        // Parse test count from output
+        let testCount = 0;
+        const rawOutput = result.all || result.stdout + result.stderr;
+
+        // Strip ANSI color codes and control characters
+        const output = rawOutput.replace(/\x1b\[[0-9;]*m/g, '').replace(/\r/g, '');
+
+        if (command.includes('jest')) {
+            // Jest output format: "Tests:       133 passed, 133 total"
+            // More flexible pattern to handle colors and spacing
+            const jestMatch = output.match(/Tests:\s*\d+[^,]*,\s*(\d+)\s+total/);
+            if (jestMatch) {
+                testCount = parseInt(jestMatch[1], 10);
+            } else {
+                // Debug: show what we actually have
+                const testsLine = output.split('\n').find(line => line.includes('Tests:'));
+                logger.info(`🐛 DEBUG: No Jest match found. Tests line: "${testsLine}"`);
+            }
+        } else if (command.includes('playwright')) {
+            // Playwright output format: "  17 passed (7.6s)"
+            // More flexible pattern
+            const playwrightMatch = output.match(/(\d+)\s+passed\s*\([^)]+\)/);
+            if (playwrightMatch) {
+                testCount = parseInt(playwrightMatch[1], 10);
+            } else {
+                // Debug: show what we actually have
+                const passedLine = output.split('\n').find(line => line.includes('passed'));
+                logger.info(`🐛 DEBUG: No Playwright match found. Passed line: "${passedLine}"`);
+            }
+        }
+
+        logger.info(`🔍 Parsed ${testCount} tests from ${title} output (${output.length} chars)`)
 
         logger.info(`---> Finished: ${title} (Success)`);
         return { duration: endTime - startTime, failed: false, testCount };
-    } catch (error) {
+    } catch (error: any) {
         const endTime = Date.now();
+
+        // Display the output to console with original colors even when failed FIRST
+        if (error.all || error.stdout || error.stderr) {
+            if (error.all) {
+                console.log(error.all);
+            } else {
+                if (error.stdout) console.log(error.stdout);
+                if (error.stderr) console.error(error.stderr);
+            }
+        }
+
+        // Parse test count even from failed output
+        let testCount = 0;
+        if (error.all || error.stdout || error.stderr) {
+            const rawOutput = error.all || (error.stdout || '') + (error.stderr || '');
+
+            // Strip ANSI color codes and control characters
+            const output = rawOutput.replace(/\x1b\[[0-9;]*m/g, '').replace(/\r/g, '');
+
+            if (command.includes('jest')) {
+                const jestMatch = output.match(/Tests:\s*\d+[^,]*,\s*(\d+)\s+total/);
+                if (jestMatch) {
+                    testCount = parseInt(jestMatch[1], 10);
+                }
+            } else if (command.includes('playwright')) {
+                const playwrightMatch = output.match(/(\d+)\s+passed\s*\([^)]+\)/);
+                if (playwrightMatch) {
+                    testCount = parseInt(playwrightMatch[1], 10);
+                }
+            }
+
+            logger.info(`🔍 Parsed ${testCount} tests from ${title} output (${output.length} chars) [FAILED]`);
+        }
+
         logger.error(`---> Failed: ${title}`);
-        return { duration: endTime - startTime, failed: true, testCount: 0 };
+        return { duration: endTime - startTime, failed: true, testCount };
     }
 }
 
@@ -225,54 +316,47 @@ async function runTests(): Promise<{
     failed: boolean
 }> {
     try {
-        // Clean and create organized test results directories
-        logger.info('🧹 Organizing test results directories...');
-        try {
-            await execa('rm', ['-rf', 'tests/results/unit', 'tests/results/api', 'tests/results/e2e', 'tests/results/logs'], { shell: true });
-            await execa('mkdir', ['-p', 'tests/results/unit', 'tests/results/api', 'tests/results/e2e/screenshots', 'tests/results/logs'], { shell: true });
-        } catch (error) {
-            logger.warn('Could not clean test results directories (non-fatal):', error);
-        }
-
         // Run each test suite separately to get accurate timing and counts
         logger.info('🧪 Running test suites...');
 
-        // COMMENTED OUT: Run unit tests first
-        // const unitResult = await runTestCommand(
-        //     'NODE_ENV=test npm run test:unit:container',
-        //     'Unit Tests'
-        // );
-
-        // DEBUG: Log environment details before running logs test
-        logger.info('🐛 DEBUG: Environment details before logs test:');
+        // DEBUG: Log environment details before running tests
+        logger.info('🐛 DEBUG: Environment details before running tests:');
         logger.info(`   NODE_ENV: ${process.env.NODE_ENV}`);
         logger.info(`   Working directory: ${process.cwd()}`);
         logger.info(`   LOKI_URL: ${process.env.LOKI_URL}`);
-        logger.info(`   EXTERNAL_SERVER_URL: ${process.env.EXTERNAL_SERVER_URL}`);
-        logger.info(`   Command: NODE_ENV=test pnpm test:logs:container`);
+        logger.info(`   VITE_API_BASE_URL: ${process.env.VITE_API_BASE_URL}`);
+        logger.info(`   VALIDATION_TRACE_ID: ${traceId}`);
 
-        // Run logs tests - ISOLATED FOR DEBUGGING
-        const logsResult = await runTestCommand(
-            'NODE_ENV=test pnpm test:logs:container',
-            'Logs Tests'
+        // Run unit tests
+        const unitResult = await runTestCommand(
+            'test:unit:run',
+            'Unit Tests'
         );
 
-        // COMMENTED OUT: Run remaining test suites
+        // // Run API tests
         // const apiResult = await runTestCommand(
-        //     'NODE_ENV=test npm run test:api:container',
+        //     'test:api:run',
         //     'API Tests'
         // );
+
+        // // Run E2E tests
         // const e2eResult = await runTestCommand(
-        //     'NODE_ENV=test npm run test:e2e:container',
+        //     'test:e2e:run',
         //     'E2E Tests'
         // );
 
-        // Use dummy values for commented out tests
-        const unitResult = { duration: 0, failed: false, testCount: 0 };
+        // // Run logs tests
+        // const logsResult = await runTestCommand(
+        //     'test:logs:run',
+        //     'Logs Tests'
+        // );
+
+        // Dummy results for commented out tests
         const apiResult = { duration: 0, failed: false, testCount: 0 };
         const e2eResult = { duration: 0, failed: false, testCount: 0 };
+        const logsResult = { duration: 0, failed: false, testCount: 0 };
 
-        const failed = logsResult.failed; // Only check logs test failure
+        const failed = unitResult.failed || apiResult.failed || e2eResult.failed || logsResult.failed;
 
         return {
             unitTime: unitResult.duration,
@@ -302,178 +386,212 @@ async function runTests(): Promise<{
 }
 
 async function main() {
-    const modeText = FAST_MODE ? '🚀 Fast Docker Validation' : '🚀 Full Docker Validation';
-    logger.info(`Starting ${modeText} process for ${nodeEnv.toUpperCase()} environment...`);
+    logger.info(`Starting 🚀 Full Docker Validation process for ${nodeEnv.toUpperCase()} environment...`);
     logger.info(`Environment file: ${envFilePath}`);
+    logger.info(`Validation trace ID: ${traceId}`);
+    logger.info(`Fast mode: ${FAST_MODE ? 'enabled' : 'disabled'}`);
 
-    // Initialize tracking variables
-    const setupTimings: { name: string; duration: number }[] = [];
-    let setupTime = 0;
-    let testResults = {
-        unitTime: 0,
-        apiTime: 0,
-        e2eTime: 0,
-        logsTime: 0,
-        unitCount: 0,
-        apiCount: 0,
-        e2eCount: 0,
-        logsCount: 0,
-        failed: false
+    const timing: ValidationTiming = {
+        schemaVersion: '1.0.0',
+        service: 'lessons-marketplace',
+        component: 'devops-logs',
+        environment: nodeEnv.toUpperCase() as 'DEVELOPMENT' | 'TEST' | 'PRODUCTION',
+        mode: FAST_MODE ? 'fast' : 'full',
+        success: false,
+        totalExecutionTimeMs: 0,
+        totalSetupTimeMs: 0,
+        totalTestTimeMs: 0,
+        totalTestCount: 0,
+        failureReason: '',
+        failureStage: '',
+        setupSteps: {
+            cleanDockerMs: null,
+            buildImagesMs: null,
+            startServicesMs: null,
+            installDepsMs: null,
+            generatePrismaMs: null,
+            setupDatabaseMs: null,
+            diagnoseTypescriptMs: null
+        },
+        testSuites: {
+            unitTestsMs: null,
+            apiTestsMs: null,
+            e2eTestsMs: null,
+            logsTestsMs: null
+        },
+        testCounts: {
+            unitTestCount: null,
+            apiTestCount: null,
+            e2eTestCount: null,
+            logsTestCount: null
+        },
+        performance: {
+            setupTimeSeconds: 0,
+            testTimeSeconds: 0,
+            totalTimeSeconds: 0,
+            setupPercentage: 0,
+            testPercentage: 0
+        }
     };
-    let totalTime = 0;
-    let validationSuccess = false;
-    let failureReason = '';
-    let failureStage = '';
+
+    const startTime = Date.now();
 
     try {
-        // Check if rebuild is needed when in fast mode
-        if (FAST_MODE) {
-            const rebuildReasons = await checkIfRebuildNeeded();
-            if (rebuildReasons.length > 0) {
-                logger.warn('⚠️  Consider running full validation (without --fast) because:');
-                rebuildReasons.forEach(reason => {
-                    logger.warn(`   • ${reason}`);
-                });
-                logger.warn(`   Run: pnpm validate:full --env=${nodeEnv} (without --fast)`);
-            } else {
-                logger.info('✅ Fast mode: Using existing Docker images');
-            }
-        }
-
-        // Run setup steps
-        failureStage = 'setup';
+        // Run setup steps and track timing
+        logger.info('🏗️  Running setup steps...');
         for (const step of setupSteps) {
-            const duration = await runSetupStep(step);
-            setupTimings.push({ name: step.name, duration });
-            setupTime += duration;
-        }
+            const duration = await runStep(step);
 
-        // Run tests
-        failureStage = 'testing';
-        testResults = await runTests();
-        const testTime = testResults.unitTime + testResults.apiTime + testResults.e2eTime + testResults.logsTime;
-        totalTime = setupTime + testTime;
-
-        if (testResults.failed) {
-            validationSuccess = false;
-            failureReason = 'Test suite failures';
-            failureStage = 'testing';
-        } else {
-            validationSuccess = true;
-            failureStage = 'completed';
-        }
-
-        // Print timing report
-        const reportTitle = FAST_MODE ?
-            `🚀 Fast Docker Validation Timing Report (${nodeEnv.toUpperCase()})` :
-            `🚀 Full Docker Validation Timing Report (${nodeEnv.toUpperCase()})`;
-        logger.info(`=== ${reportTitle} ===`);
-
-        // Setup steps
-        logger.info('📋 Setup Steps:');
-        setupTimings.forEach(({ name, duration }) => {
-            logger.info(`   ${name.padEnd(25)} ${formatDuration(duration).padStart(8)}`);
-        });
-        logger.info(`   ${'TOTAL SETUP TIME'.padEnd(25)} ${formatDuration(setupTime).padStart(8)}`);
-
-        // Test execution
-        logger.info('🧪 Test Execution:');
-        logger.info(`   ${'Unit Tests'.padEnd(25)} ${formatDuration(testResults.unitTime).padStart(8)} (${testResults.unitCount} tests)`);
-        logger.info(`   ${'API Tests'.padEnd(25)} ${formatDuration(testResults.apiTime).padStart(8)} (${testResults.apiCount} tests)`);
-        logger.info(`   ${'Logs Tests'.padEnd(25)} ${formatDuration(testResults.logsTime).padStart(8)} (${testResults.logsCount} tests)`);
-        logger.info(`   ${'E2E Tests'.padEnd(25)} ${formatDuration(testResults.e2eTime).padStart(8)} (${testResults.e2eCount} tests)`);
-        logger.info(`   ${'TOTAL TEST TIME'.padEnd(25)} ${formatDuration(testTime).padStart(8)}`);
-
-        // Calculate total test count dynamically
-        const totalTestCount = testResults.unitCount + testResults.apiCount + testResults.e2eCount + testResults.logsCount;
-
-        // Overall summary
-        logger.info('📊 Overall Summary:');
-        logger.info(`   ${'Environment'.padEnd(25)} ${nodeEnv.toUpperCase().padStart(8)}`);
-        logger.info(`   ${'Total Execution Time'.padEnd(25)} ${formatDuration(totalTime).padStart(8)}`);
-        logger.info(`   ${'Test Count'.padEnd(25)} ${`${totalTestCount} tests`.padStart(8)}`);
-        logger.info(`   ${'Success Rate'.padEnd(25)} ${(testResults.failed ? '❌ FAILED' : '✅ 100%').padStart(8)}`);
-
-        if (FAST_MODE) {
-            logger.info(`   ${'Mode'.padEnd(25)} ${'⚡ FAST'.padStart(8)}`);
-        }
-
-    } catch (error: any) {
-        validationSuccess = false;
-        failureReason = error.message || 'Unknown error';
-        totalTime = setupTime + (testResults.unitTime + testResults.apiTime + testResults.e2eTime + testResults.logsTime);
-
-        logger.error(`❌ ${modeText} failed during ${failureStage} stage: ${failureReason}`);
-    } finally {
-        // Always log structured timing data for Grafana visualization, even on failure
-        const testTime = testResults.unitTime + testResults.apiTime + testResults.e2eTime + testResults.logsTime;
-        const totalTestCount = testResults.unitCount + testResults.apiCount + testResults.e2eCount + testResults.logsCount;
-        const rawValidationTiming = {
-            schemaVersion: '1.0.0' as const,
-            service: 'lessons-marketplace',
-            component: 'devops-logs',
-            environment: nodeEnv.toUpperCase() as 'DEVELOPMENT' | 'TEST' | 'PRODUCTION',
-            mode: FAST_MODE ? 'fast' : 'full',
-            success: validationSuccess,
-            totalExecutionTimeMs: totalTime,
-            totalSetupTimeMs: setupTime,
-            totalTestTimeMs: testTime,
-            totalTestCount: totalTestCount,
-            failureReason: failureReason || '',
-            failureStage: failureStage || '',
-            setupSteps: {
-                cleanDockerMs: setupTimings.find(s => s.name === 'Clean Docker Environment')?.duration || null,
-                buildImagesMs: setupTimings.find(s => s.name === 'Build Docker Images')?.duration || null,
-                startServicesMs: setupTimings.find(s => s.name === 'Start Services')?.duration || null,
-                installDepsMs: setupTimings.find(s => s.name === 'Install Dependencies')?.duration || null,
-                generatePrismaMs: setupTimings.find(s => s.name === 'Generate Prisma Client')?.duration || null,
-                setupDatabaseMs: setupTimings.find(s => s.name === 'Setup Database')?.duration || null,
-                diagnoseTypescriptMs: setupTimings.find(s => s.name === 'Diagnose TypeScript')?.duration || null,
-            },
-            testSuites: {
-                unitTestsMs: testResults.unitTime || null,
-                apiTestsMs: testResults.apiTime || null,
-                e2eTestsMs: testResults.e2eTime || null,
-                logsTestsMs: testResults.logsTime || null,
-            },
-            testCounts: {
-                unitTestCount: testResults.unitCount || null,
-                apiTestCount: testResults.apiCount || null,
-                e2eTestCount: testResults.e2eCount || null,
-                logsTestCount: testResults.logsCount || null,
-            },
-            performance: {
-                setupTimeSeconds: Math.round((setupTime / 1000) * 100) / 100,
-                testTimeSeconds: Math.round((testTime / 1000) * 100) / 100,
-                totalTimeSeconds: Math.round((totalTime / 1000) * 100) / 100,
-                setupPercentage: Math.round((setupTime / totalTime) * 100 * 100) / 100,
-                testPercentage: Math.round((testTime / totalTime) * 100 * 100) / 100,
+            // Map step names to timing fields
+            switch (step.name) {
+                case 'Clean Docker Environment':
+                    timing.setupSteps.cleanDockerMs = duration;
+                    break;
+                case 'Build Docker Images':
+                    timing.setupSteps.buildImagesMs = duration;
+                    break;
+                case 'Start Services for Testing':
+                    timing.setupSteps.startServicesMs = duration;
+                    break;
+                case 'Run Database Migrations':
+                    timing.setupSteps.setupDatabaseMs = duration;
+                    break;
+                case 'Seed Database':
+                    // Map seeding to a setup step (we can use one of the existing fields)
+                    if (!timing.setupSteps.generatePrismaMs) {
+                        timing.setupSteps.generatePrismaMs = duration;
+                    }
+                    break;
             }
+        }
+
+        // Run tests and track timing
+        const testResults = await runTests();
+        timing.testSuites = {
+            unitTestsMs: testResults.unitTime,
+            apiTestsMs: testResults.apiTime,
+            e2eTestsMs: testResults.e2eTime,
+            logsTestsMs: testResults.logsTime
+        };
+        timing.testCounts = {
+            unitTestCount: testResults.unitCount,
+            apiTestCount: testResults.apiCount,
+            e2eTestCount: testResults.e2eCount,
+            logsTestCount: testResults.logsCount
         };
 
-        // Validate the structured data before logging
-        const validationResult = safeValidateValidationTiming(rawValidationTiming);
-        if (validationResult.success) {
-            logger.info(validationResult.data, `Validation timing data (schema v${validationResult.version})`);
-        } else {
-            logger.error({ error: validationResult.error }, 'Failed to validate timing data structure - logging raw data');
-            logger.info(rawValidationTiming, 'Raw validation timing data (unvalidated)');
+        // Calculate total times
+        const endTime = Date.now();
+        timing.totalExecutionTimeMs = endTime - startTime;
+        timing.totalSetupTimeMs = Object.values(timing.setupSteps).reduce((sum: number, ms) => sum + (ms ?? 0), 0);
+        timing.totalTestTimeMs = Object.values(timing.testSuites).reduce((sum: number, ms) => sum + (ms ?? 0), 0);
+        timing.totalTestCount = Object.values(timing.testCounts).reduce((sum: number, count) => sum + (count ?? 0), 0);
+
+        // Calculate performance metrics
+        timing.performance = {
+            setupTimeSeconds: timing.totalSetupTimeMs / 1000,
+            testTimeSeconds: timing.totalTestTimeMs / 1000,
+            totalTimeSeconds: timing.totalExecutionTimeMs / 1000,
+            setupPercentage: (timing.totalSetupTimeMs / timing.totalExecutionTimeMs) * 100,
+            testPercentage: (timing.totalTestTimeMs / timing.totalExecutionTimeMs) * 100
+        };
+
+        timing.success = !testResults.failed;
+
+        // Print clean terminal report
+        console.log('\n' + '='.repeat(80));
+        console.log(`🚀 ${FAST_MODE ? 'FAST' : 'FULL'} DOCKER VALIDATION REPORT - ${nodeEnv.toUpperCase()} ENVIRONMENT`);
+        console.log('='.repeat(80));
+
+        // Setup steps
+        console.log('\n📋 SETUP STEPS:');
+        console.log('-'.repeat(50));
+        for (const step of setupSteps) {
+            let duration: number | null = null;
+            switch (step.name) {
+                case 'Clean Docker Environment':
+                    duration = timing.setupSteps.cleanDockerMs;
+                    break;
+                case 'Build Docker Images':
+                    duration = timing.setupSteps.buildImagesMs;
+                    break;
+                case 'Start Services for Testing':
+                    duration = timing.setupSteps.startServicesMs;
+                    break;
+                case 'Run Database Migrations':
+                    duration = timing.setupSteps.setupDatabaseMs;
+                    break;
+                case 'Seed Database':
+                    duration = timing.setupSteps.generatePrismaMs;
+                    break;
+            }
+            console.log(`  ${step.name.padEnd(30)} ${formatDuration(duration ?? 0).padStart(10)}`);
+        }
+        console.log(`  ${''.padEnd(30)} ${'-'.repeat(10)}`);
+        console.log(`  ${'TOTAL SETUP TIME'.padEnd(30)} ${formatDuration(timing.totalSetupTimeMs).padStart(10)}`);
+
+        // Test execution
+        console.log('\n🧪 TEST EXECUTION:');
+        console.log('-'.repeat(50));
+        const testSummary = [
+            { name: 'Unit Tests', time: timing.testSuites.unitTestsMs ?? 0, count: timing.testCounts.unitTestCount ?? 0 },
+            { name: 'API Tests', time: timing.testSuites.apiTestsMs ?? 0, count: timing.testCounts.apiTestCount ?? 0 },
+            { name: 'E2E Tests', time: timing.testSuites.e2eTestsMs ?? 0, count: timing.testCounts.e2eTestCount ?? 0 },
+            { name: 'Logs Tests', time: timing.testSuites.logsTestsMs ?? 0, count: timing.testCounts.logsTestCount ?? 0 }
+        ];
+
+        for (const test of testSummary) {
+            const testInfo = `(${test.count} tests)`;
+            console.log(`  ${test.name.padEnd(20)} ${formatDuration(test.time).padStart(10)} ${testInfo.padStart(12)}`);
+        }
+        console.log(`  ${''.padEnd(20)} ${'-'.repeat(10)} ${'-'.repeat(12)}`);
+        console.log(`  ${'TOTAL TEST TIME'.padEnd(20)} ${formatDuration(timing.totalTestTimeMs).padStart(10)} ${`(${timing.totalTestCount} tests)`.padStart(12)}`);
+
+        // Overall summary
+        console.log('\n📊 FINAL SUMMARY:');
+        console.log('-'.repeat(50));
+        console.log(`  Environment:           ${nodeEnv.toUpperCase()}`);
+        console.log(`  Mode:                  ${FAST_MODE ? '⚡ FAST' : '🔄 FULL'}`);
+        console.log(`  Total Execution Time:  ${formatDuration(timing.totalExecutionTimeMs)}`);
+        console.log(`  Setup Time:            ${formatDuration(timing.totalSetupTimeMs)} (${(timing.performance.setupPercentage).toFixed(1)}%)`);
+        console.log(`  Test Time:             ${formatDuration(timing.totalTestTimeMs)} (${(timing.performance.testPercentage).toFixed(1)}%)`);
+        console.log(`  Success Rate:          ${timing.success ? '✅ 100% - ALL TESTS PASSED' : '❌ FAILED'}`);
+        console.log(`  Trace ID:              ${traceId}`);
+        console.log('='.repeat(80) + '\n');
+
+        if (!timing.success) {
+            timing.failureReason = 'One or more test suites failed';
+            timing.failureStage = 'test';
         }
 
-        // Cleanup
-        logger.info('🧹 Cleaning up Docker environment...');
-        try {
-            await execa('pnpm dev:down', { shell: true, stdio: 'inherit', env: baseEnv });
-        } catch (error) {
-            logger.warn('Cleanup warning (non-fatal):', error);
-        }
+    } catch (error) {
+        const endTime = Date.now();
+        timing.totalExecutionTimeMs = endTime - startTime;
+        timing.failureReason = error instanceof Error ? error.message : 'Unknown error';
+        timing.failureStage = 'setup';
+        logger.error(`❌ 🚀 Full Docker Validation failed for ${nodeEnv.toUpperCase()} environment.`);
+        logger.error('Error details:', error);
+    }
 
-        if (!validationSuccess) {
-            logger.error(`❌ ${modeText} failed for ${nodeEnv.toUpperCase()} environment.`);
-            process.exit(1);
-        } else {
-            logger.info(`✅ ${modeText} completed successfully for ${nodeEnv.toUpperCase()} environment!`);
-        }
+    // Log timing data
+    logger.info('Raw validation timing data (unvalidated)', timing);
+
+    // Validate timing data structure
+    const validationResult = safeValidateValidationTiming(timing);
+    if (!validationResult.success) {
+        logger.error('Failed to validate timing data structure - logging raw data', validationResult.error);
+    }
+
+    // Cleanup
+    logger.info('🧹 Cleaning up Docker environment...');
+    try {
+        await execa('pnpm', ['dev:down'], { shell: true, stdio: 'inherit', env: baseEnv });
+    } catch (error) {
+        logger.warn('Cleanup warning (non-fatal):', error);
+    }
+
+    if (!timing.success) {
+        process.exit(1);
     }
 }
 

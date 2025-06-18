@@ -57,7 +57,7 @@ fi
 
 # Generate Prisma client
 log "=== GENERATING PRISMA CLIENT ==="
-NODE_ENV=$NODE_ENV pnpm prisma:generate
+NODE_ENV=$NODE_ENV pnpm prisma:generate:run
 GENERATE_EXIT_CODE=$?
 if [ $GENERATE_EXIT_CODE -ne 0 ]; then
   log "ERROR: Prisma client generation failed with exit code $GENERATE_EXIT_CODE"
@@ -67,7 +67,7 @@ fi
 
 # Run database migrations
 log "=== RUNNING DATABASE MIGRATIONS ==="
-NODE_ENV=$NODE_ENV pnpm prisma:migrate
+NODE_ENV=$NODE_ENV pnpm prisma:migrate:run
 MIGRATE_EXIT_CODE=$?
 if [ $MIGRATE_EXIT_CODE -ne 0 ]; then
   log "ERROR: Database migrations failed with exit code $MIGRATE_EXIT_CODE"
@@ -76,7 +76,7 @@ else
 fi
 
 log "=== RUNNING DATABASE SEED ==="
-NODE_ENV=$NODE_ENV pnpm prisma:seed
+NODE_ENV=$NODE_ENV pnpm prisma:seed:run
 SEED_EXIT_CODE=$?
 if [ $SEED_EXIT_CODE -ne 0 ]; then
   log "ERROR: Database seed failed with exit code $SEED_EXIT_CODE"

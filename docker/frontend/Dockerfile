@@ -1,63 +1,49 @@
-FROM node:20-slim AS base
+# Build arguments for version consistency
+ARG NODE_VERSION
+ARG PNPM_VERSION
 
-# Set working directory
+FROM node:${NODE_VERSION}-slim
+
 WORKDIR /app
 
-# Copy the entire codebase to have access to all files early in the build process
-COPY . .
-
-# Install dependencies
-FROM base AS dependencies
-RUN npm install -g pnpm
-# Install OpenSSL which is required for Prisma
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     openssl \
     ca-certificates \
     curl \
+    build-essential \
+    python3 \
+    make \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Verify OpenSSL installation and configure for Prisma
-RUN openssl version && \
-    mkdir -p /etc/ssl && \
-    echo "OpenSSL configured for Prisma"
+# Enable pnpm via corepack and use version from build arg
+RUN corepack enable
+RUN corepack use pnpm@${PNPM_VERSION}
 
-RUN pnpm install --frozen-lockfile
-
-# Build stage
-FROM dependencies AS builder
-# Make environment variables available during build
-ARG VITE_API_BASE_URL
-ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+# Copy package files and install dependencies
+COPY package.json pnpm-lock.yaml ./
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store pnpm install --frozen-lockfile
 
 # Copy prisma schema for client generation
 COPY server/prisma ./server/prisma
-RUN pnpm prisma:generate
+RUN pnpm prisma:generate:run
 
-# Build shared first since frontend may depend on it
-RUN pnpm build:shared
+# Copy tsconfig for TypeScript compilation
+COPY tsconfig.json ./
 
-# Pass the environment variable explicitly to the build command
-RUN pnpm build:frontend
+# Copy config directory for any frontend configs
+COPY config ./config
 
-# Production image
-FROM nginx:alpine
+# Copy scripts directory for diagnostic tools
+COPY scripts ./scripts
 
-# Install curl for healthchecks and openssl for runtime
-RUN apk add --no-cache curl openssl
+# Copy source directories for development
+COPY frontend ./frontend
+COPY shared ./shared
 
-# Remove default nginx configuration and create log directory
-RUN rm -rf /etc/nginx/conf.d/* && \
-    mkdir -p /var/log/nginx && \
-    chown -R nginx:nginx /var/log/nginx
+# Expose port for Vite dev server
+EXPOSE 5173
 
-# Copy CI nginx configuration template for Docker environment
-COPY frontend/config/nginx/nginx.ci.conf /etc/nginx/templates/default.conf.template
-
-# Copy built files from builder stage
-COPY --from=builder /app/dist/frontend /usr/share/nginx/html
-
-# Expose port 80
-EXPOSE 80
-
-# Process template and start nginx
-CMD ["/bin/sh", "-c", "envsubst '${VITE_API_BASE_URL} ${NODE_ENV}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'env NODE_ENV;' -g 'daemon off;'"] 
+# Development command with hot reload
+CMD ["pnpm", "dev:frontend"] 

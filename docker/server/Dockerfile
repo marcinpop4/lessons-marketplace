@@ -1,92 +1,55 @@
-FROM node:20-slim AS base
+# Build arguments for version consistency
+ARG NODE_VERSION
+ARG PNPM_VERSION
 
-# Set working directory
+FROM node:${NODE_VERSION}-slim
+
 WORKDIR /app
 
-# Set default NODE_ENV if not provided at build time
-ARG NODE_ENV=test
-ENV NODE_ENV=${NODE_ENV}
-
-# Install dependencies
-FROM base AS dependencies
-
-# Install OpenSSL and other required packages
-RUN apt-get update && apt-get install -y \
-    openssl \
-    ca-certificates \
-    curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && openssl version \
-    && mkdir -p /etc/ssl
-
-# Install pnpm globally
-RUN npm install -g pnpm
-
-# Copy package files and install dependencies
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
-
-# Copy application code
-COPY . .
-
-# Generate Prisma client before any builds
-RUN pnpm prisma:generate
-
-# Build stage
-FROM dependencies AS builder
-# Build shared code first
-RUN pnpm build:shared
-
-# Build server
-RUN pnpm build:server
-
-# Production image
-FROM base AS runner
-
-# Install required system packages
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     openssl \
     ca-certificates \
     curl \
     postgresql-client \
+    build-essential \
+    python3 \
+    make \
+    g++ \
     && rm -rf /var/lib/apt/lists/* \
     && openssl version \
     && mkdir -p /etc/ssl
 
-# Install pnpm globally
-RUN npm install -g pnpm
+# Enable pnpm via corepack and use version from build arg
+RUN corepack enable
+RUN corepack use pnpm@${PNPM_VERSION}
 
-# Copy package files
+# Copy package files and install dependencies
 COPY package.json pnpm-lock.yaml ./
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store pnpm install --frozen-lockfile
 
-# Install production dependencies including ts-node and tsconfig-paths
-RUN pnpm install --prod --frozen-lockfile
+# Copy prisma schema for client generation
+COPY server/prisma ./server/prisma
+RUN pnpm prisma:generate:run
 
-# Copy node_modules from dependencies stage
-COPY --from=dependencies /app/node_modules ./node_modules
-
-# Copy .pnpm directory to ensure Prisma client is available
-COPY --from=dependencies /app/node_modules/.pnpm ./node_modules/.pnpm
-
-# Copy Prisma schema
-COPY --from=dependencies /app/server/prisma ./server/prisma
-
-# Copy tsconfig.json for path resolution
+# Copy tsconfig for TypeScript compilation
 COPY tsconfig.json ./
 
-# Copy other necessary files
-COPY env ./env
+# Copy config directory for logger and other configs
+COPY config ./config
 
-# Copy entrypoint script
-COPY docker/server/server-entrypoint.sh /usr/local/bin/server-entrypoint.sh
-RUN chmod +x /usr/local/bin/server-entrypoint.sh
+# Copy scripts directory for diagnostic tools
+COPY scripts ./scripts
 
-# Copy built application
-COPY --from=builder /app/dist ./dist
+# Copy source directories for development
+COPY server ./server
+COPY shared ./shared
 
-# Expose the port the app runs on
-EXPOSE ${PORT:-3000}
+# Create logs directory
+RUN mkdir -p logs
 
-# Set entrypoint script
-ENTRYPOINT ["server-entrypoint.sh"]
-CMD ["pnpm", "start"]
+# Expose port
+EXPOSE 3000
+
+# Development command with hot reload
+CMD ["pnpm", "dev:server"] 

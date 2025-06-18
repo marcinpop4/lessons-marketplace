@@ -38,7 +38,12 @@ async function runE2ETests() {
         // 4. Run E2E Tests
         const testResult = await runPnpmScript('test:e2e');
         finalExitCode = testResult.code ?? 1; // Capture exit code
-        console.log('\n✅ E2E tests completed successfully.');
+
+        if (finalExitCode === 0) {
+            console.log('\n✅ E2E tests completed successfully.');
+        } else {
+            console.error('\n❌ E2E tests failed with exit code:', finalExitCode);
+        }
 
     } catch (error) {
         console.error('\n❌ E2E tests failed:', error);
