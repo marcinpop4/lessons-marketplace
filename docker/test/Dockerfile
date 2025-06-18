@@ -1,6 +1,6 @@
 # Build arguments for version consistency
-ARG NODE_VERSION
-ARG PNPM_VERSION
+ARG NODE_VERSION=23.10.0
+ARG PNPM_VERSION=10.11.1
 
 # Use Node.js version from build arg to match host environment
 FROM node:${NODE_VERSION}-bookworm
@@ -8,6 +8,12 @@ FROM node:${NODE_VERSION}-bookworm
 # Re-declare build args after FROM (they don't persist across FROM)
 ARG NODE_VERSION
 ARG PNPM_VERSION
+
+# Debug: Print build arguments to verify they're being passed correctly
+RUN echo "=== BUILD ARGS DEBUG ==="
+RUN echo "NODE_VERSION: ${NODE_VERSION}"
+RUN echo "PNPM_VERSION: ${PNPM_VERSION}"
+RUN echo "========================="
 
 # Set working directory
 WORKDIR /app

@@ -1,6 +1,6 @@
 # Build arguments for version consistency
-ARG NODE_VERSION
-ARG PNPM_VERSION
+ARG NODE_VERSION=23.10.0
+ARG PNPM_VERSION=10.11.1
 
 FROM node:${NODE_VERSION}-slim
 
